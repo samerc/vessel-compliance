@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, QuotationPIAlternative } from '../../../../shared/types'
+import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, QuotationPIAlternative, QuotationVessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
+import VesselScopeChips from '../VesselScopeChips'
 
 const DEADLINE_PRESETS = [
     'prior inception',
@@ -13,7 +14,7 @@ const DEADLINE_PRESETS = [
     'prior drydocking',
 ]
 
-export default function SurveyWarrantiesTab({ quotation, showSuccess, showError, piAlternatives = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[] }) {
+export default function SurveyWarrantiesTab({ quotation, showSuccess, showError, piAlternatives = [], qVessels = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; qVessels?: QuotationVessel[] }) {
     const [items, setItems] = useState<QuotationSurveyWarranty[]>([])
     const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
     const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
@@ -106,6 +107,13 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
         try {
             await window.api.quotationSurveyWarrantyDelete(id)
             setItems(prev => prev.filter(i => i.id !== id))
+        } catch (e: any) { showError(e.message) }
+    }
+
+    const updateItemVesselScope = async (id: string, scope: string[] | null) => {
+        try {
+            await window.api.quotationSurveyWarrantyUpdate(id, { vesselScope: scope } as any)
+            setItems(prev => prev.map(i => i.id === id ? { ...i, vesselScope: scope } : i))
         } catch (e: any) { showError(e.message) }
     }
 
@@ -311,7 +319,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                                 <button onClick={() => deleteItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '1px', marginTop: '4px' }}><Trash2 size={14} /></button>
                             </div>
                         </div>
-                        <div style={{ paddingLeft: '12px' }}>
+                        <div style={{ paddingLeft: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {qVessels.length >= 2 && <VesselScopeChips vessels={qVessels} vesselScope={item.vesselScope || null} onChange={scope => updateItemVesselScope(item.id, scope)} />}
                             <AlternativeScopeChips alternatives={piAlternatives} currentAltId={item.alternativeId || null} onChangeAltId={altId => updateItemAltId(item.id, altId)} />
                         </div>
                     </div>

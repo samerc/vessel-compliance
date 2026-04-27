@@ -1297,7 +1297,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 {activeTab === 'trading' && <TradingTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} />}
                 {activeTab === 'warTrading' && <WarTradingTab quotation={q} updateField={updateField} setQ={setQ} />}
                 {activeTab === 'warranties' && <WarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
-                {activeTab === 'surveyWarranties' && <SurveyWarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} />}
+                {activeTab === 'surveyWarranties' && <SurveyWarrantiesTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} qVessels={qVessels} />}
                 {activeTab === 'deductibles' && <DeductiblesTab quotation={q} showSuccess={showSuccess} showError={showError} isLight={isLight} updateField={updateField} setQ={setQ} getEffectiveText={getEffectiveText} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
                 {activeTab === 'exclusions' && <ExclusionsTab quotation={q} showSuccess={showSuccess} showError={showError} piAlternatives={piAlternatives} selectedPIAltId={selectedPIAltId} />}
                 {activeTab === 'sanctions' && <SanctionsTab quotation={q} updateField={updateField} setQ={setQ} sanctionsVersions={sanctionsVersions} />}

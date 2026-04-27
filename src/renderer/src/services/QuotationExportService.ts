@@ -352,15 +352,22 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
     hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
-    surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => ({
-      ...sw,
-      text: (sw.text || '')
-        .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
+    surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => {
+      let resolved = (sw.text || '')
         .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
         .replace(/\{event\}/g, sw.eventValue || '{event}')
         .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
         .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
-    })),
+      // Handle {days}: when 0, replace "within 0 days of inception" → "prior inception"
+      if (sw.daysValue != null) {
+        const days = String(sw.daysValue)
+        resolved = resolved.replace(/\{days\}/g, days)
+        if (days === '0') {
+          resolved = resolved.replace(/within 0 days of inception/gi, 'prior inception')
+        }
+      }
+      return { ...sw, text: resolved }
+    }),
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: resolvedAllWarConditions,
     warSettings: resolvedWarSettings,
