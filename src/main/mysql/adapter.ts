@@ -7958,6 +7958,7 @@ export class MySQLAdapter {
             outstandingPremiumText: r.outstandingPremiumText || null,
             outstandingPremiumBold: r.outstandingPremiumBold != null ? Boolean(r.outstandingPremiumBold) : true,
             outstandingPremiumUnderline: r.outstandingPremiumUnderline != null ? Boolean(r.outstandingPremiumUnderline) : true,
+            subjectivityDays: r.subjectivityDays != null ? Number(r.subjectivityDays) : 0,
         } as Quotation
     }
 
