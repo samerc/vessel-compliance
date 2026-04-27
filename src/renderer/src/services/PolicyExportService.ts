@@ -2378,7 +2378,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     if (polSubjIntro) {
       const psDays = data.subjectivityDays ?? 7
       const psTiming = psDays === 0 ? 'prior inception' : `within ${psDays} days`
-      subjContent.push(...polMp(polSubjIntro.replace(/\{subjectivity_days\}/g, psTiming)))
+      let psIntroFixed = polSubjIntro
+      if (psIntroFixed.includes('{subjectivity_days}')) {
+        psIntroFixed = psIntroFixed.replace(/\{subjectivity_days\}/g, psTiming)
+      } else {
+        psIntroFixed = psIntroFixed.replace(/within \d+ days?\s*(of|prior)?\s*inception/i, psTiming)
+                                   .replace(/prior\s+inception/i, psTiming)
+      }
+      subjContent.push(...polMp(psIntroFixed))
     }
     for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }

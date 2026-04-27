@@ -1770,7 +1770,13 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       let introText = stripHtml(subjIntro)
       const subjDays = data.subjectivityDays ?? 0
       const subjTiming = subjDays === 0 ? 'prior inception' : `within ${subjDays} days`
-      introText = introText.replace(/\{subjectivity_days\}/g, subjTiming)
+      // Replace placeholder if present, otherwise replace hardcoded timing in old saved text
+      if (introText.includes('{subjectivity_days}')) {
+        introText = introText.replace(/\{subjectivity_days\}/g, subjTiming)
+      } else {
+        introText = introText.replace(/within \d+ days?\s*(of|prior)?\s*inception/i, subjTiming)
+                             .replace(/prior\s+inception/i, subjTiming)
+      }
       subjText += introText + '\n\n'
     }
     for (const s of data.subjectivities) { const sScope = vesselScopeSuffix(s.vesselScope, data.quotationVessels); subjText += `- ${s.text}${sScope}\n` }
@@ -3857,7 +3863,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (subjIntroDocx) {
       const sDays = data.subjectivityDays ?? 0
       const sTiming = sDays === 0 ? 'prior inception' : `within ${sDays} days`
-      subjContent.push(...mp(subjIntroDocx.replace(/\{subjectivity_days\}/g, sTiming)))
+      let sIntroFixed = subjIntroDocx
+      if (sIntroFixed.includes('{subjectivity_days}')) {
+        sIntroFixed = sIntroFixed.replace(/\{subjectivity_days\}/g, sTiming)
+      } else {
+        sIntroFixed = sIntroFixed.replace(/within \d+ days?\s*(of|prior)?\s*inception/i, sTiming)
+                                 .replace(/prior\s+inception/i, sTiming)
+      }
+      subjContent.push(...mp(sIntroFixed))
     }
     for (const s of data.subjectivities) {
       const isNewSubj = origData && s.piSubjectivityId && !origSubjectivityPiIds.has(s.piSubjectivityId)
