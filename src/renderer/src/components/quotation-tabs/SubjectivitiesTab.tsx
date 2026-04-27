@@ -369,7 +369,19 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
             {/* Master picker dropdown */}
             {showMasterPicker && availableMasters.length > 0 && (
                 <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0, 210, 255, 0.05)' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Select from master list:</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Select from master list:</span>
+                        <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }} onClick={async () => {
+                            for (const m of availableMasters) {
+                                if (items.some(i => i.piSubjectivityId === m.id)) continue
+                                await window.api.addQuotationSubjectivity({ quotationId: quotation.id, piSubjectivityId: m.id, text: m.text, order: items.length })
+                            }
+                            showSuccess('All subjectivities added')
+                            loadData()
+                            setShowMasterPicker(false)
+                        }}>Select All</button>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{availableMasters.length} available</span>
+                    </div>
                     {availableMasters.map(m => (
                         <div key={m.id} onClick={() => { handleAddFromMaster(m); setShowMasterPicker(false) }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', marginBottom: '4px', border: '1px solid var(--table-border)' }}
                             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0, 210, 255, 0.08)')}
