@@ -3178,6 +3178,20 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: subjectivity_days on quotations (default 0) and policy_documents (default 7)
+            try {
+                const [sdCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'subjectivity_days'") as any[]
+                if ((sdCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN subjectivity_days INT DEFAULT 0")
+                }
+            } catch {}
+            try {
+                const [sdpCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'subjectivity_days'") as any[]
+                if ((sdpCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN subjectivity_days INT DEFAULT 7")
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -7869,6 +7883,7 @@ export class MySQLAdapter {
                 q.outstanding_premium_text as outstandingPremiumText,
                 q.outstanding_premium_bold as outstandingPremiumBold,
                 q.outstanding_premium_underline as outstandingPremiumUnderline,
+                q.subjectivity_days as subjectivityDays,
                 q.created_at as createdAt, q.updated_at as updatedAt, q.created_by as createdBy
             FROM quotations q
             LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
@@ -8044,6 +8059,7 @@ export class MySQLAdapter {
             outstandingPremiumUnderline: 'outstanding_premium_underline',
             fullPremiumLossEnabled: 'full_premium_loss_enabled',
             fullPremiumLossText: 'full_premium_loss_text',
+            subjectivityDays: 'subjectivity_days',
         }
         const fields: string[] = []
         const values: any[] = []
@@ -10574,6 +10590,7 @@ export class MySQLAdapter {
             selectedLolOptionId: r.selected_lol_option_id || null,
             selectedAgreedValueOptionId: r.selected_agreed_value_option_id || null,
             ourShare: r.our_share != null ? Number(r.our_share) : null,
+            subjectivityDays: r.subjectivity_days != null ? Number(r.subjectivity_days) : 7,
         }
     }
 

@@ -704,6 +704,7 @@ interface PolicyDocRecord {
   selectedLolOptionId?: string | null
   selectedAgreedValueOptionId?: string | null
   ourShare?: number | null
+  subjectivityDays?: number
 }
 
 interface PolicyInstalment {
@@ -771,6 +772,7 @@ interface PolicyExportData {
   customExclusions: QuotationCustomExclusion[]
   excludedCountries: QuotationExcludedCountry[]
   subjectivities: QuotationSubjectivity[]
+  subjectivityDays: number
   sectionTexts: PISectionTexts
   sanctionsVersions: PISanctionsVersion[]
   clauseOverrides: Record<string, string>
@@ -1015,6 +1017,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     subjectivities: (Array.isArray(subjectivities) ? subjectivities : []).filter(
       (s: QuotationSubjectivity) => !s.vesselScope || !vessel || s.vesselScope.includes(vessel.id)
     ),
+    subjectivityDays: policy.subjectivityDays ?? 7,
     sectionTexts: mergedTexts,
     sanctionsVersions: Array.isArray(sanctionsVersions) ? sanctionsVersions : [],
     clauseOverrides,
@@ -2371,7 +2374,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   // SUBJECTIVITIES
   if (data.subjectivities.length > 0) {
     const subjContent: (Paragraph | Table)[] = []
-    if (polSt(data, 'subjectivitiesIntro')) subjContent.push(...polMp(polSt(data, 'subjectivitiesIntro')))
+    const polSubjIntro = polSt(data, 'subjectivitiesIntro')
+    if (polSubjIntro) {
+      const psDays = data.subjectivityDays ?? 7
+      const psTiming = psDays === 0 ? 'prior inception' : `within ${psDays} days prior inception`
+      const fixedPolIntro = polSubjIntro.replace(/within \d+ days? prior inception/i, psTiming).replace(/prior inception/i, psTiming)
+      subjContent.push(...polMp(fixedPolIntro))
+    }
     for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
     rows.push(makeRow('Subjectivities', subjContent))

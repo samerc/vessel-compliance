@@ -12,6 +12,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [showMasterPicker, setShowMasterPicker] = useState(false)
+    const [subjectivityDays, setSubjectivityDays] = useState(quotation.subjectivityDays ?? 0)
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [scopeAutoDetected, setScopeAutoDetected] = useState(false)
     const autoPopulateRan = useRef(false)
@@ -364,7 +365,22 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     </button>
                 </div>
             </div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>Add subjectivities that must be met for this quotation to be valid.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Documents to be provided</span>
+                <input
+                    type="number" min={0}
+                    value={subjectivityDays}
+                    onChange={e => {
+                        const v = Math.max(0, parseInt(e.target.value) || 0)
+                        setSubjectivityDays(v)
+                        window.api.updateQuotation(quotation.id, { subjectivityDays: v } as any).catch(() => {})
+                    }}
+                    style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'center' }}
+                />
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    {subjectivityDays === 0 ? 'days (0 = prior inception)' : 'days prior inception'}
+                </span>
+            </div>
 
             {/* Master picker dropdown */}
             {showMasterPicker && availableMasters.length > 0 && (

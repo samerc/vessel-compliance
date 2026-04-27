@@ -102,6 +102,7 @@ interface QuotationData {
   hullCustomConditions: { id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // Survey warranties
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
+  subjectivityDays: number
   // War-specific data
   warConditions: QuotationWarCondition[]
   allWarConditions: WarCondition[]
@@ -378,7 +379,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     cargoLawClauses: Array.isArray(cargoLawClauses) ? cargoLawClauses : [],
     cargoConditionCustom: Array.isArray(cargoConditionCustom) ? cargoConditionCustom : [],
     cargoSpecialCustom: Array.isArray(cargoSpecialCustom) ? cargoSpecialCustom : [],
-    cargoLawCustom: Array.isArray(cargoLawCustom) ? cargoLawCustom : []
+    cargoLawCustom: Array.isArray(cargoLawCustom) ? cargoLawCustom : [],
+    subjectivityDays: quotation.subjectivityDays ?? 0
   }
 }
 
@@ -1763,7 +1765,16 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   // Subjectivities
   if (data.subjectivities.length > 0) {
     let subjText = ''
-    if (st(data, 'subjectivitiesIntro')) subjText += stripHtml(st(data, 'subjectivitiesIntro')) + '\n\n'
+    const subjIntro = st(data, 'subjectivitiesIntro')
+    if (subjIntro) {
+      let introText = stripHtml(subjIntro)
+      // Replace timing phrase based on subjectivityDays
+      const days = data.subjectivityDays ?? 0
+      const timing = days === 0 ? 'prior inception' : `within ${days} days prior inception`
+      introText = introText.replace(/within \d+ days? prior inception/i, timing)
+      introText = introText.replace(/prior inception/i, timing)
+      subjText += introText + '\n\n'
+    }
     for (const s of data.subjectivities) { const sScope = vesselScopeSuffix(s.vesselScope, data.quotationVessels); subjText += `- ${s.text}${sScope}\n` }
     if (st(data, 'subjectivitiesNote')) subjText += '\n' + stripHtml(st(data, 'subjectivitiesNote'))
     sectionMap.set('subjectivities', ['Subjectivities', subjText.trim()])
@@ -3844,7 +3855,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Subjectivities ----
   if (data.subjectivities.length > 0) {
     const subjContent: (Paragraph | Table)[] = []
-    if (st(data, 'subjectivitiesIntro')) subjContent.push(...mp(st(data, 'subjectivitiesIntro')))
+    const subjIntroDocx = st(data, 'subjectivitiesIntro')
+    if (subjIntroDocx) {
+      const sDays = data.subjectivityDays ?? 0
+      const sTiming = sDays === 0 ? 'prior inception' : `within ${sDays} days prior inception`
+      let fixedIntro = subjIntroDocx.replace(/within \d+ days? prior inception/i, sTiming).replace(/prior inception/i, sTiming)
+      subjContent.push(...mp(fixedIntro))
+    }
     for (const s of data.subjectivities) {
       const isNewSubj = origData && s.piSubjectivityId && !origSubjectivityPiIds.has(s.piSubjectivityId)
       const isNewCustomSubj = origData && s.isCustom && !(origData.subjectivities || []).some(os => os.text === s.text)
