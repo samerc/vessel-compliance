@@ -833,9 +833,14 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             updateField('outstandingPremiumEnabled', enabled)
                             if (enabled && !quotation.outstandingPremiumText) {
                                 try {
-                                    const raw = await window.api.getSetting('policyExportSettings')
-                                    const defaultText = raw ? JSON.parse(raw).outstandingPremiumDefaultText : null
-                                    const text = defaultText || 'All outstanding premium to be settled prior inception'
+                                    // Check quotation standard texts first, then policy settings, then hardcoded default
+                                    const [globalTexts, policyRaw] = await Promise.all([
+                                        window.api.piGetSectionTexts(),
+                                        window.api.getSetting('policyExportSettings')
+                                    ])
+                                    const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find((t: any) => t.key === 'outstandingPremiumDefaultText')?.value
+                                    const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
+                                    const text = qDefault || pDefault || 'All outstanding premium to be settled prior inception'
                                     setQ(p => ({ ...p, outstandingPremiumText: text }))
                                     updateField('outstandingPremiumText', text)
                                 } catch {}
@@ -872,9 +877,13 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             updateField('fullPremiumLossEnabled', enabled)
                             if (enabled && !quotation.fullPremiumLossText) {
                                 try {
-                                    const raw = await window.api.getSetting('policyExportSettings')
-                                    const defaultText = raw ? JSON.parse(raw).fullPremiumLossDefaultText : null
-                                    const text = defaultText || 'Full annual premium payable in case of loss.'
+                                    const [globalTexts, policyRaw] = await Promise.all([
+                                        window.api.piGetSectionTexts(),
+                                        window.api.getSetting('policyExportSettings')
+                                    ])
+                                    const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find((t: any) => t.key === 'fullPremiumLossDefaultText')?.value
+                                    const pDefault = policyRaw ? JSON.parse(policyRaw).fullPremiumLossDefaultText : null
+                                    const text = qDefault || pDefault || 'Full annual premium payable in case of loss.'
                                     setQ(p => ({ ...p, fullPremiumLossText: text }))
                                     updateField('fullPremiumLossText', text)
                                 } catch {}

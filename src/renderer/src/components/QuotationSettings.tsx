@@ -3057,6 +3057,8 @@ const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: 
     { key: 'premiumPaymentIntroSingle', label: 'Payment Intro — Single Instalment ({timing} = "at inception" or "within X days")', section: 'Premium', rows: 2 },
     { key: 'premiumCondition', label: 'Payment Condition Precedent', section: 'Premium', rows: 4 },
     { key: 'premiumEarned', label: 'Premium Earned Clause', section: 'Premium', rows: 3 },
+    { key: 'outstandingPremiumDefaultText', label: 'Outstanding Premium Notice (default text)', section: 'Premium', rows: 1 },
+    { key: 'fullPremiumLossDefaultText', label: 'Full Premium in Case of Loss (default text)', section: 'Premium', rows: 1 },
     { key: 'informationNote', label: 'Information Note', section: 'Information', rows: 2 },
     { key: 'importantNotice', label: 'Important Notice (Default)', section: 'Important Notice', rows: 5 },
     { key: 'importantNoticePI', label: 'Important Notice (P&I)', section: 'Important Notice', rows: 5 },

@@ -107,6 +107,8 @@ Continue the Policy on such terms and conditions as it may determine.`,
     premiumPaymentIntroSingle: 'Premium shall be payable in one single Instalment {timing}, at Noon Lebanon LST, time being of the essence.',
     premiumCondition: 'Compliance with this clause shall be a condition precedent to coverage and/or the Insurer\'s liability under this policy. Any failure to comply shall entitle the Insurer to reject claims whether arising before or after the breach and demand payment of the full premium including all unpaid instalments.',
     premiumEarned: 'Premium deemed earned in full on inception of risk and shall be payable in full notwithstanding any breach by the Insured or any warranty or other provision of the Policy which discharges the Insurer from liability.',
+    outstandingPremiumDefaultText: 'All outstanding premium to be settled prior inception',
+    fullPremiumLossDefaultText: 'Full annual premium payable in case of loss.',
     informationNote: 'Note: Failure to supply information or provide satisfactory information on any subjectivity (above) may result in this quote being withdrawn and / or cover being cancelled at the sole discretion of Underwriters.',
     importantNotice: 'IMPORTANT NOTICE\n\nAttention is drawn to Clause 4 of the Al-Bahriah P&I Terms and Conditions applicable to this Policy which contains terms contracting out of certain provisions of the English Insurance Act 2015 as respects the fair presentation of the risk, the effect of warranties and other terms, the making of fraudulent claims, the duty of good faith and damages for late payment of claims.'
 }

@@ -1368,6 +1368,8 @@ export interface PISectionTexts {
   continuationPiClubText?: string
   nonRefundableFirstText?: string
   nonRefundablePercentText?: string
+  outstandingPremiumDefaultText?: string
+  fullPremiumLossDefaultText?: string
   informationNote?: string
   importantNotice?: string
   importantNoticePI?: string
