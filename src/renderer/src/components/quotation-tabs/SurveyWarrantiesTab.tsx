@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save, X } from 'lucide-react'
 import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, QuotationSurveyWarranty, QuotationPIAlternative, QuotationVessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
@@ -19,6 +19,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
     const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
     const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
     const [customText, setCustomText] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
     const { theme } = useTheme()
     const isLight = theme === 'light' || theme === 'aurora'
 
@@ -211,9 +213,25 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                                    {item.customText ? item.customText : item.text}
+                                {editingId === item.id ? (
+                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                        <textarea
+                                            value={editText}
+                                            onChange={e => setEditText(e.target.value)}
+                                            rows={2}
+                                            style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical', lineHeight: 1.5 }}
+                                            autoFocus
+                                            onKeyDown={e => { if (e.key === 'Escape') setEditingId(null) }}
+                                        />
+                                        <button onClick={() => { updateItem(item.id, item.customText ? { customText: editText } : { text: editText }); setEditingId(null) }} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}><Save size={14} /></button>
+                                        <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={14} /></button>
+                                    </div>
+                                ) : (
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                    <span style={{ flex: 1 }}>{item.customText ? item.customText : item.text}</span>
+                                    <button onClick={() => { setEditingId(item.id); setEditText(item.customText || item.text) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', flexShrink: 0, opacity: 0.5 }} title="Edit text"><Pencil size={12} /></button>
                                 </div>
+                                )}
 
                                 {/* Placeholder inputs */}
                                 {!item.customText && placeholders.length > 0 && (
