@@ -3732,8 +3732,13 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
   }
 
   children.push(new Table({
-    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_CONTENT_W, type: WidthType.DXA },
+    columnWidths: [POL_TITLE_W, POL_BODY_W],
     layout: TableLayoutType.FIXED,
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder
+    },
     rows
   }))
 
@@ -3877,8 +3882,13 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   }
 
   children.push(new Table({
-    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_CONTENT_W, type: WidthType.DXA },
+    columnWidths: [POL_TITLE_W, POL_BODY_W],
     layout: TableLayoutType.FIXED,
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder
+    },
     rows
   }))
 
@@ -3995,8 +4005,13 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   }
 
   children.push(new Table({
-    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_CONTENT_W, type: WidthType.DXA },
+    columnWidths: [POL_TITLE_W, POL_BODY_W],
     layout: TableLayoutType.FIXED,
+    borders: {
+      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+      insideHorizontal: noBorder, insideVertical: noBorder
+    },
     rows
   }))
 
