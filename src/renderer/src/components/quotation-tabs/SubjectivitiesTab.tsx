@@ -169,10 +169,31 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
             quotationId: quotation.id,
             piSubjectivityId: m.id,
             text: m.text,
-            order: items.length
+            order: m.order ?? items.length
         })
         showSuccess('Added from master')
-        loadData()
+        // Re-sort all items by master order
+        await resortByMasterOrder()
+    }
+
+    const resortByMasterOrder = async () => {
+        const refreshed = await window.api.getQuotationSubjectivities(quotation.id)
+        const safeItems = Array.isArray(refreshed) ? refreshed : []
+        // Build order map from master list
+        const masterOrderMap = new Map(masterList.map(m => [m.id, m.order ?? 999]))
+        // Sort: master items by their settings order, custom items at end
+        safeItems.sort((a, b) => {
+            const aOrder = a.piSubjectivityId ? (masterOrderMap.get(a.piSubjectivityId) ?? 999) : 9999
+            const bOrder = b.piSubjectivityId ? (masterOrderMap.get(b.piSubjectivityId) ?? 999) : 9999
+            return aOrder - bOrder
+        })
+        // Save the new order
+        for (let i = 0; i < safeItems.length; i++) {
+            if (safeItems[i].order !== i) {
+                await window.api.updateQuotationSubjectivity(safeItems[i].id, { order: i })
+            }
+        }
+        setItems(safeItems.map((s, i) => ({ ...s, order: i })))
     }
 
     const handleUpdate = async () => {
@@ -390,10 +411,10 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                         <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }} onClick={async () => {
                             for (const m of availableMasters) {
                                 if (items.some(i => i.piSubjectivityId === m.id)) continue
-                                await window.api.addQuotationSubjectivity({ quotationId: quotation.id, piSubjectivityId: m.id, text: m.text, order: items.length })
+                                await window.api.addQuotationSubjectivity({ quotationId: quotation.id, piSubjectivityId: m.id, text: m.text, order: m.order ?? items.length })
                             }
                             showSuccess('All subjectivities added')
-                            loadData()
+                            await resortByMasterOrder()
                             setShowMasterPicker(false)
                         }}>Select All</button>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{availableMasters.length} available</span>
