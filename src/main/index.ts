@@ -426,13 +426,13 @@ function createWindow(): void {
         if (restoredSession) {
           db.updateUserLastLogin(restoredSession.user.id).catch(() => {})
         }
-        mainWindow.webContents.send('app:db-status', { connected: true })
+        if (!mainWindow.isDestroyed()) mainWindow.webContents.send('app:db-status', { connected: true })
       }
     } catch (error) {
       console.error('Startup error:', error)
-      mainWindow.webContents.send('app:db-status', { connected: false })
+      if (!mainWindow.isDestroyed()) mainWindow.webContents.send('app:db-status', { connected: false })
     } finally {
-      mainWindow.show()
+      if (!mainWindow.isDestroyed()) mainWindow.show()
     }
   })
 
