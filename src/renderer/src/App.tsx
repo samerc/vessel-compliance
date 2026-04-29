@@ -56,7 +56,7 @@ function App(): React.JSX.Element {
   const { isAuthenticated, isAdmin, logout, user, hasPermission } = useAuth()
   const { theme, setThemeTo } = useTheme()
   const [navigateToVesselId, setNavigateToVesselId] = useState<string | null>(null)
-  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | undefined>(undefined)
+  const [navigateToVesselSection, setNavigateToVesselSection] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | undefined>(undefined)
   const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
   const [complianceSubTab, setComplianceSubTab] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>('documents')
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)

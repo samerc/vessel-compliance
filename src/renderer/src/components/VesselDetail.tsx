@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, Tag, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
+import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
-import { formatDate, formatDateTime, formatDateShort, formatDateLong } from '../utils/dateUtils'
+import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
@@ -23,7 +23,7 @@ interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
-    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations'
+    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'
     initialEditing?: boolean
     onNavigateToQuotation?: (quotationId: string) => void
 }
@@ -140,12 +140,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         } catch { /* ignore */ }
     }
 
-    const loadAuditLog = async () => {
-        try {
-            const log = await window.api.getVesselAuditLog(vessel.id)
-            setAuditLog(Array.isArray(log) ? log : [])
-        } catch { /* ignore */ }
-    }
+
 
     const handleExportAllPolicies = async () => {
         try {
@@ -372,16 +367,16 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'history' | 'timeline' | 'quotations'>(initialSection || 'documents')
+    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'>(initialSection === 'history' as any ? 'timeline' : initialSection || 'documents')
     useEffect(() => {
         if (initialSection) {
             setDetailView(initialSection)
             if (initialSection === 'policies' || initialSection === 'surveys') loadDynamicPolicies()
-            if (initialSection === 'history') loadAuditLog()
+            // History merged into Activity (timeline)
         }
     }, [initialSection])
     const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
-    const [auditLog, setAuditLog] = useState<VesselAuditEntry[]>([])
+    // auditLog removed — merged into Activity (timeline) tab
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
     const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
@@ -1296,13 +1291,12 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 marginBottom: '16px',
                 alignItems: 'center'
             }}>
-                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'history', 'timeline'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'timeline'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {
                             setDetailView(view)
                             if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
-                            if (view === 'history') loadAuditLog()
                         }}
                         style={{
                             display: 'flex',
@@ -1325,9 +1319,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         {view === 'surveys' && <ClipboardList size={18} />}
                         {view === 'policies' && <Shield size={18} />}
                         {view === 'quotations' && <Hash size={18} />}
-                        {view === 'history' && <Calendar size={18} />}
                         {view === 'timeline' && <Clock size={18} />}
-                        {view === 'assureds' ? 'Assured' : view.charAt(0).toUpperCase() + view.slice(1)}
+                        {view === 'assureds' ? 'Assured' : view === 'timeline' ? 'Activity' : view.charAt(0).toUpperCase() + view.slice(1)}
                     </button>
                 ))}
                 {detailView === 'documents' && (
@@ -1962,10 +1955,6 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         isLight={isLight}
                     />
                 </>
-            )}
-
-            {detailView === 'history' && (
-                <VesselHistoryView auditLog={auditLog} isLight={isLight} flagStates={flagStates} />
             )}
 
             {detailView === 'timeline' && (
@@ -2958,241 +2947,16 @@ function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, s
     )
 }
 
-// ==================== Vessel History View ====================
-
-function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: VesselAuditEntry[]; isLight: boolean; flagStates: FlagState[] }) {
-    const [search, setSearch] = useState('')
-    const [filterField, setFilterField] = useState('all')
-    const [entityNameMap, setEntityNameMap] = useState<Map<string, string>>(new Map())
-
-    // Resolve any UUID-valued Customer entries to entity names (covers legacy entries written before the fix)
-    useEffect(() => {
-        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        const ids = new Set<string>()
-        for (const entry of auditLog) {
-            if (entry.fieldName === 'Customer') {
-                if (entry.oldValue && uuidPattern.test(entry.oldValue)) ids.add(entry.oldValue)
-                if (entry.newValue && uuidPattern.test(entry.newValue)) ids.add(entry.newValue)
-            }
-        }
-        if (ids.size === 0) return
-        window.api.getEntities().then(ents => {
-            const map = new Map<string, string>()
-            for (const e of (ents || [])) if (ids.has(e.id)) map.set(e.id, e.name)
-            setEntityNameMap(map)
-        }).catch(() => {})
-    }, [auditLog])
-
-    const resolveFlagValue = (val: string | null) => {
-        if (!val) return val
-        const match = flagStates.find(fs => fs.id === val)
-        return match ? `${match.name} (${match.iso3Code})` : val
-    }
-
-    const resolveEntityValue = (val: string | null) => {
-        if (!val) return val
-        return entityNameMap.get(val) ?? val
-    }
-
-    const getFieldMeta = (fieldName: string): { icon: React.ReactNode; color: string; bg: string } => {
-        const fn = fieldName.toLowerCase()
-        if (fn.includes('name'))
-            return { icon: <FileText size={12} />, color: isLight ? '#2563eb' : '#60a5fa', bg: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(96,165,250,0.12)' }
-        if (fn.includes('flag'))
-            return { icon: <Shield size={12} />, color: isLight ? '#7c3aed' : '#a78bfa', bg: isLight ? 'rgba(124,58,237,0.1)' : 'rgba(167,139,250,0.12)' }
-        if (fn.includes('status') || fn.includes('active'))
-            return { icon: <ToggleLeft size={12} />, color: isLight ? '#b45309' : '#f59e0b', bg: isLight ? 'rgba(180,83,9,0.1)' : 'rgba(245,158,11,0.12)' }
-        if (fn.includes('imo'))
-            return { icon: <Hash size={12} />, color: isLight ? '#0e7490' : '#22d3ee', bg: isLight ? 'rgba(14,116,144,0.1)' : 'rgba(34,211,238,0.12)' }
-        if (fn.includes('class') || fn.includes('society'))
-            return { icon: <ClipboardList size={12} />, color: isLight ? '#059669' : '#34d399', bg: isLight ? 'rgba(5,150,105,0.1)' : 'rgba(52,211,153,0.12)' }
-        if (fn.includes('type') || fn.includes('vessel type'))
-            return { icon: <Tag size={12} />, color: isLight ? '#db2777' : '#f472b6', bg: isLight ? 'rgba(219,39,119,0.1)' : 'rgba(244,114,182,0.12)' }
-        if (fn.includes('assured'))
-            return { icon: <Users size={12} />, color: isLight ? '#9333ea' : '#c084fc', bg: isLight ? 'rgba(147,51,234,0.1)' : 'rgba(192,132,252,0.12)' }
-        return { icon: <Calendar size={12} />, color: isLight ? '#1a73e8' : 'var(--accent-primary)', bg: isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)' }
-    }
-
-    const uniqueFields = [...new Set(auditLog.map(e => e.fieldName))].sort()
-    const uniqueUsers = new Set(auditLog.map(e => e.changedBy)).size
-    const firstChange = auditLog.length > 0 ? new Date(auditLog[auditLog.length - 1].changedAt) : null
-
-    const filtered = auditLog.filter(e => {
-        const q = search.toLowerCase()
-        const matchSearch = !q ||
-            e.fieldName.toLowerCase().includes(q) ||
-            e.changedBy.toLowerCase().includes(q) ||
-            (e.newValue || '').toLowerCase().includes(q) ||
-            (e.oldValue || '').toLowerCase().includes(q)
-        const matchField = filterField === 'all' || e.fieldName === filterField
-        return matchSearch && matchField
-    })
-
-    // Group by date
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
-    const groups: { label: string; entries: VesselAuditEntry[] }[] = []
-    const seenLabels = new Map<string, VesselAuditEntry[]>()
-    for (const entry of filtered) {
-        const d = new Date(entry.changedAt); d.setHours(0, 0, 0, 0)
-        let label: string
-        if (d.getTime() === today.getTime()) label = 'Today'
-        else if (d.getTime() === yesterday.getTime()) label = 'Yesterday'
-        else label = formatDateLong(entry.changedAt)
-        if (!seenLabels.has(label)) { seenLabels.set(label, []); groups.push({ label, entries: seenLabels.get(label)! }) }
-        seenLabels.get(label)!.push(entry)
-    }
-
-    if (auditLog.length === 0) {
-        return (
-            <div style={{ textAlign: 'center', padding: '56px 32px', color: 'var(--text-secondary)' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                    <Clock size={28} style={{ opacity: 0.25 }} />
-                </div>
-                <div style={{ fontWeight: 600, marginBottom: '6px' }}>No changes recorded yet</div>
-                <div style={{ fontSize: '0.85rem' }}>Edit history will appear here after the first update.</div>
-            </div>
-        )
-    }
-
-    return (
-        <div>
-            {/* Stats strip */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                {[
-                    { label: 'Total Changes', value: auditLog.length, icon: <Clock size={16} />, accent: true },
-                    { label: 'Contributors', value: uniqueUsers, icon: <Users size={16} />, accent: false },
-                    { label: 'Since', value: firstChange ? formatDateShort(firstChange) : '—', icon: <Calendar size={16} />, accent: false },
-                ].map(stat => (
-                    <div key={stat.label} className="glass-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: stat.accent ? 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))' : (isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: stat.accent ? 'white' : 'var(--accent-primary)' }}>
-                            {stat.icon}
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 700, lineHeight: 1.1 }}>{stat.value}</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{stat.label}</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Controls */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                    <input
-                        type="text"
-                        placeholder="Search field, user, or value..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        style={{ width: '100%', paddingLeft: '32px', fontSize: '0.85rem' }}
-                    />
-                </div>
-                <select value={filterField} onChange={e => setFilterField(e.target.value)} style={{ padding: '8px 10px', fontSize: '0.82rem', minWidth: '160px' }}>
-                    <option value="all">All Fields</option>
-                    {uniqueFields.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-                {(search || filterField !== 'all') && (
-                    <button onClick={() => { setSearch(''); setFilterField('all') }} className="btn-secondary" style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                        <X size={13} /> Clear
-                    </button>
-                )}
-            </div>
-
-            {/* Empty filtered state */}
-            {filtered.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    No entries match your search.
-                </div>
-            )}
-
-            {/* Grouped timeline */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {groups.map(group => (
-                    <div key={group.label}>
-                        {/* Date group header */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                                {group.label}
-                            </div>
-                            <div style={{ flex: 1, height: '1px', background: 'var(--table-border)' }} />
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
-                                {group.entries.length} change{group.entries.length !== 1 ? 's' : ''}
-                            </div>
-                        </div>
-
-                        {/* Entries */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {group.entries.map(entry => {
-                                const isFlagField = entry.fieldName === 'Flag State'
-                                const isCustomerField = entry.fieldName === 'Customer'
-                                const displayOld = isFlagField ? resolveFlagValue(entry.oldValue) : isCustomerField ? resolveEntityValue(entry.oldValue) : entry.oldValue
-                                const displayNew = isFlagField ? resolveFlagValue(entry.newValue) : isCustomerField ? resolveEntityValue(entry.newValue) : entry.newValue
-                                const meta = getFieldMeta(entry.fieldName)
-                                const entryTime = new Date(entry.changedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-
-                                return (
-                                    <div key={entry.id} style={{
-                                        display: 'flex', gap: '12px', alignItems: 'flex-start',
-                                        padding: '12px 14px', borderRadius: '10px',
-                                        border: '1px solid var(--table-border)',
-                                        borderLeft: `3px solid ${meta.color}`,
-                                        background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)',
-                                        transition: 'background 0.12s',
-                                    }}>
-                                        {/* Icon */}
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: meta.color, marginTop: '1px' }}>
-                                            {meta.icon}
-                                        </div>
-
-                                        {/* Content */}
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                                                <span style={{ fontWeight: 600, fontSize: '0.85rem', color: meta.color }}>{entry.fieldName}</span>
-                                                <div style={{ flex: 1 }} />
-                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                    <Clock size={10} />{entryTime}
-                                                </span>
-                                            </div>
-
-                                            {/* Value change */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.83rem' }}>
-                                                {displayOld ? (
-                                                    <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{displayOld}</span>
-                                                ) : (
-                                                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.78rem' }}>empty</span>
-                                                )}
-                                                <ArrowRight size={12} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-                                                {displayNew ? (
-                                                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayNew}</span>
-                                                ) : (
-                                                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.78rem' }}>cleared</span>
-                                                )}
-                                            </div>
-
-                                            {/* By */}
-                                            <div style={{ marginTop: '5px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                                by <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.changedBy}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
-}
-
-// ==================== Vessel Timeline ====================
+// ==================== Vessel Activity (formerly Timeline + History) ====================
 
 interface TimelineEvent {
     date: string
     type: 'audit' | 'document' | 'policy' | 'survey' | 'warranty' | 'sanctions'
     title: string
     subtitle?: string
+    oldValue?: string | null
+    newValue?: string | null
+    changedBy?: string
     iconType: string
     color: string
 }
@@ -3230,6 +2994,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     })
     const [dateTo, setDateTo] = useState<string>(() => new Date().toISOString().split('T')[0])
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+    const [activitySearch, setActivitySearch] = useState('')
 
     useEffect(() => {
         let cancelled = false
@@ -3257,9 +3022,14 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                             date: entry.changedAt || '',
                             type: 'audit',
                             title: isAssured ? entry.fieldName : `${entry.fieldName} changed`,
-                            subtitle: isAssured ? (entry.newValue || entry.oldValue || undefined) : (entry.newValue ? `New: ${entry.newValue}` : undefined),
-                            iconType: 'audit',
-                            color: '#6495ed'
+                            subtitle: isAssured
+                                ? (entry.newValue || entry.oldValue || undefined)
+                                : (entry.oldValue && entry.newValue ? `${entry.oldValue} → ${entry.newValue}` : entry.newValue ? `Set to ${entry.newValue}` : undefined),
+                            oldValue: entry.oldValue,
+                            newValue: entry.newValue,
+                            changedBy: entry.changedBy,
+                            iconType: isAssured ? 'assured' : 'audit',
+                            color: isAssured ? '#c084fc' : '#6495ed'
                         })
                     }
                 }
@@ -3372,13 +3142,18 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
         typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1
     }
 
-    // Filter by type and date range
+    // Filter by type, date range, and search
     const filteredEvents = events.filter(ev => {
         if (typeFilter !== 'all' && ev.type !== typeFilter) return false
         if (ev.date) {
             const evDate = ev.date.split('T')[0]
             if (dateFrom && evDate < dateFrom) return false
             if (dateTo && evDate > dateTo) return false
+        }
+        if (activitySearch.trim()) {
+            const q = activitySearch.toLowerCase()
+            const searchable = [ev.title, ev.subtitle, ev.oldValue, ev.newValue, ev.changedBy].filter(Boolean).join(' ').toLowerCase()
+            if (!searchable.includes(q)) return false
         }
         return true
     })
@@ -3443,6 +3218,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     const getIcon = (iconType: string) => {
         switch (iconType) {
             case 'audit': return <Edit3 size={14} />
+            case 'assured': return <Users size={14} />
             case 'document': return <FileText size={14} />
             case 'policy': return <Shield size={14} />
             case 'survey': return <ClipboardList size={14} />
@@ -3473,9 +3249,8 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
         <div className="fade-in" style={{ maxWidth: '800px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <GitCommit size={20} color="var(--accent-primary)" />
-                <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Vessel Timeline</span>
+                <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Activity</span>
                 <span style={{
-                    marginLeft: '8px',
                     padding: '2px 10px',
                     borderRadius: '12px',
                     background: 'rgba(0,210,255,0.1)',
@@ -3483,8 +3258,18 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                     fontSize: '0.78rem',
                     fontWeight: 600
                 }}>
-                    {filteredEvents.length} events
+                    {filteredEvents.length}
                 </span>
+                <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                    <input
+                        type="text"
+                        value={activitySearch}
+                        onChange={e => { setActivitySearch(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+                        placeholder="Search activity..."
+                        style={{ padding: '5px 10px 5px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '200px' }}
+                    />
+                </div>
             </div>
 
             {/* Filter chips */}
@@ -3683,11 +3468,18 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                                 {me.date ? formatDate(me.date) : 'Unknown'}
                                             </span>
                                         </div>
-                                        {!isMerged && me.items[0]?.subtitle && (
+                                        {!isMerged && me.type === 'audit' && (me.items[0]?.oldValue || me.items[0]?.newValue) ? (
+                                            <div style={{ fontSize: '0.8rem', paddingLeft: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {me.items[0].oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{me.items[0].oldValue}</span>}
+                                                {me.items[0].oldValue && me.items[0].newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
+                                                {me.items[0].newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{me.items[0].newValue}</span>}
+                                                {me.items[0].changedBy && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>by {me.items[0].changedBy}</span>}
+                                            </div>
+                                        ) : !isMerged && me.items[0]?.subtitle ? (
                                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '22px' }}>
                                                 {me.items[0].subtitle}
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
 
                                     {/* Expanded items */}
@@ -3704,12 +3496,19 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <span style={{ color: ev.color, display: 'flex', alignItems: 'center' }}>{getIcon(ev.iconType)}</span>
                                                         <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ev.title}</span>
+                                                        {ev.changedBy && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>by {ev.changedBy}</span>}
                                                     </div>
-                                                    {ev.subtitle && (
+                                                    {ev.type === 'audit' && (ev.oldValue || ev.newValue) ? (
+                                                        <div style={{ fontSize: '0.78rem', paddingLeft: '20px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            {ev.oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{ev.oldValue}</span>}
+                                                            {ev.oldValue && ev.newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
+                                                            {ev.newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ev.newValue}</span>}
+                                                        </div>
+                                                    ) : ev.subtitle ? (
                                                         <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '20px' }}>
                                                             {ev.subtitle}
                                                         </div>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                             ))}
                                         </div>
