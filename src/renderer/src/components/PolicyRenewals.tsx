@@ -106,8 +106,10 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1) // 1-based
     const [renewals, setRenewals] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
-    const [sortField, setSortField] = useState<SortField>('endDate')
-    const [sortDir, setSortDir] = useState<SortDir>('asc')
+    const [sortField, setSortFieldRaw] = useState<SortField>(() => (localStorage.getItem('renewals_sortField') as SortField) || 'endDate')
+    const [sortDir, setSortDirRaw] = useState<SortDir>(() => (localStorage.getItem('renewals_sortDir') as SortDir) || 'asc')
+    const setSortField = (f: SortField) => { setSortFieldRaw(f); localStorage.setItem('renewals_sortField', f) }
+    const setSortDir = (d: SortDir | ((prev: SortDir) => SortDir)) => { setSortDirRaw(prev => { const val = typeof d === 'function' ? d(prev) : d; localStorage.setItem('renewals_sortDir', val); return val }) }
     const [groupByFleet, setGroupByFleet] = useState(false)
     const [multiMonthView, setMultiMonthView] = useState(false)
     const [search, setSearch] = useState('')
