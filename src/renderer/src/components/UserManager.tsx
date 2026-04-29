@@ -332,11 +332,18 @@ export default function UserManager() {
 
     const modalUser = groupsModalUserId ? users.find(u => u.id === groupsModalUserId) : null
 
+    const parseVersionKey = (v: string): number => {
+        // "7.6.7 (build 12)" → numeric key for comparison
+        const match = v.match(/^(\d+)\.(\d+)\.(\d+)(?:\s*\(build\s*(\d+)\))?/)
+        if (!match) return 0
+        const [, major, minor, patch, build] = match
+        return Number(major) * 1e9 + Number(minor) * 1e6 + Number(patch) * 1e3 + Number(build || 0)
+    }
     const currentVersion = users.reduce((max, u) => {
         if (!u.lastAppVersion) return max
-        return u.lastAppVersion > max ? u.lastAppVersion : max
+        return parseVersionKey(u.lastAppVersion) > parseVersionKey(max) ? u.lastAppVersion : max
     }, '0.0.0')
-    const isOldVersion = (v?: string) => !!v && v < currentVersion
+    const isOldVersion = (v?: string) => !!v && parseVersionKey(v) < parseVersionKey(currentVersion)
     const adminCount = users.filter(u => u.role === 'admin').length
     const regularCount = users.filter(u => u.role === 'user').length
     const onLatestCount = users.filter(u => u.lastAppVersion === currentVersion).length
