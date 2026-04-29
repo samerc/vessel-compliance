@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bell, Check, AlertTriangle, Clock, RefreshCw, X, FileWarning, Ship, ChevronRight } from 'lucide-react'
+import { Bell, Check, AlertTriangle, Clock, RefreshCw, X, FileWarning, Ship, ChevronRight, Search } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -61,6 +61,10 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
+  const [activeTab, setActiveTab] = useState<'warranties' | 'endorsements'>('warranties')
+  const [warrantySearch, setWarrantySearch] = useState('')
+  const [warrantyPage, setWarrantyPage] = useState(1)
+  const ITEMS_PER_PAGE = 25
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null)
   const [reminderHistory, setReminderHistory] = useState<Record<string, SurveyWarrantyReminder[]>>({})
 
@@ -184,14 +188,24 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   }
 
   // Filtered + sorted warranties
-  const filteredWarranties = warranties
+  const allFiltered = warranties
     .filter(w => statusFilter === 'active' ? (w.status === 'pending' || w.status === 'survey_done') : true)
+    .filter(w => {
+      if (!warrantySearch.trim()) return true
+      const q = warrantySearch.toLowerCase()
+      return (w.vesselName || '').toLowerCase().includes(q) ||
+        (w.description || '').toLowerCase().includes(q) ||
+        (w.policyTypeName || '').toLowerCase().includes(q) ||
+        (w.imoNumber || '').toLowerCase().includes(q)
+    })
     .sort((a, b) => {
       const ua = URGENCY_ORDER[getUrgency(a)]
       const ub = URGENCY_ORDER[getUrgency(b)]
       if (ua !== ub) return ua - ub
       return (a.vesselName || '').localeCompare(b.vesselName || '')
     })
+  const totalPages = Math.ceil(allFiltered.length / ITEMS_PER_PAGE)
+  const filteredWarranties = allFiltered.slice((warrantyPage - 1) * ITEMS_PER_PAGE, warrantyPage * ITEMS_PER_PAGE)
 
   // Active counts for badge
   const activeCount = warranties.filter(w => w.status === 'pending' || w.status === 'survey_done').length
@@ -296,29 +310,31 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         ))}
       </div>
 
-      {/* ── Survey Warranties Section ─────────────────────────────── */}
-      <div className="glass-card" style={{ padding: '20px', marginBottom: '24px' }}>
+      {/* ── Tabs ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '16px' }}>
+        <button onClick={() => setActiveTab('warranties')} style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: activeTab === 'warranties' ? 700 : 400, background: activeTab === 'warranties' ? 'var(--bg-card)' : 'transparent', color: activeTab === 'warranties' ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'warranties' ? '2px solid var(--accent-primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <FileWarning size={15} /> Warranties
+          {activeCount > 0 && <span style={{ padding: '1px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,165,0,0.15)', color: '#e6a800' }}>{activeCount}</span>}
+        </button>
+        <button onClick={() => setActiveTab('endorsements')} style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: activeTab === 'endorsements' ? 700 : 400, background: activeTab === 'endorsements' ? 'var(--bg-card)' : 'transparent', color: activeTab === 'endorsements' ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'endorsements' ? '2px solid var(--accent-primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Bell size={15} /> Endorsements
+          {endorsementsDue.length > 0 && <span style={{ padding: '1px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,165,0,0.15)', color: '#e6a800' }}>{endorsementsDue.length}</span>}
+        </button>
+      </div>
+
+      {/* ── Survey Warranties Tab ─────────────────────────────────── */}
+      {activeTab === 'warranties' && <div className="glass-card" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileWarning size={16} style={{ color: 'var(--accent-primary)' }} />
-            Survey Warranties
-            {activeCount > 0 && (
-              <span style={{ padding: '1px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(255,165,0,0.15)', color: '#e6a800' }}>
-                {activeCount}
-              </span>
-            )}
-          </h2>
           <div style={{ display: 'flex', gap: '6px' }}>
             {(['active', 'all'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className={statusFilter === f ? 'btn-primary' : 'btn-secondary'}
-                style={{ fontSize: '0.78rem', padding: '4px 12px' }}
-              >
+              <button key={f} onClick={() => { setStatusFilter(f); setWarrantyPage(1) }} className={statusFilter === f ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.78rem', padding: '4px 12px' }}>
                 {f === 'active' ? 'Active' : 'All'}
               </button>
             ))}
+          </div>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <input type="text" value={warrantySearch} onChange={e => { setWarrantySearch(e.target.value); setWarrantyPage(1) }} placeholder="Search vessels or warranties..." style={{ padding: '6px 10px 6px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '220px' }} />
           </div>
         </div>
 
@@ -354,7 +370,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                     <>
                       <tr key={w.id} style={{ background: rowBg, borderBottom: isHistoryExpanded ? 'none' : '1px solid var(--table-border)' }}>
                         {/* Vessel */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ship size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
                             {onNavigateToVessel ? (
@@ -372,18 +388,18 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                         </td>
 
                         {/* Warranty description */}
-                        <td style={{ padding: '10px 12px', maxWidth: '220px' }}>
+                        <td style={{ padding: '8px 10px', maxWidth: '220px' }}>
                           <div style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.description}</div>
                           {w.notes && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>{w.notes}</div>}
                         </td>
 
                         {/* Policy */}
-                        <td style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                           {w.policyTypeName || '—'}
                         </td>
 
                         {/* Deadline */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                           {w.deadlineType === 'days' && w.deadlineDays && w.inceptionDate ? (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
@@ -400,7 +416,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                         </td>
 
                         {/* Status */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                           <span style={{
                             padding: '2px 9px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700',
                             textTransform: 'uppercase', background: sc.bg, color: sc.color
@@ -408,7 +424,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                         </td>
 
                         {/* Reminders */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <Bell size={12} />{w.reminderCount ?? 0}
@@ -427,7 +443,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                         </td>
 
                         {/* Actions */}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap', alignItems: 'center' }}>
                             {(w.status === 'pending' || w.status === 'survey_done') && (
                               <button
@@ -519,19 +535,19 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
             </table>
           </div>
         )}
-      </div>
 
-      {/* ── Endorsement Reminders Section ────────────────────────── */}
-      <div className="glass-card" style={{ padding: '20px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Bell size={16} style={{ color: '#e6a800' }} />
-          Endorsement Reminders Due
-          {endorsementsDue.length > 0 && (
-            <span style={{ padding: '1px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(255,165,0,0.15)', color: '#e6a800' }}>
-              {endorsementsDue.length}
-            </span>
-          )}
-        </h2>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--table-border)' }}>
+            <button disabled={warrantyPage <= 1} onClick={() => setWarrantyPage(p => p - 1)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Previous</button>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Page {warrantyPage} of {totalPages} ({allFiltered.length} items)</span>
+            <button disabled={warrantyPage >= totalPages} onClick={() => setWarrantyPage(p => p + 1)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>Next</button>
+          </div>
+        )}
+      </div>}
+
+      {/* ── Endorsements Tab ─────────────────────────────────────── */}
+      {activeTab === 'endorsements' && <div className="glass-card" style={{ padding: '20px' }}>
         {endorsementsDue.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             No endorsement reminders due.
@@ -548,7 +564,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
             <tbody>
               {endorsementsDue.map((e: any, idx: number) => (
                 <tr key={e.id} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.01)') }}>
-                  <td style={{ padding: '10px 12px' }}>
+                  <td style={{ padding: '8px 10px' }}>
                     <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <Ship size={13} style={{ color: 'var(--text-secondary)' }} />
                       {onNavigateToVessel ? (
@@ -558,15 +574,15 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                       ) : (e.vesselName || e.vessel_name || '—')}
                     </div>
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{formatDateOrDash(e.surveyDate || e.survey_date)}</td>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{e.surveyType || e.survey_type || '—'}</td>
-                  <td style={{ padding: '10px 12px' }}>
+                  <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{formatDateOrDash(e.surveyDate || e.survey_date)}</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{e.surveyType || e.survey_type || '—'}</td>
+                  <td style={{ padding: '8px 10px' }}>
                     <span style={{ color: '#e6a800', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Bell size={12} />
                       {formatDateOrDash(e.endorsementReminderDate || e.endorsement_reminder_date)}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 12px' }}>
+                  <td style={{ padding: '8px 10px' }}>
                     {onNavigateToVessel && (
                       <button
                         onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id)}
@@ -582,7 +598,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
             </tbody>
           </table>
         )}
-      </div>
+      </div>}
 
       {/* ── Log Reminder Modal ───────────────────────────────────── */}
       {logReminderFor && (
