@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -65,6 +65,13 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const [warrantySearch, setWarrantySearch] = useState('')
   const [warrantyPage, setWarrantyPage] = useState(1)
   const ITEMS_PER_PAGE = 25
+  const [wSortField, setWSortField] = useState<string>(() => localStorage.getItem('surveyFollowUp_sortField') || 'urgency')
+  const [wSortDir, setWSortDir] = useState<'asc' | 'desc'>(() => (localStorage.getItem('surveyFollowUp_sortDir') as 'asc' | 'desc') || 'asc')
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('surveyFollowUp_colWidths') || '{}') } catch { return {} }
+  })
+  const resizingCol = useRef<{ key: string; startX: number; startW: number } | null>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
   const [expandedReminderId, setExpandedReminderId] = useState<string | null>(null)
   const [reminderHistory, setReminderHistory] = useState<Record<string, SurveyWarrantyReminder[]>>({})
 
@@ -85,6 +92,43 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
 
   // Complete form
   const [completeNotes, setCompleteNotes] = useState('')
+
+  const toggleSort = (field: string) => {
+    if (wSortField === field) {
+      const next = wSortDir === 'asc' ? 'desc' : 'asc'
+      setWSortDir(next); localStorage.setItem('surveyFollowUp_sortDir', next)
+    } else {
+      setWSortField(field); localStorage.setItem('surveyFollowUp_sortField', field)
+      setWSortDir('asc'); localStorage.setItem('surveyFollowUp_sortDir', 'asc')
+    }
+    setWarrantyPage(1)
+  }
+
+  const startResize = useCallback((key: string, e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const th = (e.target as HTMLElement).closest('th')
+    if (!th) return
+    resizingCol.current = { key, startX: e.clientX, startW: th.offsetWidth }
+    const onMove = (me: MouseEvent) => {
+      if (!resizingCol.current) return
+      const newW = Math.max(50, resizingCol.current.startW + (me.clientX - resizingCol.current.startX))
+      setColWidths(prev => { const next = { ...prev, [key]: newW }; localStorage.setItem('surveyFollowUp_colWidths', JSON.stringify(next)); return next })
+    }
+    const onUp = () => { resizingCol.current = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
+
+  const SortHeader = ({ field, label }: { field: string; label: string }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(field)}>
+      {label}
+      {wSortField === field && (wSortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDownIcon size={10} />)}
+    </div>
+  )
+
+  const ResizeHandle = ({ colKey }: { colKey: string }) => (
+    <div onMouseDown={e => startResize(colKey, e)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '4px', cursor: 'col-resize', zIndex: 1 }} />
+  )
 
   const loadData = async () => {
     setIsLoading(true)
@@ -199,10 +243,26 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         (w.imoNumber || '').toLowerCase().includes(q)
     })
     .sort((a, b) => {
-      const ua = URGENCY_ORDER[getUrgency(a)]
-      const ub = URGENCY_ORDER[getUrgency(b)]
-      if (ua !== ub) return ua - ub
-      return (a.vesselName || '').localeCompare(b.vesselName || '')
+      let cmp = 0
+      if (wSortField === 'urgency') {
+        cmp = URGENCY_ORDER[getUrgency(a)] - URGENCY_ORDER[getUrgency(b)]
+        if (cmp === 0) cmp = (a.vesselName || '').localeCompare(b.vesselName || '')
+      } else if (wSortField === 'vessel') {
+        cmp = (a.vesselName || '').localeCompare(b.vesselName || '')
+      } else if (wSortField === 'warranty') {
+        cmp = (a.description || '').localeCompare(b.description || '')
+      } else if (wSortField === 'policy') {
+        cmp = (a.policyTypeName || '').localeCompare(b.policyTypeName || '')
+      } else if (wSortField === 'deadline') {
+        const aD = a.deadlineDays && a.inceptionDate ? calcDeadlineDate(a.inceptionDate, a.deadlineDays).getTime() : 0
+        const bD = b.deadlineDays && b.inceptionDate ? calcDeadlineDate(b.inceptionDate, b.deadlineDays).getTime() : 0
+        cmp = aD - bD
+      } else if (wSortField === 'status') {
+        cmp = (a.status || '').localeCompare(b.status || '')
+      } else if (wSortField === 'reminders') {
+        cmp = (a.reminderCount ?? 0) - (b.reminderCount ?? 0)
+      }
+      return wSortDir === 'asc' ? cmp : -cmp
     })
   const totalPages = Math.ceil(allFiltered.length / ITEMS_PER_PAGE)
   const filteredWarranties = allFiltered.slice((warrantyPage - 1) * ITEMS_PER_PAGE, warrantyPage * ITEMS_PER_PAGE)
@@ -346,20 +406,19 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', tableLayout: 'fixed' }}>
+            <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '24%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '20%' }} />
+                {[{ key: 'vessel', def: '14%' }, { key: 'warranty', def: '24%' }, { key: 'policy', def: '7%' }, { key: 'deadline', def: '13%' }, { key: 'status', def: '9%' }, { key: 'reminders', def: '13%' }, { key: 'actions', def: '20%' }].map(c => (
+                  <col key={c.key} style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : c.def }} />
+                ))}
               </colgroup>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-                  {['Vessel', 'Warranty', 'Policy', 'Deadline', 'Status', 'Reminders', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
+                  {[{ key: 'vessel', label: 'Vessel' }, { key: 'warranty', label: 'Warranty' }, { key: 'policy', label: 'Policy' }, { key: 'deadline', label: 'Deadline' }, { key: 'status', label: 'Status' }, { key: 'reminders', label: 'Reminders' }, { key: 'actions', label: 'Actions' }].map(h => (
+                    <th key={h.key} style={{ padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', whiteSpace: 'nowrap', position: 'relative' }}>
+                      {h.key !== 'actions' ? <SortHeader field={h.key} label={h.label} /> : h.label}
+                      <ResizeHandle colKey={h.key} />
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -549,11 +608,19 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
             No endorsement reminders due.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', tableLayout: 'fixed' }}>
+            <colgroup>
+              {[{ key: 'e_vessel', def: '25%' }, { key: 'e_date', def: '20%' }, { key: 'e_type', def: '15%' }, { key: 'e_reminder', def: '20%' }, { key: 'e_action', def: '20%' }].map(c => (
+                <col key={c.key} style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : c.def }} />
+              ))}
+            </colgroup>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-                {['Vessel', 'Survey Date', 'Type', 'Reminder Date', 'Action'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>{h}</th>
+                {[{ key: 'e_vessel', label: 'Vessel' }, { key: 'e_date', label: 'Survey Date' }, { key: 'e_type', label: 'Type' }, { key: 'e_reminder', label: 'Reminder Date' }, { key: 'e_action', label: 'Action' }].map(h => (
+                  <th key={h.key} style={{ padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', position: 'relative' }}>
+                    {h.label}
+                    <ResizeHandle colKey={h.key} />
+                  </th>
                 ))}
               </tr>
             </thead>
