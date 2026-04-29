@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bell, Check, AlertTriangle, Clock, RefreshCw, X, FileWarning, Ship, ChevronRight, Search } from 'lucide-react'
+import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -346,11 +346,20 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '24%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '20%' }} />
+              </colgroup>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
                   {['Vessel', 'Warranty', 'Policy', 'Deadline', 'Status', 'Reminders', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -370,86 +379,73 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                     <>
                       <tr key={w.id} style={{ background: rowBg, borderBottom: isHistoryExpanded ? 'none' : '1px solid var(--table-border)' }}>
                         {/* Vessel */}
-                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Ship size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                            {onNavigateToVessel ? (
-                              <button
-                                onClick={() => onNavigateToVessel(w.vesselId)}
-                                style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: '600', padding: 0, fontSize: '0.85rem' }}
-                              >
-                                {w.vesselName || '—'}
-                              </button>
-                            ) : (
-                              <span style={{ fontWeight: '600' }}>{w.vesselName || '—'}</span>
-                            )}
-                          </div>
-                          {w.imoNumber && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', paddingLeft: '19px' }}>IMO {w.imoNumber}</div>}
+                        <td style={{ padding: '6px 8px', overflow: 'hidden' }}>
+                          {onNavigateToVessel ? (
+                            <button onClick={() => onNavigateToVessel(w.vesselId)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: '600', padding: 0, fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
+                              {w.vesselName || '—'}
+                            </button>
+                          ) : (
+                            <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>{w.vesselName || '—'}</span>
+                          )}
+                          {w.imoNumber && <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>{w.imoNumber}</div>}
                         </td>
 
                         {/* Warranty description */}
-                        <td style={{ padding: '8px 10px', maxWidth: '220px' }}>
-                          <div style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.description}</div>
-                          {w.notes && <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>{w.notes}</div>}
+                        <td style={{ padding: '6px 8px', overflow: 'hidden' }}>
+                          <div style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>{w.description}</div>
+                          {w.notes && <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>{w.notes}</div>}
                         </td>
 
                         {/* Policy */}
-                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '6px 8px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
                           {w.policyTypeName || '—'}
                         </td>
 
                         {/* Deadline */}
-                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '6px 8px' }}>
                           {w.deadlineType === 'days' && w.deadlineDays && w.inceptionDate ? (
                             <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                                <Clock size={12} />
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                                 {formatDateOrDash(calcDeadlineDate(w.inceptionDate, w.deadlineDays).toISOString().split('T')[0])}
                               </div>
-                              <div style={{ marginTop: '3px' }}>{renderUrgencyPill(w)}</div>
+                              {renderUrgencyPill(w)}
                             </div>
                           ) : w.deadlineType === 'event' ? (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <AlertTriangle size={12} />{w.deadlineEvent}
-                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{w.deadlineEvent}</span>
                           ) : '—'}
                         </td>
 
                         {/* Status */}
-                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '6px 8px' }}>
                           <span style={{
-                            padding: '2px 9px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700',
+                            padding: '2px 7px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: '700',
                             textTransform: 'uppercase', background: sc.bg, color: sc.color
                           }}>{STATUS_LABELS[w.status]}</span>
                         </td>
 
                         {/* Reminders */}
-                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <Bell size={12} />{w.reminderCount ?? 0}
-                            </span>
+                        <td style={{ padding: '6px 8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                            <Bell size={11} style={{ color: 'var(--text-secondary)' }} />
+                            <span style={{ color: 'var(--text-secondary)' }}>{w.reminderCount ?? 0}</span>
                             {w.nextReminderDate && (w.status === 'pending' || w.status === 'survey_done') && (
-                              <span style={{ fontSize: '0.72rem', color: '#e6a800' }}>→ {formatDateOrDash(w.nextReminderDate)}</span>
+                              <span style={{ fontSize: '0.68rem', color: '#e6a800' }}>→ {formatDateOrDash(w.nextReminderDate)}</span>
                             )}
                           </div>
-                          <button
-                            onClick={() => toggleHistory(w.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.72rem', padding: '2px 0', display: 'flex', alignItems: 'center', gap: '2px' }}
-                          >
-                            <ChevronRight size={11} style={{ transform: isHistoryExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                          <button onClick={() => toggleHistory(w.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.68rem', padding: '1px 0', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <ChevronRight size={9} style={{ transform: isHistoryExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                             History
                           </button>
                         </td>
 
                         {/* Actions */}
-                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap', alignItems: 'center' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', alignItems: 'center' }}>
                             {(w.status === 'pending' || w.status === 'survey_done') && (
                               <button
                                 onClick={() => openLogReminder(w)}
                                 className="btn-secondary"
-                                style={{ fontSize: '0.74rem', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                style={{ fontSize: '0.7rem', padding: '2px 7px', display: 'flex', alignItems: 'center', gap: '3px' }}
                                 title="Log Reminder"
                               >
                                 <Bell size={11} /> Remind
@@ -459,7 +455,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                               <button
                                 onClick={() => handleMarkSurveyDone(w)}
                                 className="btn-secondary"
-                                style={{ fontSize: '0.74rem', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00aaff', borderColor: 'rgba(0,170,255,0.35)' }}
+                                style={{ fontSize: '0.7rem', padding: '2px 7px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00aaff', borderColor: 'rgba(0,170,255,0.35)' }}
                                 title="Mark survey received"
                               >
                                 <Check size={11} /> Done
@@ -469,7 +465,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                               <button
                                 onClick={() => { setCompleteFor(w); setCompleteNotes('') }}
                                 className="btn-secondary"
-                                style={{ fontSize: '0.74rem', padding: '3px 9px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00c864', borderColor: 'rgba(0,200,100,0.35)' }}
+                                style={{ fontSize: '0.7rem', padding: '2px 7px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00c864', borderColor: 'rgba(0,200,100,0.35)' }}
                                 title="Mark complete"
                               >
                                 <Check size={11} /> Complete
@@ -479,7 +475,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                               <button
                                 onClick={() => { setWaiveFor(w); setWaiveReason('') }}
                                 className="btn-secondary"
-                                style={{ fontSize: '0.74rem', padding: '3px 9px', color: '#888', borderColor: 'rgba(128,128,128,0.3)' }}
+                                style={{ fontSize: '0.7rem', padding: '2px 7px', color: '#888', borderColor: 'rgba(128,128,128,0.3)' }}
                                 title="Waive"
                               >
                                 Waive
