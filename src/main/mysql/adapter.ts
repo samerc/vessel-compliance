@@ -3176,7 +3176,7 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN deleted_at DATETIME DEFAULT NULL")
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN deleted_by VARCHAR(36) DEFAULT NULL")
                 }
-            } catch {}
+            } catch (e) { console.error('Migration warning (deleted_at):', e) }
 
             // Migration: subjectivity_days on quotations (default 0) and policy_documents (default 7)
             try {

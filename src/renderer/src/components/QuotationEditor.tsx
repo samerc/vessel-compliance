@@ -289,11 +289,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         try {
             if (deleteModal.deleteMode === 'all' && deleteModal.revisionCount > 1) {
                 const groupId = q.revisionGroupId || q.id
-                await window.api.deleteQuotationGroup(groupId)
-                showSuccess('All revisions deleted')
+                const result = await window.api.deleteQuotationGroup(groupId) as any
+                if (result?.error) { showError(result.message || 'Failed to delete'); return }
+                showSuccess('All revisions moved to recycle bin')
             } else {
-                await window.api.deleteQuotation(q.id)
-                showSuccess('Quotation deleted')
+                const result = await window.api.deleteQuotation(q.id) as any
+                if (result?.error) { showError(result.message || 'Failed to delete'); return }
+                showSuccess('Quotation moved to recycle bin')
             }
             setDeleteModal(null)
             onBack()
