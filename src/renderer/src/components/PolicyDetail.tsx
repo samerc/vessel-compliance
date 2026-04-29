@@ -45,6 +45,7 @@ import {
 import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
 import ConfirmationModal from './ConfirmationModal'
+import EndorsementManager from './EndorsementManager'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
@@ -3281,6 +3282,19 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           </div>
         </div>
       )}
+
+      {/* Endorsements Card */}
+      <div style={cardStyle}>
+        <div style={cardHeaderStyle}>
+          <FileCheck size={18} style={{ color: 'var(--text-secondary)' }} />
+          <span style={cardTitleStyle}>Endorsements</span>
+        </div>
+        <EndorsementManager
+          policyDocId={policyId}
+          policyNumber={policy.policyNumber}
+          premiumCurrency="USD"
+        />
+      </div>
 
       {/* Revision History Card */}
       <div style={cardStyle}>

@@ -21,7 +21,8 @@ import {
   Loader2,
   PenTool,
   QrCode,
-  Percent
+  Percent,
+  Edit3
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -58,6 +59,7 @@ type PolicySettingsTab =
   | 'qrVerification'
   | 'commissions'
   | 'declaration'
+  | 'endorsements'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -82,6 +84,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'qrVerification', label: 'QR Verification', icon: <QrCode size={15} /> },
     { id: 'commissions', label: 'Commissions', icon: <Percent size={15} /> },
     { id: 'declaration', label: 'Declaration', icon: <FileText size={15} /> },
+    { id: 'endorsements', label: 'Endorsements', icon: <FileCheck size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -201,6 +204,7 @@ export default function PolicySettings() {
         {activeTab === 'qrVerification' && <QrVerificationTab showSuccess={showSuccess} />}
         {activeTab === 'commissions' && <CommissionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'declaration' && <DeclarationSettingsTab showSuccess={showSuccess} />}
+        {activeTab === 'endorsements' && <EndorsementSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -1753,6 +1757,202 @@ function DeclarationSettingsTab({ showSuccess }: { showSuccess: (m: string) => v
       <button className="btn-primary" onClick={handleSave} style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Save size={14} /> Save
       </button>
+    </div>
+  )
+}
+
+// ── Endorsement Settings ──────────────────────────────────────
+
+function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+  const [closingText, setClosingText] = useState('')
+  const [triggerFields, setTriggerFields] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  const [addingTemplate, setAddingTemplate] = useState(false)
+  const [newTmplName, setNewTmplName] = useState('')
+  const [newTmplSection, setNewTmplSection] = useState('general')
+  const [newTmplContent, setNewTmplContent] = useState('')
+  const [editingTmpl, setEditingTmpl] = useState<string | null>(null)
+  const [editTmplName, setEditTmplName] = useState('')
+  const [editTmplSection, setEditTmplSection] = useState('')
+  const [editTmplContent, setEditTmplContent] = useState('')
+
+  const sectionOptions = [
+    { key: 'general', label: 'General (all sections)' },
+    { key: 'interest', label: 'Interest / Vessel' },
+    { key: 'premium', label: 'Premium' },
+    { key: 'conditions', label: 'Conditions' },
+    { key: 'warranties', label: 'Warranties' },
+    { key: 'deductibles', label: 'Deductibles' },
+  ]
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const [ct, tf, tmpls] = await Promise.all([
+        window.api.getSetting('endorsement_closing_text').catch(() => null),
+        window.api.endorsementGetTriggerFields(),
+        window.api.endorsementGetTemplates()
+      ])
+      setClosingText(ct || 'All other terms and conditions of the above-mentioned policy remain unchanged.')
+      setTriggerFields(Array.isArray(tf) ? tf : [])
+      setTemplates(Array.isArray(tmpls) ? tmpls : [])
+    } catch { showError('Failed to load endorsement settings') }
+  }
+
+  async function saveClosingText() {
+    try {
+      await window.api.setSetting('endorsement_closing_text', closingText)
+      showSuccess('Closing text saved')
+    } catch { showError('Failed to save') }
+  }
+
+  async function saveTriggerFields() {
+    try {
+      await window.api.endorsementSetTriggerFields(triggerFields)
+      showSuccess('Trigger fields saved')
+    } catch { showError('Failed to save') }
+  }
+
+  async function addTemplate() {
+    if (!newTmplName.trim()) return
+    try {
+      await window.api.endorsementAddTemplate({ name: newTmplName, sectionKey: newTmplSection, content: newTmplContent })
+      setAddingTemplate(false)
+      setNewTmplName(''); setNewTmplSection('general'); setNewTmplContent('')
+      showSuccess('Template added')
+      await loadData()
+    } catch { showError('Failed to add template') }
+  }
+
+  async function updateTemplate(id: string) {
+    try {
+      await window.api.endorsementUpdateTemplate(id, { name: editTmplName, sectionKey: editTmplSection, content: editTmplContent })
+      setEditingTmpl(null)
+      showSuccess('Template updated')
+      await loadData()
+    } catch { showError('Failed to update template') }
+  }
+
+  async function deleteTemplate(id: string) {
+    try {
+      await window.api.endorsementDeleteTemplate(id)
+      showSuccess('Template deleted')
+      await loadData()
+    } catch { showError('Failed to delete') }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px',
+    border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit'
+  }
+
+  return (
+    <div>
+      {/* Closing Text */}
+      <div style={{ marginBottom: '24px' }}>
+        <h4 style={{ fontSize: '0.85rem', marginBottom: '8px' }}>Closing Text</h4>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+          Default closing text appended to all endorsement documents.
+        </p>
+        <RichTextEditor value={closingText} onChange={setClosingText} minHeight={80} />
+        <button className="btn-primary" onClick={saveClosingText} style={{ marginTop: '8px', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Save size={14} /> Save Closing Text
+        </button>
+      </div>
+
+      {/* Trigger Fields */}
+      <div style={{ marginBottom: '24px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+        <h4 style={{ fontSize: '0.85rem', marginBottom: '8px' }}>Endorsement Trigger Fields</h4>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          When these vessel fields change, the app will prompt the user to issue an endorsement.
+        </p>
+        {triggerFields.map(f => (
+          <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!f.isActive}
+              onChange={() => setTriggerFields(prev => prev.map(x => x.id === f.id ? { ...x, isActive: !x.isActive } : x))} />
+            {f.fieldLabel}
+          </label>
+        ))}
+        <button className="btn-primary" onClick={saveTriggerFields} style={{ marginTop: '8px', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Save size={14} /> Save Triggers
+        </button>
+      </div>
+
+      {/* Templates */}
+      <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 style={{ fontSize: '0.85rem', margin: 0 }}>Endorsement Templates</h4>
+          {!addingTemplate && (
+            <button className="btn-secondary" onClick={() => setAddingTemplate(true)} style={{ padding: '4px 12px', fontSize: '0.78rem' }}>
+              + Add Template
+            </button>
+          )}
+        </div>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          Reusable text templates with placeholders. Available: {'{vesselName}'}, {'{imoNumber}'}, {'{policyNumber}'}, {'{policyType}'}, {'{effectiveDate}'}, {'{endorsementNumber}'}, {'{premiumAmount}'}, {'{currency}'}, {'{oldValue}'}, {'{newValue}'}.
+        </p>
+
+        {addingTemplate && (
+          <div style={{ background: isLight ? '#f8f9fc' : '#161829', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '14px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <input value={newTmplName} onChange={e => setNewTmplName(e.target.value)} placeholder="Template name" style={inputStyle} />
+              <select value={newTmplSection} onChange={e => setNewTmplSection(e.target.value)} style={inputStyle}>
+                {sectionOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+              </select>
+            </div>
+            <RichTextEditor value={newTmplContent} onChange={setNewTmplContent} minHeight={80} />
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+              <button className="btn-primary" onClick={addTemplate} style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Add</button>
+              <button className="btn-secondary" onClick={() => setAddingTemplate(false)} style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {templates.map(t => (
+          <div key={t.id} style={{ borderBottom: '1px solid var(--glass-border)', padding: '10px 0' }}>
+            {editingTmpl === t.id ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <input value={editTmplName} onChange={e => setEditTmplName(e.target.value)} style={inputStyle} />
+                  <select value={editTmplSection} onChange={e => setEditTmplSection(e.target.value)} style={inputStyle}>
+                    {sectionOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                  </select>
+                </div>
+                <RichTextEditor value={editTmplContent} onChange={setEditTmplContent} minHeight={80} />
+                <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                  <button className="btn-primary" onClick={() => updateTemplate(t.id)} style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Save</button>
+                  <button className="btn-secondary" onClick={() => setEditingTmpl(null)} style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{t.name}</span>
+                <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0,170,200,0.1)', color: '#00aac8' }}>
+                  {sectionOptions.find(o => o.key === t.sectionKey)?.label || t.sectionKey}
+                </span>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                  <button onClick={() => { setEditingTmpl(t.id); setEditTmplName(t.name); setEditTmplSection(t.sectionKey); setEditTmplContent(t.content) }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                    <Edit3 size={14} />
+                  </button>
+                  <button onClick={() => deleteTemplate(t.id)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {templates.length === 0 && !addingTemplate && (
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+            No templates yet
+          </div>
+        )}
+      </div>
     </div>
   )
 }

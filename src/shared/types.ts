@@ -1705,3 +1705,66 @@ export const TEMPLATE_PLACEHOLDERS = [
   { key: '{{today}}', label: "Today's Date", category: 'General' },
   { key: '{{userName}}', label: 'Current User', category: 'General' },
 ] as const
+
+// ---- Policy Endorsements ----
+
+export interface PolicyEndorsement {
+  id: string
+  policyDocId: string
+  endorsementNumber: number
+  effectiveDate: string
+  affectsDebitAdvice: boolean
+  premiumAmount: number | null
+  premiumCurrency: string | null
+  commissionPercent: number | null
+  status: 'draft' | 'exported'
+  exportedAt: string | null
+  signedBy: string | null
+  signedAt: string | null
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EndorsementSection {
+  id: string
+  endorsementId: string
+  sectionKey: string
+  sectionTitle: string
+  content: string
+  isEnabled: boolean
+  orderIndex: number
+}
+
+export interface EndorsementInstalment {
+  id: string
+  endorsementId: string
+  instalmentNumber: number
+  dueDate: string
+  premiumAmount: number
+  commissionAmount: number
+}
+
+export interface EndorsementTriggerField {
+  id: string
+  fieldKey: string
+  fieldLabel: string
+  isActive: boolean
+}
+
+export interface EndorsementTemplate {
+  id: string
+  name: string
+  sectionKey: string
+  content: string
+  orderIndex: number
+}
+
+export const ENDORSEMENT_PRESET_SECTIONS = [
+  { key: 'interest', title: 'Interest / Vessel' },
+  { key: 'premium', title: 'Premium' },
+  { key: 'conditions', title: 'Conditions' },
+  { key: 'warranties', title: 'Warranties' },
+  { key: 'deductibles', title: 'Deductibles' },
+  { key: 'general', title: 'General' },
+] as const

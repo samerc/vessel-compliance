@@ -3605,3 +3605,415 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   const vName = data.vesselInfo?.name || ''
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Declaration).docx`)
 }
+
+// ============================================================================
+// ENDORSEMENT EXPORT
+// ============================================================================
+
+async function loadEndorsementExportData(policyId: string, endorsementId: string) {
+  const data = await loadPolicyExportData(policyId)
+  const endorsement = await window.api.endorsementGet(endorsementId)
+  if (!endorsement) throw new Error('Endorsement not found')
+  const sections = await window.api.endorsementGetSections(endorsementId)
+  const instalments = await window.api.endorsementGetInstalments(endorsementId)
+  return { data, endorsement, sections: Array.isArray(sections) ? sections : [], instalments: Array.isArray(instalments) ? instalments : [] }
+}
+
+export async function exportEndorsementDocx(policyId: string, endorsementId: string): Promise<void> {
+  await loadPolicyFontSize()
+  const { data, endorsement, sections } = await loadEndorsementExportData(policyId, endorsementId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+
+  let headerTitles: Record<string, string> = {
+    P: 'Protection and Indemnity Certificate',
+    H: 'Hull & Machinery Certificate',
+    W: 'War Risk Certificate'
+  }
+  try {
+    const settings = await window.api.getSetting('policyExportSettings')
+    if (settings) {
+      const parsed = JSON.parse(settings)
+      if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
+    }
+  } catch { /* ignore */ }
+  const headerTitle = headerTitles[typeCode] || 'Certificate'
+
+  // Load signature
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+
+  // Build header + footer
+  const hdrParas: Paragraph[] = []
+  const hdrHtml = polSt(data, 'docHeader')
+  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  if (hdrHtml) {
+    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+  }
+  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+
+  const children: (Paragraph | Table)[] = []
+
+  // ── Centered header ──
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `Endorsement No. ${endorsement.endorsementNumber}`, size: 22, font: 'Arial', color: '000000', bold: true })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: 'in connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: headerTitle, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  if (endorsement.affectsDebitAdvice) {
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text: '— and the relative Debit Advice —', size: POL_FONT_SIZE, font: 'Arial', color: '000000', italics: true })]
+    }))
+  }
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: data.policy.policyNumber, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+  }))
+
+  // ── Two-column table layout (same as policy) ──
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+
+  function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: { size: POL_TITLE_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: [polBp(title)]
+        }),
+        new TableCell({
+          width: { size: POL_BODY_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: content.length > 0 ? content : [polEmptyP()]
+        })
+      ]
+    })
+  }
+
+  const rows: TableRow[] = []
+
+  // Insured
+  const insuredContent = polBuildInsuredSection(data)
+  rows.push(makeRow('INSURED', insuredContent))
+
+  // Period
+  const periodContent = polBuildPeriodParagraphs(data)
+  rows.push(makeRow('PERIOD', periodContent))
+
+  // Effective Date
+  const effDate = polFormatDateUS(endorsement.effectiveDate)
+  rows.push(makeRow('EFFECTIVE DATE', [polNp(effDate)]))
+
+  // Endorsement sections
+  const enabledSections = sections.filter((s: any) => s.isEnabled)
+  enabledSections.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+  for (const sec of enabledSections) {
+    const sectionContent: (Paragraph | Table)[] = []
+    if (sec.content && polIsHtml(sec.content)) {
+      sectionContent.push(...parseHtmlToParagraphs(sec.content, { size: POL_FONT_SIZE, font: 'Arial' }))
+    } else if (sec.content) {
+      sectionContent.push(...polMp(sec.content))
+    }
+    rows.push(makeRow(sec.sectionTitle.toUpperCase(), sectionContent))
+  }
+
+  children.push(new Table({
+    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    rows
+  }))
+
+  // Closing text
+  let closingText = 'All other terms and conditions of the above-mentioned policy remain unchanged.'
+  try {
+    const savedClosing = await window.api.getSetting('endorsement_closing_text')
+    if (savedClosing) closingText = savedClosing
+  } catch { /* ignore */ }
+
+  children.push(polEmptyP())
+  if (polIsHtml(closingText)) {
+    children.push(...parseHtmlToParagraphs(closingText, { size: POL_FONT_SIZE, font: 'Arial' }))
+  } else {
+    children.push(polNp(closingText))
+  }
+
+  // Date
+  children.push(polEmptyP())
+  children.push(polNp(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })))
+
+  // Signature
+  if (signatureImageRun) {
+    children.push(polEmptyP())
+    children.push(new Paragraph({ children: [signatureImageRun] }))
+  }
+
+  const document = new Document({
+    sections: [{
+      properties: polMakePageProperties(),
+      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+      footers: adviceFooter ? { default: adviceFooter } : undefined,
+      children: children as any[]
+    }]
+  })
+
+  const blob = await Packer.toBlob(document)
+  const vName = data.vesselInfo?.name || ''
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx`)
+}
+
+export async function exportEndorsementDADocx(policyId: string, endorsementId: string): Promise<void> {
+  await loadPolicyFontSize()
+  const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const currency = endorsement.premiumCurrency || data.quotation.premiumCurrency || 'USD'
+
+  let headerTitles: Record<string, string> = {
+    P: 'Protection and Indemnity Certificate',
+    H: 'Hull & Machinery Certificate',
+    W: 'War Risk Certificate'
+  }
+  try {
+    const settings = await window.api.getSetting('policyExportSettings')
+    if (settings) {
+      const parsed = JSON.parse(settings)
+      if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
+    }
+  } catch { /* ignore */ }
+  const headerTitle = headerTitles[typeCode] || 'Certificate'
+
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+
+  const hdrParas: Paragraph[] = []
+  const hdrHtml = polSt(data, 'docHeader')
+  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  if (hdrHtml) {
+    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+  }
+  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+
+  const children: (Paragraph | Table)[] = []
+
+  // Title
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `DEBIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`, size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+  }))
+
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+
+  function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: { size: POL_TITLE_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: [polBp(title)]
+        }),
+        new TableCell({
+          width: { size: POL_BODY_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: content.length > 0 ? content : [polEmptyP()]
+        })
+      ]
+    })
+  }
+
+  const rows: TableRow[] = []
+
+  // Premium
+  const premiumAmt = Number(endorsement.premiumAmount) || 0
+  const premLabel = premiumAmt < 0 ? 'RETURN PREMIUM' : 'ADDITIONAL PREMIUM'
+  rows.push(makeRow(premLabel, [polNp(`${currency} ${Math.abs(premiumAmt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)]))
+
+  // Instalments
+  if (instalments.length > 0) {
+    const instContent: (Paragraph | Table)[] = []
+    for (const inst of instalments) {
+      instContent.push(polNp(`${polOrdinal(inst.instalmentNumber)} instalment: ${currency} ${Number(inst.premiumAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} due ${polFormatDateUS(inst.dueDate)}`))
+    }
+    rows.push(makeRow('INSTALMENTS', instContent))
+  }
+
+  // Bank details
+  if (data.bank) {
+    const bankContent: (Paragraph | Table)[] = []
+    for (const line of data.bank.details.split('\n')) {
+      if (line.trim()) bankContent.push(polNp(line.trim()))
+    }
+    rows.push(makeRow('BANK DETAILS', bankContent))
+  }
+
+  children.push(new Table({
+    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    rows
+  }))
+
+  // Closing
+  const closingParas = polBuildAdviceClosing(data, signatureImageRun)
+  children.push(...closingParas)
+
+  const document = new Document({
+    sections: [{
+      properties: polMakePageProperties(),
+      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+      footers: adviceFooter ? { default: adviceFooter } : undefined,
+      children: children as any[]
+    }]
+  })
+
+  const blob = await Packer.toBlob(document)
+  const vName = data.vesselInfo?.name || ''
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx`)
+}
+
+export async function exportEndorsementCADocx(policyId: string, endorsementId: string): Promise<void> {
+  await loadPolicyFontSize()
+  const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const currency = endorsement.premiumCurrency || data.quotation.premiumCurrency || 'USD'
+  const commPct = Number(endorsement.commissionPercent) || Number(data.policy.commissionPercent) || 0
+
+  let headerTitles: Record<string, string> = {
+    P: 'Protection and Indemnity Certificate',
+    H: 'Hull & Machinery Certificate',
+    W: 'War Risk Certificate'
+  }
+  try {
+    const settings = await window.api.getSetting('policyExportSettings')
+    if (settings) {
+      const parsed = JSON.parse(settings)
+      if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
+    }
+  } catch { /* ignore */ }
+  const headerTitle = headerTitles[typeCode] || 'Certificate'
+
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+
+  const hdrParas: Paragraph[] = []
+  const hdrHtml = polSt(data, 'docHeader')
+  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  if (hdrHtml) {
+    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+  }
+  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+
+  const children: (Paragraph | Table)[] = []
+
+  // Title
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `CREDIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`, size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+  }))
+
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+
+  function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: { size: POL_TITLE_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: [polBp(title)]
+        }),
+        new TableCell({
+          width: { size: POL_BODY_W, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.TOP,
+          borders: thinBorders(),
+          children: content.length > 0 ? content : [polEmptyP()]
+        })
+      ]
+    })
+  }
+
+  const rows: TableRow[] = []
+
+  // Commission
+  const premiumAmt = Math.abs(Number(endorsement.premiumAmount) || 0)
+  const totalComm = premiumAmt * commPct / 100
+  rows.push(makeRow('COMMISSION', [polNp(`${commPct}% of ${currency} ${premiumAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} = ${currency} ${totalComm.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)]))
+
+  // Commission per instalment
+  if (instalments.length > 0) {
+    const instContent: (Paragraph | Table)[] = []
+    for (const inst of instalments) {
+      const commAmt = Number(inst.commissionAmount) || 0
+      instContent.push(polNp(`${polOrdinal(inst.instalmentNumber)} instalment: ${currency} ${commAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} due ${polFormatDateUS(inst.dueDate)}`))
+    }
+    rows.push(makeRow('INSTALMENTS', instContent))
+  }
+
+  children.push(new Table({
+    width: { size: POL_TITLE_W + POL_BODY_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    rows
+  }))
+
+  // Closing
+  const closingParas = polBuildAdviceClosing(data, signatureImageRun)
+  children.push(...closingParas)
+
+  const document = new Document({
+    sections: [{
+      properties: polMakePageProperties(),
+      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+      footers: adviceFooter ? { default: adviceFooter } : undefined,
+      children: children as any[]
+    }]
+  })
+
+  const blob = await Packer.toBlob(document)
+  const vName = data.vesselInfo?.name || ''
+  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx`)
+}

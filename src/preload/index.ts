@@ -851,6 +851,27 @@ const api = {
   policySign: (policyId: string) => ipcRenderer.invoke('policy:sign', policyId),
   policyGetSignature: (policyId: string) => ipcRenderer.invoke('policy:getSignature', policyId),
 
+  // Policy Endorsements
+  endorsementList: (policyDocId: string) => ipcRenderer.invoke('endorsement:list', policyDocId),
+  endorsementGet: (id: string) => ipcRenderer.invoke('endorsement:get', id),
+  endorsementNextNumber: (policyDocId: string) => ipcRenderer.invoke('endorsement:nextNumber', policyDocId),
+  endorsementCreate: (data: any) => ipcRenderer.invoke('endorsement:create', data),
+  endorsementUpdate: (id: string, updates: any) => ipcRenderer.invoke('endorsement:update', id, updates),
+  endorsementDelete: (id: string) => ipcRenderer.invoke('endorsement:delete', id),
+  endorsementGetSections: (endorsementId: string) => ipcRenderer.invoke('endorsement:getSections', endorsementId),
+  endorsementSetSections: (endorsementId: string, sections: any[]) => ipcRenderer.invoke('endorsement:setSections', endorsementId, sections),
+  endorsementGetInstalments: (endorsementId: string) => ipcRenderer.invoke('endorsement:getInstalments', endorsementId),
+  endorsementSetInstalments: (endorsementId: string, instalments: any[]) => ipcRenderer.invoke('endorsement:setInstalments', endorsementId, instalments),
+  endorsementCount: (policyDocId: string) => ipcRenderer.invoke('endorsement:count', policyDocId),
+  endorsementSign: (id: string) => ipcRenderer.invoke('endorsement:sign', id),
+  endorsementGetTriggerFields: () => ipcRenderer.invoke('endorsement:getTriggerFields'),
+  endorsementSetTriggerFields: (fields: any[]) => ipcRenderer.invoke('endorsement:setTriggerFields', fields),
+  endorsementGetTemplates: () => ipcRenderer.invoke('endorsement:getTemplates'),
+  endorsementAddTemplate: (data: any) => ipcRenderer.invoke('endorsement:addTemplate', data),
+  endorsementUpdateTemplate: (id: string, updates: any) => ipcRenderer.invoke('endorsement:updateTemplate', id, updates),
+  endorsementDeleteTemplate: (id: string) => ipcRenderer.invoke('endorsement:deleteTemplate', id),
+  endorsementReorderTemplates: (ids: string[]) => ipcRenderer.invoke('endorsement:reorderTemplates', ids),
+
   // Signatures
   signatureGet: () => ipcRenderer.invoke('signature:get'),
   signatureGetForUser: (userId: string) => ipcRenderer.invoke('signature:getForUser', userId),

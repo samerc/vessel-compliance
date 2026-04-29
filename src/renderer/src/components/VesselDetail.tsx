@@ -50,6 +50,13 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light' || theme === 'aurora'
 
+    // Endorsement prompt state
+    const [endorsementPrompt, setEndorsementPrompt] = useState<{
+        show: boolean
+        changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }>
+        policies: Array<{ id: string; policyDocId: string | null; typeName: string; typeCode: string; policyNumber: string; nextEndNum: number; selected: boolean }>
+    }>({ show: false, changes: [], policies: [] })
+
     useEffect(() => {
         loadData()
     }, [vessel])
@@ -533,6 +540,12 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
     const handleSaveVessel = async () => {
         if (!editName.trim() || !editImo.trim()) return
+        // Capture old values before save for endorsement trigger check
+        const oldValues: Record<string, string> = {
+            name: vessel.name || '',
+            flagStateId: vessel.flagStateId || '',
+            classificationSociety: vessel.classificationSociety || '',
+        }
         // Derive classification text from junction table selection
         const classText = vesselClassificationIds.size > 0
             ? classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(' / ')
@@ -564,6 +577,60 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         // Reload to refresh name history
         const history = await window.api.getVesselNameHistory(vessel.id)
         setNameHistory(Array.isArray(history) ? history : [])
+
+        // Check endorsement triggers
+        try {
+            const newValues: Record<string, string> = {
+                name: editName || '',
+                flagStateId: selectedFlagStateId || '',
+                classificationSociety: classText || '',
+            }
+            const triggerFields = await window.api.endorsementGetTriggerFields()
+            if (!Array.isArray(triggerFields)) return
+            const activeFields = triggerFields.filter(f => f.isActive)
+            const changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }> = []
+            for (const f of activeFields) {
+                const oldV = oldValues[f.fieldKey] || ''
+                const newV = newValues[f.fieldKey] || ''
+                if (oldV !== newV) {
+                    // Resolve flag state names for display
+                    let displayOld = oldV
+                    let displayNew = newV
+                    if (f.fieldKey === 'flagStateId') {
+                        const fs = flagStates || []
+                        displayOld = fs.find(s => s.id === oldV)?.name || oldV
+                        displayNew = fs.find(s => s.id === newV)?.name || newV
+                    }
+                    changes.push({ fieldLabel: f.fieldLabel, oldValue: displayOld, newValue: displayNew })
+                }
+            }
+            if (changes.length > 0) {
+                // Find active policy documents for this vessel
+                const dp = dynamicPolicies.filter(p => p.status === 'active')
+                const policyTypes = await window.api.getPolicyTypes()
+                const policies: typeof endorsementPrompt.policies = []
+                for (const p of dp) {
+                    const pt = Array.isArray(policyTypes) ? policyTypes.find(t => t.id === p.policyTypeId) : null
+                    const code = pt?.code || ''
+                    const policyDocId = await window.api.policyFindActiveForVessel(vessel.id, code)
+                    if (policyDocId) {
+                        const nextNum = await window.api.endorsementNextNumber(policyDocId)
+                        policies.push({
+                            id: p.id,
+                            policyDocId,
+                            typeName: pt?.name || p.policyTypeName || '',
+                            typeCode: code,
+                            policyNumber: p.policyNumber || '',
+                            nextEndNum: nextNum,
+                            selected: true
+                        })
+                    }
+                }
+                if (policies.length > 0) {
+                    setEndorsementPrompt({ show: true, changes, policies })
+                }
+            }
+        } catch { /* endorsement prompt is best-effort */ }
     }
 
     const handleToggleVesselActive = async () => {
@@ -1979,6 +2046,96 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
                 />
             )}
+
+            {/* Endorsement Prompt Modal */}
+            {endorsementPrompt.show && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+                        onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))} />
+                    <div style={{
+                        position: 'relative', width: '480px', borderRadius: '14px', padding: '24px',
+                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)'
+                    }}>
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>Issue Endorsement?</h3>
+                        <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
+                            {endorsementPrompt.changes.map((c, i) => (
+                                <div key={i} style={{ marginBottom: '6px' }}>
+                                    <strong>{c.fieldLabel}</strong> changed from{' '}
+                                    <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>{c.oldValue || '(empty)'}</span>
+                                    {' → '}
+                                    <span style={{ fontWeight: 600 }}>{c.newValue || '(empty)'}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                            Select policies to create endorsements for:
+                        </div>
+                        {endorsementPrompt.policies.map(p => (
+                            <label key={p.id} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px',
+                                fontSize: '0.85rem', cursor: 'pointer'
+                            }}>
+                                <input type="checkbox" checked={p.selected}
+                                    onChange={() => setEndorsementPrompt(prev => ({
+                                        ...prev,
+                                        policies: prev.policies.map(x => x.id === p.id ? { ...x, selected: !x.selected } : x)
+                                    }))} />
+                                {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
+                                <span style={{
+                                    fontSize: '0.72rem', padding: '1px 6px', borderRadius: '8px',
+                                    background: 'rgba(0,170,200,0.1)', color: '#00aac8'
+                                }}>
+                                    Endorsement No. {p.nextEndNum}
+                                </span>
+                            </label>
+                        ))}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))}
+                                style={{
+                                    padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem',
+                                    border: '1px solid var(--glass-border)', background: 'transparent',
+                                    color: 'var(--text-primary)', cursor: 'pointer'
+                                }}>Skip</button>
+                            <button onClick={async () => {
+                                const selected = endorsementPrompt.policies.filter(p => p.selected && p.policyDocId)
+                                if (selected.length === 0) {
+                                    setEndorsementPrompt(prev => ({ ...prev, show: false }))
+                                    return
+                                }
+                                try {
+                                    const changeDesc = endorsementPrompt.changes.map(c =>
+                                        `It is hereby noted and agreed that the ${c.fieldLabel} has been changed from ${c.oldValue || '(none)'} to ${c.newValue || '(none)'}.`
+                                    ).join('\n')
+                                    for (const p of selected) {
+                                        const id = await window.api.endorsementCreate({
+                                            policyDocId: p.policyDocId!,
+                                            endorsementNumber: p.nextEndNum,
+                                            effectiveDate: new Date().toISOString().slice(0, 10)
+                                        })
+                                        // Set interest section with change description
+                                        await window.api.endorsementSetSections(id, [{
+                                            sectionKey: 'interest',
+                                            sectionTitle: 'Interest / Vessel',
+                                            content: `<p>${changeDesc.replace(/\n/g, '</p><p>')}</p>`,
+                                            isEnabled: true,
+                                            orderIndex: 0
+                                        }])
+                                    }
+                                    showSuccess(`${selected.length} draft endorsement${selected.length > 1 ? 's' : ''} created`)
+                                } catch {
+                                    showError('Failed to create endorsements')
+                                }
+                                setEndorsementPrompt(prev => ({ ...prev, show: false }))
+                            }}
+                                style={{
+                                    padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
+                                    background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer'
+                                }}>Create</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showRemapModal && (
                 <RemapFilePathsModal
                     vesselId={vessel.id}

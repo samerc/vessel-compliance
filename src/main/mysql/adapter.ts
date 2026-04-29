@@ -3192,6 +3192,73 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // ---- Policy Endorsements tables ----
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
+                id VARCHAR(36) PRIMARY KEY,
+                policy_doc_id VARCHAR(36) NOT NULL,
+                endorsement_number INT NOT NULL,
+                effective_date DATE NOT NULL,
+                affects_debit_advice TINYINT(1) DEFAULT 0,
+                premium_amount DECIMAL(15,2) NULL,
+                premium_currency VARCHAR(10) NULL,
+                commission_percent DECIMAL(5,2) NULL,
+                status VARCHAR(20) DEFAULT 'draft',
+                exported_at DATETIME NULL,
+                signed_by VARCHAR(36) NULL,
+                signed_at DATETIME NULL,
+                created_by VARCHAR(36) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_policy_endorsement (policy_doc_id, endorsement_number)
+            )`)
+
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS endorsement_sections (
+                id VARCHAR(36) PRIMARY KEY,
+                endorsement_id VARCHAR(36) NOT NULL,
+                section_key VARCHAR(50) NOT NULL,
+                section_title VARCHAR(255) NOT NULL,
+                content TEXT NOT NULL,
+                is_enabled TINYINT(1) DEFAULT 1,
+                order_index INT DEFAULT 0
+            )`)
+
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS endorsement_instalments (
+                id VARCHAR(36) PRIMARY KEY,
+                endorsement_id VARCHAR(36) NOT NULL,
+                instalment_number INT NOT NULL,
+                due_date DATE NOT NULL,
+                premium_amount DECIMAL(15,2) NOT NULL,
+                commission_amount DECIMAL(15,2) DEFAULT 0
+            )`)
+
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS endorsement_trigger_fields (
+                id VARCHAR(36) PRIMARY KEY,
+                field_key VARCHAR(50) NOT NULL,
+                field_label VARCHAR(100) NOT NULL,
+                is_active TINYINT(1) DEFAULT 1
+            )`)
+
+            await this.pool.query(`CREATE TABLE IF NOT EXISTS endorsement_templates (
+                id VARCHAR(36) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                section_key VARCHAR(50) NOT NULL,
+                content TEXT NOT NULL,
+                order_index INT DEFAULT 0
+            )`)
+
+            // Seed default trigger fields if table is empty
+            {
+                const [etfRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM endorsement_trigger_fields') as any[]
+                if (etfRows[0].cnt === 0) {
+                    await this.pool.query(`INSERT INTO endorsement_trigger_fields (id, field_key, field_label, is_active) VALUES
+                        (?, 'name', 'Vessel Name', 1),
+                        (?, 'flagStateId', 'Flag State', 1),
+                        (?, 'classificationSociety', 'Classification Society', 1)`,
+                        [uuidv4(), uuidv4(), uuidv4()]
+                    )
+                }
+            }
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -14245,6 +14312,232 @@ export class MySQLAdapter {
         }
 
         return results
+    }
+    // ---- Policy Endorsements ----
+
+    async getEndorsements(policyDocId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
+                    effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
+                    premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
+                    commission_percent AS commissionPercent, status,
+                    exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
+                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt
+             FROM policy_endorsements WHERE policy_doc_id = ? ORDER BY endorsement_number ASC`,
+            [policyDocId]
+        )
+        return rows as any[]
+    }
+
+    async getEndorsement(id: string): Promise<any | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
+                    effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
+                    premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
+                    commission_percent AS commissionPercent, status,
+                    exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
+                    created_by AS createdBy, created_at AS createdAt, updated_at AS updatedAt
+             FROM policy_endorsements WHERE id = ?`,
+            [id]
+        )
+        const arr = rows as any[]
+        return arr.length > 0 ? arr[0] : null
+    }
+
+    async getNextEndorsementNumber(policyDocId: string): Promise<number> {
+        if (!this.pool) return 1
+        const [rows] = await this.pool.query(
+            'SELECT COALESCE(MAX(endorsement_number), 0) + 1 AS nextNum FROM policy_endorsements WHERE policy_doc_id = ?',
+            [policyDocId]
+        )
+        return (rows as any[])[0].nextNum
+    }
+
+    async createEndorsement(data: {
+        policyDocId: string
+        endorsementNumber: number
+        effectiveDate: string
+        affectsDebitAdvice?: boolean
+        premiumAmount?: number | null
+        premiumCurrency?: string | null
+        commissionPercent?: number | null
+        createdBy?: string
+    }): Promise<string> {
+        if (!this.pool) throw new Error('No DB connection')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO policy_endorsements (id, policy_doc_id, endorsement_number, effective_date,
+             affects_debit_advice, premium_amount, premium_currency, commission_percent, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.policyDocId, data.endorsementNumber, data.effectiveDate,
+             data.affectsDebitAdvice ? 1 : 0, data.premiumAmount ?? null,
+             data.premiumCurrency ?? null, data.commissionPercent ?? null, data.createdBy ?? null]
+        )
+        return id
+    }
+
+    async updateEndorsement(id: string, updates: Partial<{
+        effectiveDate: string
+        affectsDebitAdvice: boolean
+        premiumAmount: number | null
+        premiumCurrency: string | null
+        commissionPercent: number | null
+        status: string
+        exportedAt: string | null
+        signedBy: string | null
+        signedAt: string | null
+    }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.effectiveDate !== undefined) { fields.push('effective_date = ?'); values.push(updates.effectiveDate) }
+        if (updates.affectsDebitAdvice !== undefined) { fields.push('affects_debit_advice = ?'); values.push(updates.affectsDebitAdvice ? 1 : 0) }
+        if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount) }
+        if (updates.premiumCurrency !== undefined) { fields.push('premium_currency = ?'); values.push(updates.premiumCurrency) }
+        if (updates.commissionPercent !== undefined) { fields.push('commission_percent = ?'); values.push(updates.commissionPercent) }
+        if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
+        if (updates.exportedAt !== undefined) { fields.push('exported_at = ?'); values.push(updates.exportedAt) }
+        if (updates.signedBy !== undefined) { fields.push('signed_by = ?'); values.push(updates.signedBy) }
+        if (updates.signedAt !== undefined) { fields.push('signed_at = ?'); values.push(updates.signedAt) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE policy_endorsements SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteEndorsement(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM endorsement_sections WHERE endorsement_id = ?', [id])
+        await this.pool.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [id])
+        await this.pool.execute('DELETE FROM policy_endorsements WHERE id = ?', [id])
+    }
+
+    async getEndorsementSections(endorsementId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, endorsement_id AS endorsementId, section_key AS sectionKey,
+                    section_title AS sectionTitle, content, is_enabled AS isEnabled, order_index AS orderIndex
+             FROM endorsement_sections WHERE endorsement_id = ? ORDER BY order_index ASC`,
+            [endorsementId]
+        )
+        return rows as any[]
+    }
+
+    async setEndorsementSections(endorsementId: string, sections: Array<{
+        id?: string; sectionKey: string; sectionTitle: string; content: string; isEnabled: boolean; orderIndex: number
+    }>): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM endorsement_sections WHERE endorsement_id = ?', [endorsementId])
+        for (const s of sections) {
+            await this.pool.execute(
+                `INSERT INTO endorsement_sections (id, endorsement_id, section_key, section_title, content, is_enabled, order_index)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [s.id || uuidv4(), endorsementId, s.sectionKey, s.sectionTitle, s.content, s.isEnabled ? 1 : 0, s.orderIndex]
+            )
+        }
+    }
+
+    async getEndorsementInstalments(endorsementId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, endorsement_id AS endorsementId, instalment_number AS instalmentNumber,
+                    due_date AS dueDate, premium_amount AS premiumAmount, commission_amount AS commissionAmount
+             FROM endorsement_instalments WHERE endorsement_id = ? ORDER BY instalment_number ASC`,
+            [endorsementId]
+        )
+        return rows as any[]
+    }
+
+    async setEndorsementInstalments(endorsementId: string, instalments: Array<{
+        instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number
+    }>): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [endorsementId])
+        for (const inst of instalments) {
+            await this.pool.execute(
+                `INSERT INTO endorsement_instalments (id, endorsement_id, instalment_number, due_date, premium_amount, commission_amount)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [uuidv4(), endorsementId, inst.instalmentNumber, inst.dueDate, inst.premiumAmount, inst.commissionAmount]
+            )
+        }
+    }
+
+    async getEndorsementCountForPolicy(policyDocId: string): Promise<number> {
+        if (!this.pool) return 0
+        const [rows] = await this.pool.query(
+            'SELECT COUNT(*) AS cnt FROM policy_endorsements WHERE policy_doc_id = ?',
+            [policyDocId]
+        )
+        return (rows as any[])[0].cnt
+    }
+
+    // ---- Endorsement Trigger Fields ----
+
+    async getEndorsementTriggerFields(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, field_key AS fieldKey, field_label AS fieldLabel, is_active AS isActive
+             FROM endorsement_trigger_fields ORDER BY field_label ASC`
+        )
+        return rows as any[]
+    }
+
+    async setEndorsementTriggerFields(fields: Array<{ id: string; fieldKey: string; fieldLabel: string; isActive: boolean }>): Promise<void> {
+        if (!this.pool) return
+        for (const f of fields) {
+            await this.pool.execute(
+                `UPDATE endorsement_trigger_fields SET is_active = ? WHERE id = ?`,
+                [f.isActive ? 1 : 0, f.id]
+            )
+        }
+    }
+
+    // ---- Endorsement Templates ----
+
+    async getEndorsementTemplates(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, name, section_key AS sectionKey, content, order_index AS orderIndex
+             FROM endorsement_templates ORDER BY order_index ASC`
+        )
+        return rows as any[]
+    }
+
+    async addEndorsementTemplate(data: { name: string; sectionKey: string; content: string; orderIndex?: number }): Promise<string> {
+        if (!this.pool) throw new Error('No DB connection')
+        const id = uuidv4()
+        const orderIndex = data.orderIndex ?? 0
+        await this.pool.execute(
+            'INSERT INTO endorsement_templates (id, name, section_key, content, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, data.name, data.sectionKey, data.content, orderIndex]
+        )
+        return id
+    }
+
+    async updateEndorsementTemplate(id: string, updates: Partial<{ name: string; sectionKey: string; content: string; orderIndex: number }>): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name) }
+        if (updates.sectionKey !== undefined) { fields.push('section_key = ?'); values.push(updates.sectionKey) }
+        if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content) }
+        if (updates.orderIndex !== undefined) { fields.push('order_index = ?'); values.push(updates.orderIndex) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE endorsement_templates SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteEndorsementTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM endorsement_templates WHERE id = ?', [id])
+    }
+
+    async reorderEndorsementTemplates(orderedIds: string[]): Promise<void> {
+        if (!this.pool) return
+        for (let i = 0; i < orderedIds.length; i++) {
+            await this.pool.execute('UPDATE endorsement_templates SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
     }
 }
 

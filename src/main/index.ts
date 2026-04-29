@@ -2981,6 +2981,44 @@ app.whenReady().then(() => {
     return { quotationId }
   })
 
+  // ── Policy Endorsements ──────────────────────────────────────
+  safeHandle('endorsement:list', (event, policyDocId: string) => { requireSession(event); return db.getEndorsements(policyDocId) })
+  safeHandle('endorsement:get', (event, id: string) => { requireSession(event); return db.getEndorsement(id) })
+  safeHandle('endorsement:nextNumber', (event, policyDocId: string) => { requireSession(event); return db.getNextEndorsementNumber(policyDocId) })
+  safeHandle('endorsement:create', async (event, data: any) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const id = await db.createEndorsement({ ...data, createdBy: user.id })
+    db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Policies', entityType: 'endorsement', entityId: id, entityName: `Endorsement No. ${data.endorsementNumber}`, details: `Created endorsement for policy ${data.policyDocId}` }).catch(() => {})
+    return id
+  })
+  safeHandle('endorsement:update', async (event, id: string, updates: any) => {
+    await requirePermission(event, 'policies:manage')
+    return db.updateEndorsement(id, updates)
+  })
+  safeHandle('endorsement:delete', async (event, id: string) => {
+    const user = await requirePermission(event, 'policies:manage')
+    await db.deleteEndorsement(id)
+    db.logActivity({ userId: user.id, username: user.username, action: 'DELETE', module: 'Policies', entityType: 'endorsement', entityId: id, entityName: 'Endorsement', details: 'Deleted endorsement' }).catch(() => {})
+  })
+  safeHandle('endorsement:getSections', (event, endorsementId: string) => { requireSession(event); return db.getEndorsementSections(endorsementId) })
+  safeHandle('endorsement:setSections', async (event, endorsementId: string, sections: any[]) => { await requirePermission(event, 'policies:manage'); return db.setEndorsementSections(endorsementId, sections) })
+  safeHandle('endorsement:getInstalments', (event, endorsementId: string) => { requireSession(event); return db.getEndorsementInstalments(endorsementId) })
+  safeHandle('endorsement:setInstalments', async (event, endorsementId: string, instalments: any[]) => { await requirePermission(event, 'policies:manage'); return db.setEndorsementInstalments(endorsementId, instalments) })
+  safeHandle('endorsement:count', (event, policyDocId: string) => { requireSession(event); return db.getEndorsementCountForPolicy(policyDocId) })
+  safeHandle('endorsement:sign', async (event, id: string) => {
+    const user = await requirePermission(event, 'policies:sign')
+    return db.updateEndorsement(id, { signedBy: user.id, signedAt: new Date().toISOString() })
+  })
+
+  // ── Endorsement Settings ──────────────────────────────────
+  safeHandle('endorsement:getTriggerFields', (event) => { requireSession(event); return db.getEndorsementTriggerFields() })
+  safeHandle('endorsement:setTriggerFields', async (event, fields: any[]) => { await requirePermission(event, 'admin:setup'); return db.setEndorsementTriggerFields(fields) })
+  safeHandle('endorsement:getTemplates', (event) => { requireSession(event); return db.getEndorsementTemplates() })
+  safeHandle('endorsement:addTemplate', async (event, data: any) => { await requirePermission(event, 'admin:setup'); return db.addEndorsementTemplate(data) })
+  safeHandle('endorsement:updateTemplate', async (event, id: string, updates: any) => { await requirePermission(event, 'admin:setup'); return db.updateEndorsementTemplate(id, updates) })
+  safeHandle('endorsement:deleteTemplate', async (event, id: string) => { await requirePermission(event, 'admin:setup'); return db.deleteEndorsementTemplate(id) })
+  safeHandle('endorsement:reorderTemplates', async (event, ids: string[]) => { await requirePermission(event, 'admin:setup'); return db.reorderEndorsementTemplates(ids) })
+
   // ── Signatures ─────────────────────────────────────────────
   safeHandle('signature:get', async (event) => {
     const user = requireSession(event)
