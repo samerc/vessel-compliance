@@ -99,6 +99,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
     const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
     const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
     const [docSearch, setDocSearch] = useState('')
+    const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
     const [activeTab, setActiveTabRaw] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>(initialTab || 'documents')
     const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
         setActiveTabRaw(tab)
@@ -156,13 +157,14 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
 
     const loadData = async () => {
         try {
-            const [vData, dData, tData, edtData, edData, assuredData] = await Promise.all([
+            const [vData, dData, tData, edtData, edData, assuredData, endorsements] = await Promise.all([
                 window.api.getVessels(),
                 window.api.getVesselDocuments(),
                 window.api.getDocumentTypes(),
                 window.api.getEntityDocumentTypes(),
                 window.api.getEntityDocuments(),
-                window.api.getVesselAssureds()
+                window.api.getVesselAssureds(),
+                window.api.surveyWarrantyGetEndorsementsDue().catch(() => [])
             ])
             setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
             setDocs(Array.isArray(dData) ? dData : [])
@@ -170,6 +172,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
             setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t: any) => t.isActive) : [])
             setEntityDocs(Array.isArray(edData) ? edData : [])
             setAllAssureds(Array.isArray(assuredData) ? assuredData : [])
+            setEndorsementsDue(Array.isArray(endorsements) ? endorsements : [])
         } catch (error) {
             console.error('ComplianceCenter: Failed to load data:', error)
             setVessels([])
@@ -430,6 +433,15 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                 })
             })
         })
+
+        // Endorsement due alerts
+        for (const e of endorsementsDue) {
+            alerts.push({
+                id: `endorsement-${e.surveyId}`, vesselId: e.vesselId, vessel: e.vesselName || 'Unknown',
+                document: `Endorsement (${e.surveyType || 'Survey'} - ${e.surveyDate || ''})`, category: 'endorsement',
+                type: 'missing', severity: 'high', message: 'Endorsement not issued', date: e.endorsementReminderDate || '-'
+            })
+        }
 
         let filtered = alerts.filter(a => filter === 'all' || a.type === filter)
         if (docSearch.trim()) {

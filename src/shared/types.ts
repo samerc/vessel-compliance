@@ -1317,6 +1317,7 @@ export interface NotificationGroup {
 
 export const NOTIFICATION_EVENT_TYPES = [
   { key: 'survey_warranty_deadline', label: 'Survey Warranty Deadlines', category: 'Surveys' },
+  { key: 'endorsement_due', label: 'Endorsement Reminders Due', category: 'Surveys' },
   { key: 'document_expiring', label: 'Document Expiry Warnings', category: 'Compliance' },
   { key: 'document_missing', label: 'Missing Documents', category: 'Compliance' },
   { key: 'compliance_match', label: 'Sanctions Screening Matches', category: 'Compliance' },

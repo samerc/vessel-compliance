@@ -84,6 +84,7 @@ export class DailyAlertScheduler {
       await this.checkPolicyExpiry(policyExpiryDays)
       await this.checkBlueCardExpiry(blueCardDays)
       await this.checkWarrantyDeadlines(warrantyDays)
+      await this.checkEndorsementReminders()
 
       await this.db.setSetting('daily_alerts_last_run', today)
       console.log('[DailyAlerts] Completed')
@@ -256,6 +257,27 @@ export class DailyAlertScheduler {
         undefined,
         undefined
       )
+    }
+  }
+
+  private async checkEndorsementReminders(): Promise<void> {
+    if (!this.db.pool) return
+    try {
+      const due = await this.db.getEndorsementsDue()
+      if (due.length > 0) {
+        const summary = due.length === 1
+          ? `Endorsement reminder for ${due[0].vesselName} (${due[0].surveyType || 'survey'} on ${due[0].surveyDate})`
+          : `${due.length} endorsement reminders are due`
+        await this.db.notifyGroupsForEvent(
+          'endorsement_due',
+          'Endorsement reminders due',
+          summary,
+          undefined,
+          undefined
+        )
+      }
+    } catch (err) {
+      console.error('[DailyAlerts] Endorsement check error:', err)
     }
   }
 }
