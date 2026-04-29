@@ -30,6 +30,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
     const [importText, setImportText] = useState('')
     const [importedItems, setImportedItems] = useState<string[]>([])
     const [showTexts, setShowTexts] = useState(false)
+    const [showAdditionalText, setShowAdditionalText] = useState(false)
     const defaultsApplied = useRef(false)
 
     useEffect(() => { loadData() }, [])
@@ -599,30 +600,40 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                 <button onClick={() => setShowImportModal(true)} className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.72rem' }} title="Bulk import"><Upload size={12} /></button>
                             </div>
 
-                            {/* Standard Texts (collapsible) */}
+                            {/* Additional Text (collapsible) */}
                             <div style={{ marginTop: '12px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
-                                <button onClick={() => setShowTexts(!showTexts)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0', width: '100%', textAlign: 'left' }}>
-                                    <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: showTexts ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
-                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>Standard Texts</span>
+                                <button onClick={() => setShowAdditionalText(!showAdditionalText)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0', width: '100%', textAlign: 'left' }}>
+                                    <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: showAdditionalText ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>Additional Text</span>
                                 </button>
-                                {showTexts && (
+                                {showAdditionalText && (
                                     <div style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                                        <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Breach of Warranties</label>
                                         <RichTextEditor
-                                            value={quotation.sectionTextsOverride?.warrantiesBreach ?? getEffectiveText('warrantiesBreach')}
+                                            value={quotation.sectionTextsOverride?.warrantiesAdditionalText ?? getEffectiveText('warrantiesAdditionalText')}
                                             onChange={val => {
-                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesBreach: val }
+                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesAdditionalText: val }
                                                 setQ(p => ({ ...p, sectionTextsOverride: override }))
                                                 updateField('sectionTextsOverride', override)
                                             }}
                                             minHeight={60}
                                             showFontSize showAlignment showLineSpacing
                                         />
-                                        <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '4px', marginTop: '12px', color: 'var(--text-secondary)' }}>Additional Text (after warranties, before breach)</label>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Breach of Warranties (collapsible) */}
+                            <div style={{ marginTop: '8px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
+                                <button onClick={() => setShowTexts(!showTexts)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0', width: '100%', textAlign: 'left' }}>
+                                    <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: showTexts ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>Breach of Warranties</span>
+                                </button>
+                                {showTexts && (
+                                    <div style={{ paddingLeft: '20px', marginTop: '8px' }}>
                                         <RichTextEditor
-                                            value={quotation.sectionTextsOverride?.warrantiesAdditionalText ?? getEffectiveText('warrantiesAdditionalText')}
+                                            value={quotation.sectionTextsOverride?.warrantiesBreach ?? getEffectiveText('warrantiesBreach')}
                                             onChange={val => {
-                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesAdditionalText: val }
+                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesBreach: val }
                                                 setQ(p => ({ ...p, sectionTextsOverride: override }))
                                                 updateField('sectionTextsOverride', override)
                                             }}
