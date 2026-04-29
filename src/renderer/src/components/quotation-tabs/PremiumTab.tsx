@@ -38,6 +38,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         loadInstalments()
         loadVessels()
         window.api.piGetInstalmentDefaults().then(d => setInstalmentDefaults(d || {}))
+        // Populate outstanding premium text if enabled but empty (new quotation default)
+        if (quotation.outstandingPremiumEnabled && !quotation.outstandingPremiumText) {
+            Promise.all([window.api.piGetSectionTexts(), window.api.getSetting('policyExportSettings')]).then(([globalTexts, policyRaw]) => {
+                const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find((t: any) => t.key === 'outstandingPremiumDefaultText')?.value
+                const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
+                const text = qDefault || pDefault || 'All outstanding premium to be settled prior inception'
+                setQ(p => ({ ...p, outstandingPremiumText: text }))
+                updateField('outstandingPremiumText', text)
+            }).catch(() => {})
+        }
         window.api.premiumGetTextTemplates().then(res => {
             const all = Array.isArray(res) ? res : []
             setNcbTemplates(all.filter(t => t.type === 'ncb'))

@@ -8000,14 +8000,16 @@ export class MySQLAdapter {
             initialStepId = (stepRows as any[])[0]?.id || null
         } catch {}
         await this.pool.execute(`
-            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number, workflow_step_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number, workflow_step_id, outstanding_premium_enabled, non_refundable_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
         `, [
             id, referenceNumber, q.quotationTypeId || null, q.quotationDate || new Date().toISOString().split('T')[0], q.policyTypeId || null, q.vesselId || null,
             q.isRenewal || false, q.status || 'draft', q.periodText || null, q.validityDays || 14,
-            q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id, initialStepId
+            q.sanctionsClauseVersion || null, q.vdrDeductibleEnabled !== false, q.createdBy || null, id, initialStepId,
+            q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : true,
+            q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
         ])
-        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || null, vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '' } as Quotation
+        return { ...q, id, status: q.status || 'draft', sanctionsClauseVersion: q.sanctionsClauseVersion || null, vdrDeductibleEnabled: q.vdrDeductibleEnabled !== false, validityDays: q.validityDays || 14, isRenewal: q.isRenewal || false, ncbEnabled: q.ncbEnabled || false, upccEnabled: q.upccEnabled || false, referenceNumber: referenceNumber || '', outstandingPremiumEnabled: q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : true, nonRefundableType: q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment' } as Quotation
     }
 
     async updateQuotation(id: string, updates: Partial<Quotation>): Promise<void> {
