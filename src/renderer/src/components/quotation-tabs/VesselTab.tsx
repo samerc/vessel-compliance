@@ -101,9 +101,12 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     window.api.getAssuredRoles()
                 ])
                 const roleOrder = new Map((Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx]))
-                const existingEntityIds = new Set(existingQAssureds.map(a => a.entityId).filter(Boolean))
+                // Skip entities already added for THIS vessel label (allow same entity on different vessels)
+                const existingForThisVessel = new Set(
+                    existingQAssureds.filter(a => a.vesselLabel === vLabel).map(a => a.entityId).filter(Boolean)
+                )
                 const toAdd = vassureds
-                    .filter(va => !existingEntityIds.has(va.entityId))
+                    .filter(va => !existingForThisVessel.has(va.entityId))
                     .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
                 let addIdx = 0
                 for (let i = 0; i < toAdd.length; i++) {
