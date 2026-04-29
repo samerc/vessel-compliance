@@ -126,7 +126,7 @@ Vessel inspection tracking with defects management:
 Cross-vessel warranty and endorsement tracking system:
 
 - **WarrantyManager** (`src/renderer/src/components/WarrantyManager.tsx`): Per-survey warranty management embedded in `ConditionSurveyManager`. Tracks warranty items with deadline type (date/voyage/voyage+date), reference number, status (OPEN/CLOSED), notes, and sent reminders.
-- **SurveyFollowUp** (`src/renderer/src/components/SurveyFollowUp.tsx`): Fleet-wide survey follow-up page reachable from the sidebar. Shows all open warranties grouped by vessel, endorsements due, and reminder log.
+- **SurveyFollowUp** (`src/renderer/src/components/SurveyFollowUp.tsx`): Fleet-wide survey follow-up page reachable from the sidebar. Two tabs: Warranties + Endorsements (with badge counts). Warranties tab has search, pagination (25/page), sortable columns, and resizable columns. Sort + column widths persisted in localStorage. Compact table styling.
 - **Tables**: `survey_warranties` (id, survey_id, vessel_id, description, deadline_type, deadline_date, deadline_voyage, reference_number, status, notes), `warranty_reminders` (id, warranty_id, sent_at, next_reminder_date, notes)
 - **Endorsements Due**: Computed from surveys with open defects past their due date; displayed in a dedicated tab
 - **IPC Handlers**: `survey_warranty:getByVessel`, `survey_warranty:getAll`, `survey_warranty:create`, `survey_warranty:update`, `survey_warranty:delete`, `survey_warranty:getReminders`, `survey_warranty:addReminder`, `survey_warranty:getEndorsementsDue`
@@ -235,7 +235,7 @@ For `annualRenewal = true` document types, the effective expiry is inherited fro
 
 Centralized compliance monitoring with four tabs:
 
-- **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days). Includes entity documents (CoI, AoA, KYC, passport) per vessel's assureds with purple "Entity" badge. Three view modes: Vessel (grouped, collapsed by default), Document (grouped by doc type), Flat. Search input filters by vessel name or document name.
+- **Document Alerts Tab**: Missing required files, expired documents, expiring soon (30 days). Includes entity documents (CoI, AoA, KYC, passport) per vessel's assureds with purple "Entity" badge. Endorsement reminders included. Three view modes: Vessel (grouped, collapsed by default), Document (grouped by doc type), Flat. Search input filters by vessel name or document name.
 - **Policy Alerts Tab**: Expired + Expiring Soon (90 days) sub-filters, status dropdown to change policy status directly. View button navigates to vessel's policies section. New IPC: `policies:getExpiringSoon` with `getExpiringSoonPolicies(daysAhead)` adapter method.
 - **Sanctions Screening Tab**:
   - Pending reviews table with expandable match details
@@ -367,6 +367,7 @@ Monthly view of expiring policies (`src/renderer/src/components/PolicyRenewals.t
 - **Export**: Excel export via `xlsx` library
 - **IPC Handler**: `policies:getRenewalsByMonth`
 - **Renewal States**: `renewal_status_types` table, `renewal_status_id` FK on `vessel_dynamic_policies`. IPC prefix: `renewalStates:`. Status badge in table: text always black, background `statusColor + "22"` (hex opacity), border `2px solid statusColor`.
+- **Sort persistence**: Sort field + direction persisted in localStorage
 
 ### Vessel Active Status
 
@@ -518,6 +519,7 @@ Tag-based warranty categorization with sets, custom warranties, type scope, and 
 - **Custom Warranty Input**: Auto-growing textarea (`resize: none`, dynamic height via `scrollHeight` on change, max 200px).
 - **Import Modal**: Bulk paste warranties with bullet/dash/number stripping, parse preview, then confirm to add as custom warranties.
 - **Selected Warranties Order**: `selectedWarrantyIds` array preserves selection order; reorderable via up/down arrows in the selected list.
+- **Collapsible sections**: "Additional Text" and "Breach of Warranties" are separate collapsible sections in WarrantiesTab (not nested under Standard Texts)
 
 ### Quotation Standard Texts
 
@@ -607,25 +609,24 @@ MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) cau
 
 ### Vessel Detail Navigation
 
-- **Sections**: Toggle between Documents, Assured, Surveys, Policies, and History views via `detailView` state
+- **Sections**: Toggle between Documents, Assured, Surveys, Policies, and Activity views via `detailView` state
 - **External Navigation**: `initialSection` prop allows navigating directly to any tab
 - **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
-- **Section Values**: `'documents'`, `'assureds'`, `'surveys'`, `'policies'`, `'history'`
+- **Section Values**: `'documents'`, `'assureds'`, `'surveys'`, `'policies'`, `'activity'`
 - **Auto-edit on add**: `VesselDetail` accepts `initialEditing?: boolean` prop → `useState(initialEditing)` opens in edit mode immediately. `VesselManager` sets `openInEditMode = true` after successful vessel creation; back handler resets it to `false`. Also requires `useEffect(() => { if (initialEditing) setIsEditing(true) }, [initialEditing])` to handle prop changes after mount.
 - **Searchable edit dropdowns**: Classification society and flag state fields use custom searchable dropdowns (`classSearch`, `flagDropdownOpen`, `flagSearch` states). Classification shows search input when `classSocieties.length > 6`; flag filters by name AND iso3Code. The flag `+` (add new) button is retained alongside the dropdown.
 - **Stale classification IDs**: The seeding `useEffect` checks `validIds.length === 0` (IDs that match current `classSocieties` list), not just `vesselClassificationIds.size === 0`. This handles the case where the junction table has IDs for societies that were deleted and re-added with new UUIDs.
 
-### Vessel History Tab (`VesselHistoryView`)
+### Vessel Activity Tab (Merged History + Timeline)
 
-Redesigned history view inside `VesselDetail.tsx` (rendered when `detailView === 'history'`):
+Unified activity view inside `VesselDetail.tsx` (rendered when `detailView === 'activity'`). Replaces the old separate History and Timeline tabs (VesselHistoryView component removed):
 
-- **Stats strip**: 3 KPI cards — Total Changes / Contributors / Since (earliest entry date)
-- **Search + field filter**: text search across field names and values; dropdown to filter by specific field
-- **Date-grouped timeline**: entries grouped into Today / Yesterday / specific date labels; each group has a bold header + entry count badge
-- **`getFieldMeta(fieldName)`**: returns `{ icon, color, bg }` by keyword category (name=blue, flag=purple, status=amber, imo=cyan, class=green, type=pink)
-- **Entry row**: colored 3px left border + icon in rounded square, field name, old value (strikethrough) → new value (bold), Clock icon + time, "by username"
-- **Flag UUID resolution**: `resolveFlagValue(val)` maps flag UUIDs → `"Name (ISO3)"` using `flagStates` prop
-- **Customer name resolution**: `entityNameMap` state populated by a `useEffect` on mount — detects UUID-shaped values in `fieldName === 'Customer'` entries, calls `window.api.getEntities()` once, builds an ID→name map. `resolveEntityValue(val)` applies it at render. Handles legacy entries stored as raw UUIDs before the adapter-level name resolution fix.
+- **Merged data**: Aggregates audit log entries + timeline events (documents, policies, surveys, warranties, sanctions) into a single chronological view
+- **Audit entries**: Show old→new values with strikethrough styling + "by username"
+- **Search**: Single search input filters across all event types (field names, values, descriptions)
+- **Filters**: Type chips + date range for timeline events
+- **Layout**: Vertical timeline with month+year headers, colored icons per type
+- **Assured changes**: Assured Added/Removed/Role changes logged in vessel_audit_log with purple icon, clean titles without "changed" suffix
 
 ### Vessel Document Expiry (`VesselDocumentsView`)
 
@@ -639,6 +640,7 @@ The audit loop in `updateVessel` has two special normalizations:
 
 - **Numeric fields** (`builtYear`, `grossTonnage`): MySQL `DECIMAL` columns return `"4737.00"` as a string from raw SELECT queries, but TypeScript sends `4737` as a number. Normalize both sides with `String(parseFloat(val))` before comparing to avoid false audit entries on every edit.
 - **Customer field** (`customerId`): Before writing the audit entry, both old and new UUIDs are resolved to entity names via `SELECT id, name FROM entities WHERE id IN (?)`. Stores readable names instead of UUIDs in the log.
+- **Assured changes**: Assured Added/Removed/Role changes logged as audit entries with field names like "Assured Added", "Assured Removed", "Assured Role". Purple icon in Activity tab, clean titles without "changed" suffix.
 
 ### Vessel List
 
@@ -688,13 +690,16 @@ Bootstrap + overlay architecture for code-only deployments without full installe
 
 - **Entry point**: `src/main/bootstrap.ts` is the app entry (`package.json` main = `./out/main/bootstrap.js`)
 - **Startup check**: On launch, checks `%APPDATA%/vessel-compliance/hot-update/out/` for cached code; if found, loads that instead of bundled code
+- **Extract path**: Zip extracts into `out/` subdirectory (fixes path mismatch between zip structure and expected load path)
 - **HotUpdateService** (`src/main/services/HotUpdateService.ts`): Checks GitHub `code-latest` prerelease tag for newer builds
 - **Auto-apply**: Downloads and applies updates on startup (before window shows), restarts automatically
+- **Window safety**: All `mainWindow` calls guarded against `isDestroyed()` during restart to prevent crashes
 - **Background check**: Every 30 min while running; shows notification bar in renderer if update found
 - **Deploy command**: `npm run deploy` builds + uploads `code-update.zip` to GitHub via `gh` CLI
 - **Deploy script**: `scripts/deploy-update.js` — uses temp `.ps1` files, `--prerelease` flag, `--notes-file` for GitHub release
 - **Build numbers**: Auto-incrementing, version shown as `v7.6.7b3` format in sidebar
 - **Admin visibility**: Admin Panel → File Paths → Hot Updates section shows source/build/status
+- **Worker threads**: Worker thread loads parser from ASAR (not hot-update cache) to ensure `node_modules` access
 - **Isolation**: `electron-updater` configured with `allowPrerelease = false` + error handler ignores `code-latest`, so hot-updates and full updates do not interfere
 
 ### Code Style
@@ -807,9 +812,9 @@ Personal event-driven notifications:
 
 - **Bell Icon**: Sidebar with unread count badge, polls every 30 seconds
 - **Notifications Page** (`NotificationsPage.tsx`): Filters (All/Unread/Notes/Policies/System), type icons, relative time
-- **Event Triggers**: Note replies, @mentions, workflow transitions, policy conversions
+- **Event Triggers**: Note replies, @mentions, workflow transitions, policy conversions, endorsement due
 - **Notification Groups** (`notification_groups`): Route notifications to teams with event subscriptions
-- **Daily Alert Scheduler** (`DailyAlertScheduler.ts`): Automated checks for expiring documents, policies, blue cards, warranty deadlines
+- **Daily Alert Scheduler** (`DailyAlertScheduler.ts`): Automated checks for expiring documents, policies, blue cards, warranty deadlines, endorsements due
 - **Auto-cleanup**: Read notifications deleted after 90 days
 
 ### Note Replies & @Mentions
@@ -871,7 +876,9 @@ Widget-based dashboard with per-user layout:
 
 ### Vessel Timeline
 
-- **Tab**: In VesselDetail, aggregates 6 data sources (audit, documents, policies, surveys, warranties, sanctions)
+**Merged into Activity tab** — Timeline and History are now a single "Activity" tab in VesselDetail. See "Vessel Activity Tab" section above.
+
+- **Data sources**: Aggregates 6 sources (audit, documents, policies, surveys, warranties, sanctions)
 - **Merged Events**: Same-day same-type events grouped with count + expand
 - **Filters**: Type chips + date range (default last 12 months)
 - **Layout**: Vertical timeline with month+year headers, colored icons per type
@@ -920,6 +927,9 @@ Per-quotation P&I alternatives (similar to hull):
 - **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
 - **Editor Tab**: "Survey Warranties" in all quotation types. Templates and selected items visually separated.
 - **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event/surveyor/dateofsurvey
+- **Editable text**: Pencil icon on each selected survey warranty opens inline text editing for the resolved text
+- **Vessel scope**: VesselScopeChips shown on each survey warranty when 2+ vessels; per-vessel scoping stored in `vessel_scope`
+- **Days=0 handling**: When `{days}` is 0, "within 0 days of inception" renders as "prior inception" in exports
 
 ### Bulk Operations
 
@@ -1059,7 +1069,7 @@ Draft quotation references include the policy type code:
 - `vessel_name_history`, `vessel_audit_log` - Vessel change tracking
 - `war_breach_records` - Saved War Breach Calculator results
 - `quotation_types` - Quotation type definitions (P&I, H&M, War Risk, FDD, Loss of Hire) with code and order
-- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT, quotation_type_id FK, workflow_step_id, pro_rata_enabled, outstanding_premium_enabled, full_premium_loss_enabled)
+- `quotations` - Insurance quotation records (section_texts_override is MEDIUMTEXT, quotation_type_id FK, workflow_step_id, pro_rata_enabled, outstanding_premium_enabled, full_premium_loss_enabled, deleted_at, deleted_by, subjectivity_days)
 - `pi_warranties`, `pi_warranty_tags`, `pi_warranty_tag_map` - P&I warranty definitions with tag categorization
 - `pi_warranty_sets`, `pi_warranty_set_items` - Named warranty groups with default_selected flag
 - `quotation_warranties` - Per-quotation warranty selections with order_index
@@ -1077,7 +1087,7 @@ Draft quotation references include the policy type code:
 - `trading_warranty_templates` - Reusable trading warranty intro text templates
 - `renewal_status_types` - Custom renewal status labels for policies
 - `app_settings` / `settings` - Key-value store for app settings (report settings, file types, compliance schedule, section_order_defaults_{typeCode}, etc.)
-- `policy_documents` - Insurance policy records with dates, premium, commission, bank, signature
+- `policy_documents` - Insurance policy records with dates, premium, commission, bank, signature, subjectivity_days
 - `policy_doc_instalments` - Policy instalment schedule
 - `policy_doc_addresses` - Per-policy insured addresses
 - `policy_blue_cards` - Blue card certificates with status, owner, port, addressed-to
@@ -1196,6 +1206,7 @@ Excel registry file for quotation numbering and logging:
 - **canEdit**: Step constraint enforced — `canEdit=false` disables editing with blue banner
 - **Approve & Export**: Gated by `hasPermission('quotations:approve')`, not by workflow step's `canExport` (dead column removed from workflow settings)
 - **Create Revision**: Visible for approved quotations, gated by `hasPermission('quotations:edit')` not `canEdit`
+- **isDraft**: Checks `q.status === 'draft'` — not reference number prefix. Draft quotations with real references (revisions) get registry numbers correctly.
 - **isApproved**: Checks `status` field only — no longer checks reference number format
 - **Step deletion**: Blocked when quotations exist on the step
 - **Single initial**: Setting a step as initial unsets all others
@@ -1239,8 +1250,10 @@ Sub-annual quotation premium with auto-detection:
 ### Outstanding Premium & Full Loss Notices
 
 Two checkbox-based notices in PremiumTab (non-cargo):
-- **Outstanding Premium**: Configurable text + bold/underline toggles. Default: "All outstanding premium to be settled prior inception"
+- **Outstanding Premium**: Configurable text + bold/underline toggles. Default: "All outstanding premium to be settled prior inception". Enabled by default on new quotations.
 - **Full Premium Loss**: Configurable text (no formatting). Default: "Full annual premium payable in case of loss."
+- **Non-refundable default**: New quotations default to `nonRefundableType = 'first_instalment'`
+- **Default texts**: `outstandingPremiumDefaultText` and `fullPremiumLossDefaultText` configurable in Quotation Settings → Standard Texts → Premium section of `PISectionTexts`
 - **Settings**: Defaults in Policy Settings → Premium Intro
 - **Export**: Rendered after instalments in quotation (PDF/DOCX) and policy exports
 
@@ -1259,6 +1272,7 @@ Two checkbox-based notices in PremiumTab (non-cargo):
 
 - **Editable username**: Username can be changed (uniqueness enforced server-side)
 - **Full name**: Optional `full_name` field on `users` table
+- **Version comparison**: Build numbers parsed numerically (not string comparison) for correct ordering
 
 ### Vessel Classification Change
 
@@ -1284,13 +1298,34 @@ Configurable local↔network path mapping for users connecting via VPN:
 - **Back navigation**: If draft + no edits + created <60s ago + no vessels → auto-deleted
 - **Applies to**: Renewal quotations from PolicyRenewals, new quotations — prevents orphaned empty drafts
 
-### Survey Warranty Templates for Quotations
+### Quotation Recycle Bin
 
-- **Templates** (`survey_warranty_templates`): Text with {deadline}, {days}, {event}, {surveyor}, {dateofsurvey} placeholders. Title field for easy reference.
-- **Placeholders**: {deadline} (blue), {days} (purple), {event} (red), {surveyor} (green), {dateofsurvey} (amber)
-- **Sets** (`survey_warranty_template_sets`): Named groups for batch-apply
-- **Editor Tab**: "Survey Warranties" in all quotation types. Templates and selected items visually separated.
-- **Placeholder Inputs**: Dropdown presets for deadline, number input for days, text for event/surveyor/dateofsurvey
+Soft-delete system for quotations with restore capability:
+
+- **Schema**: `deleted_at DATETIME` + `deleted_by VARCHAR(36)` columns on `quotations` table
+- **Soft delete**: `deleteQuotation` sets `deleted_at` timestamp instead of hard DELETE. Delete messages say "moved to recycle bin".
+- **Restore**: `restoreQuotation` clears `deleted_at` and `deleted_by`
+- **Permanent delete**: `permanentlyDeleteQuotation` requires `quotations:bulkDelete` permission
+- **Filtered queries**: `getQuotations` filters `WHERE deleted_at IS NULL` — soft-deleted items hidden from normal views
+- **Recycle Bin tab**: Right-aligned tab in QuotationList with trash icon. Shows soft-deleted quotations with Restore + Permanently Delete actions.
+- **Error display**: Delete shows actual error from `safeHandle` instead of silent success
+- **IPC**: `db:getDeletedQuotations`, `db:restoreQuotation`, `db:permanentlyDeleteQuotation`
+
+### Subjectivity Days
+
+Configurable subjectivity compliance period per quotation and policy:
+
+- **Fields**: `subjectivity_days INT DEFAULT 0` on `quotations`, `subjectivity_days INT DEFAULT 7` on `policy_documents`
+- **UI**: Number input in SubjectivitiesTab
+- **Export**: Uses `{subjectivity_days}` placeholder in standard text intro. Handles both placeholder and old hardcoded text.
+- **Rendering**: 0 = "prior inception", N = "within N days"
+- **Select All**: Button in master subjectivity list picker for bulk selection
+- **Sort order**: Items sorted by master list order from settings (`resortByMasterOrder`)
+
+### Quotation Assured per Vessel
+
+- **Multi-vessel**: Same entity can appear as assured on multiple vessels in a quotation
+- **Dedup scope**: Only skips duplicates within the same vessel label (not across all vessels)
 
 ### Conditions Sub-Tabs
 
@@ -1309,20 +1344,3 @@ Configurable local↔network path mapping for users connecting via VPN:
 - **Dark themes**: `dark`, `premium` (Frost) — use dark backgrounds, light text
 - **`isLight` check**: `theme === 'light' || theme === 'aurora'` — used across all 48+ components for conditional styling
 - **Cargo warranties/exclusions**: Only visible when cargo quotation type OR cargo clause selected in P&I conditions
-
-### User Management Enhancements
-
-- **Username**: Editable inline in UserManager (uniqueness enforced)
-- **Full name**: Optional field on users table, shown below username
-- **Schema**: `full_name VARCHAR(255)` on users, included in login session queries
-
-### Deductible MoneyInput
-
-- **MoneyInput**: Shared component in `shared.tsx` — shows thousand separators when not focused, raw number while editing
-- **Applied to**: All deductible amount fields (primary, secondary, previous, per-vessel)
-- **Layout**: Previous amounts on dedicated second row below main amounts
-
-### Conditions Sub-Tabs
-
-- **P&I Conditions**: Split into "Clauses" and "Additional Clauses" sub-tabs with count badges
-- **Hull Conditions**: Split into "Conditions", "Additional Conditions", and "Custom" sub-tabs with count badges
