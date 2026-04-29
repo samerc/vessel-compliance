@@ -3008,6 +3008,8 @@ function VesselHistoryView({ auditLog, isLight, flagStates }: { auditLog: Vessel
             return { icon: <ClipboardList size={12} />, color: isLight ? '#059669' : '#34d399', bg: isLight ? 'rgba(5,150,105,0.1)' : 'rgba(52,211,153,0.12)' }
         if (fn.includes('type') || fn.includes('vessel type'))
             return { icon: <Tag size={12} />, color: isLight ? '#db2777' : '#f472b6', bg: isLight ? 'rgba(219,39,119,0.1)' : 'rgba(244,114,182,0.12)' }
+        if (fn.includes('assured'))
+            return { icon: <Users size={12} />, color: isLight ? '#9333ea' : '#c084fc', bg: isLight ? 'rgba(147,51,234,0.1)' : 'rgba(192,132,252,0.12)' }
         return { icon: <Calendar size={12} />, color: isLight ? '#1a73e8' : 'var(--accent-primary)', bg: isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)' }
     }
 
@@ -3250,11 +3252,12 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                 // Audit log entries
                 if (Array.isArray(auditLog)) {
                     for (const entry of auditLog) {
+                        const isAssured = entry.fieldName?.toLowerCase().includes('assured')
                         allEvents.push({
                             date: entry.changedAt || '',
                             type: 'audit',
-                            title: `${entry.fieldName} changed`,
-                            subtitle: entry.newValue ? `New: ${entry.newValue}` : undefined,
+                            title: isAssured ? entry.fieldName : `${entry.fieldName} changed`,
+                            subtitle: isAssured ? (entry.newValue || entry.oldValue || undefined) : (entry.newValue ? `New: ${entry.newValue}` : undefined),
                             iconType: 'audit',
                             color: '#6495ed'
                         })

@@ -1393,26 +1393,40 @@ app.whenReady().then(() => {
       const [entRows] = await (db as any).pool.query('SELECT name FROM entities WHERE id = ?', [assured.entityId])
       const entityName = (entRows as any[])[0]?.name || assured.entityId
       db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Assureds', entityType: 'vessel_assured', entityId: assured.vesselId, entityName: vesselName, details: `Added ${entityName} as ${assured.role || 'assured'} on ${vesselName}` }).catch(() => {})
+      db.addVesselAuditEntry(assured.vesselId, 'Assured Added', null, `${entityName} (${assured.role || 'assured'})`, user.username).catch(() => {})
     } catch { /* do not block */ }
     return result
   })
   safeHandle('db:deleteVesselAssured', async (event, id) => {
     const user = await requirePermission(event, 'assureds:manage')
+    let vesselId = ''
     let vesselName = ''
     let entityName = ''
     let role = ''
     try {
       const [rows] = await (db as any).pool.query('SELECT va.vessel_id, va.role, e.name AS entity_name, v.name AS vessel_name FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id LEFT JOIN vessels v ON v.id = va.vessel_id WHERE va.id = ?', [id])
       const row = (rows as any[])[0]
+      vesselId = row?.vessel_id || ''
       vesselName = row?.vessel_name || ''
       entityName = row?.entity_name || ''
       role = row?.role || ''
     } catch { /* do not block */ }
     const result = await db.deleteVesselAssured(id)
     db.logActivity({ userId: user.id, username: user.username, action: 'DELETE', module: 'Assureds', entityType: 'vessel_assured', entityName: vesselName, details: `Removed ${entityName}${role ? ' (' + role + ')' : ''} from ${vesselName}` }).catch(() => {})
+    if (vesselId) db.addVesselAuditEntry(vesselId, 'Assured Removed', `${entityName} (${role || 'assured'})`, null, user.username).catch(() => {})
     return result
   })
-  safeHandle('db:updateVesselAssuredRole', async (event, id, role) => { await requirePermission(event, 'assureds:manage'); return db.updateVesselAssuredRole(id, role) })
+  safeHandle('db:updateVesselAssuredRole', async (event, id, role) => {
+    const user = await requirePermission(event, 'assureds:manage')
+    try {
+      const [rows] = await (db as any).pool.query('SELECT va.vessel_id, va.role, e.name AS entity_name FROM vessel_assureds va LEFT JOIN entities e ON e.id = va.entity_id WHERE va.id = ?', [id])
+      const row = (rows as any[])[0]
+      if (row && row.role !== role) {
+        db.addVesselAuditEntry(row.vessel_id, 'Assured Role', `${row.entity_name} (${row.role || 'none'})`, `${row.entity_name} (${role || 'none'})`, user.username).catch(() => {})
+      }
+    } catch { /* do not block */ }
+    return db.updateVesselAssuredRole(id, role)
+  })
 
   safeHandle('db:getEntityUBOs', (event, assuredEntityId) => { requireSession(event); return db.getEntityUBOs(assuredEntityId) })
   safeHandle('db:addEntityUBO', async (event, ubo) => { await requirePermission(event, 'entities:edit'); return db.addEntityUBO(ubo) })
