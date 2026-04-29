@@ -3522,7 +3522,7 @@ export class MySQLAdapter {
 
         // Fetch current vessel for audit logging
         const [currentRows]: any[] = await this.pool.query(
-            'SELECT name, imo_number, fleet_id, flag_state_id, built_year, rebuilt_year, gross_tonnage, vessel_type, classification_society, call_sign, is_active, customer_id, customer_type FROM vessels WHERE id = ?',
+            'SELECT name, imo_number, fleet_id, flag_state_id, built_year, rebuilt_year, gross_tonnage, vessel_type, vessel_type_id, classification_society, call_sign, is_active, customer_id, customer_type FROM vessels WHERE id = ?',
             [id]
         )
         const current = currentRows.length > 0 ? currentRows[0] : null
@@ -3608,6 +3608,26 @@ export class MySQLAdapter {
                         continue
                     }
 
+                    // Resolve flag state UUIDs to names for the Flag State field
+                    if (af.updateKey === 'flagStateId') {
+                        const idsToResolve = [oldVal, newVal].filter(Boolean) as string[]
+                        const nameMap = new Map<string, string>()
+                        if (idsToResolve.length > 0) {
+                            const placeholders = idsToResolve.map(() => '?').join(',')
+                            const [nameRows] = await this.pool.query(
+                                `SELECT id, name FROM flag_states WHERE id IN (${placeholders})`,
+                                idsToResolve
+                            )
+                            for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+                        }
+                        const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
+                        const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
+                        if (oldName !== newName) {
+                            await this.addVesselAuditEntry(id, af.label, oldName, newName, who)
+                        }
+                        continue
+                    }
+
                     // Resolve entity UUIDs to names for the Customer field
                     if (af.updateKey === 'customerId') {
                         const idsToResolve = [oldVal, newVal].filter(Boolean) as string[]
@@ -3633,7 +3653,7 @@ export class MySQLAdapter {
                     const oldNorm = isNumeric && oldVal != null ? String(parseFloat(oldVal)) : oldVal
                     const newNorm = isNumeric && newVal != null ? String(parseFloat(newVal)) : newVal
                     if (oldNorm !== newNorm) {
-                        await this.addVesselAuditEntry(id, af.label, oldVal, newVal, who)
+                        await this.addVesselAuditEntry(id, af.label, oldNorm, newNorm, who)
                     }
                 }
             }

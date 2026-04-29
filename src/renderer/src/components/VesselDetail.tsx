@@ -2949,6 +2949,14 @@ function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, s
 
 // ==================== Vessel Activity (formerly Timeline + History) ====================
 
+/** Format audit values: add thousand separators if the value is a plain number */
+function formatAuditValue(val: string | null | undefined): string {
+    if (!val) return ''
+    const num = Number(val)
+    if (!isNaN(num) && String(num) === val.trim()) return num.toLocaleString()
+    return val
+}
+
 interface TimelineEvent {
     date: string
     type: 'audit' | 'document' | 'policy' | 'survey' | 'warranty' | 'sanctions'
@@ -3470,9 +3478,9 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                         </div>
                                         {!isMerged && me.type === 'audit' && (me.items[0]?.oldValue || me.items[0]?.newValue) ? (
                                             <div style={{ fontSize: '0.8rem', paddingLeft: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                {me.items[0].oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{me.items[0].oldValue}</span>}
+                                                {me.items[0].oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{formatAuditValue(me.items[0].oldValue)}</span>}
                                                 {me.items[0].oldValue && me.items[0].newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
-                                                {me.items[0].newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{me.items[0].newValue}</span>}
+                                                {me.items[0].newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatAuditValue(me.items[0].newValue)}</span>}
                                                 {me.items[0].changedBy && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>by {me.items[0].changedBy}</span>}
                                             </div>
                                         ) : !isMerged && me.items[0]?.subtitle ? (
@@ -3500,9 +3508,9 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                                     </div>
                                                     {ev.type === 'audit' && (ev.oldValue || ev.newValue) ? (
                                                         <div style={{ fontSize: '0.78rem', paddingLeft: '20px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            {ev.oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{ev.oldValue}</span>}
+                                                            {ev.oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{formatAuditValue(ev.oldValue)}</span>}
                                                             {ev.oldValue && ev.newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
-                                                            {ev.newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ev.newValue}</span>}
+                                                            {ev.newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatAuditValue(ev.newValue)}</span>}
                                                         </div>
                                                     ) : ev.subtitle ? (
                                                         <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '20px' }}>
