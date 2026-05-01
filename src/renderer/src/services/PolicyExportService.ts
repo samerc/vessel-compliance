@@ -1551,6 +1551,27 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
   })]
 }
 
+/** Period for endorsement DA/CA: from endorsement effective date to policy expiry */
+function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData): (Paragraph | Table)[] {
+  const { expiryDate, expiryTime, timezone } = data.policy
+  const labelW = Math.round(POL_BODY_W * 0.12)
+  const dateW = Math.round(POL_BODY_W * 0.33)
+  const timeW = POL_BODY_W - labelW - dateW
+  const pCell = (text: string, w: number) => new TableCell({
+    width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
+    children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
+  })
+  return [new Table({
+    width: { size: POL_BODY_W, type: WidthType.DXA },
+    layout: TableLayoutType.FIXED,
+    columnWidths: [labelW, dateW, timeW],
+    rows: [
+      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(effectiveDate), dateW), pCell(`${polFormatTime(data.policy.inceptionTime)} ${timezone || ''}`.trim(), timeW)] }),
+      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)] })
+    ]
+  })]
+}
+
 function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[] {
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const content: (Paragraph | Table)[] = []
@@ -2994,8 +3015,8 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   } catch { /* ignore */ }
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
-  // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  // Load signature (for closing section — not in footer for DA)
+  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   // Build header (company details only, no certificate title) + footer
   const daHeaderParas: Paragraph[] = []
@@ -3198,8 +3219,8 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   } catch { /* ignore */ }
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
-  // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  // Load signature (for closing section — not in footer for CA)
+  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   // Build header (company details only) + footer
   const caHeaderParas: Paragraph[] = []
@@ -3810,7 +3831,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   } catch { /* ignore */ }
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
@@ -3931,8 +3952,8 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
     rows.push(makeRow(`Additional\nPremium Payment\nCondition\nPrecedent`, ppcpContent))
   }
 
-  // PERIOD — same as policy DA
-  rows.push(makeRow('Period', polBuildPeriodParagraphs(data)))
+  // PERIOD — from endorsement effective date to policy expiry
+  rows.push(makeRow('Period', polBuildEndorsementPeriod(endorsement.effectiveDate, data)))
 
   // BANK DETAILS
   if (data.bank) {
@@ -3993,7 +4014,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   } catch { /* ignore */ }
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
@@ -4065,6 +4086,9 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
     }
     rows.push(makeRow('INSTALMENTS', instContent))
   }
+
+  // PERIOD — from endorsement effective date to policy expiry
+  rows.push(makeRow('Period', polBuildEndorsementPeriod(endorsement.effectiveDate, data)))
 
   children.push(new Table({
     width: { size: POL_CONTENT_W, type: WidthType.DXA },
