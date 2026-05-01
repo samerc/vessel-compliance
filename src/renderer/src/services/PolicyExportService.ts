@@ -2820,7 +2820,6 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
 async function polBuildAdviceFooter(
   sigBuf: Uint8Array | null
 ): Promise<Footer> {
-  const footerChildren: (Paragraph | Table)[] = []
   let footerText = ''
   try {
     const settings = await window.api.getSetting('policyExportSettings')
@@ -2830,26 +2829,44 @@ async function polBuildAdviceFooter(
     }
   } catch { /* ignore */ }
 
+  // Parse footer text lines
+  const footerLines: string[] = []
   if (footerText) {
-    // Strip HTML tags, split by <br> and newlines, render each as a line
     const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
     for (const line of plainFooter.split('\n')) {
-      if (line.trim()) {
-        footerChildren.push(new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999' })]
-        }))
-      }
+      if (line.trim()) footerLines.push(line.trim())
     }
   }
 
-  // Signature in footer (right-aligned) if signed
-  if (sigBuf) {
+  // Build a single-row table: footer text on left, signature on right
+  if (footerLines.length > 0 || sigBuf) {
     const footerW = POL_CONTENT_W || 9000
     const fColLeft = Math.round(footerW * 0.67)
     const fColRight = footerW - fColLeft
-    footerChildren.push(new Table({
+
+    const leftParas: Paragraph[] = footerLines.map(line => new Paragraph({
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 0, after: 0 },
+      children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
+    }))
+    if (leftParas.length === 0) leftParas.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
+
+    const rightParas: Paragraph[] = []
+    if (sigBuf) {
+      rightParas.push(new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 0 },
+        children: [new ImageRun({
+          data: sigBuf,
+          transformation: { width: 120, height: 60 },
+          type: 'png'
+        })]
+      }))
+    } else {
+      rightParas.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
+    }
+
+    const footerTable = new Table({
       width: { size: footerW, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [fColLeft, fColRight],
@@ -2859,29 +2876,22 @@ async function polBuildAdviceFooter(
             width: { size: fColLeft, type: WidthType.DXA },
             borders: polNoBorders(),
             verticalAlign: VerticalAlign.BOTTOM,
-            children: [new Paragraph({ spacing: { after: 0 }, children: [] })]
+            children: leftParas
           }),
           new TableCell({
             width: { size: fColRight, type: WidthType.DXA },
             borders: polNoBorders(),
             verticalAlign: VerticalAlign.BOTTOM,
-            children: [new Paragraph({
-              alignment: AlignmentType.RIGHT,
-              spacing: { after: 0 },
-              children: [new ImageRun({
-                data: sigBuf,
-                transformation: { width: 120, height: 60 },
-                type: 'png'
-              })]
-            })]
+            children: rightParas
           })
         ]
       })]
-    }))
+    })
+
+    return new Footer({ children: [footerTable] })
   }
 
-  if (footerChildren.length === 0) footerChildren.push(polEmptyP())
-  return new Footer({ children: footerChildren })
+  return new Footer({ children: [polEmptyP()] })
 }
 
 /** Build the closing block for DA/CA — subject line, city/date, company name + signature (right-aligned) */
@@ -2994,7 +3004,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   if (daHeaderHtml) {
     daHeaderParas.push(...parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+  const adviceFooter = await polBuildAdviceFooter(null)
 
   const children: (Paragraph | Table)[] = []
 
@@ -3198,7 +3208,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   if (caHeaderHtml) {
     caHeaderParas.push(...parseHtmlToParagraphs(caHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: caHeaderSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+  const adviceFooter = await polBuildAdviceFooter(null)
 
   // Load credit advice commission wording from settings
   let caCommissionMultiText = 'Commission payable in {instalments} instalments:'
@@ -3808,7 +3818,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   if (hdrHtml) {
     hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+  const adviceFooter = await polBuildAdviceFooter(null)
 
   const children: (Paragraph | Table)[] = []
 
@@ -3991,7 +4001,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   if (hdrHtml) {
     hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(sigBuf)
+  const adviceFooter = await polBuildAdviceFooter(null)
 
   const children: (Paragraph | Table)[] = []
 
