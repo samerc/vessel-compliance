@@ -1735,6 +1735,7 @@ export interface EndorsementSection {
   sectionTitle: string
   content: string
   isEnabled: boolean
+  isFullWidth: boolean
   orderIndex: number
 }
 

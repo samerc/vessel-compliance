@@ -38,6 +38,7 @@ interface EditState {
     sectionTitle: string
     content: string
     isEnabled: boolean
+    isFullWidth: boolean
     orderIndex: number
   }>
   instalments: Array<{
@@ -62,6 +63,7 @@ const EMPTY_EDIT: EditState = {
     sectionTitle: s.title,
     content: '',
     isEnabled: false,
+    isFullWidth: false,
     orderIndex: i
   })),
   instalments: []
@@ -182,6 +184,7 @@ export default function EndorsementManager({
           sectionTitle: s.title,
           content: initialContent || '',
           isEnabled: s.key === 'interest' && !!initialContent,
+          isFullWidth: false,
           orderIndex: i
         }))
       }
@@ -214,12 +217,14 @@ export default function EndorsementManager({
           sectionTitle: saved.sectionTitle,
           content: saved.content,
           isEnabled: !!saved.isEnabled,
+          isFullWidth: !!saved.isFullWidth,
           orderIndex: saved.orderIndex
         } : {
           sectionKey: ps.key,
           sectionTitle: ps.title,
           content: '',
           isEnabled: false,
+          isFullWidth: false,
           orderIndex: i
         }
       })
@@ -232,6 +237,7 @@ export default function EndorsementManager({
           sectionTitle: cs.sectionTitle,
           content: cs.content,
           isEnabled: !!cs.isEnabled,
+          isFullWidth: !!cs.isFullWidth,
           orderIndex: cs.orderIndex
         })
       }
@@ -309,6 +315,7 @@ export default function EndorsementManager({
         sectionTitle: s.sectionTitle,
         content: s.content,
         isEnabled: s.isEnabled,
+        isFullWidth: s.isFullWidth,
         orderIndex: i
       })))
       // Save instalments
@@ -407,6 +414,13 @@ export default function EndorsementManager({
     })
   }
 
+  const toggleFullWidth = (key: string) => {
+    setEditState(prev => ({
+      ...prev,
+      sections: prev.sections.map(s => s.sectionKey === key ? { ...s, isFullWidth: !s.isFullWidth } : s)
+    }))
+  }
+
   const addCustomSection = () => {
     const id = crypto.randomUUID?.() || Date.now().toString()
     const key = `custom__${id}`
@@ -417,6 +431,7 @@ export default function EndorsementManager({
         sectionTitle: 'Custom Section',
         content: '',
         isEnabled: true,
+        isFullWidth: false,
         orderIndex: prev.sections.length
       }]
     }))
@@ -768,7 +783,16 @@ export default function EndorsementManager({
                   ) : (
                     <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{s.sectionTitle}</span>
                   )}
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button onClick={e => { e.stopPropagation(); toggleFullWidth(s.sectionKey) }}
+                      title={s.isFullWidth ? 'Two columns (title + content)' : 'Full width (no title column)'}
+                      style={{
+                        background: 'transparent', border: `1px solid ${s.isFullWidth ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
+                        borderRadius: '4px', cursor: 'pointer', padding: '1px 6px', fontSize: '0.65rem', fontWeight: 600,
+                        color: s.isFullWidth ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                      }}>
+                      {s.isFullWidth ? 'FULL' : '2-COL'}
+                    </button>
                     <button onClick={e => { e.stopPropagation(); moveSection(editState.sections.indexOf(s), -1) }}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>
                       <ArrowUp size={13} />

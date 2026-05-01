@@ -3221,6 +3221,7 @@ export class MySQLAdapter {
                 section_title VARCHAR(255) NOT NULL,
                 content TEXT NOT NULL,
                 is_enabled TINYINT(1) DEFAULT 1,
+                is_full_width TINYINT(1) DEFAULT 0,
                 order_index INT DEFAULT 0
             )`)
 
@@ -3260,6 +3261,14 @@ export class MySQLAdapter {
                     )
                 }
             }
+
+            // Migration: add is_full_width to endorsement_sections
+            try {
+                const [fwCol] = await this.pool.query("SHOW COLUMNS FROM endorsement_sections LIKE 'is_full_width'") as any[]
+                if ((fwCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE endorsement_sections ADD COLUMN is_full_width TINYINT(1) DEFAULT 0')
+                }
+            } catch {}
 
             // Migration: add pro-rata columns to policy_endorsements
             try {
@@ -14437,7 +14446,8 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, endorsement_id AS endorsementId, section_key AS sectionKey,
-                    section_title AS sectionTitle, content, is_enabled AS isEnabled, order_index AS orderIndex
+                    section_title AS sectionTitle, content, is_enabled AS isEnabled,
+                    is_full_width AS isFullWidth, order_index AS orderIndex
              FROM endorsement_sections WHERE endorsement_id = ? ORDER BY order_index ASC`,
             [endorsementId]
         )
@@ -14445,15 +14455,15 @@ export class MySQLAdapter {
     }
 
     async setEndorsementSections(endorsementId: string, sections: Array<{
-        id?: string; sectionKey: string; sectionTitle: string; content: string; isEnabled: boolean; orderIndex: number
+        id?: string; sectionKey: string; sectionTitle: string; content: string; isEnabled: boolean; isFullWidth?: boolean; orderIndex: number
     }>): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM endorsement_sections WHERE endorsement_id = ?', [endorsementId])
         for (const s of sections) {
             await this.pool.execute(
-                `INSERT INTO endorsement_sections (id, endorsement_id, section_key, section_title, content, is_enabled, order_index)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [s.id || uuidv4(), endorsementId, s.sectionKey, s.sectionTitle, s.content, s.isEnabled ? 1 : 0, s.orderIndex]
+                `INSERT INTO endorsement_sections (id, endorsement_id, section_key, section_title, content, is_enabled, is_full_width, order_index)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [s.id || uuidv4(), endorsementId, s.sectionKey, s.sectionTitle, s.content, s.isEnabled ? 1 : 0, s.isFullWidth ? 1 : 0, s.orderIndex]
             )
         }
     }

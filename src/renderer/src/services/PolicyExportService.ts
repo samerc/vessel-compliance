@@ -3749,9 +3749,27 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
   const effDate = polFormatDateUS(endorsement.effectiveDate)
   rows.push(makeRow('EFFECTIVE DATE', [polNp(effDate)]))
 
-  // Endorsement sections
+  // Endorsement sections — two-column or full-width, interleaved
   const enabledSections = sections.filter((s: any) => s.isEnabled)
   enabledSections.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+
+  // Split into groups: consecutive two-column sections form a table, full-width sections are standalone
+  const flushRows = () => {
+    if (rows.length > 0) {
+      children.push(new Table({
+        width: { size: POL_CONTENT_W, type: WidthType.DXA },
+        columnWidths: [POL_TITLE_W, POL_BODY_W],
+        layout: TableLayoutType.FIXED,
+        borders: {
+          top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
+          insideHorizontal: noBorder, insideVertical: noBorder
+        },
+        rows: [...rows]
+      }))
+      rows.length = 0
+    }
+  }
+
   for (const sec of enabledSections) {
     const sectionContent: (Paragraph | Table)[] = []
     if (sec.content && polIsHtml(sec.content)) {
@@ -3759,19 +3777,20 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
     } else if (sec.content) {
       sectionContent.push(...polMp(sec.content))
     }
-    rows.push(makeRow(sec.sectionTitle.toUpperCase(), sectionContent))
+
+    if (sec.isFullWidth) {
+      // Flush any pending two-column rows first
+      flushRows()
+      // Add full-width content directly
+      children.push(polEmptyP())
+      children.push(...sectionContent)
+    } else {
+      rows.push(makeRow(sec.sectionTitle.toUpperCase(), sectionContent))
+    }
   }
 
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    columnWidths: [POL_TITLE_W, POL_BODY_W],
-    layout: TableLayoutType.FIXED,
-    borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
-    },
-    rows
-  }))
+  // Flush remaining two-column rows
+  flushRows()
 
   // Closing text
   let closingText = 'All other terms and conditions of the above-mentioned policy remain unchanged.'
