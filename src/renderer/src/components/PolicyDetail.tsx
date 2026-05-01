@@ -229,6 +229,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const [, setRenewing] = useState(false)
   const [signing, setSigning] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelMode, setCancelMode] = useState<'instalment' | 'date'>('instalment')
+  const [cancelAfterInstalment, setCancelAfterInstalment] = useState(0)
+  const [cancelDate, setCancelDate] = useState('')
+  const [cancelling, setCancelling] = useState(false)
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -1382,6 +1387,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       })
                     }} style={{ ...actionItemStyle, color: isLight ? '#008844' : '#00c864' }} className="hover-effect">
                       <RefreshCw size={15} /> Renew
+                    </button>
+                  )}
+
+                  {hasPermission('policies:manage') && policy.status === 'active' && (
+                    <button onClick={() => { setShowActionsMenu(false); setShowCancelModal(true) }}
+                      style={{ ...actionItemStyle, color: 'var(--danger)' }} className="hover-effect">
+                      <X size={15} /> Cancel Policy
                     </button>
                   )}
 
@@ -3392,6 +3404,232 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             })()}
           </div>
         </div>
+      )}
+
+      {/* Cancel Policy Modal */}
+      {showCancelModal && policy && (
+        (() => {
+          const currency = (policy as any).premiumCurrency || 'USD'
+          const commPct = Number(policy.commissionPercent) || 0
+          const isPnI = policy.quotationTypeCode === 'P'
+
+          // Calculate return amounts
+          let returnPremium = 0
+          let returnCommission = 0
+          let returnInstalments: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number }> = []
+
+          if (cancelMode === 'instalment' && instalments.length > 0) {
+            returnInstalments = instalments
+              .filter(inst => inst.instalmentNumber > cancelAfterInstalment)
+              .map(inst => {
+                const prem = Number((inst as any).premiumAmount || (inst as any).amount || 0)
+                const comm = Number(inst.commissionAmount || 0)
+                return { instalmentNumber: inst.instalmentNumber, dueDate: inst.dueDate, premiumAmount: prem, commissionAmount: comm }
+              })
+            returnPremium = returnInstalments.reduce((s, i) => s + i.premiumAmount, 0)
+            returnCommission = returnInstalments.reduce((s, i) => s + i.commissionAmount, 0)
+          } else if (cancelMode === 'date' && cancelDate && policy.premiumAmount) {
+            // Pro-rata calculation
+            const totalPrem = Number(policy.premiumAmount) || 0
+            const inc = new Date(policy.inceptionDate)
+            const exp = new Date(policy.expiryDate)
+            const canc = new Date(cancelDate)
+            const totalDays = Math.round((exp.getTime() - inc.getTime()) / 86400000)
+            const usedDays = Math.round((canc.getTime() - inc.getTime()) / 86400000)
+            if (totalDays > 0) {
+              returnPremium = Math.round(totalPrem * (totalDays - usedDays) / totalDays * 100) / 100
+              returnCommission = Math.round(returnPremium * commPct / 100 * 100) / 100
+            }
+            // Build instalments using bottom-fill
+            if (instalments.length > 0 && returnPremium > 0) {
+              const annualPerInst = Math.round(totalPrem / instalments.length * 100) / 100
+              const fullCount = annualPerInst > 0 ? Math.floor(returnPremium / annualPerInst) : 0
+              const remainder = Math.round((returnPremium - fullCount * annualPerInst) * 100) / 100
+              const startIdx = instalments.length - fullCount - (remainder > 0 ? 1 : 0)
+              returnInstalments = []
+              for (let i = Math.max(0, startIdx); i < instalments.length; i++) {
+                const isFirst = i === startIdx && remainder > 0
+                const prem = isFirst ? remainder : annualPerInst
+                const comm = Math.round(prem * commPct / 100 * 100) / 100
+                returnInstalments.push({
+                  instalmentNumber: returnInstalments.length + 1,
+                  dueDate: instalments[i].dueDate,
+                  premiumAmount: prem,
+                  commissionAmount: comm
+                })
+              }
+            }
+          }
+
+          const effectiveDate = cancelMode === 'instalment'
+            ? (cancelAfterInstalment > 0 && instalments[cancelAfterInstalment - 1]?.dueDate
+              ? instalments[cancelAfterInstalment - 1].dueDate.slice(0, 10)
+              : policy.inceptionDate?.slice(0, 10) || '')
+            : cancelDate
+
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+                onClick={() => setShowCancelModal(false)} />
+              <div style={{
+                position: 'relative', width: '520px', maxHeight: '85vh', overflowY: 'auto',
+                borderRadius: '14px', padding: '24px',
+                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>Cancel Policy</h3>
+                  <button onClick={() => setShowCancelModal(false)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  {policy.policyNumber} — {policy.vesselName}
+                </p>
+
+                {/* Mode selector */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  {['instalment', 'date'].map(m => (
+                    <button key={m} onClick={() => setCancelMode(m as any)}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
+                        border: cancelMode === m ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                        background: cancelMode === m ? 'rgba(0,170,200,0.08)' : 'transparent',
+                        color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}>
+                      {m === 'instalment' ? 'Cancel on Instalment' : 'Cancel on Date (Pro-rata)'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Instalment mode */}
+                {cancelMode === 'instalment' && instalments.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                      Cancel after instalment
+                    </label>
+                    <select value={cancelAfterInstalment}
+                      onChange={e => setCancelAfterInstalment(Number(e.target.value))}
+                      style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}>
+                      <option value={0}>From inception (return all)</option>
+                      {instalments.map(inst => (
+                        <option key={inst.instalmentNumber} value={inst.instalmentNumber}>
+                          After {inst.instalmentNumber}{inst.instalmentNumber === 1 ? 'st' : inst.instalmentNumber === 2 ? 'nd' : inst.instalmentNumber === 3 ? 'rd' : 'th'} instalment
+                          {(inst as any).isNonRefundable ? ' (non-refundable)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Date mode */}
+                {cancelMode === 'date' && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                      Cancellation effective date
+                    </label>
+                    <input type="date" value={cancelDate}
+                      onChange={e => setCancelDate(e.target.value)}
+                      style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                  </div>
+                )}
+
+                {/* Preview */}
+                {returnPremium > 0 && (
+                  <div style={{
+                    background: isLight ? '#f8f9fc' : '#161829',
+                    border: '1px solid var(--glass-border)', borderRadius: '8px',
+                    padding: '14px', marginBottom: '16px'
+                  }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+                      Return Summary
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.85rem' }}>
+                      <span>Return Premium</span>
+                      <span style={{ fontWeight: 700 }}>{currency} {returnPremium.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {returnCommission > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.85rem' }}>
+                        <span>Commission to Reclaim ({commPct}%)</span>
+                        <span style={{ fontWeight: 700 }}>{currency} {returnCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    {returnInstalments.length > 0 && (
+                      <div style={{ marginTop: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '8px' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Instalments to return:</div>
+                        {returnInstalments.map((inst, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '2px' }}>
+                            <span>#{inst.instalmentNumber} — {inst.dueDate ? formatDateShort(inst.dueDate) : '—'}</span>
+                            <span>{currency} {inst.premiumAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Warnings */}
+                <div style={{ fontSize: '0.8rem', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', color: 'var(--danger)' }}>
+                    <AlertTriangle size={14} /> Policy will be marked as cancelled
+                  </div>
+                  {isPnI && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', color: '#ffb020' }}>
+                      <AlertTriangle size={14} /> Active blue cards will be superseded
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowCancelModal(false)}
+                    style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                    Close
+                  </button>
+                  <button onClick={async () => {
+                    if (returnPremium <= 0 && cancelMode === 'date') {
+                      showError('Enter a valid cancellation date')
+                      return
+                    }
+                    setCancelling(true)
+                    try {
+                      const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
+                      await window.api.endorsementCancelPolicy(policyId, {
+                        effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+                        endorsementContent: content,
+                        returnPremium,
+                        premiumCurrency: currency,
+                        commissionPercent: commPct,
+                        instalments: returnInstalments,
+                        isProRata: cancelMode === 'date',
+                        annualPremium: cancelMode === 'date' ? (Number(policy.premiumAmount) || 0) : null,
+                        policyNumber: policy.policyNumber
+                      })
+                      showSuccess('Policy cancelled')
+                      setShowCancelModal(false)
+                      // Reload to reflect cancelled status
+                      loadData()
+                    } catch (err: any) {
+                      showError(err?.message || 'Failed to cancel policy')
+                    }
+                    setCancelling(false)
+                  }}
+                    disabled={cancelling}
+                    style={{
+                      padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
+                      background: 'var(--danger)', color: '#fff', border: 'none', cursor: 'pointer',
+                      opacity: cancelling ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '6px'
+                    }}>
+                    {cancelling ? <Loader2 size={14} className="spin" /> : <X size={14} />}
+                    Cancel Policy
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()
       )}
     </div>
   )

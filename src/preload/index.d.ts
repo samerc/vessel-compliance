@@ -915,6 +915,7 @@ export interface Api {
   endorsementUpdateTemplate: (id: string, updates: Partial<EndorsementTemplate>) => Promise<void>
   endorsementDeleteTemplate: (id: string) => Promise<void>
   endorsementReorderTemplates: (ids: string[]) => Promise<void>
+  endorsementCancelPolicy: (policyDocId: string, options: any) => Promise<string>
 
   // Signatures
   signatureGet: () => Promise<{ id: string; userId: string; imageData: number[]; fileName: string; uploadedAt: string } | null>

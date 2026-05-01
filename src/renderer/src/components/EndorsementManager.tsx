@@ -935,6 +935,12 @@ export default function EndorsementManager({
               <span style={{ fontWeight: 700, minWidth: '50px', color: 'var(--text-primary)' }}>
                 No. {end.endorsementNumber}
               </span>
+              {end.isCancellation && (
+                <span style={{
+                  fontSize: '0.65rem', padding: '1px 6px', borderRadius: '8px', fontWeight: 700,
+                  background: 'rgba(255,77,77,0.15)', color: 'var(--danger)', textTransform: 'uppercase'
+                }}>Cancellation</span>
+              )}
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
                 {end.effectiveDate ? formatDateShort(end.effectiveDate) : '—'}
               </span>
@@ -949,7 +955,7 @@ export default function EndorsementManager({
               )}
               {statusBadge(end.status, !!end.signedBy)}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                {canManage && end.status === 'draft' && (
+                {canManage && end.status === 'draft' && !end.isCancellation && (
                   <button onClick={() => handleEdit(end)} title="Edit"
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                     <Edit3 size={14} />
@@ -979,7 +985,7 @@ export default function EndorsementManager({
                     <PenTool size={14} />
                   </button>
                 )}
-                {canManage && end.status === 'draft' && (
+                {canManage && end.status === 'draft' && !end.isCancellation && (
                   <button onClick={() => setDeleteConfirm({ show: true, id: end.id, number: end.endorsementNumber })} title="Delete"
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}>
                     <Trash2 size={14} />

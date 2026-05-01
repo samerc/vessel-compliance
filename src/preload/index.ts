@@ -871,6 +871,7 @@ const api = {
   endorsementUpdateTemplate: (id: string, updates: any) => ipcRenderer.invoke('endorsement:updateTemplate', id, updates),
   endorsementDeleteTemplate: (id: string) => ipcRenderer.invoke('endorsement:deleteTemplate', id),
   endorsementReorderTemplates: (ids: string[]) => ipcRenderer.invoke('endorsement:reorderTemplates', ids),
+  endorsementCancelPolicy: (policyDocId: string, options: any) => ipcRenderer.invoke('endorsement:cancelPolicy', policyDocId, options),
 
   // Signatures
   signatureGet: () => ipcRenderer.invoke('signature:get'),

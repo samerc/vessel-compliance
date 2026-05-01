@@ -3018,6 +3018,12 @@ app.whenReady().then(() => {
   safeHandle('endorsement:updateTemplate', async (event, id: string, updates: any) => { await requirePermission(event, 'admin:setup'); return db.updateEndorsementTemplate(id, updates) })
   safeHandle('endorsement:deleteTemplate', async (event, id: string) => { await requirePermission(event, 'admin:setup'); return db.deleteEndorsementTemplate(id) })
   safeHandle('endorsement:reorderTemplates', async (event, ids: string[]) => { await requirePermission(event, 'admin:setup'); return db.reorderEndorsementTemplates(ids) })
+  safeHandle('endorsement:cancelPolicy', async (event, policyDocId: string, options: any) => {
+    const user = await requirePermission(event, 'policies:manage')
+    const endorsementId = await db.cancelPolicy(policyDocId, { ...options, createdBy: user.id })
+    db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Policies', entityType: 'policy_document', entityId: policyDocId, entityName: options.policyNumber || policyDocId, details: `Cancelled policy effective ${options.effectiveDate}` }).catch(() => {})
+    return endorsementId
+  })
 
   // ── Signatures ─────────────────────────────────────────────
   safeHandle('signature:get', async (event) => {

@@ -1715,6 +1715,7 @@ export interface PolicyEndorsement {
   effectiveDate: string
   affectsDebitAdvice: boolean
   isProRata: boolean
+  isCancellation: boolean
   annualPremium: number | null
   premiumAmount: number | null
   premiumCurrency: string | null

@@ -3200,6 +3200,7 @@ export class MySQLAdapter {
                 effective_date DATE NOT NULL,
                 affects_debit_advice TINYINT(1) DEFAULT 0,
                 is_pro_rata TINYINT(1) DEFAULT 0,
+                is_cancellation TINYINT(1) DEFAULT 0,
                 annual_premium DECIMAL(15,2) NULL,
                 premium_amount DECIMAL(15,2) NULL,
                 premium_currency VARCHAR(10) NULL,
@@ -3270,12 +3271,18 @@ export class MySQLAdapter {
                 }
             } catch {}
 
-            // Migration: add pro-rata columns to policy_endorsements
+            // Migration: add pro-rata and cancellation columns to policy_endorsements
             try {
                 const [prCol] = await this.pool.query("SHOW COLUMNS FROM policy_endorsements LIKE 'is_pro_rata'") as any[]
                 if ((prCol as any[]).length === 0) {
                     await this.pool.query('ALTER TABLE policy_endorsements ADD COLUMN is_pro_rata TINYINT(1) DEFAULT 0')
                     await this.pool.query('ALTER TABLE policy_endorsements ADD COLUMN annual_premium DECIMAL(15,2) NULL')
+                }
+            } catch {}
+            try {
+                const [ccCol] = await this.pool.query("SHOW COLUMNS FROM policy_endorsements LIKE 'is_cancellation'") as any[]
+                if ((ccCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_endorsements ADD COLUMN is_cancellation TINYINT(1) DEFAULT 0')
                 }
             } catch {}
 
@@ -14340,7 +14347,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
                     effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
-                    is_pro_rata AS isProRata, annual_premium AS annualPremium,
+                    is_pro_rata AS isProRata, is_cancellation AS isCancellation, annual_premium AS annualPremium,
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
@@ -14356,7 +14363,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
                     effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
-                    is_pro_rata AS isProRata, annual_premium AS annualPremium,
+                    is_pro_rata AS isProRata, is_cancellation AS isCancellation, annual_premium AS annualPremium,
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
@@ -14383,6 +14390,7 @@ export class MySQLAdapter {
         effectiveDate: string
         affectsDebitAdvice?: boolean
         isProRata?: boolean
+        isCancellation?: boolean
         annualPremium?: number | null
         premiumAmount?: number | null
         premiumCurrency?: string | null
@@ -14393,10 +14401,10 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             `INSERT INTO policy_endorsements (id, policy_doc_id, endorsement_number, effective_date,
-             affects_debit_advice, is_pro_rata, annual_premium, premium_amount, premium_currency, commission_percent, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             affects_debit_advice, is_pro_rata, is_cancellation, annual_premium, premium_amount, premium_currency, commission_percent, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, data.policyDocId, data.endorsementNumber, data.effectiveDate,
-             data.affectsDebitAdvice ? 1 : 0, data.isProRata ? 1 : 0,
+             data.affectsDebitAdvice ? 1 : 0, data.isProRata ? 1 : 0, data.isCancellation ? 1 : 0,
              data.annualPremium ?? null, data.premiumAmount ?? null,
              data.premiumCurrency ?? null, data.commissionPercent ?? null, data.createdBy ?? null]
         )
@@ -14567,6 +14575,114 @@ export class MySQLAdapter {
         if (!this.pool) return
         for (let i = 0; i < orderedIds.length; i++) {
             await this.pool.execute('UPDATE endorsement_templates SET order_index = ? WHERE id = ?', [i, orderedIds[i]])
+        }
+    }
+
+    // ---- Policy Cancellation ----
+
+    async cancelPolicy(policyDocId: string, options: {
+        effectiveDate: string
+        endorsementContent: string
+        returnPremium: number
+        premiumCurrency: string
+        commissionPercent: number
+        instalments: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number }>
+        isProRata: boolean
+        annualPremium?: number | null
+        createdBy: string
+    }): Promise<string> {
+        if (!this.pool) throw new Error('No DB connection')
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.beginTransaction()
+
+            // 1. Get policy info
+            const [policyRows] = await conn.query('SELECT vessel_id, quotation_id FROM policy_documents WHERE id = ?', [policyDocId])
+            const policy = (policyRows as any[])[0]
+            if (!policy) throw new Error('Policy not found')
+
+            // Check if P&I (for blue card supersession)
+            let isPnI = false
+            try {
+                const [qtRows] = await conn.query(
+                    `SELECT qt.code FROM policy_documents pd JOIN quotations q ON pd.quotation_id = q.id JOIN policy_types qt ON q.quotation_type_id = qt.id WHERE pd.id = ?`,
+                    [policyDocId]
+                )
+                isPnI = (qtRows as any[])[0]?.code === 'P'
+            } catch { /* ignore */ }
+
+            // 2. Create cancellation endorsement
+            const nextNum = await this.getNextEndorsementNumber(policyDocId)
+            const endorsementId = uuidv4()
+            await conn.execute(
+                `INSERT INTO policy_endorsements (id, policy_doc_id, endorsement_number, effective_date,
+                 affects_debit_advice, is_pro_rata, is_cancellation, annual_premium,
+                 premium_amount, premium_currency, commission_percent, created_by)
+                 VALUES (?, ?, ?, ?, 1, ?, 1, ?, ?, ?, ?, ?)`,
+                [endorsementId, policyDocId, nextNum, options.effectiveDate,
+                 options.isProRata ? 1 : 0, options.annualPremium ?? null,
+                 -Math.abs(options.returnPremium), options.premiumCurrency,
+                 options.commissionPercent, options.createdBy]
+            )
+
+            // 3. Set endorsement section
+            await conn.execute(
+                `INSERT INTO endorsement_sections (id, endorsement_id, section_key, section_title, content, is_enabled, is_full_width, order_index)
+                 VALUES (?, ?, 'general', 'General', ?, 1, 1, 0)`,
+                [uuidv4(), endorsementId, options.endorsementContent]
+            )
+
+            // 4. Set endorsement instalments
+            for (const inst of options.instalments) {
+                await conn.execute(
+                    `INSERT INTO endorsement_instalments (id, endorsement_id, instalment_number, due_date, premium_amount, commission_amount)
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [uuidv4(), endorsementId, inst.instalmentNumber, inst.dueDate, inst.premiumAmount, inst.commissionAmount]
+                )
+            }
+
+            // 5. Cancel the policy document
+            await conn.execute("UPDATE policy_documents SET status = 'cancelled' WHERE id = ?", [policyDocId])
+
+            // 6. Cancel matching vessel_dynamic_policies
+            // Find by vessel_id + quotation's policy type
+            try {
+                const [qRows] = await conn.query(
+                    'SELECT quotation_type_id FROM quotations WHERE id = ?', [policy.quotation_id]
+                )
+                const qtId = (qRows as any[])[0]?.quotation_type_id
+                if (qtId) {
+                    await conn.execute(
+                        "UPDATE vessel_dynamic_policies SET status = 'cancelled' WHERE vessel_id = ? AND policy_type_id = ? AND status = 'active'",
+                        [policy.vessel_id, qtId]
+                    )
+                }
+            } catch { /* best effort */ }
+
+            // 7. Supersede blue cards (P&I only)
+            if (isPnI) {
+                await conn.execute(
+                    "UPDATE policy_blue_cards SET status = 'superseded' WHERE policy_doc_id = ? AND status = 'active'",
+                    [policyDocId]
+                )
+            }
+
+            // 8. Check if vessel has remaining active policies → deactivate vessel if none
+            const [remaining] = await conn.query(
+                "SELECT COUNT(*) as cnt FROM vessel_dynamic_policies WHERE vessel_id = ? AND status = 'active'",
+                [policy.vessel_id]
+            )
+            if ((remaining as any[])[0].cnt === 0) {
+                await conn.execute('UPDATE vessels SET is_active = FALSE WHERE id = ?', [policy.vessel_id])
+            }
+
+            await conn.commit()
+            return endorsementId
+        } catch (err) {
+            await conn.rollback()
+            throw err
+        } finally {
+            conn.release()
         }
     }
 }
