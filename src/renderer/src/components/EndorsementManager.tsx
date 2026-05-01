@@ -27,6 +27,8 @@ interface EditState {
   id: string | null
   effectiveDate: string
   affectsDebitAdvice: boolean
+  isProRata: boolean
+  annualPremium: string
   premiumAmount: string
   premiumCurrency: string
   commissionPercent: string
@@ -50,6 +52,8 @@ const EMPTY_EDIT: EditState = {
   id: null,
   effectiveDate: new Date().toISOString().slice(0, 10),
   affectsDebitAdvice: false,
+  isProRata: false,
+  annualPremium: '',
   premiumAmount: '',
   premiumCurrency: 'USD',
   commissionPercent: '',
@@ -61,6 +65,49 @@ const EMPTY_EDIT: EditState = {
     orderIndex: i
   })),
   instalments: []
+}
+
+/** Calculate pro-rata premium: annual × (days from effective to expiry) / (days from inception to expiry) */
+function calcProRata(annual: number, effectiveDate: string, inceptionDate: string, expiryDate: string): number {
+  const eff = new Date(effectiveDate)
+  const inc = new Date(inceptionDate)
+  const exp = new Date(expiryDate)
+  const totalDays = Math.round((exp.getTime() - inc.getTime()) / 86400000)
+  const remainDays = Math.round((exp.getTime() - eff.getTime()) / 86400000)
+  if (totalDays <= 0) return annual
+  return Math.round(annual * remainDays / totalDays * 100) / 100
+}
+
+/** Distribute pro-rata premium across policy instalments, filling from the bottom */
+function distributeInstalments(
+  proRataAmount: number,
+  annualAmount: number,
+  policyInstalments: Array<{ instalmentNumber: number; dueDate: string }>,
+  commissionPct: number
+): Array<{ instalmentNumber: number; dueDate: string; premiumAmount: string; commissionAmount: string }> {
+  const numInst = policyInstalments.length
+  if (numInst === 0) return []
+  const baseInstalment = Math.round(annualAmount / numInst * 100) / 100
+  const fullCount = baseInstalment > 0 ? Math.floor(proRataAmount / baseInstalment) : 0
+  const remainder = Math.round((proRataAmount - fullCount * baseInstalment) * 100) / 100
+
+  // Build from bottom: last N instalments get base amount, the one above gets remainder
+  const result: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: string; commissionAmount: string }> = []
+  const startIdx = numInst - fullCount - (remainder > 0 ? 1 : 0)
+
+  for (let i = startIdx; i < numInst; i++) {
+    const pi = policyInstalments[i]
+    const isFirst = i === startIdx && remainder > 0
+    const prem = isFirst ? remainder : baseInstalment
+    const comm = Math.round(prem * commissionPct / 100 * 100) / 100
+    result.push({
+      instalmentNumber: result.length + 1,
+      dueDate: pi.dueDate?.slice(0, 10) || '',
+      premiumAmount: String(prem),
+      commissionAmount: String(comm)
+    })
+  }
+  return result
 }
 
 export default function EndorsementManager({
@@ -76,6 +123,9 @@ export default function EndorsementManager({
   const [endorsements, setEndorsements] = useState<PolicyEndorsement[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [policyData, setPolicyData] = useState<{ inceptionDate: string; expiryDate: string; commissionPercent: number } | null>(null)
+  const [policyInstalments, setPolicyInstalments] = useState<Array<{ instalmentNumber: number; dueDate: string }>>([])
+
   const [editState, setEditState] = useState<EditState>(EMPTY_EDIT)
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
@@ -87,12 +137,25 @@ export default function EndorsementManager({
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [list, tmpls] = await Promise.all([
+      const [list, tmpls, policy, polInst] = await Promise.all([
         window.api.endorsementList(policyDocId),
-        window.api.endorsementGetTemplates()
+        window.api.endorsementGetTemplates(),
+        window.api.policyGetById(policyDocId),
+        window.api.policyGetInstalments(policyDocId)
       ])
       setEndorsements(Array.isArray(list) ? list : [])
       setTemplates(Array.isArray(tmpls) ? tmpls : [])
+      if (policy) {
+        setPolicyData({
+          inceptionDate: policy.inceptionDate || '',
+          expiryDate: policy.expiryDate || '',
+          commissionPercent: Number(policy.commissionPercent) || 0
+        })
+      }
+      setPolicyInstalments(Array.isArray(polInst) ? polInst.map((pi: any) => ({
+        instalmentNumber: pi.instalmentNumber,
+        dueDate: pi.dueDate || ''
+      })) : [])
     } catch (err: any) {
       showError('Failed to load endorsements')
     }
@@ -179,6 +242,8 @@ export default function EndorsementManager({
         id: endorsement.id,
         effectiveDate: endorsement.effectiveDate?.slice(0, 10) || '',
         affectsDebitAdvice: !!endorsement.affectsDebitAdvice,
+        isProRata: !!endorsement.isProRata,
+        annualPremium: endorsement.annualPremium != null ? String(endorsement.annualPremium) : '',
         premiumAmount: endorsement.premiumAmount != null ? String(endorsement.premiumAmount) : '',
         premiumCurrency: endorsement.premiumCurrency || premiumCurrency || 'USD',
         commissionPercent: endorsement.commissionPercent != null ? String(endorsement.commissionPercent) : '',
@@ -219,6 +284,8 @@ export default function EndorsementManager({
           endorsementNumber: nextNum,
           effectiveDate: editState.effectiveDate,
           affectsDebitAdvice: editState.affectsDebitAdvice,
+          isProRata: editState.isProRata,
+          annualPremium: editState.annualPremium ? parseFloat(editState.annualPremium) : null,
           premiumAmount: editState.premiumAmount ? parseFloat(editState.premiumAmount) : null,
           premiumCurrency: editState.premiumCurrency || null,
           commissionPercent: editState.commissionPercent ? parseFloat(editState.commissionPercent) : null
@@ -228,6 +295,8 @@ export default function EndorsementManager({
         await window.api.endorsementUpdate(endorsementId, {
           effectiveDate: editState.effectiveDate,
           affectsDebitAdvice: editState.affectsDebitAdvice,
+          isProRata: editState.isProRata,
+          annualPremium: editState.annualPremium ? parseFloat(editState.annualPremium) : null,
           premiumAmount: editState.premiumAmount ? parseFloat(editState.premiumAmount) : null,
           premiumCurrency: editState.premiumCurrency || null,
           commissionPercent: editState.commissionPercent ? parseFloat(editState.commissionPercent) : null
@@ -402,24 +471,50 @@ export default function EndorsementManager({
     }))
   }
 
-  const prefillInstalments = async () => {
-    try {
-      const policyInstalments = await window.api.policyGetInstalments(policyDocId)
-      if (Array.isArray(policyInstalments) && policyInstalments.length > 0) {
-        setEditState(prev => ({
+  const prefillInstalments = () => {
+    if (policyInstalments.length === 0) {
+      showError('No policy instalments found')
+      return
+    }
+    setEditState(prev => {
+      const premAmt = parseFloat(prev.premiumAmount) || 0
+      const commPct = parseFloat(prev.commissionPercent) || policyData?.commissionPercent || 0
+
+      if (prev.isProRata && premAmt > 0 && parseFloat(prev.annualPremium) > 0) {
+        // Pro-rata: distribute using bottom-fill algorithm
+        const distributed = distributeInstalments(premAmt, parseFloat(prev.annualPremium), policyInstalments, commPct)
+        return { ...prev, instalments: distributed }
+      } else if (premAmt > 0) {
+        // Non pro-rata: divide premium equally across all policy instalments
+        const perInst = Math.round(premAmt / policyInstalments.length * 100) / 100
+        const firstAdj = Math.round((premAmt - perInst * (policyInstalments.length - 1)) * 100) / 100
+        return {
           ...prev,
-          instalments: policyInstalments.map((pi: any) => ({
-            instalmentNumber: pi.instalmentNumber,
+          instalments: policyInstalments.map((pi, i) => {
+            const prem = i === 0 ? firstAdj : perInst
+            const comm = Math.round(prem * commPct / 100 * 100) / 100
+            return {
+              instalmentNumber: i + 1,
+              dueDate: pi.dueDate?.slice(0, 10) || '',
+              premiumAmount: String(prem),
+              commissionAmount: String(comm)
+            }
+          })
+        }
+      } else {
+        // No premium — just bring dates
+        return {
+          ...prev,
+          instalments: policyInstalments.map((pi, i) => ({
+            instalmentNumber: i + 1,
             dueDate: pi.dueDate?.slice(0, 10) || '',
             premiumAmount: '',
             commissionAmount: ''
           }))
-        }))
-        setShowInstalments(true)
+        }
       }
-    } catch {
-      showError('Failed to load policy instalments')
-    }
+    })
+    setShowInstalments(true)
   }
 
   const removeInstalment = (idx: number) => {
@@ -531,14 +626,43 @@ export default function EndorsementManager({
             <div>
               <label style={labelStyle}>Effective Date</label>
               <input type="date" value={editState.effectiveDate}
-                onChange={e => setEditState(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                onChange={e => {
+                  const newDate = e.target.value
+                  setEditState(prev => {
+                    const updated = { ...prev, effectiveDate: newDate }
+                    // Recalculate pro-rata if enabled
+                    if (prev.isProRata && prev.annualPremium && policyData) {
+                      const proRata = calcProRata(parseFloat(prev.annualPremium), newDate, policyData.inceptionDate, policyData.expiryDate)
+                      updated.premiumAmount = String(proRata)
+                    }
+                    return updated
+                  })
+                }}
                 style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Premium Amount</label>
-              <input type="number" value={editState.premiumAmount} placeholder="0.00"
-                onChange={e => setEditState(prev => ({ ...prev, premiumAmount: e.target.value }))}
-                style={inputStyle} />
+              <label style={labelStyle}>
+                {editState.isProRata ? 'Annual Premium (p.a.)' : 'Premium Amount'}
+              </label>
+              {editState.isProRata ? (
+                <input type="number" value={editState.annualPremium} placeholder="0.00"
+                  onChange={e => {
+                    const annual = e.target.value
+                    setEditState(prev => {
+                      const updated = { ...prev, annualPremium: annual }
+                      if (annual && policyData) {
+                        const proRata = calcProRata(parseFloat(annual), prev.effectiveDate, policyData.inceptionDate, policyData.expiryDate)
+                        updated.premiumAmount = String(proRata)
+                      }
+                      return updated
+                    })
+                  }}
+                  style={inputStyle} />
+              ) : (
+                <input type="number" value={editState.premiumAmount} placeholder="0.00"
+                  onChange={e => setEditState(prev => ({ ...prev, premiumAmount: e.target.value }))}
+                  style={inputStyle} />
+              )}
             </div>
             <div>
               <label style={labelStyle}>Currency</label>
@@ -548,12 +672,41 @@ export default function EndorsementManager({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+          {editState.isProRata && editState.premiumAmount && (
+            <div style={{ marginBottom: '12px', fontSize: '0.82rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              Pro-rata premium: {editState.premiumCurrency} {parseFloat(editState.premiumAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
               <label style={labelStyle}>Commission %</label>
               <input type="number" value={editState.commissionPercent} placeholder="0"
                 onChange={e => setEditState(prev => ({ ...prev, commissionPercent: e.target.value }))}
                 style={inputStyle} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={editState.isProRata}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setEditState(prev => {
+                      const updated = { ...prev, isProRata: checked }
+                      if (checked && prev.premiumAmount && !prev.annualPremium) {
+                        // If switching to pro-rata with an existing premium, treat it as annual
+                        updated.annualPremium = prev.premiumAmount
+                        if (policyData) {
+                          const proRata = calcProRata(parseFloat(prev.premiumAmount), prev.effectiveDate, policyData.inceptionDate, policyData.expiryDate)
+                          updated.premiumAmount = String(proRata)
+                        }
+                      } else if (!checked) {
+                        updated.annualPremium = ''
+                      }
+                      return updated
+                    })
+                  }} />
+                Pro-rata
+              </label>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '4px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer' }}>

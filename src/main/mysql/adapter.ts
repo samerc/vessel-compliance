@@ -3199,6 +3199,8 @@ export class MySQLAdapter {
                 endorsement_number INT NOT NULL,
                 effective_date DATE NOT NULL,
                 affects_debit_advice TINYINT(1) DEFAULT 0,
+                is_pro_rata TINYINT(1) DEFAULT 0,
+                annual_premium DECIMAL(15,2) NULL,
                 premium_amount DECIMAL(15,2) NULL,
                 premium_currency VARCHAR(10) NULL,
                 commission_percent DECIMAL(5,2) NULL,
@@ -3258,6 +3260,15 @@ export class MySQLAdapter {
                     )
                 }
             }
+
+            // Migration: add pro-rata columns to policy_endorsements
+            try {
+                const [prCol] = await this.pool.query("SHOW COLUMNS FROM policy_endorsements LIKE 'is_pro_rata'") as any[]
+                if ((prCol as any[]).length === 0) {
+                    await this.pool.query('ALTER TABLE policy_endorsements ADD COLUMN is_pro_rata TINYINT(1) DEFAULT 0')
+                    await this.pool.query('ALTER TABLE policy_endorsements ADD COLUMN annual_premium DECIMAL(15,2) NULL')
+                }
+            } catch {}
 
         } catch (error) {
             console.error('Schema initialization failed:', error)
@@ -14320,6 +14331,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
                     effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
+                    is_pro_rata AS isProRata, annual_premium AS annualPremium,
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
@@ -14335,6 +14347,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
                     effective_date AS effectiveDate, affects_debit_advice AS affectsDebitAdvice,
+                    is_pro_rata AS isProRata, annual_premium AS annualPremium,
                     premium_amount AS premiumAmount, premium_currency AS premiumCurrency,
                     commission_percent AS commissionPercent, status,
                     exported_at AS exportedAt, signed_by AS signedBy, signed_at AS signedAt,
@@ -14360,6 +14373,8 @@ export class MySQLAdapter {
         endorsementNumber: number
         effectiveDate: string
         affectsDebitAdvice?: boolean
+        isProRata?: boolean
+        annualPremium?: number | null
         premiumAmount?: number | null
         premiumCurrency?: string | null
         commissionPercent?: number | null
@@ -14369,10 +14384,11 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             `INSERT INTO policy_endorsements (id, policy_doc_id, endorsement_number, effective_date,
-             affects_debit_advice, premium_amount, premium_currency, commission_percent, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             affects_debit_advice, is_pro_rata, annual_premium, premium_amount, premium_currency, commission_percent, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, data.policyDocId, data.endorsementNumber, data.effectiveDate,
-             data.affectsDebitAdvice ? 1 : 0, data.premiumAmount ?? null,
+             data.affectsDebitAdvice ? 1 : 0, data.isProRata ? 1 : 0,
+             data.annualPremium ?? null, data.premiumAmount ?? null,
              data.premiumCurrency ?? null, data.commissionPercent ?? null, data.createdBy ?? null]
         )
         return id
@@ -14381,6 +14397,8 @@ export class MySQLAdapter {
     async updateEndorsement(id: string, updates: Partial<{
         effectiveDate: string
         affectsDebitAdvice: boolean
+        isProRata: boolean
+        annualPremium: number | null
         premiumAmount: number | null
         premiumCurrency: string | null
         commissionPercent: number | null
@@ -14394,6 +14412,8 @@ export class MySQLAdapter {
         const values: any[] = []
         if (updates.effectiveDate !== undefined) { fields.push('effective_date = ?'); values.push(updates.effectiveDate) }
         if (updates.affectsDebitAdvice !== undefined) { fields.push('affects_debit_advice = ?'); values.push(updates.affectsDebitAdvice ? 1 : 0) }
+        if (updates.isProRata !== undefined) { fields.push('is_pro_rata = ?'); values.push(updates.isProRata ? 1 : 0) }
+        if (updates.annualPremium !== undefined) { fields.push('annual_premium = ?'); values.push(updates.annualPremium) }
         if (updates.premiumAmount !== undefined) { fields.push('premium_amount = ?'); values.push(updates.premiumAmount) }
         if (updates.premiumCurrency !== undefined) { fields.push('premium_currency = ?'); values.push(updates.premiumCurrency) }
         if (updates.commissionPercent !== undefined) { fields.push('commission_percent = ?'); values.push(updates.commissionPercent) }

@@ -1714,6 +1714,8 @@ export interface PolicyEndorsement {
   endorsementNumber: number
   effectiveDate: string
   affectsDebitAdvice: boolean
+  isProRata: boolean
+  annualPremium: number | null
   premiumAmount: number | null
   premiumCurrency: string | null
   commissionPercent: number | null

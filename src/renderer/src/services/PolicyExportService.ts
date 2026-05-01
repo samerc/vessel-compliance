@@ -3910,10 +3910,9 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
       ]
     })
   ]
-  // Pro-rata line if policy has per-annum premium
-  const policyAny = data.policy as any
-  if (policyAny.perAnnumPremium && policyAny.proRata) {
-    premiumContent.push(polNp(`Pro-rata ${polFormatCurrency(policyAny.perAnnumPremium, currency)} per annum`))
+  // Pro-rata line if endorsement is pro-rata
+  if (endorsement.isProRata && endorsement.annualPremium) {
+    premiumContent.push(polNp(`Pro-rata ${polFormatCurrency(Number(endorsement.annualPremium), currency)} per annum`))
   }
   rows.push(makeRow(premLabel, premiumContent))
 

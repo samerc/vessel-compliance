@@ -899,7 +899,7 @@ export interface Api {
   endorsementList: (policyDocId: string) => Promise<PolicyEndorsement[]>
   endorsementGet: (id: string) => Promise<PolicyEndorsement | null>
   endorsementNextNumber: (policyDocId: string) => Promise<number>
-  endorsementCreate: (data: { policyDocId: string; endorsementNumber: number; effectiveDate: string; affectsDebitAdvice?: boolean; premiumAmount?: number | null; premiumCurrency?: string | null; commissionPercent?: number | null }) => Promise<string>
+  endorsementCreate: (data: { policyDocId: string; endorsementNumber: number; effectiveDate: string; affectsDebitAdvice?: boolean; isProRata?: boolean; annualPremium?: number | null; premiumAmount?: number | null; premiumCurrency?: string | null; commissionPercent?: number | null }) => Promise<string>
   endorsementUpdate: (id: string, updates: Partial<PolicyEndorsement>) => Promise<void>
   endorsementDelete: (id: string) => Promise<void>
   endorsementGetSections: (endorsementId: string) => Promise<EndorsementSection[]>
