@@ -3812,26 +3812,25 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   const children: (Paragraph | Table)[] = []
 
-  // Title
+  // Title block — matches screenshot layout
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `DEBIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`, size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
+    children: [new TextRun({ text: 'DEBIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
   }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `Endorsement N° ${endorsement.endorsementNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+  }))
+
+  // Preamble
+  children.push(new Paragraph({
+    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text: `This Debit Advice shall be deemed to be attached to and forming an integral part of Endorsement N° ${endorsement.endorsementNumber} - ${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   }))
 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -3844,12 +3843,17 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: [polBp(title)]
+          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          children: [new Paragraph({
+            spacing: { before: 0, after: 0 },
+            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+          })]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
+          margins: { top: 60, bottom: 200, left: 80, right: 80 },
           children: content.length > 0 ? content : [polEmptyP()]
         })
       ]
@@ -3858,27 +3862,75 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   const rows: TableRow[] = []
 
-  // Premium
-  const premiumAmt = Number(endorsement.premiumAmount) || 0
-  const premLabel = premiumAmt < 0 ? 'RETURN PREMIUM' : 'ADDITIONAL PREMIUM'
-  rows.push(makeRow(premLabel, [polNp(`${currency} ${Math.abs(premiumAmt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)]))
+  // INSURED — same as policy DA
+  const insuredContent = polBuildInsuredSection(data)
+  if (insuredContent.length > 0) rows.push(makeRow('INSURED', insuredContent))
 
-  // Instalments
-  if (instalments.length > 0) {
-    const instContent: (Paragraph | Table)[] = []
-    for (const inst of instalments) {
-      instContent.push(polNp(`${polOrdinal(inst.instalmentNumber)} instalment: ${currency} ${Number(inst.premiumAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} due ${polFormatDateUS(inst.dueDate)}`))
-    }
-    rows.push(makeRow('INSTALMENTS', instContent))
+  // ADDITIONAL PREMIUM / CREDIT PREMIUM — amount bold + words
+  const premiumAmt = Number(endorsement.premiumAmount) || 0
+  const absPremium = Math.abs(premiumAmt)
+  const premLabel = premiumAmt < 0 ? 'CREDIT PREMIUM' : 'ADDITIONAL PREMIUM'
+  const premiumContent: (Paragraph | Table)[] = [
+    new Paragraph({
+      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({ text: polFormatCurrency(absPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+        new TextRun({ text: ` (${numberToWords(absPremium, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+      ]
+    })
+  ]
+  // Pro-rata line if policy has per-annum premium
+  const policyAny = data.policy as any
+  if (policyAny.perAnnumPremium && policyAny.proRata) {
+    premiumContent.push(polNp(`Pro-rata ${polFormatCurrency(policyAny.perAnnumPremium, currency)} per annum`))
+  }
+  rows.push(makeRow(premLabel, premiumContent))
+
+  // ADDITIONAL PREMIUM PAYMENT CONDITION PRECEDENT
+  const ppcpContent: (Paragraph | Table)[] = []
+  const daTimezone = data.policy.timezone || ''
+
+  if (instalments.length === 1) {
+    ppcpContent.push(polNp(
+      `Additional Premium shall be payable on ${polFormatDateUS(instalments[0].dueDate)} at ${polFormatTime(data.policy.inceptionTime)} ${daTimezone}, time being of the essence.`
+    ))
+  } else if (instalments.length > 1) {
+    ppcpContent.push(polNp(
+      `Additional Premium ${polFormatCurrency(absPremium, currency)} shall be payable in ${instalments.length} Instalments on the following dates, at ${polFormatTime(data.policy.inceptionTime)} ${daTimezone}, time being of the essence:`
+    ))
+    ppcpContent.push(polEmptyP())
+
+    // Instalment table — same pattern as policy DA
+    const instDescW = Math.round(POL_BODY_W * 0.55)
+    const instAmtW = POL_BODY_W - instDescW
+    const instRows = instalments.map(inst => {
+      const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
+      const amtText = polFormatCurrency(Number(inst.premiumAmount) || 0, currency)
+      return new TableRow({
+        children: [
+          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+        ]
+      })
+    })
+    ppcpContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(polEmptyP())
   }
 
-  // Bank details
+  if (ppcpContent.length > 0) {
+    rows.push(makeRow(`Additional\nPremium Payment\nCondition\nPrecedent`, ppcpContent))
+  }
+
+  // PERIOD — same as policy DA
+  rows.push(makeRow('Period', polBuildPeriodParagraphs(data)))
+
+  // BANK DETAILS
   if (data.bank) {
     const bankContent: (Paragraph | Table)[] = []
     for (const line of data.bank.details.split('\n')) {
-      if (line.trim()) bankContent.push(polNp(line.trim()))
+      if (line.trim()) bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
-    rows.push(makeRow('BANK DETAILS', bankContent))
+    rows.push(makeRow('Bank Details', bankContent))
   }
 
   children.push(new Table({
@@ -3893,14 +3945,14 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   }))
 
   // Closing
-  const closingParas = polBuildAdviceClosing(data, signatureImageRun)
-  children.push(...closingParas)
+  children.push(...polBuildAdviceClosing(data, signatureImageRun))
 
   const document = new Document({
+    numbering: polMakeDocxNumbering(),
     sections: [{
       properties: polMakePageProperties(),
-      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
-      footers: adviceFooter ? { default: adviceFooter } : undefined,
+      headers: { default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] }) },
+      footers: { default: adviceFooter },
       children: children as any[]
     }]
   })
