@@ -14,6 +14,7 @@ import type {
   EndorsementTemplate
 } from '../../../shared/types'
 import { ENDORSEMENT_PRESET_SECTIONS } from '../../../shared/types'
+import { countDays, calcProRataPremium, distributeInstalments as distributeInstalmentsFn } from '../utils/premiumCalc'
 
 interface EndorsementManagerProps {
   policyDocId: string
@@ -69,47 +70,13 @@ const EMPTY_EDIT: EditState = {
   instalments: []
 }
 
-/** Calculate pro-rata premium: annual × (days from effective to expiry) / (days from inception to expiry) */
+/** Calculate pro-rata premium using shared DST-safe day counting */
 function calcProRata(annual: number, effectiveDate: string, inceptionDate: string, expiryDate: string): number {
-  const eff = new Date(effectiveDate)
-  const inc = new Date(inceptionDate)
-  const exp = new Date(expiryDate)
-  const totalDays = Math.round((exp.getTime() - inc.getTime()) / 86400000)
-  const remainDays = Math.round((exp.getTime() - eff.getTime()) / 86400000)
-  if (totalDays <= 0) return annual
-  return Math.round(annual * remainDays / totalDays * 100) / 100
-}
-
-/** Distribute pro-rata premium across policy instalments, filling from the bottom */
-function distributeInstalments(
-  proRataAmount: number,
-  annualAmount: number,
-  policyInstalments: Array<{ instalmentNumber: number; dueDate: string }>,
-  commissionPct: number
-): Array<{ instalmentNumber: number; dueDate: string; premiumAmount: string; commissionAmount: string }> {
-  const numInst = policyInstalments.length
-  if (numInst === 0) return []
-  const baseInstalment = Math.round(annualAmount / numInst * 100) / 100
-  const fullCount = baseInstalment > 0 ? Math.floor(proRataAmount / baseInstalment) : 0
-  const remainder = Math.round((proRataAmount - fullCount * baseInstalment) * 100) / 100
-
-  // Build from bottom: last N instalments get base amount, the one above gets remainder
-  const result: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: string; commissionAmount: string }> = []
-  const startIdx = numInst - fullCount - (remainder > 0 ? 1 : 0)
-
-  for (let i = startIdx; i < numInst; i++) {
-    const pi = policyInstalments[i]
-    const isFirst = i === startIdx && remainder > 0
-    const prem = isFirst ? remainder : baseInstalment
-    const comm = Math.round(prem * commissionPct / 100 * 100) / 100
-    result.push({
-      instalmentNumber: result.length + 1,
-      dueDate: pi.dueDate?.slice(0, 10) || '',
-      premiumAmount: String(prem),
-      commissionAmount: String(comm)
-    })
-  }
-  return result
+  const totalPeriod = countDays(inceptionDate, expiryDate)
+  const remainPeriod = countDays(effectiveDate, expiryDate)
+  if (totalPeriod.days <= 0) return annual
+  const result = calcProRataPremium(remainPeriod.days, annual, totalPeriod.days, 1, 0)
+  return result.proRataPremium
 }
 
 export default function EndorsementManager({
@@ -497,8 +464,8 @@ export default function EndorsementManager({
 
       if (prev.isProRata && premAmt > 0 && parseFloat(prev.annualPremium) > 0) {
         // Pro-rata: distribute using bottom-fill algorithm
-        const distributed = distributeInstalments(premAmt, parseFloat(prev.annualPremium), policyInstalments, commPct)
-        return { ...prev, instalments: distributed }
+        const distributed = distributeInstalmentsFn(premAmt, parseFloat(prev.annualPremium), policyInstalments, commPct)
+        return { ...prev, instalments: distributed.map(d => ({ ...d, premiumAmount: String(d.premiumAmount), commissionAmount: String(d.commissionAmount) })) }
       } else if (premAmt > 0) {
         // Non pro-rata: divide premium equally across all policy instalments
         const perInst = Math.round(premAmt / policyInstalments.length * 100) / 100

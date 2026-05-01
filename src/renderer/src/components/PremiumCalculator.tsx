@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { RotateCcw, Copy, Check } from 'lucide-react'
+import { countDays, calcProRataPremium } from '../utils/premiumCalc'
+import type { InstalmentRow } from '../utils/premiumCalc'
 
 // ── Number to words ────────────────────────────────────────────────────────────
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -28,12 +30,6 @@ function numberToText(n: number): string {
   return `${formatted} - ${words} and ${dec.toString().padStart(2, '0')}/100`
 }
 
-interface InstalmentRow {
-  number: number
-  premium: number
-  commission: number
-}
-
 interface CalcDetails {
   days: number
   calendarDays: number
@@ -49,34 +45,6 @@ interface CalcDetails {
   annualCommissionInstalment: number
   firstCommissionInstalment: number
   rows: InstalmentRow[]
-}
-
-function countDays(startStr: string, endStr: string): { days: number; calendarDays: number; addedDay: boolean } {
-  if (!startStr || !endStr) return { days: 0, calendarDays: 0, addedDay: false }
-  const start = new Date(startStr)
-  const end = new Date(endStr)
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return { days: 0, calendarDays: 0, addedDay: false }
-  if (end <= start) return { days: 0, calendarDays: 0, addedDay: false }
-
-  // Use date-only comparison to avoid DST issues
-  const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate())
-  const calendarDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000)
-
-  // Compare time-of-day: if calendarDays > 0 and end time > start time, add 1
-  if (calendarDays > 0) {
-    const startMinutes = start.getHours() * 60 + start.getMinutes()
-    const endMinutes = end.getHours() * 60 + end.getMinutes()
-    if (endMinutes > startMinutes) {
-      return { days: calendarDays + 1, calendarDays, addedDay: true }
-    }
-  }
-
-  return { days: calendarDays, calendarDays, addedDay: false }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }
 
 function fmt(n: number): string {
@@ -115,38 +83,7 @@ export default function PremiumCalculator() {
     const startTime = startObj.getHours().toString().padStart(2, '0') + ':' + startObj.getMinutes().toString().padStart(2, '0')
     const endTime = endObj.getHours().toString().padStart(2, '0') + ':' + endObj.getMinutes().toString().padStart(2, '0')
 
-    // Step 2: Pro-rata premium
-    const proRataPremium = round2((days * annual) / period)
-
-    // Step 3: Annual instalment amount
-    const annualInstalment = round2(annual / instalments)
-
-    // Step 4: How many full annual instalments does the pro-rata cover?
-    const fullInstalments = Math.floor(proRataPremium / annualInstalment)
-
-    // Step 5: First instalment = remainder
-    const firstPremiumInstalment = round2(proRataPremium - annualInstalment * fullInstalments)
-
-    // Step 6: Pro-rata commission
-    const commissionTotal = round2(proRataPremium * commission / 100)
-
-    // Step 7 & 8: Annual commission and per-instalment
-    const annualCommission = round2(annual * commission / 100)
-    const annualCommissionInstalment = round2(annualCommission / instalments)
-
-    // Step 9 & 10: Commission first instalment (same number of full instalments)
-    const firstCommissionInstalment = round2(commissionTotal - annualCommissionInstalment * fullInstalments)
-
-    // Build rows: first instalment (remainder) + full instalments from bottom
-    const rows: InstalmentRow[] = []
-    let rowNum = 1
-
-    if (firstPremiumInstalment > 0) {
-      rows.push({ number: rowNum++, premium: firstPremiumInstalment, commission: firstCommissionInstalment })
-    }
-    for (let i = 0; i < fullInstalments; i++) {
-      rows.push({ number: rowNum++, premium: annualInstalment, commission: annualCommissionInstalment })
-    }
+    const calc = calcProRataPremium(days, annual, period, instalments, commission)
 
     return {
       days,
@@ -154,15 +91,7 @@ export default function PremiumCalculator() {
       addedDay,
       startTime,
       endTime,
-      proRataPremium,
-      annualInstalment,
-      fullInstalments,
-      firstPremiumInstalment,
-      commissionTotal,
-      annualCommission,
-      annualCommissionInstalment,
-      firstCommissionInstalment,
-      rows
+      ...calc
     }
   }, [startDate, endDate, annualPremium, standardPeriod, numInstalments, commissionPct])
 

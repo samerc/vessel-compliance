@@ -46,6 +46,7 @@ import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
 import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
+import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
@@ -3429,35 +3430,26 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             returnPremium = returnInstalments.reduce((s, i) => s + i.premiumAmount, 0)
             returnCommission = returnInstalments.reduce((s, i) => s + i.commissionAmount, 0)
           } else if (cancelMode === 'date' && cancelDate && policy.premiumAmount) {
-            // Pro-rata calculation
+            // Pro-rata calculation using shared utility
             const totalPrem = Number(policy.premiumAmount) || 0
-            const inc = new Date(policy.inceptionDate)
-            const exp = new Date(policy.expiryDate)
-            const canc = new Date(cancelDate)
-            const totalDays = Math.round((exp.getTime() - inc.getTime()) / 86400000)
-            const usedDays = Math.round((canc.getTime() - inc.getTime()) / 86400000)
-            if (totalDays > 0) {
-              returnPremium = Math.round(totalPrem * (totalDays - usedDays) / totalDays * 100) / 100
-              returnCommission = Math.round(returnPremium * commPct / 100 * 100) / 100
+            const totalPeriod = countDays(policy.inceptionDate, policy.expiryDate)
+            const remainPeriod = countDays(cancelDate, policy.expiryDate)
+            if (totalPeriod.days > 0) {
+              const calc = calcProRataPremium(remainPeriod.days, totalPrem, totalPeriod.days, 1, commPct)
+              returnPremium = calc.proRataPremium
+              returnCommission = calc.commissionTotal
             }
-            // Build instalments using bottom-fill
+            // Build instalments using shared bottom-fill
             if (instalments.length > 0 && returnPremium > 0) {
-              const annualPerInst = Math.round(totalPrem / instalments.length * 100) / 100
-              const fullCount = annualPerInst > 0 ? Math.floor(returnPremium / annualPerInst) : 0
-              const remainder = Math.round((returnPremium - fullCount * annualPerInst) * 100) / 100
-              const startIdx = instalments.length - fullCount - (remainder > 0 ? 1 : 0)
-              returnInstalments = []
-              for (let i = Math.max(0, startIdx); i < instalments.length; i++) {
-                const isFirst = i === startIdx && remainder > 0
-                const prem = isFirst ? remainder : annualPerInst
-                const comm = Math.round(prem * commPct / 100 * 100) / 100
-                returnInstalments.push({
-                  instalmentNumber: returnInstalments.length + 1,
-                  dueDate: instalments[i].dueDate,
-                  premiumAmount: prem,
-                  commissionAmount: comm
-                })
-              }
+              const dist = distributeInstalments(returnPremium, totalPrem, instalments.map(inst => ({
+                instalmentNumber: inst.instalmentNumber, dueDate: inst.dueDate
+              })), commPct)
+              returnInstalments = dist.map(d => ({
+                instalmentNumber: d.instalmentNumber,
+                dueDate: d.dueDate,
+                premiumAmount: d.premiumAmount,
+                commissionAmount: d.commissionAmount
+              }))
             }
           }
 
