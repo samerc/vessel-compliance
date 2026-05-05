@@ -724,7 +724,6 @@ export interface PISubjectivity {
   docTypeIds: string[]
   typeScope: QuotationTypeScope
   order: number
-  isOptional?: boolean
 }
 
 export interface QuotationSubjectivity {

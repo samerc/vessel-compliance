@@ -729,8 +729,8 @@ export interface Api {
   setQuotationExcludedCountries: (qId: string, countries: { name: string; listType: string }[]) => Promise<void>
 
   getPISubjectivities: () => Promise<PISubjectivity[]>
-  addPISubjectivity: (data: { text: string; docTypeIds?: string[]; typeScope?: string; order?: number; isOptional?: boolean }) => Promise<PISubjectivity>
-  updatePISubjectivity: (id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string; isOptional?: boolean }) => Promise<void>
+  addPISubjectivity: (data: { text: string; docTypeIds?: string[]; typeScope?: string; order?: number }) => Promise<PISubjectivity>
+  updatePISubjectivity: (id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string }) => Promise<void>
   deletePISubjectivity: (id: string) => Promise<void>
   reorderPISubjectivities: (ids: string[]) => Promise<void>
 

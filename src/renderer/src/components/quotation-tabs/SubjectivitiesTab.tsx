@@ -411,7 +411,11 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                         <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }} onClick={async () => {
                             for (const m of availableMasters) {
                                 if (items.some(i => i.piSubjectivityId === m.id)) continue
-                                if (m.isOptional) continue
+                                // Skip if all linked doc types are non-required (optional)
+                                if (m.docTypeIds && m.docTypeIds.length > 0 && m.docTypeIds.every(id => {
+                                    const dt = docTypes.find(d => d.id === id)
+                                    return dt && !dt.required
+                                })) continue
                                 await window.api.addQuotationSubjectivity({ quotationId: quotation.id, piSubjectivityId: m.id, text: m.text, order: m.order ?? items.length })
                             }
                             showSuccess('All subjectivities added')

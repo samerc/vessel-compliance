@@ -2736,12 +2736,10 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const [newText, setNewText] = useState('')
     const [newDocTypeIds, setNewDocTypeIds] = useState<string[]>([])
     const [newTypeScope, setNewTypeScope] = useState<string>('all')
-    const [newIsOptional, setNewIsOptional] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
     const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
     const [editTypeScope, setEditTypeScope] = useState<string>('all')
-    const [editIsOptional, setEditIsOptional] = useState(false)
 
     useEffect(() => { loadData() }, [])
     const ENTITY_DOC_TYPES: DocumentType[] = [
@@ -2763,20 +2761,20 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const handleAdd = async () => {
         if (!newText.trim()) return
         try {
-            await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, typeScope: newTypeScope, order: items.length, isOptional: newIsOptional })
-            setNewText(''); setNewDocTypeIds([]); setNewTypeScope('all'); setNewIsOptional(false)
+            await window.api.addPISubjectivity({ text: newText.trim(), docTypeIds: newDocTypeIds, typeScope: newTypeScope, order: items.length })
+            setNewText(''); setNewDocTypeIds([]); setNewTypeScope('all')
             showSuccess('Subjectivity added'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to add') }
     }
 
     const startEdit = (s: PISubjectivity) => {
-        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || []); setEditTypeScope(s.typeScope || 'all'); setEditIsOptional(!!s.isOptional)
+        setEditingId(s.id); setEditText(s.text); setEditDocTypeIds(s.docTypeIds || []); setEditTypeScope(s.typeScope || 'all')
     }
 
     const handleUpdate = async () => {
         if (!editingId || !editText.trim()) return
         try {
-            await window.api.updatePISubjectivity(editingId, { text: editText.trim(), docTypeIds: editDocTypeIds, typeScope: editTypeScope, isOptional: editIsOptional })
+            await window.api.updatePISubjectivity(editingId, { text: editText.trim(), docTypeIds: editDocTypeIds, typeScope: editTypeScope })
             setEditingId(null); showSuccess('Updated'); loadData()
         } catch (err: any) { showError(err.message || 'Failed to update') }
     }
@@ -2822,20 +2820,14 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                             ))}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
-                            <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
-                                <option value="both">Both</option>
-                                <option value="pi">P&I only</option>
-                                <option value="hull">Hull only</option>
-                                <option value="war">War only</option>
-                            </select>
-                        </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                            <input type="checkbox" checked={newIsOptional} onChange={e => setNewIsOptional(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
-                            Optional (excluded from "Select All")
-                        </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
+                        <select value={newTypeScope} onChange={e => setNewTypeScope(e.target.value as any)} style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                            <option value="both">Both</option>
+                            <option value="pi">P&I only</option>
+                            <option value="hull">Hull only</option>
+                            <option value="war">War only</option>
+                        </select>
                     </div>
                     <button onClick={handleAdd} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}><Plus size={14} /> Add Subjectivity</button>
                 </div>
@@ -2870,10 +2862,6 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                         }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
                                     })}
                                 </div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                    <input type="checkbox" checked={editIsOptional} onChange={e => setEditIsOptional(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
-                                    Optional (excluded from "Select All")
-                                </label>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                     <button onClick={handleUpdate} className="btn-primary" style={{ fontSize: '0.78rem' }}><Save size={12} /> Save</button>
                                     <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
@@ -2891,7 +2879,6 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                    {s.isOptional && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(160,160,160,0.12)', color: 'var(--text-secondary)', border: '1px solid rgba(160,160,160,0.2)' }}>Optional</span>}
                                     {s.typeScope && s.typeScope !== 'all' && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : s.typeScope === 'hull' ? 'rgba(255, 100, 200, 0.15)' : 'rgba(255, 176, 32, 0.15)', color: s.typeScope === 'pi' ? '#6464ff' : s.typeScope === 'hull' ? '#ff64c8' : '#ffb020' }}>{s.typeScope === 'pi' ? 'P&I' : s.typeScope === 'hull' ? 'Hull' : 'War'}</span>}
                                     {(s.docTypeIds || []).map(dtId => {
                                         const dt = docTypes.find(d => d.id === dtId)

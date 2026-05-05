@@ -9870,38 +9870,36 @@ export class MySQLAdapter {
     async getPISubjectivities(): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order`, is_optional as isOptional FROM pi_subjectivities ORDER BY order_index ASC")
+            "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC")
         const subjs = rows as any[]
         // Load doc type links
         for (const s of subjs) {
             const [links] = await this.pool.query(
                 'SELECT doc_type_id as docTypeId FROM pi_subjectivity_doc_types WHERE subjectivity_id = ?', [s.id])
             s.docTypeIds = (links as any[]).map(l => l.docTypeId)
-            s.isOptional = s.isOptional === 1 || s.isOptional === true
         }
         return subjs
     }
 
-    async addPISubjectivity(data: { text: string; docTypeIds?: string[]; typeScope?: string; order?: number; isOptional?: boolean }): Promise<any> {
+    async addPISubjectivity(data: { text: string; docTypeIds?: string[]; typeScope?: string; order?: number }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.execute('INSERT INTO pi_subjectivities (id, text, type_scope, order_index, is_optional) VALUES (?, ?, ?, ?, ?)',
-            [id, data.text, data.typeScope || 'all', data.order || 0, data.isOptional ? 1 : 0])
+        await this.pool.execute('INSERT INTO pi_subjectivities (id, text, type_scope, order_index) VALUES (?, ?, ?, ?)',
+            [id, data.text, data.typeScope || 'all', data.order || 0])
         if (data.docTypeIds && data.docTypeIds.length > 0) {
             for (const dtId of data.docTypeIds) {
                 await this.pool.execute('INSERT INTO pi_subjectivity_doc_types (id, subjectivity_id, doc_type_id) VALUES (?, ?, ?)',
                     [uuidv4(), id, dtId])
             }
         }
-        return { id, text: data.text, docTypeIds: data.docTypeIds || [], typeScope: data.typeScope || 'all', order: data.order || 0, isOptional: !!data.isOptional }
+        return { id, text: data.text, docTypeIds: data.docTypeIds || [], typeScope: data.typeScope || 'all', order: data.order || 0 }
     }
 
-    async updatePISubjectivity(id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string; isOptional?: boolean }): Promise<void> {
+    async updatePISubjectivity(id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string }): Promise<void> {
         if (!this.pool) return
         const fields = ['text = ?']
         const vals: any[] = [data.text]
         if (data.typeScope !== undefined) { fields.push('type_scope = ?'); vals.push(data.typeScope) }
-        if (data.isOptional !== undefined) { fields.push('is_optional = ?'); vals.push(data.isOptional ? 1 : 0) }
         vals.push(id)
         await this.pool.execute(`UPDATE pi_subjectivities SET ${fields.join(', ')} WHERE id = ?`, vals)
         // Replace doc type links
