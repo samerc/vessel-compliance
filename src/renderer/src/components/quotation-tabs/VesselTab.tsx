@@ -156,6 +156,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             setShowAddForm(false)
             showSuccess(`Vessel added${assuredsAdded > 0 ? ` — ${assuredsAdded} assured(s) loaded` : ''}`)
             loadData()
+            if (onVesselsChanged) onVesselsChanged()
         } catch (err: any) { showError(err.message || 'Failed to add vessel') }
     }
 
@@ -180,6 +181,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             setShowAddForm(false)
             showSuccess('Vessel added')
             loadData()
+            if (onVesselsChanged) onVesselsChanged()
         } catch (err: any) { showError(err.message || 'Failed to add vessel') }
     }
 
@@ -187,6 +189,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
         await window.api.deleteQuotationVessel(id)
         showSuccess('Vessel removed')
         loadData()
+        if (onVesselsChanged) onVesselsChanged()
     }
 
     const loadFleets = async () => {
@@ -313,6 +316,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             setFleetSearch('')
             showSuccess(`Added ${newVessels.length} vessel${newVessels.length > 1 ? 's' : ''} from ${fleet.name}${totalAssuredsAdded > 0 ? ` — ${totalAssuredsAdded} assured(s) loaded` : ''}`)
             loadData()
+            if (onVesselsChanged) onVesselsChanged()
         } catch (err: any) {
             showError(err.message || 'Failed to add fleet vessels')
         } finally {
