@@ -826,6 +826,8 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     // Render a set of alternatives (used both in shared and per-vessel views)
     const renderAlternatives = (alts: QuotationHullAlternative[], _vesselScopeId?: string | null) => {
         const isMulti = alts.length > 1
+        // For vessel-scoped overrides, only show that vessel in per-vessel deductible inputs
+        const scopedVessels = _vesselScopeId ? qVessels.filter(v => v.id === _vesselScopeId) : qVessels
         return (
             <>
                 {alts.map((alt, idx) => {
@@ -882,7 +884,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                     onOverrideBlur={saveConditionOverrides}
                                     scopes={getAltScopes(alt.id)}
                                     onScopeChange={updateConditionScope}
-                                    vessels={qVessels}
+                                    vessels={scopedVessels}
                                     emptyText="No conditions defined for this clause. Add them in Quotation Settings → Hull Clauses."
                                     amounts={getAltAmounts(alt.id)}
                                     onAmountChange={updateConditionAmount}
