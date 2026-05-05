@@ -412,6 +412,37 @@ function fmtPct(val: number | string): string {
   return n % 1 === 0 ? String(Math.round(n)) : String(n)
 }
 
+/**
+ * Build a vessel label for hull conditions export.
+ * - ≤3 vessels: "M/V NAME1 AND M/V NAME2"
+ * - >3 vessels: "All vessels except M/V X" (unless X is in both shared and override → "All vessels")
+ * - Single vessel: "M/V NAME"
+ */
+function buildHullVesselLabel(
+  vesselIds: string[],
+  allVessels: Array<{ id: string; name?: string; vesselLabel?: string }>,
+  totalVesselCount: number
+): string {
+  const names = vesselIds.map(id => {
+    const v = allVessels.find(x => x.id === id)
+    return `M/V ${(v?.name || v?.vesselLabel || '').toUpperCase()}`
+  }).filter(Boolean)
+
+  if (names.length === totalVesselCount) return '' // All vessels — no label needed
+  if (names.length <= 3) return names.join(' AND ')
+
+  // More than 3: "All vessels except X"
+  const exceptIds = allVessels.map(v => v.id).filter(id => !vesselIds.includes(id))
+  const exceptNames = exceptIds.map(id => {
+    const v = allVessels.find(x => x.id === id)
+    return `M/V ${(v?.name || v?.vesselLabel || '').toUpperCase()}`
+  })
+  // If the excepted vessel is also in the shared group (in both), just say nothing
+  if (exceptIds.every(id => vesselIds.includes(id))) return ''
+  if (exceptNames.length === 0) return ''
+  return `All vessels except ${exceptNames.join(', ')}`
+}
+
 function formatCurrency(amount: number | undefined, currency: string | undefined): string {
   if (amount == null || isNaN(amount)) return '-'
   const c = currency || 'USD'
@@ -1186,15 +1217,19 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
 
       // Returns array of [ref, text] pairs for table-like rendering
-      const getCondPairs = (conds: typeof hc): [string, string][] => {
+      // vesselFilter: optional set of vessel IDs to restrict per-vessel amounts to
+      const getCondPairs = (conds: typeof hc, vesselFilter?: Set<string>): [string, string][] => {
         const pairs: [string, string][] = []
         const currency = data.quotation.premiumCurrency || 'USD'
+        const filteredVessels = vesselFilter
+          ? data.quotationVessels.filter(v => vesselFilter.has(v.id))
+          : data.quotationVessels
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
           if (!def) continue
           // If vesselAmounts exist and differ, emit one line per vessel
           if (qc.vesselAmounts && def.hasAmount && Object.keys(qc.vesselAmounts).length > 0) {
-            for (const vessel of data.quotationVessels) {
+            for (const vessel of filteredVessels) {
               const va = qc.vesselAmounts[vessel.id]
               if (va == null) continue
               let t = qc.textOverride || def.text
@@ -1302,34 +1337,48 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       if (multiAlt) {
         // Group effective alts by vessel for per-vessel export
         if (isPerVesselExport) {
-          // Group by vessel: each vessel gets its alternatives rendered as a section
-          const vesselOrder = data.quotationVessels.map(v => v.id)
-          const altsByVessel = new Map<string, typeof effectiveAlts>()
-          for (const alt of effectiveAlts) {
-            if (!alt.vesselScopeId) continue
-            const existing = altsByVessel.get(alt.vesselScopeId) || []
-            existing.push(alt)
-            altsByVessel.set(alt.vesselScopeId, existing)
+          const nonOverrideVesselIds = data.quotationVessels.filter(v => !vesselIdsWithOverrides.has(v.id)).map(v => v.id)
+
+          // 1. Shared conditions section (non-override vessels combined)
+          if (nonOverrideVesselIds.length > 0 && sharedAlts.length > 0) {
+            const sharedLabel = buildHullVesselLabel(nonOverrideVesselIds, data.quotationVessels, data.quotationVessels.length)
+            const sharedVesselFilter = new Set(nonOverrideVesselIds)
+            if (sharedAlts.length === 1) {
+              const alt = sharedAlts[0]
+              const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+              const altConds = getAltCondsResolved(alt)
+              hcBlocks.push({ title: sharedLabel || undefined, underline: !!sharedLabel, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds, sharedVesselFilter), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
+            } else {
+              if (sharedLabel) hcBlocks.push({ title: sharedLabel, underline: true })
+              for (let ai = 0; ai < sharedAlts.length; ai++) {
+                const alt = sharedAlts[ai]
+                const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+                const altConds = getAltCondsResolved(alt)
+                hcBlocks.push({ title: `  Alternative ${ai + 1}`, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds, sharedVesselFilter), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
+              }
+            }
           }
-          for (const vId of vesselOrder) {
-            const vAlts = altsByVessel.get(vId) || []
+
+          // 2. Per-vessel override sections
+          const vesselSpecificAlts = alts.filter(a => a.vesselScopeId)
+          const overrideVesselOrder = data.quotationVessels.filter(v => vesselIdsWithOverrides.has(v.id))
+          for (const vessel of overrideVesselOrder) {
+            const vAlts = vesselSpecificAlts.filter(a => a.vesselScopeId === vessel.id)
             if (vAlts.length === 0) continue
-            const vessel = data.quotationVessels.find(v => v.id === vId)
-            const vesselTitle = vessel ? `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}` : `Vessel`
+            const vesselTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+            const vesselFilter = new Set([vessel.id])
             if (vAlts.length === 1) {
               const alt = vAlts[0]
               const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
               const altConds = getAltCondsResolved(alt)
-              const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
-              hcBlocks.push({ title: vesselTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === realAltId) })
+              hcBlocks.push({ title: vesselTitle, underline: true, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds, vesselFilter), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
             } else {
               hcBlocks.push({ title: vesselTitle, underline: true })
               for (let ai = 0; ai < vAlts.length; ai++) {
                 const alt = vAlts[ai]
                 const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
                 const altConds = getAltCondsResolved(alt)
-                const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
-                hcBlocks.push({ title: `  Alternative ${ai + 1}`, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === realAltId) })
+                hcBlocks.push({ title: `  Alternative ${ai + 1}`, desc: clause ? (clause.description || clause.name) : undefined, condPairs: getCondPairs(altConds, vesselFilter), addl: renderAddlForSection(b => b.type === 'alt' && b.altId === alt.id) })
               }
             }
           }
@@ -3034,8 +3083,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return sibling?.amount
       }
 
-      const makeCondTable = (conds: typeof hc) => {
+      const makeCondTable = (conds: typeof hc, vesselFilter?: Set<string>) => {
         const currency = data.quotation.premiumCurrency || 'USD'
+        const filteredVessels = vesselFilter
+          ? data.quotationVessels.filter(v => vesselFilter.has(v.id))
+          : data.quotationVessels
         const tableRows: TableRow[] = []
         for (const qc of conds) {
           const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
@@ -3044,7 +3096,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const hcColor = isNewHC ? RED : '000000'
           // If vesselAmounts exist and differ, emit one row per vessel
           if (qc.vesselAmounts && def.hasAmount && Object.keys(qc.vesselAmounts).length > 0) {
-            for (const vessel of data.quotationVessels) {
+            for (const vessel of filteredVessels) {
               const va = qc.vesselAmounts[vessel.id]
               if (va == null) continue
               let text = qc.textOverride || def.text
@@ -3177,34 +3229,44 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       if (dMultiAlt) {
         if (dIsPerVessel) {
-          // Group by vessel: each vessel gets its alternatives rendered as a section
-          const dVesselOrder = data.quotationVessels.map(v => v.id)
-          const dAltsByVessel = new Map<string, typeof dEffectiveAlts>()
-          for (const alt of dEffectiveAlts) {
-            if (!alt.vesselScopeId) continue
-            const existing = dAltsByVessel.get(alt.vesselScopeId) || []
-            existing.push(alt)
-            dAltsByVessel.set(alt.vesselScopeId, existing)
+          const dNonOverrideVesselIds = data.quotationVessels.filter(v => !dVesselIdsWithOverrides.has(v.id)).map(v => v.id)
+
+          // 1. Shared conditions section (non-override vessels combined)
+          if (dNonOverrideVesselIds.length > 0 && dSharedAlts.length > 0) {
+            const dSharedLabel = buildHullVesselLabel(dNonOverrideVesselIds, data.quotationVessels, data.quotationVessels.length)
+            const dSharedVesselFilter = new Set(dNonOverrideVesselIds)
+            if (dSharedLabel) { hcContent.push(bup(dSharedLabel)); hcContent.push(emptyP()) }
+            for (let ai = 0; ai < dSharedAlts.length; ai++) {
+              const alt = dSharedAlts[ai]
+              const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+              const altConds = dGetAltCondsResolved(alt)
+              if (dSharedAlts.length > 1) { hcContent.push(bup(`  Alternative ${ai + 1}`)); hcContent.push(emptyP()) }
+              if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
+              if (altConds.length > 0) hcContent.push(makeCondTable(altConds, dSharedVesselFilter))
+              const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
+              if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
+              hcContent.push(emptyP())
+            }
           }
-          for (const vId of dVesselOrder) {
-            const vAlts = dAltsByVessel.get(vId) || []
+
+          // 2. Per-vessel override sections
+          const dVesselSpecificAlts = dAlts.filter(a => a.vesselScopeId)
+          const dOverrideVessels = data.quotationVessels.filter(v => dVesselIdsWithOverrides.has(v.id))
+          for (const vessel of dOverrideVessels) {
+            const vAlts = dVesselSpecificAlts.filter(a => a.vesselScopeId === vessel.id)
             if (vAlts.length === 0) continue
-            const vessel = data.quotationVessels.find(v => v.id === vId)
-            const vesselTitle = vessel ? `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}` : 'Vessel'
+            const vesselTitle = `M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()}`
+            const dVesselFilter = new Set([vessel.id])
             hcContent.push(bup(vesselTitle))
             hcContent.push(emptyP())
             for (let ai = 0; ai < vAlts.length; ai++) {
               const alt = vAlts[ai]
               const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
               const altConds = dGetAltCondsResolved(alt)
-              const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
-              if (vAlts.length > 1) {
-                hcContent.push(bup(`  Alternative ${ai + 1}`))
-                hcContent.push(emptyP())
-              }
+              if (vAlts.length > 1) { hcContent.push(bup(`  Alternative ${ai + 1}`)); hcContent.push(emptyP()) }
               if (clause) { hcContent.push(np(clause.description || clause.name)); hcContent.push(emptyP()) }
-              if (altConds.length > 0) hcContent.push(makeCondTable(altConds))
-              const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === realAltId)
+              if (altConds.length > 0) hcContent.push(makeCondTable(altConds, dVesselFilter))
+              const altAddl = dRenderAddlForSection(b => b.type === 'alt' && b.altId === alt.id)
               if (altAddl.length > 0) { hcContent.push(emptyP()); hcContent.push(...altAddl) }
               hcContent.push(emptyP())
             }
