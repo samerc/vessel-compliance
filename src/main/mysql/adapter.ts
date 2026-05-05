@@ -7717,8 +7717,9 @@ export class MySQLAdapter {
             SELECT q.id FROM quotations q
             INNER JOIN (
                 SELECT revision_group_id, MAX(revision_number) as max_rev
-                FROM quotations GROUP BY revision_group_id
+                FROM quotations WHERE deleted_at IS NULL GROUP BY revision_group_id
             ) latest ON q.revision_group_id = latest.revision_group_id AND q.revision_number = latest.max_rev
+            WHERE q.deleted_at IS NULL
         `)
         const latestIds = new Set((latestRows as any[]).map((r: any) => r.id))
         const latestIdList = [...latestIds].map((id) => `'${id}'`).join(',')
@@ -7739,7 +7740,7 @@ export class MySQLAdapter {
                 GROUP BY qv2.quotation_id
             ) qv_agg ON qv_agg.quotation_id = q.id
             LEFT JOIN users lu ON q.locked_by = lu.id
-            WHERE q.id IN (${latestIdList}) ${whereClause}
+            WHERE q.id IN (${latestIdList}) AND q.deleted_at IS NULL ${whereClause}
         `
 
         // Count total
