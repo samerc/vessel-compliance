@@ -411,6 +411,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                         <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }} onClick={async () => {
                             for (const m of availableMasters) {
                                 if (items.some(i => i.piSubjectivityId === m.id)) continue
+                                if (m.isOptional) continue
                                 await window.api.addQuotationSubjectivity({ quotationId: quotation.id, piSubjectivityId: m.id, text: m.text, order: m.order ?? items.length })
                             }
                             showSuccess('All subjectivities added')
