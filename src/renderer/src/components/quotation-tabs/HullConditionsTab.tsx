@@ -1134,29 +1134,71 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 </div>
             )}
 
-            {/* Remove Override button (shown when viewing a vessel that has overrides) */}
-            {selectedVesselScope !== null && visibleAlternatives.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-                    <button
-                        onClick={() => handleRemoveOverride(selectedVesselScope)}
-                        style={{
-                            background: 'none',
-                            border: '1px solid var(--input-border)',
-                            borderRadius: '6px',
-                            padding: '4px 10px',
-                            cursor: 'pointer',
-                            color: 'var(--danger)',
-                            fontSize: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                        }}
-                        title="Remove this vessel override and fall back to shared conditions"
-                    >
-                        <Trash2 size={12} /> Remove Override (use shared)
-                    </button>
-                </div>
-            )}
+            {/* Override controls (shown when viewing a vessel that has overrides) */}
+            {selectedVesselScope !== null && visibleAlternatives.length > 0 && (() => {
+                const includeInShared = visibleAlternatives[0]?.includeInShared !== false
+                const handleToggleIncludeInShared = async () => {
+                    const newVal = !includeInShared
+                    const vesselAlts = alternatives.filter(a => a.vesselScopeId === selectedVesselScope)
+                    for (const alt of vesselAlts) {
+                        try { await window.api.hullUpdateQuotationAlternative(alt.id, { includeInShared: newVal }) } catch {}
+                    }
+                    setAlternatives(prev => prev.map(a => a.vesselScopeId === selectedVesselScope ? { ...a, includeInShared: newVal } : a))
+                }
+                return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        {/* Include in shared toggle */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                            <div
+                                onClick={handleToggleIncludeInShared}
+                                style={{
+                                    width: '32px',
+                                    height: '18px',
+                                    borderRadius: '9px',
+                                    background: includeInShared ? 'var(--accent-primary)' : (isLight ? '#ccc' : '#444'),
+                                    position: 'relative',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s',
+                                    flexShrink: 0
+                                }}
+                            >
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '2px',
+                                    left: includeInShared ? '16px' : '2px',
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '50%',
+                                    background: '#fff',
+                                    transition: 'left 0.15s'
+                                }} />
+                            </div>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                Also include in shared conditions
+                            </span>
+                        </label>
+                        {/* Remove override button */}
+                        <button
+                            onClick={() => handleRemoveOverride(selectedVesselScope)}
+                            style={{
+                                background: 'none',
+                                border: '1px solid var(--input-border)',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                cursor: 'pointer',
+                                color: 'var(--danger)',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                            title="Remove this vessel override and fall back to shared conditions"
+                        >
+                            <Trash2 size={12} /> Remove Override (use shared)
+                        </button>
+                    </div>
+                )
+            })()}
 
             {/* Alternatives for the current scope */}
             {isSharedEmptyState && (

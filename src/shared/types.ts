@@ -888,6 +888,7 @@ export interface QuotationHullAlternative {
   agreedValueCurrency?: string
   order: number
   vesselScopeId?: string | null
+  includeInShared?: boolean
 }
 
 export interface QuotationPIAlternative {

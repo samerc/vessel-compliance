@@ -2670,6 +2670,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: include_in_shared on quotation_hull_alternatives
+            try {
+                const [iisCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'include_in_shared'") as any[]
+                if ((iisCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_hull_alternatives ADD COLUMN include_in_shared TINYINT(1) DEFAULT 1 NOT NULL")
+                }
+            } catch {}
+
             // Migration: make hull_clause_id nullable on quotation_hull_alternatives
             try {
                 const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
@@ -8535,8 +8543,8 @@ export class MySQLAdapter {
             altIdMap[a.id] = newAId
             const remappedVesselScopeId = a.vessel_scope_id ? (vesselIdMap[a.vessel_scope_id] || a.vessel_scope_id) : null
             await this.pool.execute(
-                `INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, premium_amount, order_index, vessel_scope_id, agreed_value, agreed_value_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [newAId, newId, a.hull_clause_id, a.label, a.premium_amount, a.order_index, remappedVesselScopeId, a.agreed_value, a.agreed_value_currency]
+                `INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, premium_amount, order_index, vessel_scope_id, agreed_value, agreed_value_currency, include_in_shared) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newAId, newId, a.hull_clause_id, a.label, a.premium_amount, a.order_index, remappedVesselScopeId, a.agreed_value, a.agreed_value_currency, a.include_in_shared ?? 1]
             )
         }
 
@@ -11900,10 +11908,10 @@ export class MySQLAdapter {
     async getQuotationHullAlternatives(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, quotation_id as quotationId, hull_clause_id as hullClauseId, label, premium_amount as premiumAmount, agreed_value as agreedValue, agreed_value_currency as agreedValueCurrency, order_index as `order`, vessel_scope_id as vesselScopeId FROM quotation_hull_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
+            'SELECT id, quotation_id as quotationId, hull_clause_id as hullClauseId, label, premium_amount as premiumAmount, agreed_value as agreedValue, agreed_value_currency as agreedValueCurrency, order_index as `order`, vessel_scope_id as vesselScopeId, include_in_shared as includeInShared FROM quotation_hull_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
             [quotationId]
         )
-        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined, agreedValue: r.agreedValue != null ? Number(r.agreedValue) : undefined }))
+        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined, agreedValue: r.agreedValue != null ? Number(r.agreedValue) : undefined, includeInShared: r.includeInShared !== 0 }))
     }
 
     async addQuotationHullAlternative(quotationId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null, agreedValue?: number | null, agreedValueCurrency?: string): Promise<any> {
@@ -11920,10 +11928,10 @@ export class MySQLAdapter {
         } finally {
             await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         }
-        return { id, quotationId, hullClauseId: hullClauseId || null, label: label || undefined, premiumAmount: undefined, agreedValue: agreedValue ?? undefined, agreedValueCurrency: agreedValueCurrency || undefined, order, vesselScopeId: vesselScopeId || null }
+        return { id, quotationId, hullClauseId: hullClauseId || null, label: label || undefined, premiumAmount: undefined, agreedValue: agreedValue ?? undefined, agreedValueCurrency: agreedValueCurrency || undefined, order, vesselScopeId: vesselScopeId || null, includeInShared: true }
     }
 
-    async updateQuotationHullAlternative(id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null; agreedValue?: number | null; agreedValueCurrency?: string }): Promise<void> {
+    async updateQuotationHullAlternative(id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null; agreedValue?: number | null; agreedValueCurrency?: string; includeInShared?: boolean }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -11933,6 +11941,7 @@ export class MySQLAdapter {
         if (updates.vesselScopeId !== undefined) { fields.push('vessel_scope_id = ?'); values.push(updates.vesselScopeId ?? null) }
         if (updates.agreedValue !== undefined) { fields.push('agreed_value = ?'); values.push(updates.agreedValue ?? null) }
         if (updates.agreedValueCurrency !== undefined) { fields.push('agreed_value_currency = ?'); values.push(updates.agreedValueCurrency || null) }
+        if (updates.includeInShared !== undefined) { fields.push('include_in_shared = ?'); values.push(updates.includeInShared ? 1 : 0) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_hull_alternatives SET ${fields.join(', ')} WHERE id = ?`, values)

@@ -1337,12 +1337,19 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       if (multiAlt) {
         // Group effective alts by vessel for per-vessel export
         if (isPerVesselExport) {
-          const nonOverrideVesselIds = data.quotationVessels.filter(v => !vesselIdsWithOverrides.has(v.id)).map(v => v.id)
+          // Override vessels with includeInShared=true also appear in the shared section
+          const overrideVesselsInShared = new Set(
+            alts.filter(a => a.vesselScopeId && a.includeInShared !== false).map(a => a.vesselScopeId!)
+          )
+          const sharedSectionVesselIds = [
+            ...data.quotationVessels.filter(v => !vesselIdsWithOverrides.has(v.id)).map(v => v.id),
+            ...data.quotationVessels.filter(v => overrideVesselsInShared.has(v.id)).map(v => v.id)
+          ]
 
-          // 1. Shared conditions section (non-override vessels combined)
-          if (nonOverrideVesselIds.length > 0 && sharedAlts.length > 0) {
-            const sharedLabel = buildHullVesselLabel(nonOverrideVesselIds, data.quotationVessels, data.quotationVessels.length)
-            const sharedVesselFilter = new Set(nonOverrideVesselIds)
+          // 1. Shared conditions section
+          if (sharedSectionVesselIds.length > 0 && sharedAlts.length > 0) {
+            const sharedLabel = buildHullVesselLabel(sharedSectionVesselIds, data.quotationVessels, data.quotationVessels.length)
+            const sharedVesselFilter = new Set(sharedSectionVesselIds)
             if (sharedAlts.length === 1) {
               const alt = sharedAlts[0]
               const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
@@ -3229,12 +3236,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       if (dMultiAlt) {
         if (dIsPerVessel) {
-          const dNonOverrideVesselIds = data.quotationVessels.filter(v => !dVesselIdsWithOverrides.has(v.id)).map(v => v.id)
+          // Override vessels with includeInShared=true also appear in the shared section
+          const dOverrideVesselsInShared = new Set(
+            dAlts.filter(a => a.vesselScopeId && a.includeInShared !== false).map(a => a.vesselScopeId!)
+          )
+          const dSharedSectionVesselIds = [
+            ...data.quotationVessels.filter(v => !dVesselIdsWithOverrides.has(v.id)).map(v => v.id),
+            ...data.quotationVessels.filter(v => dOverrideVesselsInShared.has(v.id)).map(v => v.id)
+          ]
 
-          // 1. Shared conditions section (non-override vessels combined)
-          if (dNonOverrideVesselIds.length > 0 && dSharedAlts.length > 0) {
-            const dSharedLabel = buildHullVesselLabel(dNonOverrideVesselIds, data.quotationVessels, data.quotationVessels.length)
-            const dSharedVesselFilter = new Set(dNonOverrideVesselIds)
+          // 1. Shared conditions section
+          if (dSharedSectionVesselIds.length > 0 && dSharedAlts.length > 0) {
+            const dSharedLabel = buildHullVesselLabel(dSharedSectionVesselIds, data.quotationVessels, data.quotationVessels.length)
+            const dSharedVesselFilter = new Set(dSharedSectionVesselIds)
             if (dSharedLabel) { hcContent.push(bup(dSharedLabel)); hcContent.push(emptyP()) }
             for (let ai = 0; ai < dSharedAlts.length; ai++) {
               const alt = dSharedAlts[ai]
