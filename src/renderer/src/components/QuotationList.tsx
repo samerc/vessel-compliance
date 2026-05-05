@@ -185,11 +185,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
     return () => clearTimeout(timer)
   }, [search])
 
-  // Month navigation → auto-set dateFrom/dateTo (current month + next month)
+  // Month navigation → auto-set dateFrom/dateTo (M-1, M, M+1)
   useEffect(() => {
     if (isSearchActive) return
-    const from = new Date(navYear, navMonth, 1)
-    const toEnd = new Date(navYear, navMonth + 1, 0) // last day of current month
+    const from = new Date(navYear, navMonth - 1, 1) // first day of M-1
+    const toEnd = new Date(navYear, navMonth + 2, 0) // last day of M+1
     setDateFrom(from.toISOString().split('T')[0])
     setDateTo(toEnd.toISOString().split('T')[0])
   }, [navYear, navMonth, isSearchActive])
@@ -521,7 +521,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   }
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const navLabel = `${monthNames[navMonth]} ${navYear}`
+  const prevDate = new Date(navYear, navMonth - 1, 1)
+  const nextDate = new Date(navYear, navMonth + 1, 1)
+  const navLabel = prevDate.getFullYear() === nextDate.getFullYear()
+    ? `${monthNames[prevDate.getMonth()]} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
+    : `${monthNames[prevDate.getMonth()]} ${prevDate.getFullYear()} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
 
   const hasActiveFilters =
     statusFilter !== 'all' ||
@@ -1173,7 +1177,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
           <button onClick={() => navigateMonth(-1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronLeft size={16} /></button>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '140px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '180px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
           <button onClick={() => navigateMonth(1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronRight size={16} /></button>
           <button onClick={goToToday} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>Today</button>
         </div>
