@@ -9100,9 +9100,11 @@ export class MySQLAdapter {
             if (qv.vesselId) vesselIdToLabel.set(qv.vesselId, qv.vesselLabel)
         }
 
-        // Get existing quotation assureds
+        // Get existing quotation assureds — track per-vessel using entityId:vesselLabel keys
         const existingAssureds = await this.getQuotationAssureds(newQuotationId)
-        const existingEntityIds = new Set(existingAssureds.map((a: any) => a.entityId).filter(Boolean))
+        const existingEntityKeys = new Set(
+            existingAssureds.map((a: any) => a.entityId ? `${a.entityId}:${a.vesselLabel || ''}` : null).filter(Boolean)
+        )
 
         // For each non-primary vessel that has a policy, merge their data
         for (const vid of vesselIds) {
@@ -9115,7 +9117,7 @@ export class MySQLAdapter {
                 const vLabel = vesselIdToLabel.get(vid) || ''
                 let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
                 for (const va of vassureds) {
-                    if (existingEntityIds.has(va.entityId)) continue
+                    if (existingEntityKeys.has(`${va.entityId}:${vLabel}`)) continue
                     const entity = entities.find((e: any) => e.id === va.entityId)
                     if (!entity) continue
                     // c/o role → skip (handled as broker)
@@ -9128,7 +9130,7 @@ export class MySQLAdapter {
                         vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
                         order: assuredOrder++
                     })
-                    existingEntityIds.add(va.entityId)
+                    existingEntityKeys.add(`${va.entityId}:${vLabel}`)
                 }
                 continue
             }
@@ -9192,12 +9194,12 @@ export class MySQLAdapter {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             }
 
-            // Merge assureds (dedup by entity ID)
+            // Merge assureds (dedup per vessel using entityId:vesselLabel keys)
             const sourceAssureds = await this.getQuotationAssureds(sourceQId)
             const vLabel = vesselIdToLabel.get(vid) || ''
             let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
             for (const sa of sourceAssureds) {
-                if (sa.entityId && existingEntityIds.has(sa.entityId)) continue
+                if (sa.entityId && existingEntityKeys.has(`${sa.entityId}:${vLabel}`)) continue
                 await this.addQuotationAssured({
                     quotationId: newQuotationId,
                     entityId: sa.entityId || undefined,
@@ -9206,7 +9208,7 @@ export class MySQLAdapter {
                     vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
                     order: assuredOrder++
                 })
-                if (sa.entityId) existingEntityIds.add(sa.entityId)
+                if (sa.entityId) existingEntityKeys.add(`${sa.entityId}:${vLabel}`)
             }
         }
 
