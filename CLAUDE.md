@@ -577,6 +577,7 @@ Admin-managed reusable text templates for the trading warranty intro section:
 - **Table**: `trading_warranty_templates` (id, name, text, order_index, created_at)
 - **Settings UI**: `TradingWarrantyTemplatesTab` in QuotationSettings (General category) with add/edit/delete/reorder, RichTextEditor for template text, name input
 - **Editor**: Template selector dropdown above the trading warranty RichTextEditor. Selecting a template populates the text; users can modify or write new text freely.
+- **Custom wording hides default text**: When `tradingCustomMode` is enabled ("Use custom wording" checkbox), the standard "Trading Warranty Text" section is hidden. The `!quotation.tradingCustomMode` guard wraps the default text block in TradingTab.
 - **IPC**: `pi:getTradingWarrantyTemplates`, `pi:addTradingWarrantyTemplate`, `pi:updateTradingWarrantyTemplate`, `pi:deleteTradingWarrantyTemplate`, `pi:reorderTradingWarrantyTemplates`
 
 ### Quotation Section Order
@@ -919,6 +920,8 @@ Per-quotation P&I alternatives (similar to hull):
 - **`vessel_scope_id`** on `quotation_hull_alternatives`: Links alternative to a specific vessel
 - **Vessel Selector**: In HullConditionsTab when 2+ vessels
 - **Export**: Per-vessel sections with vessel names instead of "Alternative 1/2"
+- **`include_in_shared` toggle**: `include_in_shared TINYINT(1) DEFAULT 1` on `quotation_hull_alternatives`. When a vessel has an override, HullConditionsTab shows "Also include in shared conditions" toggle. When enabled (default), that vessel also appears in the shared section of the export. Toggle updates ALL alternatives for that `vesselScopeId` at once.
+- **`includeInShared` in export**: `sharedSectionVesselIds` = non-override vessels PLUS override vessels where `includeInShared !== false`. Override vessels with `includeInShared = false` appear only in their dedicated per-vessel section.
 
 ### Survey Warranty Templates for Quotations
 
@@ -985,7 +988,7 @@ Vessel type stored as FK reference, not text. Renaming a type in settings auto-r
 Redesigned quotation list with view tabs, month navigation, and chip filters:
 
 - **View tabs**: Active (default, excludes converted), Converted, All, plus saved custom views as tabs
-- **Month navigator**: Arrow-based single-month range, "Today" button to reset
+- **Month navigator**: Arrow-based navigation centering on M. Default range shows M-1, M, M+1 (3-month window). Label shows the range e.g. "Apr – Jun 2026"; handles year boundaries ("Dec 2025 – Feb 2026"). "Today" button resets to current month.
 - **Search**: Bypasses all date/view filters to search ALL quotations. Shows "ALL" indicator when active.
 - **Chip filters**: Status and type as toggle chips with counts (not dropdowns)
 - **Compact stats**: Inline total count instead of large glass cards
@@ -1319,13 +1322,14 @@ Configurable subjectivity compliance period per quotation and policy:
 - **UI**: Number input in SubjectivitiesTab
 - **Export**: Uses `{subjectivity_days}` placeholder in standard text intro. Handles both placeholder and old hardcoded text.
 - **Rendering**: 0 = "prior inception", N = "within N days"
-- **Select All**: Button in master subjectivity list picker for bulk selection
+- **Select All**: Button in master subjectivity list picker for bulk selection — skips subjectivities that are "optional". A subjectivity is optional when it has ≥1 linked doc types AND all of those doc types have `required = false` in Document Types settings. Subjectivities with no linked doc types are always included.
 - **Sort order**: Items sorted by master list order from settings (`resortByMasterOrder`)
 
 ### Quotation Assured per Vessel
 
 - **Multi-vessel**: Same entity can appear as assured on multiple vessels in a quotation
 - **Dedup scope**: Only skips duplicates within the same vessel label (not across all vessels)
+- **Fleet renewal dedup** (`renewFleetPolicies` in adapter.ts): Uses `entityId:vesselLabel` composite keys — NOT plain `entityId`. A plain-entityId global set would cause shared entities (e.g. same ship owner on all fleet vessels) to be added only for the first vessel and skipped for the rest.
 
 ### Conditions Sub-Tabs
 
