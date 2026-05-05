@@ -116,8 +116,8 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                 </div>
             </div>
 
-            {/* Trading Warranty Text (intro — always visible) */}
-            <div style={sectionStyle}>
+            {/* Trading Warranty Text (intro — hidden when custom wording is active) */}
+            {!quotation.tradingCustomMode && <div style={sectionStyle}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Trading Warranty Text</label>
                 {templates.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
@@ -150,7 +150,7 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                     minHeight={80}
                     showFontSize showAlignment showLineSpacing
                 />
-            </div>
+            </div>}
 
             {!quotation.tradingCustomMode && <>
             {/* Section B: DDQ Countries List */}
