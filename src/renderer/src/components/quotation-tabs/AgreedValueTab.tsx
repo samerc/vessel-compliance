@@ -182,13 +182,13 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                         <Plus size={12} /> Add Option
                     </button>
                 </div>
-            ) : hullAlts.length > 1 ? (
+            ) : hullAlts.filter(a => !a.vesselScopeId).length > 1 ? (
                 <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}>
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>H&M Values per Alternative</label>
                             <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {hullAlts.map((alt, ai) => {
+                                {hullAlts.filter(a => !a.vesselScopeId).map((alt, ai) => {
                                     const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                                     const altColor = altColors[ai % altColors.length]
                                     return (
