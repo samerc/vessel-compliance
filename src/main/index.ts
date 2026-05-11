@@ -2136,7 +2136,10 @@ app.whenReady().then(() => {
 
   safeHandle('sanctions:refreshSource', async (event, source: string) => {
     await requirePermission(event, 'admin:settings')
-    return await sanctionsService.refreshSource(source)
+    console.log(`[IPC] sanctions:refreshSource called with source=${source}`)
+    const result = await sanctionsService.refreshSource(source)
+    console.log(`[IPC] sanctions:refreshSource result:`, JSON.stringify(result).substring(0, 200))
+    return result
   })
 
   // Compliance Schedule Handlers
