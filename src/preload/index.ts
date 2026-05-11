@@ -169,6 +169,11 @@ const api = {
   // OFAC/Sanctions Check
   checkSanctions: (name: string, threshold?: number, sources?: string[]) => ipcRenderer.invoke('ofac:checkSanctions', name, threshold, sources),
 
+  // Sanctions Data Management
+  sanctionsGetStatus: () => ipcRenderer.invoke('sanctions:getStatus'),
+  sanctionsRefresh: (source?: string) => ipcRenderer.invoke('sanctions:refresh', source),
+  sanctionsRefreshSource: (source: string) => ipcRenderer.invoke('sanctions:refreshSource', source),
+
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),
   complianceSetScheduleSettings: (settings) => ipcRenderer.invoke('compliance:setScheduleSettings', settings),

@@ -13,6 +13,7 @@ import { updateService } from './services/UpdateService'
 import { formatDateForMySQL } from './mysql/utils'
 import { assignRegistryNumber, markRegistryCancelled } from './services/QuotationRegistryService'
 import { hotUpdateService } from './services/HotUpdateService'
+import { sanctionsService } from './sanctions/SanctionsService'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -287,17 +288,7 @@ const getConfigPath = () => {
   return configDir ? join(configDir, 'db-config.json') : null
 }
 
-const getSanctionsApiKey = (): string | null => {
-  const configPath = getConfigPath()
-  if (!configPath || !existsSync(configPath)) return null
 
-  try {
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'))
-    return config.sanctionsApiKey || null
-  } catch {
-    return null
-  }
-}
 
 function createWindow(): void {
   const windowState = store.get('windowState', {
@@ -2078,85 +2069,38 @@ app.whenReady().then(() => {
     }
   })
 
-  // OFAC/Sanctions Check Handler (session required)
+  // OFAC/Sanctions Check Handler — uses local SanctionsService (no external API)
   safeHandle('ofac:checkSanctions', async (event, name: string, threshold?: number, sources?: string[]) => {
     requireSession(event)
     try {
-      // Load compliance settings to get the configured threshold and auto-mark preference
       const compSettings = await db.getComplianceScheduleSettings()
       const effectiveThreshold = threshold ?? (compSettings.threshold || 85) / 100
       const autoMarkCleanOnCheck = compSettings.autoMarkCleanOnCheck ?? true
 
-      const apiKey = getSanctionsApiKey()
-      if (!apiKey) {
-        console.error('Sanctions API key not configured')
-        return {
-          status: 'ERROR',
-          matchFound: false,
-          timestamp: formatDateForMySQL(new Date()),
-          matches: [],
-          autoMarkCleanOnCheck,
-          error: 'Sanctions API key not configured. Add sanctionsApiKey to db-config.json'
-        }
-      }
-
-      const params = new URLSearchParams({
-        q: name,
-        mode: 'both',
-        threshold: effectiveThreshold.toString(),
-        limit: '20'
+      const data = sanctionsService.search(name, {
+        threshold: effectiveThreshold,
+        sources: sources?.map(s => s.toUpperCase()),
+        limit: 20,
+        mode: 'both'
       })
 
-      // Add source filtering if provided
-      if (sources && sources.length > 0) {
-        params.append('sources', sources.join(','))
-      }
-
-      const response = await fetch(`https://sanctions.fancyshark.com/api/search?${params}`, {
-        headers: {
-          'X-API-Key': apiKey
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      // Transform results to match existing SanctionsMatch interface
-      const matches = (data.results || [])
-        .map((result: any) => {
-          // Extract IMO number if available in entity metadata (often in details or remarks)
-          let imoNumber: string | undefined
-          if (result.entity?.details) {
-            const detailsStr = JSON.stringify(result.entity.details)
-            const imoMatch = detailsStr.match(/IMO\s*(\d{7})/i)
-            if (imoMatch) imoNumber = imoMatch[1]
-          }
-
-          return {
-            id: result.entity?.source_id || '',
-            target_type: result.entity?.entity_type || 'unknown',
-            source: result.entity?.source || 'unknown',
-            source_id: result.entity?.source_id || '',
-            names: [
-              result.entity?.name,
-              ...(result.entity?.aliases || [])
-            ].filter(Boolean),
-            positions: result.entity?.programs || [],
-            remarks: result.entity?.addresses?.join(', ') || null,
-            listed_on: null,
-            created_at: formatDateForMySQL(new Date()),
-            score: result.score,
-            imo_number: result.entity?.vessel_imo || imoNumber
-          }
-        })
-        // Strict filtering: Ensure API or mapping didn't include matches below threshold
+      const matches = data.results
+        .map(result => ({
+          id: result.entity.source_id || '',
+          target_type: result.entity.entity_type || 'unknown',
+          source: result.entity.source || 'unknown',
+          source_id: result.entity.source_id || '',
+          names: [result.entity.name, ...(result.entity.aliases || [])].filter(Boolean),
+          positions: result.entity.programs || [],
+          remarks: result.entity.addresses?.join(', ') || null,
+          listed_on: result.entity.listed_date || null,
+          created_at: formatDateForMySQL(new Date()),
+          score: result.score,
+          imo_number: result.entity.vessel_imo || undefined
+        }))
         .filter((match: any) => (match.score || 0) >= effectiveThreshold)
 
       const matchFound = matches.length > 0
-
       return {
         status: matchFound ? 'POTENTIAL_MATCH' : 'CLEARED',
         matchFound,
@@ -2165,7 +2109,7 @@ app.whenReady().then(() => {
         autoMarkCleanOnCheck
       }
     } catch (error) {
-      console.error('OFAC check failed:', error)
+      console.error('Sanctions check failed:', error)
       return {
         status: 'ERROR',
         matchFound: false,
@@ -2174,6 +2118,25 @@ app.whenReady().then(() => {
         autoMarkCleanOnCheck: true
       }
     }
+  })
+
+  // Sanctions data management handlers
+  safeHandle('sanctions:getStatus', async (event) => {
+    requireSession(event)
+    return sanctionsService.getStatus()
+  })
+
+  safeHandle('sanctions:refresh', async (event, source?: string) => {
+    await requirePermission(event, 'admin:settings')
+    if (source) {
+      return await sanctionsService.refreshSource(source)
+    }
+    return await sanctionsService.refreshAll()
+  })
+
+  safeHandle('sanctions:refreshSource', async (event, source: string) => {
+    await requirePermission(event, 'admin:settings')
+    return await sanctionsService.refreshSource(source)
   })
 
   // Compliance Schedule Handlers
@@ -3998,6 +3961,16 @@ app.whenReady().then(() => {
   // Cleanup old read notifications on startup
   db.deleteOldNotifications(90).catch(() => {})
 
+  // Initialize local sanctions screening database
+  try {
+    const configPath = db.getConfigPath()
+    const sanctionsDir = configPath ? dirname(configPath) : app.getPath('userData')
+    sanctionsService.initialize(sanctionsDir)
+    console.log('Sanctions service initialized')
+  } catch (err) {
+    console.error('Failed to initialize sanctions service:', err)
+  }
+
   createWindow()
 
   // Start the compliance scheduler after window is created
@@ -4516,6 +4489,7 @@ app.whenReady().then(() => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  sanctionsService.close()
   if (process.platform !== 'darwin') {
     app.quit()
   }

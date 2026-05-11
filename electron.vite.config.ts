@@ -12,7 +12,7 @@ export default defineConfig({
           index: resolve(__dirname, 'src/main/index.ts'),
           parser: resolve(__dirname, 'src/main/workers/parser.ts')
         },
-        external: ['mysql2', 'mysql2/promise']
+        external: ['mysql2', 'mysql2/promise', 'better-sqlite3']
       }
     }
   },

@@ -8,7 +8,10 @@
       "Bash(cmd /c \"findstr /n \"\"Policy Renewals\"\" c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\")",
       "Bash(cmd /c \"findstr /n /i \"\"renewals\\\\|dashboard\"\" \"\"c:\\\\Users\\\\Administrator\\\\Documents\\\\coding\\\\vessel-compliance\\\\CLAUDE.md\"\"\")",
       "Bash(findstr /n \"Renewals Dashboard\")",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(xargs grep:*)",
+      "Read(//z/Coding/sanctions API/**)",
+      "Bash(grep -E \"\\\\.\\(js|py|json|yaml|yml\\)$|^d\")"
     ]
   }
 }

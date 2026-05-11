@@ -159,12 +159,18 @@ export interface Api {
   fileTypesSetSettings: (settings: FileTypeSettings) => Promise<FileTypeSettings>
   fileTypesValidateFile: (filePath: string) => Promise<{ valid: boolean; reason?: string }>
 
-  checkSanctions: (name: string) => Promise<{
+  checkSanctions: (name: string, threshold?: number, sources?: string[]) => Promise<{
     status: 'CLEARED' | 'MATCH' | 'ERROR' | 'PENDING' | 'POTENTIAL_MATCH'
     matchFound: boolean
     timestamp: string
     matches: SanctionsMatch[]
+    autoMarkCleanOnCheck?: boolean
   }>
+
+  // Sanctions Data Management
+  sanctionsGetStatus: () => Promise<{ sources: { source: string; updated_at: string; record_count: number; status: string; release_date: string | null; entityCount: number }[]; totalEntities: number }>
+  sanctionsRefresh: (source?: string) => Promise<any>
+  sanctionsRefreshSource: (source: string) => Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }>
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => Promise<ComplianceScheduleSettings>
