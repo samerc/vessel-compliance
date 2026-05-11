@@ -448,7 +448,13 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
         // War: Sum Insured (skip if war excess — per-vessel values used instead)
         if (typeCode === 'W' && !quotation.warExcessEnabled && (quotation.agreedValue == null || quotation.agreedValue === 0)) {
-            warnings.push('Sum Insured is not set')
+            // Check per-vessel agreed values before warning
+            let hasPerVesselValue = false
+            try {
+                const qv = await window.api.getQuotationVessels(quotation.id)
+                if (Array.isArray(qv) && qv.some((v: any) => v.agreedValue != null && v.agreedValue > 0)) hasPerVesselValue = true
+            } catch {}
+            if (!hasPerVesselValue) warnings.push('Sum Insured is not set')
         }
 
         // Cargo: Insured Value (when not rate mode)
