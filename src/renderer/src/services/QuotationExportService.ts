@@ -1937,32 +1937,17 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const pa = ' per annum'
       if (hasDiscount) {
         if (hasVesselPremiums) {
-          // Split vessels: those with at least one discount vs fully excluded
+          // Per-vessel format: plain vessels get one line, discount vessels get technical + payable
           const hasVDiscount = (v: any) => (q.ncbEnabled && !v?.ncbExcluded) || (q.upccEnabled && !v?.upccExcluded)
-          const discLines = pdfPremLines.filter(l => hasVDiscount(l.vessel))
-          const plainLines = pdfPremLines.filter(l => !hasVDiscount(l.vessel))
-          // Plain vessels — no technical/payable split
-          for (const l of plainLines) {
-            premText += `${l.label}    ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
-          }
-          if (plainLines.length > 0 && discLines.length > 0) premText += '\n'
-          // Discounted vessels — technical/payable split
-          if (discLines.length > 0) {
-            premText += 'Technical Premium\n'
-            for (const l of discLines) {
-              premText += `${l.label}    ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
-            }
-            if (discLines.length > 1) {
-              const totalTech = discLines.reduce((s, l) => s + l.tech, 0)
-              premText += `Total    ${fc(totalTech)}${pa}\n`
-            }
-            premText += '\nPayable Premium\n'
-            for (const l of discLines) {
-              premText += `${l.label}    ${fc(computePayable(l.tech, l.vessel))}${pa}\n`
-            }
-            if (discLines.length > 1) {
-              const totalPayable = discLines.reduce((s, l) => s + computePayable(l.tech, l.vessel), 0)
-              premText += `Total    ${fc(totalPayable)}${pa}\n`
+          for (let li = 0; li < pdfPremLines.length; li++) {
+            const l = pdfPremLines[li]
+            if (li > 0) premText += '\n'
+            if (!hasVDiscount(l.vessel)) {
+              premText += `${l.label}: ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
+            } else {
+              premText += `${l.label}:\n`
+              premText += `Technical Premium: ${fc(l.tech)}${pa}${prevSuffix(l)}\n`
+              premText += `Payable Premium: ${fc(computePayable(l.tech, l.vessel))}${pa}\n`
             }
           }
         } else {
@@ -4037,12 +4022,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const vpRow3 = (name: string, amount: string) => new TableRow({
         children: [vpCell(name, true, vpNameW), vpCell(':', false, vpColonW), vpCell(amount, true, vpAmtW)]
       })
-      const vpRow2 = (name: string, amount: string) => new TableRow({
-        children: [
-          vpCell(name, true, vpNameW),
-          new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: amount, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })
-        ]
-      })
+
 
       // Helper: build previous premium annotation in red for per-vessel DOCX
       const vpPrevRun = (v: QuotationVessel) => {
@@ -4053,55 +4033,41 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
 
       if (wHasDiscount) {
-        // Split vessels: those with at least one discount vs fully excluded
+        // Per-vessel format: plain vessels get one line, discount vessels get technical + payable
         const wHasVDiscount = (v: any) => (wq.ncbEnabled && !v?.ncbExcluded) || (wq.upccEnabled && !v?.upccExcluded)
-        const discVessels = data.quotationVessels.filter(v => wHasVDiscount(v))
-        const plainVessels = data.quotationVessels.filter(v => !wHasVDiscount(v))
-
         const allRows: TableRow[] = []
-        // Plain vessels — no technical/payable split
-        for (const v of plainVessels) {
-          const prevR = vpPrevRun(v)
-          const amtRuns: TextRun[] = [new TextRun({ text: formatCurrency(v.premiumAmount || 0, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })]
-          if (prevR) amtRuns.push(prevR)
-          allRows.push(new TableRow({ children: [
-            vpCell((v.name || v.vesselLabel).toUpperCase(), true, vpNameW),
-            new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: amtRuns })] })
-          ] }))
-        }
-        // Separator if we have both plain and discounted vessels
-        if (plainVessels.length > 0 && discVessels.length > 0) {
-          allRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), width: { size: vpNameW, type: WidthType.DXA }, children: [emptyP()] }), new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [emptyP()] })] }))
-        }
-        // Discounted vessels — technical/payable split
-        if (discVessels.length > 0) {
-          allRows.push(new TableRow({ children: [
-            new TableCell({ borders: noBorders(), columnSpan: 2, width: { size: BODY_W, type: WidthType.DXA }, children: [bp('Technical Premium')] })
-          ] }))
-          for (const v of discVessels) {
+        for (let vi = 0; vi < data.quotationVessels.length; vi++) {
+          const v = data.quotationVessels[vi]
+          if (vi > 0) {
+            allRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), width: { size: vpNameW, type: WidthType.DXA }, children: [emptyP()] }), new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [emptyP()] })] }))
+          }
+          const vName = (v.name || v.vesselLabel).toUpperCase()
+          if (!wHasVDiscount(v)) {
+            // Plain vessel — single line: "VESSEL: amount per annum"
             const prevR = vpPrevRun(v)
             const amtRuns: TextRun[] = [new TextRun({ text: formatCurrency(v.premiumAmount || 0, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })]
             if (prevR) amtRuns.push(prevR)
             allRows.push(new TableRow({ children: [
-              vpCell((v.name || v.vesselLabel).toUpperCase(), true, vpNameW),
+              vpCell(vName + ':', true, vpNameW),
               new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: amtRuns })] })
             ] }))
-          }
-          if (discVessels.length > 1) {
-            const totalTech = discVessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
-            allRows.push(vpRow2('Total', formatCurrency(totalTech, wq.premiumCurrency)))
-          }
-          allRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), width: { size: vpNameW, type: WidthType.DXA }, children: [emptyP()] }), new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [emptyP()] })] }))
-          allRows.push(new TableRow({ children: [
-            new TableCell({ borders: noBorders(), columnSpan: 2, width: { size: BODY_W, type: WidthType.DXA }, children: [bp('Payable Premium')] })
-          ] }))
-          for (const v of discVessels) {
+          } else {
+            // Discount vessel — vessel name header + technical + payable
+            allRows.push(new TableRow({ children: [
+              new TableCell({ borders: noBorders(), columnSpan: 2, width: { size: BODY_W, type: WidthType.DXA }, children: [bp(vName + ':')] })
+            ] }))
+            const prevR = vpPrevRun(v)
+            const techRuns: TextRun[] = [new TextRun({ text: formatCurrency(v.premiumAmount || 0, wq.premiumCurrency), size: 22, font: 'Arial', bold: true, color: '000000' })]
+            if (prevR) techRuns.push(prevR)
+            allRows.push(new TableRow({ children: [
+              vpCell('Technical Premium:', false, vpNameW),
+              new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: techRuns })] })
+            ] }))
             const vPrem = v.premiumAmount || 0
-            allRows.push(vpRow2((v.name || v.vesselLabel).toUpperCase(), vPrem > 0 ? formatCurrency(wComputePayable(vPrem, v), wq.premiumCurrency) : '-'))
-          }
-          if (discVessels.length > 1) {
-            const totalPayable = discVessels.reduce((s, v) => s + wComputePayable(v.premiumAmount || 0, v), 0)
-            allRows.push(vpRow2('Total', formatCurrency(totalPayable, wq.premiumCurrency)))
+            allRows.push(new TableRow({ children: [
+              vpCell('Payable Premium:', false, vpNameW),
+              new TableCell({ borders: noBorders(), width: { size: BODY_W - vpNameW, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: vPrem > 0 ? formatCurrency(wComputePayable(vPrem, v), wq.premiumCurrency) : '-', size: 22, font: 'Arial', bold: true, color: '000000' })] })] })
+            ] }))
           }
         }
         premContent.push(new Table({ rows: allRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [vpNameW, BODY_W - vpNameW], layout: TableLayoutType.FIXED }))
