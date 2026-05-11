@@ -2123,7 +2123,9 @@ app.whenReady().then(() => {
   // Sanctions data management handlers
   safeHandle('sanctions:getStatus', async (event) => {
     requireSession(event)
-    return sanctionsService.getStatus()
+    const st = sanctionsService.getStatus()
+    console.log('[IPC] sanctions:getStatus result:', JSON.stringify(st))
+    return st
   })
 
   safeHandle('sanctions:refresh', async (event, source?: string) => {
