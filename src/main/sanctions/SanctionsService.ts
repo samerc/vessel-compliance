@@ -126,13 +126,17 @@ export class SanctionsService {
   async refreshSource(source: string, onProgress?: (msg: string) => void): Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }> {
     const src = source.toUpperCase()
     try {
+      console.log(`[Sanctions] Refreshing ${src}...`)
       onProgress?.(`Downloading ${src} data...`)
       let entities: SanctionsEntity[] = []
       let releaseDate: string | null = null
 
       if (src === 'OFAC') {
+        console.log(`[Sanctions] Downloading OFAC from ${DATA_SOURCES.OFAC}...`)
         const xmlData = await this.fetchText(DATA_SOURCES.OFAC)
+        console.log(`[Sanctions] Downloaded OFAC XML: ${(xmlData.length / 1024 / 1024).toFixed(1)}MB, parsing...`)
         const parsed = await parseOfacSdn(xmlData)
+        console.log(`[Sanctions] Parsed ${parsed.entities.length} OFAC entities`)
         entities = parsed.entities
         releaseDate = parsed.releaseDate
       } else if (src === 'EU') {
@@ -156,17 +160,21 @@ export class SanctionsService {
         throw new Error(`Unknown source: ${source}`)
       }
 
+      console.log(`[Sanctions] Storing ${entities.length} ${src} entities...`)
       onProgress?.(`Storing ${entities.length} ${src} entities...`)
       this.db.clearEntitiesBySource(src)
       this.db.insertEntitiesBatch(entities)
       this.db.upsertDataUpdate(src, entities.length, 'success', releaseDate)
 
+      console.log(`[Sanctions] Rebuilding search index...`)
       onProgress?.('Rebuilding search index...')
       this.buildIndex()
 
+      console.log(`[Sanctions] ${src} refresh complete: ${entities.length} entities`)
       return { source: src, count: entities.length, status: 'success', releaseDate }
     } catch (err: any) {
       const msg = err.message || 'Unknown error'
+      console.error(`[Sanctions] ${src} refresh failed:`, msg)
       this.db.upsertDataUpdate(src, 0, `error: ${msg}`, null)
       return { source: src, count: 0, status: 'error', releaseDate: null, error: msg }
     }

@@ -4073,10 +4073,10 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
         try {
             if (source) {
                 const result = await window.api.sanctionsRefreshSource(source)
-                if (result.status === 'error') {
-                    showError(`${source}: ${result.error}`)
+                if (result?.error || result?.status === 'error') {
+                    showError(`${source}: ${result.message || result.error || 'Unknown error'}`)
                 } else {
-                    showSuccess(`${source}: ${result.count.toLocaleString()} entities loaded`)
+                    showSuccess(`${source}: ${(result.count || 0).toLocaleString()} entities loaded`)
                 }
             } else {
                 const results = await window.api.sanctionsRefresh()
