@@ -1211,6 +1211,8 @@ export interface QuotationVessel {
   previousPremium?: number | null
   previousSection1Premium?: number | null
   previousSection2Premium?: number | null
+  ncbExcluded?: boolean
+  upccExcluded?: boolean
 }
 
 export interface QuotationSubLimit {

@@ -1851,18 +1851,18 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const upccType = q.upccDiscountType || 'percentage'
     const upccPct = q.upccDiscountPercent || 0
     const upccFixedAmt = q.upccDiscountAmount || 0
-    // Compute payable given a technical premium
-    const computePayable = (tech: number) => {
-      const ncbDed = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
+    // Compute payable given a technical premium (with optional per-vessel exclusion)
+    const computePayable = (tech: number, vessel?: any) => {
+      const ncbDed = (vessel?.ncbExcluded) ? 0 : (ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100)
       const afterNcb = tech - ncbDed
-      const upccDed = upccType === 'amount' ? upccFixedAmt : afterNcb * upccPct / 100
+      const upccDed = (vessel?.upccExcluded) ? 0 : (upccType === 'amount' ? upccFixedAmt : afterNcb * upccPct / 100)
       return afterNcb - upccDed
     }
     const isMultiVessel = data.quotationVessels.length >= 2
     const hasVesselPremiums = isMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
 
     // Build premium line items
-    type PDFPremLine = { label: string; tech: number; prev?: number }
+    type PDFPremLine = { label: string; tech: number; prev?: number; vessel?: any }
     const pdfPremLines: PDFPremLine[] = []
     const hullMultiAlt = data.hullAlternatives.length > 1 || data.hullAlternatives.some(a => a.vesselScopeId)
     const hullPerVessel = data.hullAlternatives.some(a => a.vesselScopeId)
@@ -1888,7 +1888,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
     } else if (hasVesselPremiums) {
       for (const v of data.quotationVessels) {
-        pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0, prev: v.previousPremium ?? undefined })
+        pdfPremLines.push({ label: (v.name || v.vesselLabel).toUpperCase(), tech: v.premiumAmount || 0, prev: v.previousPremium ?? undefined, vessel: v })
       }
     } else if (piMultiAltPrem) {
       for (let ai = 0; ai < data.piAlternatives.length; ai++) {
@@ -1945,9 +1945,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           premText += `Total    ${fc(totalTech)}${pa}\n`
           premText += '\nPayable Premium\n'
           for (const l of pdfPremLines) {
-            premText += `${l.label}    ${fc(computePayable(l.tech))}${pa}\n`
+            premText += `${l.label}    ${fc(computePayable(l.tech, l.vessel))}${pa}\n`
           }
-          const totalPayable = computePayable(totalTech)
+          const totalPayable = pdfPremLines.reduce((s, l) => s + computePayable(l.tech, l.vessel), 0)
           premText += `Total    ${fc(totalPayable)}${pa}\n`
         } else {
           if (pdfPremLines.length > 1) premText += 'Technical Premium\n'
@@ -3984,10 +3984,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wUpccType = wq.upccDiscountType || 'percentage'
     const wUpccPct = wq.upccDiscountPercent || 0
     const wUpccFixedAmt = wq.upccDiscountAmount || 0
-    const wComputePayable = (tech: number) => {
-      const ncbDed = wNcbType === 'amount' ? wNcbFixedAmt : tech * wNcbPct / 100
+    const wComputePayable = (tech: number, vessel?: any) => {
+      const ncbDed = (vessel?.ncbExcluded) ? 0 : (wNcbType === 'amount' ? wNcbFixedAmt : tech * wNcbPct / 100)
       const afterNcb = tech - ncbDed
-      const upccDed = wUpccType === 'amount' ? wUpccFixedAmt : afterNcb * wUpccPct / 100
+      const upccDed = (vessel?.upccExcluded) ? 0 : (wUpccType === 'amount' ? wUpccFixedAmt : afterNcb * wUpccPct / 100)
       return afterNcb - upccDed
     }
     const wIsMultiVessel = data.quotationVessels.length >= 2
@@ -4042,9 +4042,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         ] }))
         for (const v of data.quotationVessels) {
           const vPrem = v.premiumAmount || 0
-          discRows.push(vpRow2((v.name || v.vesselLabel).toUpperCase(), vPrem > 0 ? formatCurrency(wComputePayable(vPrem), wq.premiumCurrency) : '-'))
+          discRows.push(vpRow2((v.name || v.vesselLabel).toUpperCase(), vPrem > 0 ? formatCurrency(wComputePayable(vPrem, v), wq.premiumCurrency) : '-'))
         }
-        const totalPayable = wComputePayable(totalTech)
+        const totalPayable = data.quotationVessels.reduce((s, v) => s + wComputePayable(v.premiumAmount || 0, v), 0)
         discRows.push(vpRow2('Total', formatCurrency(totalPayable, wq.premiumCurrency)))
         premContent.push(new Table({ rows: discRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [vpNameW, BODY_W - vpNameW], layout: TableLayoutType.FIXED }))
       } else {

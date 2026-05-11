@@ -2686,6 +2686,15 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: ncb_excluded and upcc_excluded on quotation_vessels
+            try {
+                const [neCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'ncb_excluded'") as any[]
+                if ((neCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN ncb_excluded TINYINT(1) DEFAULT 0 NOT NULL")
+                    await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN upcc_excluded TINYINT(1) DEFAULT 0 NOT NULL")
+                }
+            } catch {}
+
             // Migration: make hull_clause_id nullable on quotation_hull_alternatives
             try {
                 const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
@@ -7136,7 +7145,8 @@ export class MySQLAdapter {
                     qv.premium_amount as premiumAmount,
                     qv.agreed_value as agreedValue, qv.iv_value as ivValue,
                     qv.war_excess_amount as warExcessAmount, qv.war_section1_premium as warSection1Premium, qv.war_section2_premium as warSection2Premium,
-                    qv.previous_premium as previousPremium, qv.previous_section1_premium as previousSection1Premium, qv.previous_section2_premium as previousSection2Premium
+                    qv.previous_premium as previousPremium, qv.previous_section1_premium as previousSection1Premium, qv.previous_section2_premium as previousSection2Premium,
+                    qv.ncb_excluded as ncbExcluded, qv.upcc_excluded as upccExcluded
              FROM quotation_vessels qv
              LEFT JOIN vessels v ON qv.vessel_id = v.id
              LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
@@ -7157,7 +7167,9 @@ export class MySQLAdapter {
             warSection2Premium: r.warSection2Premium != null ? Number(r.warSection2Premium) : null,
             previousPremium: r.previousPremium != null ? Number(r.previousPremium) : null,
             previousSection1Premium: r.previousSection1Premium != null ? Number(r.previousSection1Premium) : null,
-            previousSection2Premium: r.previousSection2Premium != null ? Number(r.previousSection2Premium) : null
+            previousSection2Premium: r.previousSection2Premium != null ? Number(r.previousSection2Premium) : null,
+            ncbExcluded: r.ncbExcluded !== 0 && r.ncbExcluded !== false && r.ncbExcluded != null ? true : false,
+            upccExcluded: r.upccExcluded !== 0 && r.upccExcluded !== false && r.upccExcluded != null ? true : false
         }))
     }
 
@@ -7172,11 +7184,11 @@ export class MySQLAdapter {
         return { id, quotationId: data.quotationId, vesselId: data.vesselId, vesselLabel: data.vesselLabel, order: data.order, name: data.name, imoNumber: data.imoNumber, builtYear: data.builtYear, rebuiltYear: data.rebuiltYear, grossTonnage: data.grossTonnage, flag: data.flag, vesselType: data.vesselType, classification: data.classification, callSign: data.callSign, agreedValue: data.agreedValue ?? null, ivValue: data.ivValue ?? null }
     }
 
-    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; orderIndex: number; premiumAmount: number; agreedValue: number | null; ivValue: number | null }>): Promise<void> {
+    async updateQuotationVessel(id: string, data: Partial<{ name: string; imoNumber: string; builtYear: number; rebuiltYear: number | null; grossTonnage: number; flag: string; vesselType: string; classification: string; callSign: string; vesselId: string; vesselLabel: string; orderIndex: number; premiumAmount: number; agreedValue: number | null; ivValue: number | null; ncbExcluded: boolean; upccExcluded: boolean }>): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value', warExcessAmount: 'war_excess_amount', warSection1Premium: 'war_section1_premium', warSection2Premium: 'war_section2_premium', previousPremium: 'previous_premium', previousSection1Premium: 'previous_section1_premium', previousSection2Premium: 'previous_section2_premium' }
+        const colMap: Record<string, string> = { name: 'name', imoNumber: 'imo_number', builtYear: 'built_year', rebuiltYear: 'rebuilt_year', grossTonnage: 'gross_tonnage', flag: 'flag', vesselType: 'vessel_type', classification: 'classification', callSign: 'call_sign', vesselId: 'vessel_id', vesselLabel: 'vessel_label', orderIndex: 'order_index', premiumAmount: 'premium_amount', agreedValue: 'agreed_value', ivValue: 'iv_value', warExcessAmount: 'war_excess_amount', warSection1Premium: 'war_section1_premium', warSection2Premium: 'war_section2_premium', previousPremium: 'previous_premium', previousSection1Premium: 'previous_section1_premium', previousSection2Premium: 'previous_section2_premium', ncbExcluded: 'ncb_excluded', upccExcluded: 'upcc_excluded' }
         for (const [key, col] of Object.entries(colMap)) {
             if (key in data) { fields.push(`${col} = ?`); values.push((data as any)[key] ?? null) }
         }
@@ -8263,8 +8275,8 @@ export class MySQLAdapter {
                     const [rows] = await this.pool.query('SELECT * FROM quotation_vessels WHERE quotation_id = ?', [sourceQuotationId])
                     for (const r of rows as any[]) {
                         await this.pool.execute(
-                            'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                            [uuidv4(), targetQuotationId, r.vessel_id, r.vessel_label, r.order_index, r.name, r.imo_number, r.built_year, r.rebuilt_year, r.gross_tonnage, r.flag, r.vessel_type, r.classification, r.call_sign]
+                            'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, ncb_excluded, upcc_excluded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            [uuidv4(), targetQuotationId, r.vessel_id, r.vessel_label, r.order_index, r.name, r.imo_number, r.built_year, r.rebuilt_year, r.gross_tonnage, r.flag, r.vessel_type, r.classification, r.call_sign, r.ncb_excluded || 0, r.upcc_excluded || 0]
                         )
                     }
                     break
@@ -8537,9 +8549,9 @@ export class MySQLAdapter {
             const newVId = uuidv4()
             vesselIdMap[v.id] = newVId
             await this.pool.execute(
-                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount, v.agreed_value, v.iv_value]
+                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value, ncb_excluded, upcc_excluded)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount, v.agreed_value, v.iv_value, v.ncb_excluded || 0, v.upcc_excluded || 0]
             )
         }
 

@@ -176,10 +176,22 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const technicalPremium = isMultiVessel
         ? qVessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
         : (quotation.premiumAmount || 0)
+
+    // Per-vessel payable respecting NCB/UPCC exclusion flags
+    const vesselPayable = (v: typeof qVessels[0]) => {
+        const tech = v.premiumAmount || 0
+        const nd = v.ncbExcluded ? 0 : (ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100)
+        const an = tech - nd
+        const ud = v.upccExcluded ? 0 : (upccType === 'amount' ? upccFixedAmt : an * upccPct / 100)
+        return an - ud
+    }
+
     const ncbDeduction = ncbType === 'amount' ? ncbFixedAmt : technicalPremium * ncbPct / 100
     const afterNcb = technicalPremium - ncbDeduction
     const upccDeduction = upccType === 'amount' ? upccFixedAmt : afterNcb * upccPct / 100
-    const payablePremium = afterNcb - upccDeduction
+    const payablePremium = isMultiVessel && hasDiscount
+        ? qVessels.reduce((sum, v) => sum + vesselPayable(v), 0)
+        : afterNcb - upccDeduction
     const premiumLabel = hasDiscount ? 'Technical Premium' : 'Premium'
     const currency = quotation.premiumCurrency || 'USD'
 
@@ -519,10 +531,12 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         <tbody>
                             {qVessels.map(v => {
                                 const vPrem = v.premiumAmount || 0
-                                const vNcbDed = ncbType === 'amount' ? ncbFixedAmt : vPrem * ncbPct / 100
-                                const vAfterNcb = vPrem - vNcbDed
-                                const vUpccDed = upccType === 'amount' ? upccFixedAmt : vAfterNcb * upccPct / 100
-                                const vPayable = vAfterNcb - vUpccDed
+                                const vPayable = vesselPayable(v)
+                                const toggleExclusion = async (field: 'ncbExcluded' | 'upccExcluded') => {
+                                    const newVal = !v[field]
+                                    setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, [field]: newVal } : pv))
+                                    await window.api.updateQuotationVessel(v.id, { [field]: newVal } as any)
+                                }
                                 return (
                                     <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                                         <td style={{ padding: '6px 10px', fontWeight: 600, textTransform: 'uppercase' }}>{v.name || v.vesselLabel}</td>
@@ -532,7 +546,23 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.previousPremium ?? ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, previousPremium: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null, 'previousPremium')} placeholder="—" style={{ width: '100px', padding: '3px 6px', textAlign: 'right', fontSize: '0.78rem', color: 'var(--danger)' }} />
                                         </td>
-                                        {hasDiscount && <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{vPrem > 0 ? vPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>}
+                                        {hasDiscount && <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                                <span style={{ color: (v.ncbExcluded && quotation.ncbEnabled) || (v.upccExcluded && quotation.upccEnabled) ? 'var(--text-secondary)' : 'var(--text-secondary)', fontStyle: (v.ncbExcluded && quotation.ncbEnabled) || (v.upccExcluded && quotation.upccEnabled) ? 'italic' : 'normal' }}>{vPrem > 0 ? vPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                {quotation.ncbEnabled && (
+                                                    <label title={v.ncbExcluded ? 'NCB excluded — click to include' : 'NCB applied — click to exclude'} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.68rem', color: v.ncbExcluded ? 'var(--danger)' : 'var(--accent-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                        <input type="checkbox" checked={!v.ncbExcluded} onChange={() => toggleExclusion('ncbExcluded')} style={{ width: '13px', height: '13px', accentColor: 'var(--accent-primary)' }} />
+                                                        NCB
+                                                    </label>
+                                                )}
+                                                {quotation.upccEnabled && (
+                                                    <label title={v.upccExcluded ? 'UPCC excluded — click to include' : 'UPCC applied — click to exclude'} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.68rem', color: v.upccExcluded ? 'var(--danger)' : 'var(--accent-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                        <input type="checkbox" checked={!v.upccExcluded} onChange={() => toggleExclusion('upccExcluded')} style={{ width: '13px', height: '13px', accentColor: 'var(--accent-primary)' }} />
+                                                        UPCC
+                                                    </label>
+                                                )}
+                                            </div>
+                                        </td>}
                                     </tr>
                                 )
                             })}
