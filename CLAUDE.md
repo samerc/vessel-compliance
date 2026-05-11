@@ -47,7 +47,7 @@ This is an Electron desktop application for maritime vessel compliance managemen
 - bcryptjs for password hashing, UUID for ID generation
 - Vanilla CSS with glassmorphic design system and light/dark theme support
 - jsPDF + xlsx for report exports
-- sanctions.network API for OFAC/sanctions screening
+- Built-in sanctions screening via local SQLite (better-sqlite3) + Fuse.js fuzzy search
 
 ### Key Patterns
 - **Database**: Auto-migrating schema in `src/main/mysql/adapter.ts` with schema defined in `schema.sql`
@@ -88,20 +88,33 @@ Global notification system for user feedback:
 - **CSS Variables**: Theme styles use CSS custom properties (`var(--text-primary)`, `var(--bg-primary)`, etc.) that adapt to current theme
 - **Light Mode**: Activated by adding `.light` class to document.body, all components use theme-aware variables
 
-### Sanctions Screening
-The app integrates with sanctions.network API for OFAC/UN/EU sanctions checking:
-- **API calls in main process** (`src/main/index.ts` - `ofac:checkSanctions` handler) to avoid CORS
-- **OfacService** (`src/renderer/src/services/OfacService.ts`) - thin wrapper calling IPC
-- **SanctionsModal** (`src/renderer/src/components/SanctionsModal.tsx`) - displays potential matches
+### Sanctions Screening (Built-in)
+Sanctions screening runs entirely within the Electron app — no external API dependency:
+- **Module**: `src/main/sanctions/` — self-contained sanctions engine
+- **SanctionsService** (`SanctionsService.ts`): Singleton — initialize, search, refresh, getStatus
+- **SanctionsDatabase** (`SanctionsDatabase.ts`): SQLite wrapper via `better-sqlite3` (externalized in electron-vite config like mysql2)
+- **Database file**: `sanctions.db` stored alongside `db-config.json` in app data directory
+- **Search**: Fuse.js fuzzy matching (weighted: name 0.5, normalized name 0.5, IMO 0.8, aliases 0.3) + SQL LIKE exact search, combined and deduplicated
+- **Data sources**: OFAC SDN (XML), EU OpenSanctions (CSV), UN Consolidated (XML), ISF Lebanon (Excel)
+- **Parsers**: `parsers/ofacParser.ts`, `parsers/euParser.ts`, `parsers/unParser.ts`, `parsers/isfParser.ts` — ported from external API source at `Z:\Coding\sanctions API`
+- **Normalize**: `normalize.ts` — lowercase, NFD unicode, strip diacritics, strip special chars
+- **Startup**: `sanctionsService.initialize(dbDir)` called in `app.whenReady()`, loads all entities into Fuse.js in-memory index
+- **Shutdown**: `sanctionsService.close()` in `window-all-closed` handler
+- **IPC**: `ofac:checkSanctions` uses `SanctionsService.search()` locally (no HTTP calls)
+- **OfacService** (`src/renderer/src/services/OfacService.ts`) - thin wrapper calling IPC (unchanged)
+- **SanctionsModal** (`src/renderer/src/components/SanctionsModal.tsx`) - displays potential matches (unchanged)
 - **Status flow**: `PENDING` → `POTENTIAL_MATCH` (yellow, needs review) → `CLEARED` or `MATCH` (user decision)
 - Each component with sanctions badges (VesselManager, AssuredManager, EntityDirectory) has its own `OfacBadge` component that must handle all statuses
-- **Loading States**: OfacBadge shows "CHECKING..." spinner during API calls
+- **Loading States**: OfacBadge shows "CHECKING..." spinner during searches
 - **Theme-Aware Colors**: Badge colors adapt for light/dark mode (darker colors in light mode for readability)
 - **Auto-clean toggle**: `ComplianceScheduleSettings.autoMarkCleanOnCheck` — when false, a CLEARED result is not auto-saved (toast only)
+- **Data refresh IPC**: `sanctions:getStatus`, `sanctions:refresh`, `sanctions:refreshSource` — admin-only, downloads and parses lists into SQLite, rebuilds Fuse.js index
+- **Admin UI**: "Sanctions Data" section in Admin Panel with per-source status cards (entity count, last update, release date) and Refresh buttons
 
 ### Scheduled Compliance Checks
 Automated weekly sanctions screening for all entities and vessels:
-- **Scheduler** (`src/main/index.ts`): Background timer runs compliance checks on configured schedule
+- **Scheduler** (`src/main/services/ComplianceScheduler.ts`): Background timer runs compliance checks on configured schedule
+- **Local search**: Uses `sanctionsService.search()` directly (no HTTP calls, no rate limiting needed)
 - **Settings** (Admin Panel): Enable/disable, day of week, time, match threshold (50-100%), include vessels, skip cleared
 - **Match Threshold**: Only matches above configured score (default 85%) are flagged as `POTENTIAL_MATCH`
 - **Results Storage**: `compliance_check_logs` table stores run history, `compliance_check_results` stores individual matches
@@ -304,8 +317,9 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 
 - **Per-User Threshold**: Minimum match threshold (10-95%) persisted to `users.sanctions_threshold` column
 - **IPC Handler**: `users:updateSanctionsThreshold` saves to DB and updates session cache
-- **Source Filters**: Toggle OFAC, UN, EU sanctions lists independently
+- **Source Filters**: Toggle OFAC, UN, EU, ISF sanctions lists independently
 - **Results**: Expandable cards with match score, aliases, remarks, source IDs
+- **Local search**: All searches run against local SQLite database via `SanctionsService.search()`
 
 ### Admin Panel
 
@@ -319,7 +333,8 @@ System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with co
 6. **Vessel Reminder Settings**: Snooze period and clipboard template
 7. **File Upload Security**: Allowed/blocked file extensions for uploads
 8. **Report Settings**: Company name, logo, accent color used in PDF reports
-9. **Database Configuration**: View/change MySQL connection settings
+9. **Sanctions Data**: Per-source status cards (OFAC, EU, UN, ISF) with entity count, last update, release date; per-source and bulk refresh buttons
+10. **Database Configuration**: View/change MySQL connection settings
 
 - **Collapsible Pattern**: Uses `collapsedSections` state (`Set<string>`) with `toggleSection` function; each section header has ChevronRight/ChevronDown toggle
 - **All sections collapsed by default**: Initial state includes all section IDs
@@ -1123,6 +1138,10 @@ Draft quotation references include the policy type code:
 - `policy_type_commissions` - Default commission % per policy type
 - `entity_commission_overrides` - Per-customer per-type commission overrides
 - `quotation_hull_custom_conditions` - Per-quotation custom hull additional conditions (free text)
+
+**SQLite tables** (in `sanctions.db`, separate from MySQL):
+- `entities` - Sanctions list entities (OFAC, EU, UN, ISF) with name, aliases, identifications, programs, vessel_imo
+- `data_updates` - Per-source refresh metadata (last update, record count, release date)
 
 ### Commission Defaults
 
