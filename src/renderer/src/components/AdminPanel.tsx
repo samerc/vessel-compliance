@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import RichTextEditor from './RichTextEditor'
 
@@ -1333,6 +1334,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             { id: 'logRetention', label: 'Log Retention', icon: <Clock size={16} />, adminOnly: true },
             { id: 'backup', label: 'Backup & Restore', icon: <Download size={16} />, adminOnly: true },
             { id: 'filePaths', label: 'File Paths', icon: <FolderOpen size={16} />, adminOnly: true },
+            { id: 'sanctionsData', label: 'Sanctions Data', icon: <Shield size={16} />, adminOnly: true },
             { id: 'dbConfig', label: 'Database', icon: <Database size={16} />, adminOnly: true },
         ] : []),
     ]
@@ -2677,6 +2679,9 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
             {/* File Path Settings */}
             {effectiveSection === 'filePaths' && <FilePathSettingsSection showSuccess={showSuccess} showError={showError} />}
+
+            {/* Sanctions Data Management */}
+            {effectiveSection === 'sanctionsData' && <SanctionsDataSection showSuccess={showSuccess} showError={showError} />}
 
             {/* 6. Database Configuration */}
             {effectiveSection === 'dbConfig' && (
@@ -4042,6 +4047,128 @@ function FilePathSettingsSection({ showSuccess, showError }: { showSuccess: (m: 
                         } catch (e: any) { showError(e.message || 'Failed') }
                     }} style={{ padding: '6px 14px', fontSize: '0.78rem', color: 'var(--danger)' }}>Clear Cache</button>
                 </div>
+            </div>
+        </section>
+    )
+}
+
+function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: string) => void; showError: (m: string) => void }) {
+    const [status, setStatus] = useState<{ sources: any[]; totalEntities: number } | null>(null)
+    const [refreshing, setRefreshing] = useState<string | null>(null) // source name or 'ALL'
+    const { theme } = useTheme()
+    const isLight = theme === 'light' || theme === 'aurora'
+
+    const loadStatus = async () => {
+        try {
+            const s = await window.api.sanctionsGetStatus()
+            setStatus(s)
+        } catch { /* ignore */ }
+    }
+
+    useEffect(() => { loadStatus() }, [])
+
+    const handleRefresh = async (source?: string) => {
+        const label = source || 'ALL'
+        setRefreshing(label)
+        try {
+            if (source) {
+                const result = await window.api.sanctionsRefreshSource(source)
+                if (result.status === 'error') {
+                    showError(`${source}: ${result.error}`)
+                } else {
+                    showSuccess(`${source}: ${result.count.toLocaleString()} entities loaded`)
+                }
+            } else {
+                const results = await window.api.sanctionsRefresh()
+                const arr = Array.isArray(results) ? results : [results]
+                const errors = arr.filter((r: any) => r.status === 'error')
+                const total = arr.reduce((s: number, r: any) => s + (r.count || 0), 0)
+                if (errors.length > 0) {
+                    showError(`${errors.length} source(s) failed: ${errors.map((e: any) => e.source).join(', ')}`)
+                } else {
+                    showSuccess(`All sources refreshed — ${total.toLocaleString()} entities loaded`)
+                }
+            }
+            await loadStatus()
+        } catch (err: any) {
+            showError(err.message || 'Refresh failed')
+        } finally {
+            setRefreshing(null)
+        }
+    }
+
+    const formatDate = (d: string | null) => {
+        if (!d) return '—'
+        try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) } catch { return d }
+    }
+
+    const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UN: '#44cc88', ISF: '#ffb020' }
+
+    return (
+        <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Shield size={20} color="var(--accent-primary)" /> Sanctions Data
+                </h3>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {status && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{status.totalEntities.toLocaleString()} total entities</span>}
+                    <button onClick={() => handleRefresh()} disabled={!!refreshing} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
+                        {refreshing === 'ALL' ? <Loader2 size={14} className="spinner" /> : <RefreshCw size={14} />} Refresh All
+                    </button>
+                </div>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+                Sanctions lists are stored locally for screening. Refresh to download the latest data from OFAC, EU, UN, and ISF sources.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                {(status?.sources || [{ source: 'OFAC' }, { source: 'EU' }, { source: 'UN' }, { source: 'ISF' }]).map((src: any) => {
+                    const color = sourceColors[src.source] || 'var(--accent-primary)'
+                    const isRefreshing = refreshing === src.source || refreshing === 'ALL'
+                    const hasData = src.entityCount > 0
+                    return (
+                        <div key={src.source} style={{
+                            padding: '14px 16px', borderRadius: '10px',
+                            border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
+                            background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.02)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }} />
+                                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{src.source}</span>
+                                </div>
+                                <button onClick={() => handleRefresh(src.source)} disabled={!!refreshing} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    {isRefreshing ? <Loader2 size={12} className="spinner" /> : <Download size={12} />} Refresh
+                                </button>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.78rem' }}>
+                                <div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Entities</div>
+                                    <div style={{ fontWeight: 600, color: hasData ? 'var(--text-primary)' : 'var(--danger)' }}>{hasData ? (src.entityCount || 0).toLocaleString() : 'No data'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Last Update</div>
+                                    <div style={{ fontWeight: 600 }}>{formatDate(src.updated_at)}</div>
+                                </div>
+                                {src.release_date && (
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Release Date</div>
+                                        <div style={{ fontWeight: 600 }}>{src.release_date}</div>
+                                    </div>
+                                )}
+                            </div>
+                            {src.status && src.status !== 'never' && src.status !== 'success' && (
+                                <div style={{ marginTop: '8px', fontSize: '0.72rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <AlertTriangle size={12} /> {src.status}
+                                </div>
+                            )}
+                            {hasData && src.status === 'success' && (
+                                <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#44cc88', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <CheckCircle size={12} /> Up to date
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
             </div>
         </section>
     )
