@@ -99,7 +99,7 @@ export class SanctionsDatabase {
   searchExact(query: string, options: { source?: string; limit?: number } = {}): SanctionsEntity[] {
     if (!this.db) return []
     const normalizedQuery = query.toLowerCase().trim()
-    let sql = `SELECT * FROM entities WHERE name_normalized LIKE ? OR aliases LIKE ? OR (vessel_imo IS NOT NULL AND vessel_imo = ?)`
+    let sql = `SELECT * FROM entities WHERE (name_normalized LIKE ? OR aliases LIKE ? OR (vessel_imo IS NOT NULL AND vessel_imo = ?))`
     const params: any[] = [`%${normalizedQuery}%`, `%${normalizedQuery}%`, query.trim()]
     if (options.source) {
       sql += ' AND source = ?'
