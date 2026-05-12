@@ -6,6 +6,8 @@ import pkg from './package.json'
 export default defineConfig({
   main: {
     build: {
+      // Bundle pure-JS deps (fuse.js, xml2js) so they work from hot-update cache (no node_modules there)
+      externalizeDeps: { exclude: ['fuse.js', 'xml2js'] },
       rollupOptions: {
         input: {
           bootstrap: resolve(__dirname, 'src/main/bootstrap.ts'),
