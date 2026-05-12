@@ -252,6 +252,13 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
         await window.api.updateQuotationItemVesselScope('quotation_additional_clauses', id, scope)
     }
 
+    const updateAdditionalClauseAltId = async (id: string, altId: string | null) => {
+        try {
+            await window.api.updateQuotationItemAlternativeId('quotation_additional_clauses', id, altId)
+            setAdditionalClauses(prev => prev.map(c => c.id === id ? { ...c, alternativeId: altId } : c))
+        } catch { /* ignore */ }
+    }
+
     const addAdditionalClause = async (clauseId: string) => {
         const clause = allAdditional.find(c => c.id === clauseId)
         if (!clause) return
@@ -373,8 +380,9 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
                                     </span>
                                     <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
                                 </div>
-                                <div style={{ paddingLeft: '30px' }}>
+                                <div style={{ paddingLeft: '30px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <VesselScopeChips vessels={qVessels} vesselScope={ac.vesselScope} onChange={scope => updateAdditionalClauseScope(ac.id, scope)} />
+                                    {piAlternatives.length >= 2 && <AlternativeScopeChips alternatives={piAlternatives} currentAltId={ac.alternativeId || null} onChangeAltId={altId => updateAdditionalClauseAltId(ac.id, altId)} />}
                                 </div>
                             </div>
                         )
