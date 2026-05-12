@@ -4072,7 +4072,7 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
         setRefreshing(label)
         try {
             if (source) {
-                const result = await window.api.sanctionsRefreshSource(source)
+                const result = await window.api.sanctionsRefreshSource(source) as any
                 if (result?.error || result?.status === 'error') {
                     showError(`${source}: ${result.message || result.error || 'Unknown error'}`)
                 } else {

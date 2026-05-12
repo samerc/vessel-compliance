@@ -11,7 +11,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     const selectedIds = useMemo(() => {
         const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
         const filtered = altId
-            ? selectedRows.filter((r: any) => r.alternativeId === altId)
+            ? selectedRows.filter((r: any) => !r.alternativeId || r.alternativeId === altId)
             : selectedRows
         return new Set(filtered.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
     }, [selectedRows, piAlternatives, selectedPIAltId])

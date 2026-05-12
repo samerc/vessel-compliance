@@ -1790,7 +1790,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
       // Shared (null alt) + common exclusions first
       const sharedItems = allExclItems.filter(e => !e.altId)
-      const commonItems = allExclItems.filter(e => e.exclId && commonExclIds.has(e.exclId) && e.altId === altIds[0])
+      const sharedExclIds = new Set(sharedItems.filter(e => e.exclId).map(e => e.exclId!))
+      const commonItems = allExclItems.filter(e => e.exclId && commonExclIds.has(e.exclId) && !sharedExclIds.has(e.exclId) && e.altId === altIds[0])
       const baseItems = [...sharedItems, ...commonItems]
       if (baseItems.length > 0) {
         exclText += baseItems.map(e => `- ${e.text}`).join('\n')
@@ -1798,7 +1799,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
       // Per-alternative additional exclusions (not common)
       for (const alt of data.piAlternatives) {
-        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || !commonExclIds.has(e.exclId)))
+        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || (!commonExclIds.has(e.exclId) && !sharedExclIds.has(e.exclId))))
         if (altOnly.length > 0) {
           exclText += `\n\nAdditional exclusions applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:\n`
           exclText += altOnly.map(e => `- ${e.text}`).join('\n')
@@ -3885,7 +3886,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       // Shared (null alt) + common exclusions
       const dSharedItems = allExclItems.filter(e => !e.altId)
-      const dCommonItems = allExclItems.filter(e => e.exclId && dCommonExclIds.has(e.exclId) && e.altId === dAltIds[0])
+      const dSharedExclIds = new Set(dSharedItems.filter(e => e.exclId).map(e => e.exclId!))
+      const dCommonItems = allExclItems.filter(e => e.exclId && dCommonExclIds.has(e.exclId) && !dSharedExclIds.has(e.exclId) && e.altId === dAltIds[0])
       const dBaseItems = [...dSharedItems, ...dCommonItems]
       if (dBaseItems.length > 0) {
         exclContent.push(...dBaseItems.map(e => {
@@ -3895,7 +3897,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       // Per-alternative additional exclusions
       for (const alt of data.piAlternatives) {
-        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || !dCommonExclIds.has(e.exclId)))
+        const altOnly = allExclItems.filter(e => e.altId === alt.id && (!e.exclId || (!dCommonExclIds.has(e.exclId) && !dSharedExclIds.has(e.exclId))))
         if (altOnly.length > 0) {
           exclContent.push(emptyP())
           exclContent.push(bup(`Additional exclusions applicable to ${alt.label || `Alternative ${data.piAlternatives.indexOf(alt) + 1}`}:`))
