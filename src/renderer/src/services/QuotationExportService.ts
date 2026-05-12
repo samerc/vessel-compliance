@@ -1008,7 +1008,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         const altsForThis = new Set(scopedAddls.filter(a => a.piAdditionalClauseId === ac.piAdditionalClauseId).map(a => a.alternativeId).filter(Boolean))
         if (allAltIds.size > 0 && [...allAltIds].every(id => altsForThis.has(id))) addlInAllAlts.add(ac.piAdditionalClauseId)
       }
-      const trueScopedAddls = scopedAddls.filter(ac => !ac.piAdditionalClauseId || !addlInAllAlts.has(ac.piAdditionalClauseId))
+      const sharedAddlIds = new Set(sharedAddls.filter(ac => ac.piAdditionalClauseId).map(ac => ac.piAdditionalClauseId))
+      const trueScopedAddls = scopedAddls.filter(ac => !ac.piAdditionalClauseId || (!addlInAllAlts.has(ac.piAdditionalClauseId) && !sharedAddlIds.has(ac.piAdditionalClauseId)))
       const promotedBothAddls = scopedAddls.filter(ac => ac.piAdditionalClauseId && addlInAllAlts.has(ac.piAdditionalClauseId))
       // Deduplicate promoted (keep first occurrence per piAdditionalClauseId)
       const seenPromoted = new Set<string>()
@@ -2864,7 +2865,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const altsForThis = new Set(dScopedAddls.filter(a => a.piAdditionalClauseId === ac.piAdditionalClauseId).map(a => a.alternativeId).filter(Boolean))
         if (dAllAltIds.size > 0 && [...dAllAltIds].every(id => altsForThis.has(id))) dAddlInAllAlts.add(ac.piAdditionalClauseId)
       }
-      const dTrueScopedAddls = dScopedAddls.filter(ac => !ac.piAdditionalClauseId || !dAddlInAllAlts.has(ac.piAdditionalClauseId))
+      const dSharedAddlIds = new Set(dSharedAddls.filter(ac => ac.piAdditionalClauseId).map(ac => ac.piAdditionalClauseId))
+      const dTrueScopedAddls = dScopedAddls.filter(ac => !ac.piAdditionalClauseId || (!dAddlInAllAlts.has(ac.piAdditionalClauseId) && !dSharedAddlIds.has(ac.piAdditionalClauseId)))
       const dPromotedBothAddls = dScopedAddls.filter(ac => ac.piAdditionalClauseId && dAddlInAllAlts.has(ac.piAdditionalClauseId))
       const dSeenPromoted = new Set<string>()
       const dDedupedPromoted = dPromotedBothAddls.filter(ac => {
