@@ -1660,7 +1660,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           const alt = data.piAlternatives[altIdx]
           const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
           const altCustom = sortedCustom.filter(cw => cw.alternativeId === alt.id)
-          const altSurveyW = altIdx === 0 ? data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id) : data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
+          const altSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id)
           if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
             warText += `\nAdditional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:\n`
             warText += renderWarrantyList(altWarIds, altCustom)
@@ -3708,7 +3708,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const alt = data.piAlternatives[altIdx]
         const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
         const altCustom = sortedWordCustom.filter(cw => cw.alternativeId === alt.id)
-        const altSurveyW = altIdx === 0 ? data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id) : data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
+        const altSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id)
         if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
           warContent.push(emptyP())
           warContent.push(bup(`Additional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:`))
