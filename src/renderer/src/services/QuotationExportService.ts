@@ -1652,16 +1652,18 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       }
 
       if (piMultiAltW) {
-        // Shared warranties first
+        // Shared warranties first (including survey warranties scoped to all alternatives)
         const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
         const sharedCustom = sortedCustom.filter(cw => !cw.alternativeId)
+        const sharedSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId)
         warText += renderWarrantyList(sharedWarIds, sharedCustom)
+        warText += renderSurveyWarranties(sharedSurveyW)
         // Per-alternative warranties
         for (let altIdx = 0; altIdx < data.piAlternatives.length; altIdx++) {
           const alt = data.piAlternatives[altIdx]
           const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
           const altCustom = sortedCustom.filter(cw => cw.alternativeId === alt.id)
-          const altSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id)
+          const altSurveyW = data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
           if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
             warText += `\nAdditional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:\n`
             warText += renderWarrantyList(altWarIds, altCustom)
@@ -3706,12 +3708,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (dPiMultiAltW) {
       const sharedWarIds = data.selectedWarrantyIds.filter(id => !data.warrantyAltIds[id])
       const sharedCustom = sortedWordCustom.filter(cw => !cw.alternativeId)
+      const sharedSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId)
       warContent.push(...renderWarBullets(sharedWarIds, sharedCustom))
+      warContent.push(...renderSurveyWarBullets(sharedSurveyW))
       for (let altIdx = 0; altIdx < data.piAlternatives.length; altIdx++) {
         const alt = data.piAlternatives[altIdx]
         const altWarIds = data.selectedWarrantyIds.filter(id => data.warrantyAltIds[id] === alt.id)
         const altCustom = sortedWordCustom.filter(cw => cw.alternativeId === alt.id)
-        const altSurveyW = data.surveyWarranties.filter(sw => !sw.alternativeId || sw.alternativeId === alt.id)
+        const altSurveyW = data.surveyWarranties.filter(sw => sw.alternativeId === alt.id)
         if (altWarIds.length > 0 || altCustom.length > 0 || altSurveyW.length > 0) {
           warContent.push(emptyP())
           warContent.push(bup(`Additional Warranties Applicable to ${alt.label || `Alternative ${altIdx + 1}`}:`))
