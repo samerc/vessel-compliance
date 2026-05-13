@@ -78,32 +78,43 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         return warSettings?.defaultRate ?? undefined
     }
 
+    // Total sum insured: quotation-level value, or sum of per-vessel values
+    const getEffectiveSumInsured = (q?: Quotation): number => {
+        const qq = q || quotation
+        if (qq.agreedValue) return qq.agreedValue
+        return qVessels.reduce((s, v) => s + (v.agreedValue ?? 0), 0)
+    }
+
     const handleRateChange = (rate: number | undefined) => {
+        const sumInsured = getEffectiveSumInsured()
         setQ(q => {
             const updated = { ...q, premiumRate: rate }
-            if (rate && q.agreedValue) {
-                updated.premiumAmount = Math.round(q.agreedValue * rate / 100 * 100) / 100
+            const si = q.agreedValue || sumInsured
+            if (rate && si) {
+                updated.premiumAmount = Math.round(si * rate / 100 * 100) / 100
             }
             return updated
         })
         updateField('premiumRate', rate ?? null)
-        if (rate && quotation.agreedValue) {
-            const premium = Math.round(quotation.agreedValue * rate / 100 * 100) / 100
+        if (rate && sumInsured) {
+            const premium = Math.round(sumInsured * rate / 100 * 100) / 100
             updateField('premiumAmount', premium)
         }
     }
 
     const handlePremiumChange = (premium: number | undefined) => {
+        const sumInsured = getEffectiveSumInsured()
         setQ(q => {
             const updated = { ...q, premiumAmount: premium }
-            if (premium && q.agreedValue) {
-                updated.premiumRate = Math.round(premium / q.agreedValue * 100 * 10000) / 10000
+            const si = q.agreedValue || sumInsured
+            if (premium && si) {
+                updated.premiumRate = Math.round(premium / si * 100 * 10000) / 10000
             }
             return updated
         })
         updateField('premiumAmount', premium ?? null)
-        if (premium && quotation.agreedValue) {
-            const rate = Math.round(premium / quotation.agreedValue * 100 * 10000) / 10000
+        if (premium && sumInsured) {
+            const rate = Math.round(premium / sumInsured * 100 * 10000) / 10000
             updateField('premiumRate', rate)
         }
     }
@@ -172,7 +183,21 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                 value={v.agreedValue}
                                 placeholder={fmtNum(quotation.agreedValue) || '0'}
                                 onChange={val => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))}
-                                onBlur={val => window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null } as any)}
+                                onBlur={val => {
+                                    window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null } as any)
+                                    // Recalculate premium from total per-vessel values × rate
+                                    if (!quotation.agreedValue) {
+                                        const rate = getEffectiveRate()
+                                        if (rate) {
+                                            const newTotal = qVessels.reduce((s, qv) => s + (qv.id === v.id ? (val ?? 0) : (qv.agreedValue ?? 0)), 0)
+                                            if (newTotal > 0) {
+                                                const premium = Math.round(newTotal * rate / 100 * 100) / 100
+                                                setQ(q => ({ ...q, premiumAmount: premium }))
+                                                updateField('premiumAmount', premium)
+                                            }
+                                        }
+                                    }
+                                }}
                                 style={{ width: '160px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
                             />
                         </div>
