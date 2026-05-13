@@ -85,6 +85,19 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         return qVessels.reduce((s, v) => s + (v.agreedValue ?? 0), 0)
     }
 
+    // Set per-vessel premiums based on each vessel's sum insured × rate
+    const syncPerVesselPremiums = (rate: number, vessels?: QuotationVessel[]) => {
+        const vList = vessels || qVessels
+        if (vList.length < 2) return
+        const hasPerVessel = vList.some(v => v.agreedValue != null && v.agreedValue > 0)
+        if (!hasPerVessel) return
+        for (const v of vList) {
+            const si = v.agreedValue ?? quotation.agreedValue ?? 0
+            const vPrem = Math.round(si * rate / 100 * 100) / 100
+            window.api.updateQuotationVessel(v.id, { premiumAmount: vPrem } as any)
+        }
+    }
+
     const handleRateChange = (rate: number | undefined) => {
         const sumInsured = getEffectiveSumInsured()
         setQ(q => {
@@ -99,6 +112,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         if (rate && sumInsured) {
             const premium = Math.round(sumInsured * rate / 100 * 100) / 100
             updateField('premiumAmount', premium)
+            syncPerVesselPremiums(rate)
         }
     }
 
@@ -116,6 +130,7 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
         if (premium && sumInsured) {
             const rate = Math.round(premium / sumInsured * 100 * 10000) / 10000
             updateField('premiumRate', rate)
+            syncPerVesselPremiums(rate)
         }
     }
 
@@ -185,15 +200,20 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
                                 onChange={val => setQVessels(prev => prev.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv))}
                                 onBlur={val => {
                                     window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null } as any)
-                                    // Recalculate premium from total per-vessel values × rate
-                                    if (!quotation.agreedValue) {
-                                        const rate = getEffectiveRate()
-                                        if (rate) {
-                                            const newTotal = qVessels.reduce((s, qv) => s + (qv.id === v.id ? (val ?? 0) : (qv.agreedValue ?? 0)), 0)
-                                            if (newTotal > 0) {
-                                                const premium = Math.round(newTotal * rate / 100 * 100) / 100
-                                                setQ(q => ({ ...q, premiumAmount: premium }))
-                                                updateField('premiumAmount', premium)
+                                    // Recalculate premium from per-vessel values × rate
+                                    const rate = getEffectiveRate()
+                                    if (rate) {
+                                        const updatedVessels = qVessels.map(qv => qv.id === v.id ? { ...qv, agreedValue: val ?? null } : qv)
+                                        const newTotal = updatedVessels.reduce((s, qv) => s + (qv.agreedValue ?? quotation.agreedValue ?? 0), 0)
+                                        if (newTotal > 0) {
+                                            const premium = Math.round(newTotal * rate / 100 * 100) / 100
+                                            setQ(q => ({ ...q, premiumAmount: premium }))
+                                            updateField('premiumAmount', premium)
+                                            // Also set per-vessel premium for each vessel
+                                            for (const qv of updatedVessels) {
+                                                const si = qv.agreedValue ?? quotation.agreedValue ?? 0
+                                                const vPrem = Math.round(si * rate / 100 * 100) / 100
+                                                window.api.updateQuotationVessel(qv.id, { premiumAmount: vPrem } as any)
                                             }
                                         }
                                     }
