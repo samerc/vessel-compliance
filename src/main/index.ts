@@ -3966,12 +3966,12 @@ app.whenReady().then(() => {
   // Cleanup old read notifications on startup
   db.deleteOldNotifications(90).catch(() => {})
 
-  // Initialize local sanctions screening database
+  // Initialize local sanctions screening database (use shared config dir, not per-user appData)
   try {
-    const configPath = db.getConfigPath()
-    const sanctionsDir = configPath ? dirname(configPath) : app.getPath('userData')
+    const sanctionsConfigPath = getConfigPath()
+    const sanctionsDir = sanctionsConfigPath ? dirname(sanctionsConfigPath) : app.getPath('userData')
     sanctionsService.initialize(sanctionsDir)
-    console.log('Sanctions service initialized')
+    console.log('Sanctions service initialized at:', sanctionsDir)
   } catch (err) {
     console.error('Failed to initialize sanctions service:', err)
   }
