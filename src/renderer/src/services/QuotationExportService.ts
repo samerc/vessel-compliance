@@ -1501,7 +1501,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   }
 
   // Sum Insured / Limits (War)
-  if (data.quotation.quotationTypeCode === 'W' && (data.quotation.agreedValue != null || data.quotation.warExcessEnabled)) {
+  const hasWarValues = data.quotation.agreedValue != null || data.quotation.warExcessEnabled || data.quotationVessels.some(v => v.agreedValue != null && v.agreedValue > 0)
+  if (data.quotation.quotationTypeCode === 'W' && hasWarValues) {
     const wCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
       // Interest section
@@ -1523,7 +1524,18 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       limitsText += `\n${combinedText}`
       sectionMap.set('sumInsured', ['Sum Insured / Limits', limitsText.trim()])
     } else {
-      sectionMap.set('sumInsured', ['Sum Insured', formatCurrency(data.quotation.agreedValue, wCur)])
+      // Per-vessel values or single quotation-level value
+      if (data.quotationVessels.length >= 2 && data.quotationVessels.some(v => v.agreedValue != null)) {
+        let sumText = ''
+        for (const qv of data.quotationVessels) {
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+          sumText += `${vi.name}: ${formatCurrency(amt, wCur)}\n`
+        }
+        sectionMap.set('sumInsured', ['Sum Insured', sumText.trim()])
+      } else {
+        sectionMap.set('sumInsured', ['Sum Insured', formatCurrency(data.quotation.agreedValue, wCur)])
+      }
     }
   }
 
@@ -3487,7 +3499,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   }
 
   // ---- Sum Insured / Interest (War) ----
-  if (data.quotation.quotationTypeCode === 'W' && (data.quotation.agreedValue != null || data.quotation.warExcessEnabled)) {
+  const dHasWarValues = data.quotation.agreedValue != null || data.quotation.warExcessEnabled || data.quotationVessels.some(v => v.agreedValue != null && v.agreedValue > 0)
+  if (data.quotation.quotationTypeCode === 'W' && dHasWarValues) {
     const dWCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
       // Interest section
