@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Download, Search, Ship, Layers, X, FileText } from 'lucide-react'
-import { Vessel, Entity, VesselAssured, Fleet } from '../../../shared/types'
+import { Vessel, Entity, VesselAssured, Fleet, AssuredRole } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
@@ -28,6 +28,7 @@ export default function AssuredReport() {
   const [allAssureds, setAllAssureds] = useState<VesselAssured[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
   const [fleets, setFleets] = useState<Fleet[]>([])
+  const [assuredRoles, setAssuredRoles] = useState<AssuredRole[]>([])
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -45,16 +46,18 @@ export default function AssuredReport() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [v, a, e, f] = await Promise.all([
+      const [v, a, e, f, r] = await Promise.all([
         window.api.getVessels(),
         window.api.getVesselAssureds(),
         window.api.getEntities(),
-        window.api.getFleets()
+        window.api.getFleets(),
+        window.api.getAssuredRoles()
       ])
       setVessels((Array.isArray(v) ? v : []).filter((vv: Vessel) => vv.isActive))
       setAllAssureds(Array.isArray(a) ? a : [])
       setEntities(Array.isArray(e) ? e : [])
       setFleets(Array.isArray(f) ? f : [])
+      setAssuredRoles(Array.isArray(r) ? r : [])
     } catch (err: any) {
       showError(err.message || 'Failed to load data')
     } finally {
@@ -74,6 +77,12 @@ export default function AssuredReport() {
     return m
   }, [fleets])
 
+  const roleOrder = useMemo(() => {
+    const m = new Map<string, number>()
+    assuredRoles.forEach((r, idx) => m.set(r.name?.toLowerCase(), r.order ?? idx))
+    return m
+  }, [assuredRoles])
+
   const filteredVessels = useMemo(() => {
     if (filterMode === 'fleet' && selectedFleetId) return vessels.filter(v => v.fleetId === selectedFleetId)
     if (filterMode === 'vessels' && selectedVesselIds.size > 0) return vessels.filter(v => selectedVesselIds.has(v.id))
@@ -84,6 +93,7 @@ export default function AssuredReport() {
     const result: AssuredRow[] = []
     for (const v of filteredVessels) {
       const vesselAssureds = allAssureds.filter(a => a.vesselId === v.id)
+        .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
       if (vesselAssureds.length === 0) {
         result.push({ vesselName: v.name, vesselImo: v.imoNumber || '', fleetName: v.fleetId ? (fleetMap.get(v.fleetId) || '') : '', assuredName: '', role: '', entityType: '', email: '', phone: '' })
         continue
