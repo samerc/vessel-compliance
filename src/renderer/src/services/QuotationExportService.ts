@@ -245,6 +245,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const mergedTexts: PISectionTexts = snapshot
     ? snapshot.sectionTexts
     : { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}), ...(quotation.sectionTextsOverride || {}) }
+  if (mergedTexts.warrantiesAdditionalText) console.log('[Export] warrantiesAdditionalText:', mergedTexts.warrantiesAdditionalText.substring(0, 100))
 
   // Build clause overrides map: clauseId -> description override
   const clauseOverrides: Record<string, string> = snapshot
@@ -1629,7 +1630,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   {
     const orderedWarranties = data.selectedWarrantyIds.map(id => data.allWarranties.find(w => w.id === id)).filter((w): w is NonNullable<typeof w> => !!w)
     const sortedCustom = [...data.customWarranties].sort((a, b) => a.order - b.order)
-    if (orderedWarranties.length > 0 || sortedCustom.length > 0) {
+    const hasWarContent = orderedWarranties.length > 0 || sortedCustom.length > 0 || data.surveyWarranties.length > 0 || st(data, 'warrantiesAdditionalText') || st(data, 'warrantiesBreach')
+    if (hasWarContent) {
       let warText = ''
       const piMultiAltW = data.piAlternatives.length > 1
 
