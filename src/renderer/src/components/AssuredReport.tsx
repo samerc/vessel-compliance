@@ -139,41 +139,116 @@ export default function AssuredReport() {
   }
 
   const exportPdf = async () => {
-    if (displayRows.length === 0) return
+    if (groupedByVessel.length === 0) return
     try {
       const s = await getReportSettings()
-      const doc = new jsPDF({ orientation: 'landscape' })
-      const accent: [number, number, number] = s.primaryColor || [0, 170, 200]
+      const doc = new jsPDF({ orientation: 'portrait' })
+      const pw = doc.internal.pageSize.getWidth()
+      const ph = doc.internal.pageSize.getHeight()
+      const navy: [number, number, number] = s.primaryColor || [10, 22, 40]
+      const teal: [number, number, number] = [0, 170, 200]
+      const margin = 14
 
-      // Header
-      doc.setFillColor(accent[0], accent[1], accent[2])
-      doc.rect(0, 0, doc.internal.pageSize.getWidth(), 14, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(11)
-      doc.setTextColor(255, 255, 255)
-      doc.text(s.companyName || 'Assured Report', 14, 9)
-      doc.setFontSize(9)
-      doc.text(`Assured Report — ${getLabel()}`, doc.internal.pageSize.getWidth() - 14, 9, { align: 'right' })
+      const drawHeader = () => {
+        doc.setFillColor(navy[0], navy[1], navy[2])
+        doc.rect(0, 0, pw, 16, 'F')
+        doc.setFillColor(teal[0], teal[1], teal[2])
+        doc.rect(0, 0, 3, 16, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(10)
+        doc.setTextColor(255, 255, 255)
+        doc.text(s.companyName || '', margin, 10.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(180, 200, 220)
+        doc.text(`Assured Report — ${getLabel()}`, pw - margin, 10.5, { align: 'right' })
+      }
 
-      // Table
-      const head = [['Vessel', 'IMO', 'Fleet', 'Assured', 'Role', 'Type', 'Email', 'Phone']]
-      const body = displayRows.map(r => [r.vesselName.toUpperCase(), r.vesselImo, r.fleetName, r.assuredName, r.role, r.entityType, r.email, r.phone])
+      const drawFooter = (pageNum: number, totalPages: number) => {
+        doc.setDrawColor(200)
+        doc.line(margin, ph - 12, pw - margin, ph - 12)
+        doc.setFontSize(7)
+        doc.setTextColor(140)
+        doc.text(`Generated ${new Date().toLocaleDateString()}`, margin, ph - 7)
+        doc.text(s.companyName || '', pw / 2, ph - 7, { align: 'center' })
+        doc.text(`Page ${pageNum} / ${totalPages}`, pw - margin, ph - 7, { align: 'right' })
+      }
 
-      autoTable(doc, {
-        startY: 18,
-        head,
-        body,
-        styles: { fontSize: 7.5, cellPadding: 2.5 },
-        headStyles: { fillColor: accent, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
-        alternateRowStyles: { fillColor: [245, 247, 252] },
-        didDrawPage: () => {
-          // Footer
-          doc.setFontSize(7)
-          doc.setTextColor(150)
-          doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, doc.internal.pageSize.getHeight() - 6)
-          doc.text(`Page ${doc.getCurrentPageInfo().pageNumber}`, doc.internal.pageSize.getWidth() - 14, doc.internal.pageSize.getHeight() - 6, { align: 'right' })
+      drawHeader()
+      let y = 22
+
+      // Summary line
+      doc.setFontSize(8)
+      doc.setTextColor(100)
+      doc.text(`${groupedByVessel.length} vessel${groupedByVessel.length > 1 ? 's' : ''} — ${uniqueAssureds} assured${uniqueAssureds !== 1 ? 's' : ''}`, margin, y)
+      y += 6
+
+      for (let gi = 0; gi < groupedByVessel.length; gi++) {
+        const group = groupedByVessel[gi]
+        const assuredRows = group.assureds.filter(a => a.assuredName)
+        const tableRows = assuredRows.length > 0 ? assuredRows : [group.assureds[0]]
+        const estimatedHeight = 12 + tableRows.length * 7 + 8
+
+        // Check if we need a new page
+        if (y + estimatedHeight > ph - 20) {
+          doc.addPage()
+          drawHeader()
+          y = 22
         }
-      })
+
+        // Vessel header bar
+        doc.setFillColor(navy[0], navy[1], navy[2])
+        doc.rect(margin, y, pw - margin * 2, 10, 'F')
+        doc.setFillColor(teal[0], teal[1], teal[2])
+        doc.rect(margin, y, 2.5, 10, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(255, 255, 255)
+        doc.text(`M/V ${group.vessel.toUpperCase()}`, margin + 6, y + 6.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7.5)
+        doc.setTextColor(160, 185, 210)
+        const vesselMeta = [group.imo ? `IMO: ${group.imo}` : '', group.fleet || ''].filter(Boolean).join('  |  ')
+        doc.text(vesselMeta, pw - margin - 2, y + 6.5, { align: 'right' })
+        y += 12
+
+        // Assured table for this vessel
+        const head = [['Assured', 'Role', 'Type', 'Email', 'Phone']]
+        const body = assuredRows.length > 0
+          ? assuredRows.map(r => [r.assuredName, r.role, r.entityType, r.email, r.phone])
+          : [['No assureds assigned', '', '', '', '']]
+
+        autoTable(doc, {
+          startY: y,
+          head,
+          body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 7.5, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, textColor: [40, 40, 40] },
+          headStyles: { fillColor: [235, 240, 248], textColor: [60, 70, 90], fontStyle: 'bold', fontSize: 7 },
+          alternateRowStyles: { fillColor: [250, 251, 254] },
+          columnStyles: {
+            0: { cellWidth: 55, fontStyle: 'bold' },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 22 },
+            3: { cellWidth: 45 },
+            4: { cellWidth: 25 }
+          },
+          didParseCell: (data: any) => {
+            if (assuredRows.length === 0 && data.section === 'body') {
+              data.cell.styles.textColor = [150, 150, 150]
+              data.cell.styles.fontStyle = 'italic'
+            }
+          }
+        })
+        y = (doc as any).lastAutoTable.finalY + 6
+      }
+
+      // Post-process: add footers with correct total page count
+      const totalPages = doc.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        drawFooter(i, totalPages)
+      }
 
       doc.save(`Assured Report - ${getLabel()}.pdf`)
       showSuccess('Exported to PDF')
