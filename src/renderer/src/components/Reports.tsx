@@ -1,16 +1,18 @@
 import { useState, lazy, Suspense } from 'react'
-import { FileBarChart2, Database } from 'lucide-react'
+import { FileBarChart2, Database, Users } from 'lucide-react'
 import LossRecordReport from './LossRecordReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
+import AssuredReport from './AssuredReport'
 
 const ReportBuilder = lazy(() => import('./ReportBuilder'))
 
-type ReportTab = 'report-builder' | 'loss-record' | 'customer-compliance'
+type ReportTab = 'report-builder' | 'loss-record' | 'customer-compliance' | 'assured-report'
 
 const TABS: { id: ReportTab; label: string; icon: any }[] = [
   { id: 'report-builder', label: 'Report Builder', icon: Database },
   { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
-  { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 }
+  { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 },
+  { id: 'assured-report', label: 'Assured Report', icon: Users }
 ]
 
 export default function Reports() {
@@ -76,6 +78,7 @@ export default function Reports() {
       )}
       {activeTab === 'loss-record' && <LossRecordReport />}
       {activeTab === 'customer-compliance' && <CustomerComplianceReport />}
+      {activeTab === 'assured-report' && <AssuredReport />}
     </div>
   )
 }
