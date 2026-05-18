@@ -206,7 +206,7 @@ export default function AssuredReport() {
   return (
     <div>
       {/* Filter Controls */}
-      <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+      <div className="glass-card" style={{ padding: '20px', marginBottom: '20px', overflow: 'visible' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           {(['all', 'fleet', 'vessels'] as const).map(mode => (
             <button key={mode} onClick={() => { setFilterMode(mode); setSelectedFleetId(''); setSelectedVesselIds(new Set()); setVesselSearch(''); setFleetSearch('') }}
