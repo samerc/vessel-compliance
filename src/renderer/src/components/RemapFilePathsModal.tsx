@@ -30,14 +30,12 @@ interface RemapFilePathsModalProps {
 
 function detectCommonPrefix(paths: string[]): string {
     if (paths.length === 0) return ''
-    // Use the most frequent top-level directory as the prefix
     const sep = paths[0].includes('\\') ? '\\' : '/'
-    // Find longest common prefix across all paths
     const parts = paths[0].split(sep)
     let commonParts: string[] = []
     for (let i = 0; i < parts.length; i++) {
         const segment = parts.slice(0, i + 1).join(sep)
-        if (paths.every(p => p.startsWith(segment))) {
+        if (paths.every(p => p.toLowerCase().startsWith(segment.toLowerCase()))) {
             commonParts = parts.slice(0, i + 1)
         } else {
             break
@@ -55,8 +53,14 @@ function shortenPath(p: string, maxLen = 55): string {
 }
 
 function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): string {
-    if (!oldPrefix || !filePath.startsWith(oldPrefix)) return filePath
-    return newPrefix + filePath.slice(oldPrefix.length)
+    if (!oldPrefix) return filePath
+    // Normalize separators for comparison
+    const normFile = filePath.replace(/\//g, '\\')
+    const normOld = oldPrefix.replace(/\//g, '\\')
+    const normNew = newPrefix.replace(/\//g, '\\')
+    // Case-insensitive prefix match (Windows paths)
+    if (!normFile.toLowerCase().startsWith(normOld.toLowerCase())) return filePath
+    return normNew + normFile.slice(normOld.length)
 }
 
 export default function RemapFilePathsModal({ vesselId, vesselName, entityId, entityName, includeEntityIds, onClose }: RemapFilePathsModalProps) {
