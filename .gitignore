@@ -106,5 +106,6 @@ Thumbs.db
 !.claude/design-guide.md
 !.claude/lessons-learned.md
 db/db-config.json
+sanctions.db
 documents
 .deploy-config.json
