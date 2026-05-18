@@ -117,6 +117,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
         for (const entry of entries) {
             const candidate = applyPrefix(entry.filePath, oldPrefix, newPrefix)
             const newExists = await window.api.fsExists(candidate)
+            console.log('[Remap]', { original: entry.filePath, oldPrefix, newPrefix, candidate, newExists })
             let status: RowStatus
             if (newExists) {
                 status = 'matched'
