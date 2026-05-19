@@ -120,6 +120,8 @@ interface QuotationData {
   lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
   // Resolved classification names per vessel ID (from junction table)
   vesselClassificationNames: Record<string, string>
+  // Per-vessel trading intro overrides
+  tradingIntros: { id: string; text: string; vesselScope: string[] | null; order: number }[]
 }
 
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
@@ -140,7 +142,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
-    flagStatesRaw, surveyWarrantiesRaw, fleetsRaw, assuredGroupsRaw
+    flagStatesRaw, surveyWarrantiesRaw, fleetsRaw, assuredGroupsRaw,
+    tradingIntrosRaw
   ] = await Promise.all([
     window.api.getQuotationVessels(quotation.id),
     window.api.getVessels(),
@@ -184,7 +187,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.getFlagStates(),
     window.api.quotationSurveyWarrantyGetAll(quotation.id),
     window.api.getFleets(),
-    window.api.getQuotationAssuredGroups(quotation.id)
+    window.api.getQuotationAssuredGroups(quotation.id),
+    window.api.tradingGetIntros(quotation.id)
   ])
 
   // Extract IDs and vessel scope / alternative maps from new object return format
@@ -381,7 +385,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     cargoConditionCustom: Array.isArray(cargoConditionCustom) ? cargoConditionCustom : [],
     cargoSpecialCustom: Array.isArray(cargoSpecialCustom) ? cargoSpecialCustom : [],
     cargoLawCustom: Array.isArray(cargoLawCustom) ? cargoLawCustom : [],
-    subjectivityDays: quotation.subjectivityDays ?? 0
+    subjectivityDays: quotation.subjectivityDays ?? 0,
+    tradingIntros: snapshot ? ((snapshot as any).tradingIntros || []) : (Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : [])
   }
 }
 
@@ -1579,7 +1584,31 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const excCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
     const ddqListStr = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
 
-    if (q.tradingWarrantyIntro) {
+    // Per-vessel trading intros (or single shared intro)
+    const perVesselIntros = data.tradingIntros.filter(ti => ti.vesselScope && ti.vesselScope.length > 0)
+    if (perVesselIntros.length > 0) {
+      // Render per-vessel intro texts
+      for (const ti of perVesselIntros) {
+        const vesselNames = (ti.vesselScope || []).map(vid => {
+          const v = data.quotationVessels.find(qv => qv.id === vid)
+          return v ? `M/V ${(v.name || v.vesselLabel).toUpperCase()}` : ''
+        }).filter(Boolean)
+        if (vesselNames.length > 0) {
+          tradingText += vesselNames.join(' and ') + ':\n'
+        }
+        tradingText += stripHtml(ti.text) + '\n\n'
+      }
+      // Also render shared intro for vessels without overrides
+      const overrideVesselIds = new Set(perVesselIntros.flatMap(ti => ti.vesselScope || []))
+      const sharedVessels = data.quotationVessels.filter(v => !overrideVesselIds.has(v.id))
+      if (sharedVessels.length > 0 && q.tradingWarrantyIntro) {
+        if (data.quotationVessels.length > 1) {
+          const names = sharedVessels.map(v => `M/V ${(v.name || v.vesselLabel).toUpperCase()}`).join(' and ')
+          tradingText += names + ':\n'
+        }
+        tradingText += stripHtml(q.tradingWarrantyIntro) + '\n\n'
+      }
+    } else if (q.tradingWarrantyIntro) {
       tradingText += stripHtml(q.tradingWarrantyIntro) + '\n\n'
     }
     if (q.tradingCustomMode && q.tradingCustomWording) {
@@ -3606,7 +3635,31 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
     })
-    if (wq.tradingWarrantyIntro) tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
+    // Per-vessel trading intros (or single shared intro)
+    const dPerVesselIntros = data.tradingIntros.filter(ti => ti.vesselScope && ti.vesselScope.length > 0)
+    if (dPerVesselIntros.length > 0) {
+      for (const ti of dPerVesselIntros) {
+        const vesselNames = (ti.vesselScope || []).map(vid => {
+          const v = data.quotationVessels.find(qv => qv.id === vid)
+          return v ? `M/V ${(v.name || v.vesselLabel).toUpperCase()}` : ''
+        }).filter(Boolean)
+        if (vesselNames.length > 0) tradContent.push(bup(vesselNames.join(' and ') + ':'))
+        tradContent.push(...mp(ti.text))
+        tradContent.push(emptyP())
+      }
+      const dOverrideVIds = new Set(dPerVesselIntros.flatMap(ti => ti.vesselScope || []))
+      const dSharedVessels = data.quotationVessels.filter(v => !dOverrideVIds.has(v.id))
+      if (dSharedVessels.length > 0 && wq.tradingWarrantyIntro) {
+        if (data.quotationVessels.length > 1) {
+          const names = dSharedVessels.map(v => `M/V ${(v.name || v.vesselLabel).toUpperCase()}`).join(' and ')
+          tradContent.push(bup(names + ':'))
+        }
+        tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
+        tradContent.push(emptyP())
+      }
+    } else if (wq.tradingWarrantyIntro) {
+      tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
+    }
     if (wq.tradingCustomMode && wq.tradingCustomWording) {
       // Custom mode: output custom wording instead of numbered paragraphs
       const customWordingChanged = origData && wq.tradingCustomWording !== origData.quotation.tradingCustomWording

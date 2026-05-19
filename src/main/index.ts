@@ -3397,6 +3397,12 @@ app.whenReady().then(() => {
   safeHandle('db:getQuotationExcludedCountries', (event, qId) => { requireSession(event); return db.getQuotationExcludedCountries(qId) })
   safeHandle('db:setQuotationExcludedCountries', async (event, qId, countries) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationExcludedCountries(qId, countries) })
 
+  // Trading per-vessel intros
+  safeHandle('trading:getIntros', (event, qId) => { requireSession(event); return db.getQuotationTradingIntros(qId) })
+  safeHandle('trading:addIntro', async (event, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationTradingIntro(data) })
+  safeHandle('trading:updateIntro', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationTradingIntro(id, updates) })
+  safeHandle('trading:deleteIntro', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationTradingIntro(id) })
+
   safeHandle('db:getPISubjectivities', (event) => { requireSession(event); return db.getPISubjectivities() })
   safeHandle('db:addPISubjectivity', async (event, data) => { await requirePermission(event, 'quotations:settings'); return db.addPISubjectivity(data) })
   safeHandle('db:updatePISubjectivity', async (event, id, data) => { await requirePermission(event, 'quotations:settings'); return db.updatePISubjectivity(id, data) })

@@ -734,6 +734,11 @@ export interface Api {
   getQuotationExcludedCountries: (qId: string) => Promise<QuotationExcludedCountry[]>
   setQuotationExcludedCountries: (qId: string, countries: { name: string; listType: string }[]) => Promise<void>
 
+  tradingGetIntros: (qId: string) => Promise<{ id: string; quotationId: string; text: string; vesselScope: string[] | null; order: number }[]>
+  tradingAddIntro: (data: { quotationId: string; text: string; vesselScope?: string[] | null; order?: number }) => Promise<any>
+  tradingUpdateIntro: (id: string, updates: { text?: string; vesselScope?: string[] | null }) => Promise<void>
+  tradingDeleteIntro: (id: string) => Promise<void>
+
   getPISubjectivities: () => Promise<PISubjectivity[]>
   addPISubjectivity: (data: { text: string; docTypeIds?: string[]; typeScope?: string; order?: number }) => Promise<PISubjectivity>
   updatePISubjectivity: (id: string, data: { text: string; docTypeIds?: string[]; typeScope?: string }) => Promise<void>

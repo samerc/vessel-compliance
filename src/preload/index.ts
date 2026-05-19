@@ -714,6 +714,12 @@ const api = {
   getQuotationExcludedCountries: (qId: string) => ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
   setQuotationExcludedCountries: (qId: string, countries: any[]) => ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),
 
+  // Trading per-vessel intros
+  tradingGetIntros: (qId: string) => ipcRenderer.invoke('trading:getIntros', qId),
+  tradingAddIntro: (data: any) => ipcRenderer.invoke('trading:addIntro', data),
+  tradingUpdateIntro: (id: string, updates: any) => ipcRenderer.invoke('trading:updateIntro', id, updates),
+  tradingDeleteIntro: (id: string) => ipcRenderer.invoke('trading:deleteIntro', id),
+
   getPISubjectivities: () => ipcRenderer.invoke('db:getPISubjectivities'),
   addPISubjectivity: (data: any) => ipcRenderer.invoke('db:addPISubjectivity', data),
   updatePISubjectivity: (id: string, data: any) => ipcRenderer.invoke('db:updatePISubjectivity', id, data),

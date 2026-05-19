@@ -2695,6 +2695,18 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: quotation_trading_intros table for per-vessel trading warranty intro text
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_trading_intros (
+                    id VARCHAR(36) PRIMARY KEY,
+                    quotation_id VARCHAR(36) NOT NULL,
+                    text TEXT NOT NULL,
+                    vessel_scope TEXT DEFAULT NULL,
+                    order_index INT DEFAULT 0,
+                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
             // Migration: make hull_clause_id nullable on quotation_hull_alternatives
             try {
                 const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
@@ -8602,6 +8614,7 @@ export class MySQLAdapter {
             { table: 'quotation_subjectivities', cols: 'quotation_id, pi_subjectivity_id, text, is_custom, is_auto_populated, order_index, vessel_scope' },
             { table: 'quotation_agreed_value_items', cols: 'quotation_id, hull_text_id, text, section, order_index, vessel_scope' },
             { table: 'quotation_war_conditions', cols: 'quotation_id, war_condition_id, text_override, order_index, vessel_scope' },
+            { table: 'quotation_trading_intros', cols: 'quotation_id, text, vessel_scope, order_index' },
         ]
 
         for (const { table, cols } of scopeTables) {
@@ -9894,6 +9907,40 @@ export class MySQLAdapter {
             await this.pool.execute('INSERT INTO quotation_excluded_countries (id, quotation_id, name, list_type) VALUES (?, ?, ?, ?)',
                 [uuidv4(), quotationId, c.name, c.listType])
         }
+    }
+
+    // -- Quotation Trading Intros (per-vessel) --
+    async getQuotationTradingIntros(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, quotation_id as quotationId, text, vessel_scope as vesselScope, order_index as \`order\`
+             FROM quotation_trading_intros WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+    }
+
+    async addQuotationTradingIntro(data: { quotationId: string; text: string; vesselScope?: string[] | null; order?: number }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO quotation_trading_intros (id, quotation_id, text, vessel_scope, order_index) VALUES (?, ?, ?, ?, ?)',
+            [id, data.quotationId, data.text, data.vesselScope ? JSON.stringify(data.vesselScope) : null, data.order || 0])
+        return { id, ...data }
+    }
+
+    async updateQuotationTradingIntro(id: string, updates: { text?: string; vesselScope?: string[] | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text) }
+        if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_trading_intros SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationTradingIntro(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_trading_intros WHERE id = ?', [id])
     }
 
     // -- Master Subjectivities (PI) --
