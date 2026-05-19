@@ -8549,9 +8549,9 @@ export class MySQLAdapter {
             const newVId = uuidv4()
             vesselIdMap[v.id] = newVId
             await this.pool.execute(
-                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value, ncb_excluded, upcc_excluded)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount, v.agreed_value, v.iv_value, v.ncb_excluded || 0, v.upcc_excluded || 0]
+                `INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, premium_amount, agreed_value, iv_value, war_excess_amount, war_section1_premium, war_section2_premium, previous_premium, previous_section1_premium, previous_section2_premium, ncb_excluded, upcc_excluded)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newVId, newId, v.vessel_id, v.vessel_label, v.order_index, v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, v.flag, v.vessel_type, v.classification, v.call_sign, v.premium_amount, v.agreed_value, v.iv_value, v.war_excess_amount, v.war_section1_premium, v.war_section2_premium, v.previous_premium, v.previous_section1_premium, v.previous_section2_premium, v.ncb_excluded || 0, v.upcc_excluded || 0]
             )
         }
 
@@ -8630,11 +8630,11 @@ export class MySQLAdapter {
             { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_warranties', cols: 'quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_custom_warranties', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
-            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id, vessel_amounts' },
+            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id, vessel_amounts, previous_amount, previous_secondary_amount' },
             { table: 'quotation_text_deductibles', cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_exclusions', cols: 'quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id' },
             { table: 'quotation_custom_exclusions', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
-            { table: 'quotation_survey_warranties', cols: 'quotation_id, template_id, text, deadline_value, days_value, event_value, custom_text, order_index, vessel_scope, alternative_id' },
+            { table: 'quotation_survey_warranties', cols: 'quotation_id, template_id, text, deadline_value, days_value, event_value, surveyor_value, date_of_survey_value, custom_text, order_index, vessel_scope, alternative_id' },
         ]
 
         for (const { table, cols } of altScopeTables) {
