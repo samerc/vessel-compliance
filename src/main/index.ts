@@ -95,6 +95,11 @@ async function assignQuotationNumberViaRegistry(quotationId: string): Promise<st
   if (!q) throw new Error('Quotation not found')
   // If already approved/exported with a real number, don't reassign
   if (q.status !== 'draft' && q.referenceNumber && !q.referenceNumber.startsWith('DRAFT-')) return q.referenceNumber
+  // Revisions already have a reference with /RN suffix — keep it, don't assign a new number
+  if (q.referenceNumber && /[/-]R\d+$/.test(q.referenceNumber)) {
+    await db.updateQuotation(quotationId, { status: 'approved' } as any)
+    return q.referenceNumber
+  }
 
   // Get vessels, assureds, customer info
   const vessels = await db.getQuotationVessels(quotationId)
