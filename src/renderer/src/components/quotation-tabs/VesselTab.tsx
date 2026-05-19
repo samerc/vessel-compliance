@@ -259,7 +259,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
 
                 // Auto-load vessel assureds (skip for cargo quotations)
                 if (!skipAssureds) {
-                    const vassureds = await window.api.getVesselAssureds(v.id).catch(() => [])
+                    const vassureds = await window.api.getVesselAssureds(v.id).catch(err => { console.error(`[Fleet] Failed to load assureds for ${v.name}:`, err); return [] })
                     const toAdd = (Array.isArray(vassureds) ? vassureds : [])
                         .filter(va => !existingEntityIds.has(`${va.entityId}:${vLabel}`))
                         .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
@@ -314,6 +314,10 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
 
             setShowAddForm(false)
             setFleetSearch('')
+            console.log(`[Fleet] Added ${newVessels.length} vessels, ${totalAssuredsAdded} assureds total`)
+            if (totalAssuredsAdded === 0 && newVessels.length > 0) {
+                console.warn('[Fleet] No assureds were loaded for any vessel — check vessel_assureds table')
+            }
             showSuccess(`Added ${newVessels.length} vessel${newVessels.length > 1 ? 's' : ''} from ${fleet.name}${totalAssuredsAdded > 0 ? ` — ${totalAssuredsAdded} assured(s) loaded` : ''}`)
             loadData()
             if (onVesselsChanged) onVesselsChanged()
