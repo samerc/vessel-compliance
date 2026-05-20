@@ -9141,6 +9141,15 @@ export class MySQLAdapter {
             if (qv.vesselId) vesselIdToLabel.set(qv.vesselId, qv.vesselLabel)
         }
 
+        // Assign vessel labels to primary vessel's assureds (cloned from single-vessel quotation with NULL labels)
+        if (allQVessels.length > 1) {
+            const primaryLabel = vesselIdToLabel.get(primaryVesselId) || 'V1'
+            await this.pool.execute(
+                'UPDATE quotation_assureds SET vessel_label = ? WHERE quotation_id = ? AND (vessel_label IS NULL OR vessel_label = ?)',
+                [primaryLabel, newQuotationId, primaryLabel]
+            )
+        }
+
         // Get existing quotation assureds — track per-vessel using entityId:vesselLabel keys
         const existingAssureds = await this.getQuotationAssureds(newQuotationId)
         const existingEntityKeys = new Set(
