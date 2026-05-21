@@ -364,8 +364,15 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
         })
     }
 
-    const openFile = (path: string) => {
-        if (path) window.api.fsOpen(path)
+    const openFile = async (path: string) => {
+        if (!path) return
+        console.log('[OpenFile]', path)
+        const res: any = await window.api.fsOpen(path)
+        if (res?.error) {
+            showError(res.message || `Cannot open: ${path}`)
+        } else if (typeof res === 'string' && res) {
+            showError(`Failed to open: ${res}`)
+        }
     }
 
     const [isEditing, setIsEditing] = useState(initialEditing)
