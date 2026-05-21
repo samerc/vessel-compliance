@@ -481,6 +481,15 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+    // Enable Ctrl+Shift+I in production for debugging
+    if (!is.dev) {
+      window.webContents.on('before-input-event', (event, input) => {
+        if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+          window.webContents.toggleDevTools()
+          event.preventDefault()
+        }
+      })
+    }
   })
 
   // Update Handlers
