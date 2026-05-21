@@ -490,6 +490,20 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                 {uploadingId === id ? 'Uploading...' : 'Upload File'}
               </button>
             ) : null
+          ) : hasFile && !fileExists ? (
+            <>
+              <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontFamily: 'monospace', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} title={doc!.filePath} onClick={() => { navigator.clipboard.writeText(doc!.filePath); showSuccess('Path copied') }}>
+                {doc!.filePath}
+              </span>
+              {hasPermission('documents:upload') && (
+                <button onClick={() => handleClickUpload(id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Replace with new file">
+                  <Upload size={13} /> Re-link
+                </button>
+              )}
+              <button onClick={() => handleUnlinkFile(doc!)} style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,77,77,0.08)', border: '1px solid rgba(255,77,77,0.25)', borderRadius: '6px', color: 'var(--danger)', cursor: 'pointer' }} title="Unlink file">
+                <Trash2 size={13} />
+              </button>
+            </>
           ) : (
             <>
               <button onClick={() => window.api.fsOpen(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file">
