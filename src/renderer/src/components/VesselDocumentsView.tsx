@@ -506,7 +506,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
             </>
           ) : (
             <>
-              <button onClick={() => window.api.fsOpen(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file">
+              <button onClick={async () => { try { await window.api.fsOpen(doc!.filePath) } catch (err: any) { showError(err.message || 'Cannot open file') } }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file">
                 <Eye size={13} /> View
               </button>
               <button onClick={() => window.api.shellShowItemInFolder(doc!.filePath)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Open file location">
