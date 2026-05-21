@@ -1824,7 +1824,8 @@ app.whenReady().then(() => {
   safeHandle('fs:exists', (event, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) return false
-    return existsSync(normalize(filePath))
+    const resolved = resolveFilePath(filePath)
+    return existsSync(normalize(resolved))
   })
 
   safeHandle('fs:open', async (event, filePath: string) => {
@@ -1835,7 +1836,7 @@ app.whenReady().then(() => {
     const resolved = resolveFilePath(filePath)
     const normalized = normalize(resolved)
     if (!existsSync(normalized)) {
-      throw new Error('File not accessible. Check your network connection.')
+      throw new Error(`File not found: ${normalized}`)
     }
     const validation = await db.validateFileExtension(normalized)
     if (!validation.valid) {
