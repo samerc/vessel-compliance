@@ -1835,6 +1835,7 @@ app.whenReady().then(() => {
     }
     const resolved = resolveFilePath(filePath)
     const normalized = normalize(resolved)
+    console.log('[fs:open]', { filePath, resolved, normalized, exists: existsSync(normalized) })
     if (!existsSync(normalized)) {
       throw new Error(`File not found: ${normalized}`)
     }
@@ -1842,7 +1843,9 @@ app.whenReady().then(() => {
     if (!validation.valid) {
       throw new Error(validation.reason || 'File type not allowed')
     }
-    return shell.openPath(normalized)
+    const result = await shell.openPath(normalized)
+    if (result) console.log('[fs:open] shell.openPath error:', result)
+    return result
   })
 
   // General file picker (for document uploads)
