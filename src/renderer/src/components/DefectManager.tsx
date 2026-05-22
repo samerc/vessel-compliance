@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search } from 'lucide-react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -35,6 +35,9 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [expandedDefectIds, setExpandedDefectIds] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkClosing, setBulkClosing] = useState(false)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -179,6 +182,31 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     setReopenReason('')
     loadDefects()
     onUpdate()
+  }
+
+  const handleBulkClose = async () => {
+    setBulkClosing(true)
+    try {
+      for (const id of selectedIds) {
+        const d = defects.find(dd => dd.id === id)
+        if (d && d.status === 'OPEN') {
+          await window.api.closeDefect(id, user?.username || 'Unknown')
+        }
+      }
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      loadDefects()
+      onUpdate()
+    } finally { setBulkClosing(false) }
+  }
+
+  const toggleSelectAll = () => {
+    const openFiltered = filteredDefects.filter(d => d.status === 'OPEN')
+    if (openFiltered.every(d => selectedIds.has(d.id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(openFiltered.map(d => d.id)))
+    }
   }
 
   const handleDeleteDefect = (defect: SurveyDefect) => {
@@ -336,6 +364,15 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                 <Download size={16} />
                 Export Excel
               </button>
+              {canManageDefects && (
+                <button
+                  onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()) }}
+                  className={selectMode ? 'btn-primary' : 'btn-secondary'}
+                  style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <CheckSquare size={16} /> {selectMode ? 'Cancel' : 'Select'}
+                </button>
+              )}
             </>
           )}
           {canManageDefects && (
@@ -408,6 +445,21 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               style={{ paddingLeft: '28px', width: '180px', fontSize: '0.78rem', padding: '5px 10px 5px 28px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectMode && selectedIds.size > 0 && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.2)', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{selectedIds.size} selected</span>
+          <button onClick={toggleSelectAll} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+            {filteredDefects.filter(d => d.status === 'OPEN').every(d => selectedIds.has(d.id)) ? 'Deselect All' : 'Select All Open'}
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={handleBulkClose} disabled={bulkClosing} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <CheckCircle size={14} /> Close Selected
+          </button>
+          <button onClick={() => { setSelectedIds(new Set()); setSelectMode(false) }} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>Clear</button>
         </div>
       )}
 
@@ -600,6 +652,11 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       : 'transparent'
                   }}
                 >
+                  {/* Bulk select checkbox */}
+                  {selectMode && defect.status === 'OPEN' && (
+                    <input type="checkbox" checked={selectedIds.has(defect.id)} onChange={() => setSelectedIds(prev => { const n = new Set(prev); if (n.has(defect.id)) n.delete(defect.id); else n.add(defect.id); return n })} onClick={e => e.stopPropagation()} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', cursor: 'pointer', marginTop: '2px', flexShrink: 0 }} />
+                  )}
+
                   {/* Expand indicator */}
                   <div style={{
                     flexShrink: 0,
