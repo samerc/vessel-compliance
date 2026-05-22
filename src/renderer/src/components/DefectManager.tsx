@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -34,6 +34,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
   const [expandedDefectIds, setExpandedDefectIds] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -64,10 +65,8 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     loadDefects()
   }, [survey.id])
 
-  const loadDefects = async () => {
-    const data = await window.api.getSurveyDefects(survey.id)
-    // Sort implementation
-    const sorted = [...data].sort((a, b) => {
+  const sortDefects = (data: SurveyDefect[]): SurveyDefect[] => {
+    const sorter = (a: SurveyDefect, b: SurveyDefect) => {
       if (sortField === 'defectNumber') {
         const numA = parseInt(a.defectNumber) || 0
         const numB = parseInt(b.defectNumber) || 0
@@ -77,8 +76,16 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
         const dateB = new Date(b.createdAt || 0).getTime()
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
       }
-    })
-    setDefects(sorted)
+    }
+    // Partition: open defects first, closed at bottom, sorted within each group
+    const open = data.filter(d => d.status === 'OPEN').sort(sorter)
+    const closed = data.filter(d => d.status !== 'OPEN').sort(sorter)
+    return [...open, ...closed]
+  }
+
+  const loadDefects = async () => {
+    const data = await window.api.getSurveyDefects(survey.id)
+    setDefects(sortDefects(data))
   }
 
   useEffect(() => {
@@ -157,18 +164,21 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     onUpdate()
   }
 
+  const [reopenModalDefect, setReopenModalDefect] = useState<SurveyDefect | null>(null)
+  const [reopenReason, setReopenReason] = useState('')
+
   const handleReopenDefect = (defect: SurveyDefect) => {
-    setConfirmation({
-      show: true,
-      title: 'Reopen Defect',
-      message: `Reopen defect #${defect.defectNumber}?`,
-      onConfirm: async () => {
-        setConfirmation(prev => ({ ...prev, show: false }))
-        await window.api.reopenDefect(defect.id)
-        loadDefects()
-        onUpdate()
-      }
-    })
+    setReopenModalDefect(defect)
+    setReopenReason('')
+  }
+
+  const handleConfirmReopen = async () => {
+    if (!reopenModalDefect) return
+    await window.api.reopenDefect(reopenModalDefect.id, reopenReason || undefined)
+    setReopenModalDefect(null)
+    setReopenReason('')
+    loadDefects()
+    onUpdate()
   }
 
   const handleDeleteDefect = (defect: SurveyDefect) => {
@@ -255,12 +265,22 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const closedCount = defects.filter(d => d.status !== 'OPEN').length
   const overdueCount = defects.filter(d => isOverdue(d)).length
 
-  // Filtered defects
-  const filteredDefects = defects.filter(d => {
-    if (statusFilter === 'open') return d.status === 'OPEN'
-    if (statusFilter === 'closed') return d.status !== 'OPEN'
-    return true
-  })
+  // Filtered defects (status + search)
+  const filteredDefects = useMemo(() => {
+    let filtered = defects
+    if (statusFilter === 'open') filtered = filtered.filter(d => d.status === 'OPEN')
+    else if (statusFilter === 'closed') filtered = filtered.filter(d => d.status !== 'OPEN')
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(d =>
+        d.defectNumber.toLowerCase().includes(q) ||
+        d.description.toLowerCase().includes(q) ||
+        (d.notes || '').toLowerCase().includes(q) ||
+        (d.closureNotes || '').toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }, [defects, statusFilter, searchQuery])
 
   const formatDueDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00')
@@ -378,6 +398,16 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               {f}
             </button>
           ))}
+          <div style={{ position: 'relative', marginLeft: '8px' }}>
+            <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search defects..."
+              style={{ paddingLeft: '28px', width: '180px', fontSize: '0.78rem', padding: '5px 10px 5px 28px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+            />
+          </div>
         </div>
       )}
 
@@ -451,7 +481,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No defects recorded</p>
       ) : filteredDefects.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-          No {statusFilter} defects
+          {searchQuery ? `No defects matching "${searchQuery}"` : `No ${statusFilter} defects`}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -460,7 +490,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
             const isExpanded = expandedDefectIds.has(defect.id)
             const overdue = isOverdue(defect)
             const sevColor = severityColors[defect.severity || ''] || 'var(--table-border)'
-            const hasExpandContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt
+            const hasExpandContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt || defect.reopenReason
 
             if (isEditing) {
               return (
@@ -839,6 +869,14 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                         </div>
                       </div>
                     )}
+                    {defect.reopenReason && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reopen Reason</div>
+                        <div style={{ padding: '8px 12px', background: isLight ? 'rgba(255,152,0,0.06)' : 'rgba(255,204,0,0.06)', borderRadius: '6px', fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', borderLeft: '3px solid #ffa726' }}>
+                          {defect.reopenReason}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -856,6 +894,28 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
           onClose={() => { setCloseModalDefect(null); setClosureNotes('') }}
           onConfirm={handleCloseDefect}
         />
+      )}
+
+      {/* Reopen modal with optional reason */}
+      {reopenModalDefect && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setReopenModalDefect(null)}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '420px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>Reopen Defect #{reopenModalDefect.defectNumber}</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>This will clear the closure data and set the defect back to OPEN.</p>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '6px', color: 'var(--text-primary)' }}>Reason (optional)</label>
+            <textarea
+              value={reopenReason}
+              onChange={e => setReopenReason(e.target.value)}
+              placeholder="Why is this defect being reopened?"
+              rows={3}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical', marginBottom: '16px' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={() => setReopenModalDefect(null)} className="btn-secondary" style={{ padding: '8px 16px' }}>Cancel</button>
+              <button onClick={handleConfirmReopen} className="btn-primary" style={{ padding: '8px 16px' }}>Reopen</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* PDF note selection modal */}
