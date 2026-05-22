@@ -1143,9 +1143,9 @@ export const ReportService = {
       ? sortedDefects.filter(d => (d.notes || d.closureNotes) && includeNoteIds.has(d.id))
       : []
 
+    let ny = ((doc as any).lastAutoTable?.finalY ?? y + 10)
     if (notesToShow.length > 0) {
-      const afterTableY = (doc as any).lastAutoTable?.finalY ?? y + 10
-      let ny = afterTableY + 10
+      ny += 10
 
       if (ny > 265) { doc.addPage(); ny = 20 }
 
@@ -1185,11 +1185,8 @@ export const ReportService = {
     }
 
     // ── Closing sentence ─────────────────────────────────────────────
-    const tableEndY: number = (doc as any).lastAutoTable?.finalY ?? y + 10
-    const notesEndApprox = notesToShow.length > 0 ? tableEndY + notesToShow.length * 22 : tableEndY
-    let closingY = notesEndApprox + 12
+    let closingY = ny + 12
     if (closingY > 255) { doc.addPage(); closingY = 25 }
-    doc.setPage(doc.getNumberOfPages())
     doc.setFontSize(9)
     doc.setFont('helvetica', 'italic')
     doc.setTextColor(40, 40, 40)
