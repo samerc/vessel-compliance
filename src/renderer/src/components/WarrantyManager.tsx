@@ -82,10 +82,26 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     loadWarranties()
   }, [vesselId])
 
+  const [linkedSurveyCounts, setLinkedSurveyCounts] = useState<Record<string, { open: number; closed: number }>>({})
+
   const loadWarranties = async () => {
     try {
       const data = await window.api.surveyWarrantyGetByVessel(vesselId)
-      setWarranties(Array.isArray(data) ? data : [])
+      const safe = Array.isArray(data) ? data : []
+      setWarranties(safe)
+      // Load defect counts for linked surveys
+      const counts: Record<string, { open: number; closed: number }> = {}
+      for (const w of safe) {
+        if (w.conditionSurveyId) {
+          try {
+            const defects = await window.api.getSurveyDefects(w.conditionSurveyId)
+            const open = defects.filter((d: any) => d.status === 'OPEN').length
+            const closed = defects.filter((d: any) => d.status !== 'OPEN').length
+            counts[w.id] = { open, closed }
+          } catch { /* ignore */ }
+        }
+      }
+      setLinkedSurveyCounts(counts)
     } catch (err: any) {
       showError(err.message || 'Failed to load warranties')
     }
@@ -431,15 +447,19 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <Bell size={11} /> Next: {formatDateOrDash(w.nextReminderDate)}
               </span>
             )}
-            {w.conditionSurveyId && (
-              <span style={{
-                display: 'flex', alignItems: 'center', gap: '3px',
-                fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
-                borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
-              }}>
-                <Link2 size={11} /> Linked Survey
-              </span>
-            )}
+            {w.conditionSurveyId && (() => {
+              const lsc = linkedSurveyCounts[w.id]
+              const total = lsc ? lsc.open + lsc.closed : 0
+              return (
+                <span style={{
+                  display: 'flex', alignItems: 'center', gap: '3px',
+                  fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
+                  borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
+                }}>
+                  <Link2 size={11} /> Survey{lsc && total > 0 ? ` — ${lsc.closed}/${total} closed` : ''}
+                </span>
+              )
+            })()}
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react'
+import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search, ChevronUp, ChevronDown as ChevronDownIcon, Download, CheckSquare } from 'lucide-react'
+import XLSX from 'xlsx-js-style'
 import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -63,6 +64,8 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
   const [activeTab, setActiveTab] = useState<'warranties' | 'endorsements'>('warranties')
   const [warrantySearch, setWarrantySearch] = useState('')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [warrantyPage, setWarrantyPage] = useState(1)
   const ITEMS_PER_PAGE = 25
   const [wSortField, setWSortField] = useState<string>(() => localStorage.getItem('surveyFollowUp_sortField') || 'urgency')
@@ -152,6 +155,50 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   }
 
   useEffect(() => { loadData() }, [])
+
+  const handleBulkMarkDone = async () => {
+    for (const id of selectedIds) {
+      const w = warranties.find(ww => ww.id === id)
+      if (w && w.status === 'pending') {
+        await window.api.surveyWarrantyUpdate(id, { status: 'survey_done' })
+      }
+    }
+    setSelectedIds(new Set()); setSelectMode(false); loadData()
+  }
+
+  const handleBulkComplete = async () => {
+    for (const id of selectedIds) {
+      const w = warranties.find(ww => ww.id === id)
+      if (w && (w.status === 'pending' || w.status === 'survey_done')) {
+        await window.api.surveyWarrantyUpdate(id, { status: 'completed' })
+      }
+    }
+    setSelectedIds(new Set()); setSelectMode(false); loadData()
+  }
+
+  const exportExcel = () => {
+    const data = allFiltered.map(w => ({
+      'Vessel': w.vesselName || '',
+      'Description': w.description || '',
+      'Policy': w.policyTypeName || '',
+      'Deadline': w.deadlineDays ? calcDeadlineStr(w) : (w.deadlineEvent || ''),
+      'Status': w.status,
+      'Reminders': w.reminderCount || 0
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 22 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Warranties')
+    XLSX.writeFile(wb, 'Survey Follow-Up.xlsx')
+    showSuccess('Exported to Excel')
+  }
+
+  const calcDeadlineStr = (w: SurveyWarranty) => {
+    if (!w.inceptionDate || !w.deadlineDays) return ''
+    const d = new Date(w.inceptionDate)
+    d.setDate(d.getDate() + w.deadlineDays)
+    return d.toISOString().split('T')[0]
+  }
 
   const loadHistory = async (warrantyId: string) => {
     try {
@@ -392,11 +439,30 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
               </button>
             ))}
           </div>
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            <input type="text" value={warrantySearch} onChange={e => { setWarrantySearch(e.target.value); setWarrantyPage(1) }} placeholder="Search vessels or warranties..." style={{ padding: '6px 10px 6px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '220px' }} />
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+              <input type="text" value={warrantySearch} onChange={e => { setWarrantySearch(e.target.value); setWarrantyPage(1) }} placeholder="Search vessels or warranties..." style={{ padding: '6px 10px 6px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '220px' }} />
+            </div>
+            <button onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()) }} className={selectMode ? 'btn-primary' : 'btn-secondary'} style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckSquare size={14} /> {selectMode ? 'Cancel' : 'Select'}
+            </button>
+            <button onClick={exportExcel} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Download size={14} /> Excel
+            </button>
           </div>
         </div>
+
+        {/* Bulk action bar */}
+        {selectMode && selectedIds.size > 0 && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.2)', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{selectedIds.size} selected</span>
+            <div style={{ flex: 1 }} />
+            <button onClick={handleBulkMarkDone} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.75rem' }}>Mark Done</button>
+            <button onClick={handleBulkComplete} className="btn-primary" style={{ padding: '5px 12px', fontSize: '0.75rem' }}>Complete</button>
+            <button onClick={() => { setSelectedIds(new Set()); setSelectMode(false) }} className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>Clear</button>
+          </div>
+        )}
 
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading…</div>
@@ -437,6 +503,14 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                   return (
                     <>
                       <tr key={w.id} style={{ background: rowBg, borderBottom: isHistoryExpanded ? 'none' : '1px solid var(--table-border)' }}>
+                        {/* Bulk select checkbox */}
+                        {selectMode && (
+                          <td style={{ padding: '6px 4px', width: '24px' }}>
+                            {(w.status === 'pending' || w.status === 'survey_done') && (
+                              <input type="checkbox" checked={selectedIds.has(w.id)} onChange={() => setSelectedIds(prev => { const n = new Set(prev); if (n.has(w.id)) n.delete(w.id); else n.add(w.id); return n })} style={{ accentColor: 'var(--accent-primary)' }} />
+                            )}
+                          </td>
+                        )}
                         {/* Vessel */}
                         <td style={{ padding: '6px 8px', overflow: 'hidden' }}>
                           {onNavigateToVessel ? (

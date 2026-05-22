@@ -501,6 +501,22 @@ export default function SurveyorDirectory() {
               )}
             </div>
 
+            {/* Performance metrics */}
+            {selectedSurveys.length > 0 && (() => {
+              const totalDefects = selectedSurveys.reduce((sum, s) => sum + allDefects.filter(d => d.surveyId === s.id).length, 0)
+              const avgDefects = selectedSurveys.length > 0 ? (totalDefects / selectedSurveys.length).toFixed(1) : '0'
+              const lastSurveyDate = selectedSurveys.length > 0 ? selectedSurveys[0].surveyDate : null
+              const daysSince = lastSurveyDate ? Math.floor((Date.now() - new Date(lastSurveyDate).getTime()) / 86400000) : null
+              const sinceLabel = daysSince === null ? '—' : daysSince === 0 ? 'Today' : daysSince === 1 ? '1 day ago' : daysSince < 7 ? `${daysSince}d ago` : daysSince < 30 ? `${Math.floor(daysSince / 7)}w ago` : daysSince < 365 ? `${Math.floor(daysSince / 30)}mo ago` : `${Math.floor(daysSince / 365)}y ago`
+              return (
+                <div style={{ padding: '12px 20px', display: 'flex', gap: '20px', borderBottom: '1px solid var(--table-border)', fontSize: '0.78rem' }}>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Last survey: </span><strong>{sinceLabel}</strong></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Avg defects: </span><strong>{avgDefects}</strong></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Total surveys: </span><strong>{selectedSurveys.length}</strong></div>
+                </div>
+              )
+            })()}
+
             {/* Survey history section */}
             <div style={{ padding: '16px 20px', flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
