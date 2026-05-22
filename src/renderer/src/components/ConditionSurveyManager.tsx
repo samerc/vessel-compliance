@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save, AlertTriangle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor, ConditionSurveyType } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -40,7 +40,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }>({ show: false, title: '', message: '', onConfirm: () => { } })
 
   // Defect counts per survey
-  const [defectCounts, setDefectCounts] = useState<Record<string, { open: number; closed: number }>>({})
+  const [defectCounts, setDefectCounts] = useState<Record<string, { open: number; closed: number; overdue: number }>>({})
   // Bump this to force DefectManager to reload its data (e.g. after importing defects)
   const [defectRefreshKey, setDefectRefreshKey] = useState(0)
 
@@ -84,14 +84,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       const attachmentData = await window.api.getSurveyAttachments()
       setAttachments(Array.isArray(attachmentData) ? attachmentData : [])
 
-      // Load defect counts
-      const counts: Record<string, { open: number; closed: number }> = {}
+      // Load defect counts (including overdue)
+      const counts: Record<string, { open: number; closed: number; overdue: number }> = {}
+      const today = new Date().toISOString().split('T')[0]
       for (const survey of safeSurveys) {
         const defects = await window.api.getSurveyDefects(survey.id)
         const safeDefects = Array.isArray(defects) ? defects : []
         counts[survey.id] = {
           open: safeDefects.filter(d => d.status === 'OPEN').length,
-          closed: safeDefects.filter(d => d.status === 'CLOSED').length
+          closed: safeDefects.filter(d => d.status === 'CLOSED').length,
+          overdue: safeDefects.filter(d => d.status === 'OPEN' && d.dueDate && d.dueDate < today).length
         }
       }
       setDefectCounts(counts)
@@ -102,12 +104,14 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
   // Lightweight refresh: only reload defect counts without reloading all surveys
   const refreshDefectCounts = async () => {
-    const counts: Record<string, { open: number; closed: number }> = {}
+    const counts: Record<string, { open: number; closed: number; overdue: number }> = {}
+    const today = new Date().toISOString().split('T')[0]
     for (const survey of surveys) {
       const defects = await window.api.getSurveyDefects(survey.id)
       counts[survey.id] = {
         open: defects.filter(d => d.status === 'OPEN').length,
-        closed: defects.filter(d => d.status === 'CLOSED').length
+        closed: defects.filter(d => d.status === 'CLOSED').length,
+        overdue: defects.filter(d => d.status === 'OPEN' && d.dueDate && d.dueDate < today).length
       }
     }
     setDefectCounts(counts)
@@ -595,6 +599,11 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                           {counts.closed > 0 && (
                             <span style={{ color: isLight ? '#008c46' : '#00ff88', fontWeight: '500' }}>
                               {counts.closed} closed
+                            </span>
+                          )}
+                          {counts.overdue > 0 && (
+                            <span style={{ color: '#ffa726', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <AlertTriangle size={12} /> {counts.overdue} overdue
                             </span>
                           )}
                           {totalDefects === 0 && <span>No defects</span>}

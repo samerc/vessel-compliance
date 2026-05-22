@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, RefreshCw, Eye, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, RefreshCw, Eye, ChevronUp, ChevronDown, Download } from 'lucide-react'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import XLSX from 'xlsx-js-style'
 
 interface Props {
   onNavigateToVessel: (vesselId: string) => void
@@ -34,7 +35,14 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const { showError } = useToast()
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [surveyorFilter, setSurveyorFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [openDefectsOnly, setOpenDefectsOnly] = useState(false)
+  const { showError, showSuccess } = useToast()
   const { visibleColumns: svVisibleCols, setVisibleColumns: setSvVisibleCols } = useColumnPrefs('surveys', SURVEY_COLUMNS)
   const svVisSet = new Set(svVisibleCols)
 
@@ -87,16 +95,31 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   }, [])
 
   const filtered = useMemo(() => {
-    if (!searchTerm) return surveys
-    const term = searchTerm.toLowerCase()
-    return surveys.filter((s) => {
-      const vessel = vesselMap.get(s.vesselId)
-      const vesselName = vessel?.name?.toLowerCase() || ''
-      const imoNumber = vessel?.imoNumber?.toLowerCase() || ''
-      const surveyType = s.surveyType?.toLowerCase() || ''
-      return vesselName.includes(term) || imoNumber.includes(term) || surveyType.includes(term)
-    })
-  }, [surveys, searchTerm, vesselMap])
+    let result = surveys
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter((s) => {
+        const vessel = vesselMap.get(s.vesselId)
+        const vesselName = vessel?.name?.toLowerCase() || ''
+        const imoNumber = vessel?.imoNumber?.toLowerCase() || ''
+        const surveyType = s.surveyType?.toLowerCase() || ''
+        const surveyor = surveyorMap.get(s.surveyorId)?.companyName?.toLowerCase() || ''
+        return vesselName.includes(term) || imoNumber.includes(term) || surveyType.includes(term) || surveyor.includes(term)
+      })
+    }
+    if (dateFrom) result = result.filter(s => s.surveyDate >= dateFrom)
+    if (dateTo) result = result.filter(s => s.surveyDate <= dateTo)
+    if (surveyorFilter) result = result.filter(s => s.surveyorId === surveyorFilter)
+    if (typeFilter) result = result.filter(s => s.surveyType === typeFilter)
+    if (openDefectsOnly) result = result.filter(s => s.openDefects > 0)
+    return result
+  }, [surveys, searchTerm, vesselMap, surveyorMap, dateFrom, dateTo, surveyorFilter, typeFilter, openDefectsOnly])
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0) }, [searchTerm, dateFrom, dateTo, surveyorFilter, typeFilter, openDefectsOnly])
+
+  // Unique survey types for filter dropdown
+  const surveyTypes = useMemo(() => [...new Set(surveys.map(s => s.surveyType).filter(Boolean))].sort(), [surveys])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -134,6 +157,30 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
       }
     })
   }, [filtered, sortKey, sortDir, vesselMap, surveyorMap])
+
+  // Pagination
+  const totalPages = Math.ceil(sorted.length / pageSize)
+  const paginated = sorted.slice(page * pageSize, (page + 1) * pageSize)
+
+  const exportExcel = () => {
+    if (sorted.length === 0) return
+    const data = sorted.map(s => ({
+      'Vessel': vesselMap.get(s.vesselId)?.name || '',
+      'IMO': vesselMap.get(s.vesselId)?.imoNumber || '',
+      'Date': s.surveyDate,
+      'Type': s.surveyType || '',
+      'Surveyor': surveyorMap.get(s.surveyorId)?.companyName || '',
+      'Location': s.location || '',
+      'Open Defects': s.openDefects,
+      'Total Defects': s.totalDefects
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 12 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Surveys')
+    XLSX.writeFile(wb, `Condition Surveys.xlsx`)
+    showSuccess('Exported to Excel')
+  }
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronUp size={12} style={{ opacity: 0.25 }} />
@@ -194,26 +241,31 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
             style={{ width: '100%', paddingLeft: '36px' }}
           />
         </div>
-        <button
-          onClick={loadData}
-          disabled={isLoading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            border: '1px solid var(--glass-border)',
-            background: 'var(--glass-bg)',
-            color: 'var(--text-primary)',
-            cursor: 'pointer',
-            fontSize: '0.85rem'
-          }}
-          title="Refresh"
-        >
-          <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
-          Refresh
+        <button onClick={loadData} disabled={isLoading} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem' }} title="Refresh">
+          <RefreshCw size={16} className={isLoading ? 'spin' : ''} /> Refresh
         </button>
+        <button onClick={exportExcel} disabled={sorted.length === 0} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.85rem' }}>
+          <Download size={16} /> Export Excel
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }} title="From date" />
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>to</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }} title="To date" />
+        <select value={surveyorFilter} onChange={e => setSurveyorFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+          <option value="">All Surveyors</option>
+          {surveyors.map(s => <option key={s.id} value={s.id}>{s.companyName}</option>)}
+        </select>
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+          <option value="">All Types</option>
+          {surveyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={openDefectsOnly} onChange={e => setOpenDefectsOnly(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
+          Open defects only
+        </label>
       </div>
 
       {/* Survey count */}
@@ -331,7 +383,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                   </td>
                 </tr>
               ) : (
-                sorted.map((survey) => {
+                paginated.map((survey) => {
                   const vessel = vesselMap.get(survey.vesselId)
                   const surveyor = surveyorMap.get(survey.surveyorId)
                   const hasOpenDefects = survey.openDefects > 0
@@ -440,6 +492,24 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button onClick={() => setPage(0)} disabled={page === 0} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>First</button>
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>Prev</button>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Page {page + 1} of {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>Next</button>
+            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.78rem' }}>Last</button>
+          </div>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+            <option value={25}>25 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={100}>100 / page</option>
+          </select>
+        </div>
+      )}
     </div>
   )
 }
