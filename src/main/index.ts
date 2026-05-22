@@ -1636,10 +1636,15 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return result
   })
-  safeHandle('db:reopenDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.reopenDefect(id) })
+  safeHandle('db:reopenDefect', async (event, id, reopenReason?: string) => { await requirePermission(event, 'surveys:defects'); return db.reopenDefect(id, reopenReason) })
   safeHandle('db:getSurveyAttachments', (event, surveyId) => { requireSession(event); return db.getSurveyAttachments(surveyId) })
   safeHandle('db:addSurveyAttachment', async (event, attachment) => { await requirePermission(event, 'surveys:manage'); return db.addSurveyAttachment(attachment) })
   safeHandle('db:deleteSurveyAttachment', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyAttachment(id) })
+
+  // Defect attachments
+  safeHandle('defect:getAttachments', (event, defectId) => { requireSession(event); return db.getDefectAttachments(defectId) })
+  safeHandle('defect:addAttachment', async (event, data) => { await requirePermission(event, 'surveys:defects'); return db.addDefectAttachment(data) })
+  safeHandle('defect:deleteAttachment', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.deleteDefectAttachment(id) })
   safeHandle('db:getOpenDefectsByVessel', (event) => { requireSession(event); return db.getOpenDefectsByVessel() })
   safeHandle('db:getSurveyHistory', (event, vesselId) => { requireSession(event); return db.getSurveyHistory(vesselId) })
   safeHandle('db:closeSurvey', async (event, surveyId, userId) => { await requirePermission(event, 'surveys:manage'); return db.closeSurvey(surveyId, userId) })

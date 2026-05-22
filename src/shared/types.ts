@@ -385,6 +385,7 @@ export interface ConditionSurvey {
   completedBy?: string
   endorsementIssued?: boolean | null
   endorsementReminderDate?: string | null
+  followUpSurveyId?: string | null
   createdAt?: string
   createdBy?: string
 }
@@ -444,6 +445,7 @@ export interface SurveyDefect {
   closedAt?: string
   closedBy?: string
   closureNotes?: string
+  reopenReason?: string | null
   createdAt?: string
 }
 

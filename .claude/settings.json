@@ -11,7 +11,8 @@
       "Bash(npm audit:*)",
       "Bash(xargs grep:*)",
       "Read(//z/Coding/sanctions API/**)",
-      "Bash(grep -E \"\\\\.\\(js|py|json|yaml|yml\\)$|^d\")"
+      "Bash(grep -E \"\\\\.\\(js|py|json|yaml|yml\\)$|^d\")",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
     ]
   }
 }

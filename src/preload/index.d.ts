@@ -232,10 +232,13 @@ export interface Api {
   updateSurveyDefect: (id: string, updates: Partial<SurveyDefect>) => Promise<void>
   deleteSurveyDefect: (id: string) => Promise<void>
   closeDefect: (id: string, closedBy: string, closureNotes?: string) => Promise<void>
-  reopenDefect: (id: string) => Promise<void>
+  reopenDefect: (id: string, reopenReason?: string) => Promise<void>
   getSurveyAttachments: (surveyId?: string) => Promise<SurveyAttachment[]>
   addSurveyAttachment: (attachment: Omit<SurveyAttachment, 'id'>) => Promise<SurveyAttachment>
   deleteSurveyAttachment: (id: string) => Promise<void>
+  defectGetAttachments: (defectId: string) => Promise<{ id: string; defectId: string; filePath: string; fileName: string; uploadedAt: string; uploadedBy: string }[]>
+  defectAddAttachment: (data: { defectId: string; filePath: string; fileName: string; uploadedBy?: string }) => Promise<any>
+  defectDeleteAttachment: (id: string) => Promise<void>
   getOpenDefectsByVessel: () => Promise<any[]>
   getSurveyHistory: (vesselId: string) => Promise<any[]>
   closeSurvey: (surveyId: string, userId: string) => Promise<void>

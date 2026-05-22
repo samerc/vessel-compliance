@@ -2707,6 +2707,35 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } catch {}
 
+            // Migration: reopen_reason on survey_defects
+            try {
+                const [rrCol] = await this.pool.query("SHOW COLUMNS FROM survey_defects LIKE 'reopen_reason'") as any[]
+                if ((rrCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE survey_defects ADD COLUMN reopen_reason TEXT NULL")
+                }
+            } catch {}
+
+            // Migration: defect_attachments table
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS defect_attachments (
+                    id VARCHAR(36) PRIMARY KEY,
+                    defect_id VARCHAR(36) NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    uploaded_by VARCHAR(255),
+                    FOREIGN KEY (defect_id) REFERENCES survey_defects(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
+            // Migration: follow_up_survey_id on condition_surveys
+            try {
+                const [fuCol] = await this.pool.query("SHOW COLUMNS FROM condition_surveys LIKE 'follow_up_survey_id'") as any[]
+                if ((fuCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE condition_surveys ADD COLUMN follow_up_survey_id VARCHAR(36) NULL")
+                }
+            } catch {}
+
             // Migration: make hull_clause_id nullable on quotation_hull_alternatives
             try {
                 const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
@@ -5136,12 +5165,14 @@ export class MySQLAdapter {
         if (vesselId) {
             sql = `SELECT id, vessel_id as vesselId, survey_date as surveyDate,
                    surveyor_id as surveyorId, survey_type as surveyType, reference, location, notes,
+                   follow_up_survey_id as followUpSurveyId,
                    created_at as createdAt, created_by as createdBy
                    FROM condition_surveys WHERE vessel_id = ? ORDER BY survey_date DESC`
             params.push(vesselId)
         } else {
             sql = `SELECT cs.id, cs.vessel_id as vesselId, cs.survey_date as surveyDate,
                    cs.surveyor_id as surveyorId, cs.survey_type as surveyType, cs.reference, cs.location, cs.notes,
+                   cs.follow_up_survey_id as followUpSurveyId,
                    cs.created_at as createdAt, cs.created_by as createdBy
                    FROM condition_surveys cs
                    JOIN vessels v ON v.id = cs.vessel_id
@@ -5211,7 +5242,7 @@ export class MySQLAdapter {
         let sql = `SELECT id, survey_id as surveyId, defect_number as defectNumber,
                    description, severity, status, due_date as dueDate, notes,
                    closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
-                   created_at as createdAt
+                   reopen_reason as reopenReason, created_at as createdAt
                    FROM survey_defects`
         const params: any[] = []
         if (surveyId) {
@@ -5266,11 +5297,11 @@ export class MySQLAdapter {
         )
     }
 
-    async reopenDefect(id: string): Promise<void> {
+    async reopenDefect(id: string, reopenReason?: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute(
-            'UPDATE survey_defects SET status = "OPEN", closed_at = NULL, closed_by = NULL, closure_notes = NULL WHERE id = ?',
-            [id]
+            'UPDATE survey_defects SET status = "OPEN", closed_at = NULL, closed_by = NULL, closure_notes = NULL, reopen_reason = ? WHERE id = ?',
+            [reopenReason || null, id]
         )
     }
 
@@ -5312,6 +5343,33 @@ export class MySQLAdapter {
     async deleteSurveyAttachment(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM survey_attachments WHERE id = ?', [id])
+    }
+
+    // --- Defect Attachments ---
+    async getDefectAttachments(defectId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            'SELECT id, defect_id as defectId, file_path as filePath, file_name as fileName, uploaded_at as uploadedAt, uploaded_by as uploadedBy FROM defect_attachments WHERE defect_id = ? ORDER BY uploaded_at DESC',
+            [defectId])
+        return rows as any[]
+    }
+
+    async addDefectAttachment(data: { defectId: string; filePath: string; fileName: string; uploadedBy?: string }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        if (data.filePath) {
+            const validation = await this.validateFileExtension(data.filePath)
+            if (!validation.valid) throw new Error(`File validation failed: ${validation.reason}`)
+        }
+        const id = uuidv4()
+        await this.pool.execute(
+            'INSERT INTO defect_attachments (id, defect_id, file_path, file_name, uploaded_by) VALUES (?, ?, ?, ?, ?)',
+            [id, data.defectId, data.filePath, data.fileName, data.uploadedBy || 'System'])
+        return { id, ...data }
+    }
+
+    async deleteDefectAttachment(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM defect_attachments WHERE id = ?', [id])
     }
 
     // --- Reports ---
