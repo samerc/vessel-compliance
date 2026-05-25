@@ -427,6 +427,7 @@ Advanced vessel search page (`src/renderer/src/components/VesselFilter.tsx`):
 Tab-based reports page (`src/renderer/src/components/Reports.tsx`) with sub-navigation:
 
 - **LossRecordReport** (`src/renderer/src/components/LossRecordReport.tsx`): Imports Book1.xlsx (UWY in col 6), outputs a PDF grouped by Underwriting Year → vessel → claim
+- **AssuredReport** (`src/renderer/src/components/AssuredReport.tsx`): Assured listing by vessel/fleet. Filter: all active vessels, by fleet (searchable), or select vessels (search + chips). Table with vessel name, IMO, fleet, assured name, role, type, email, phone. Grouped by vessel with rowSpan. Sorted by role order from settings. Export: Excel + PDF (per-vessel sections with navy header bars).
 
 ### Customer Compliance Report
 
@@ -520,6 +521,7 @@ Premium management with per-vessel amounts, sequential discounts, and non-refund
 - **Non-refundable**: Quotation-level choice via `nonRefundableType` ('first_instalment' | 'percentage' | null) + `nonRefundablePercent`. Replaces old per-instalment non-refundable fields
 - **Instalments**: Number + days from inception only (description field removed). Default days: 1→`[0]`, 2→`[0,180]`, 3→`[0,120,240]`, 4→`[0,90,180,270]`, 12→`[0,30,60...330]`; admin `InstalmentDefaults` settings take priority when configured
 - **Export premium table**: Premium section rendered as tables in PDF/DOCX for all cases except single plain premium. Multi-vessel, multi-alternative, and discount scenarios all use tabular format with label/amount columns. PDF uses autoTable with `didParseCell` for bold styling; DOCX uses `premCell`/`premRow`/`premTable` helpers for 2-column Table layout.
+- **Per-vessel NCB/UPCC exclusion**: `ncb_excluded` and `upcc_excluded` booleans on `quotation_vessels`. Multi-vessel premium table shows inline checkboxes per vessel. Excluded vessels get plain "X per annum" in export; included vessels get Technical/Payable split. NCB/UPCC text sections append "Applicable to M/V ..." when some vessels excluded.
 
 ### Quotation Warranties System
 
@@ -594,6 +596,7 @@ Admin-managed reusable text templates for the trading warranty intro section:
 - **Editor**: Template selector dropdown above the trading warranty RichTextEditor. Selecting a template populates the text; users can modify or write new text freely.
 - **Custom wording hides default text**: When `tradingCustomMode` is enabled ("Use custom wording" checkbox), the standard "Trading Warranty Text" section is hidden. The `!quotation.tradingCustomMode` guard wraps the default text block in TradingTab.
 - **IPC**: `pi:getTradingWarrantyTemplates`, `pi:addTradingWarrantyTemplate`, `pi:updateTradingWarrantyTemplate`, `pi:deleteTradingWarrantyTemplate`, `pi:reorderTradingWarrantyTemplates`
+- **Per-vessel intro**: `quotation_trading_intros` table stores per-vessel intro text overrides. Multi-vessel quotations show vessel selector bar in TradingTab. "All Vessels" edits `tradingWarrantyIntro` on quotation; specific vessel creates/edits override row. Export renders per-vessel intros with "M/V VESSEL:" headers, shared content (countries, DDQ, Israel) rendered once after all intros. IPC: `trading:getIntros`, `trading:addIntro`, `trading:updateIntro`, `trading:deleteIntro`.
 
 ### Quotation Section Order
 
@@ -1138,6 +1141,8 @@ Draft quotation references include the policy type code:
 - `policy_type_commissions` - Default commission % per policy type
 - `entity_commission_overrides` - Per-customer per-type commission overrides
 - `quotation_hull_custom_conditions` - Per-quotation custom hull additional conditions (free text)
+- `quotation_trading_intros` - Per-vessel trading warranty intro text overrides (vessel_scope JSON)
+- `defect_attachments` - Per-defect photo/evidence attachments (file_path, file_name)
 
 **SQLite tables** (in `sanctions.db`, separate from MySQL):
 - `entities` - Sanctions list entities (OFAC, EU, UN, ISF) with name, aliases, identifications, programs, vessel_imo
