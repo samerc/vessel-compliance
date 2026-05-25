@@ -60,15 +60,16 @@ function resolveFilePath(dbPath: string): string {
 /** Canonicalize a user-selected path to the DB form (network→local for remote users) */
 function canonicalizeFilePath(userPath: string): string {
   if (!userPath || !filePathLocal || !filePathNetwork) return userPath
+  // Resolve to absolute path first to prevent ../ traversal
+  const resolved = resolve(normalize(userPath))
   const normalNetwork = normalize(filePathNetwork).toLowerCase()
-  const normalUserPath = normalize(userPath).toLowerCase()
-  if (normalUserPath.startsWith(normalNetwork)) {
-    return filePathLocal + userPath.substring(filePathNetwork.length)
+  const normalResolved = resolved.toLowerCase()
+  if (normalResolved.startsWith(normalNetwork)) {
+    return filePathLocal + resolved.substring(normalize(filePathNetwork).length)
   }
-  // If already canonical (local path), keep as-is
   const normalLocal = normalize(filePathLocal).toLowerCase()
-  if (normalUserPath.startsWith(normalLocal)) return userPath
-  return userPath
+  if (normalResolved.startsWith(normalLocal)) return resolved
+  return resolved
 }
 
 /** Check if a file path is on the shared folder (local or network) */
@@ -250,7 +251,10 @@ function safeHandle(
       return await handler(event, ...args)
     } catch (error: any) {
       console.error(`IPC handler error[${channel}]: `, error?.message || error)
-      return { error: true, message: error?.message || 'An unexpected error occurred' }
+      // Sanitize error messages — don't expose SQL details or stack traces to renderer
+      const msg = error?.message || 'An unexpected error occurred'
+      const safeMsg = msg.includes('ER_') || msg.includes('SQL') ? 'A database error occurred' : msg
+      return { error: true, message: safeMsg }
     }
   })
 }
@@ -481,10 +485,10 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
-    // Enable Ctrl+Shift+I in production for debugging
+    // Enable Ctrl+Shift+F12 in production for admin debugging (less discoverable than Ctrl+Shift+I)
     if (!is.dev) {
       window.webContents.on('before-input-event', (event, input) => {
-        if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        if (input.control && input.shift && input.key === 'F12') {
           window.webContents.toggleDevTools()
           event.preventDefault()
         }
@@ -493,11 +497,13 @@ app.whenReady().then(() => {
   })
 
   // Update Handlers
-  safeHandle('update:checkForUpdates', async () => {
+  safeHandle('update:checkForUpdates', async (event) => {
+    requireSession(event)
     await updateService.checkForUpdates(true)
   })
 
-  safeHandle('update:quitAndInstall', () => {
+  safeHandle('update:quitAndInstall', (event) => {
+    requireSession(event)
     updateService.quitAndInstall()
   })
 
@@ -835,11 +841,11 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('setup:checkConnection', async () => {
+  safeHandle('setup:checkConnection', async () => {
     return await db.connect()
   })
 
-  ipcMain.handle('setup:getConfigPath', () => {
+  safeHandle('setup:getConfigPath', () => {
     return getConfigPath()
   })
 
@@ -2664,7 +2670,8 @@ app.whenReady().then(() => {
           if (val == null || val === '' || val === undefined) continue
 
           if (f.type === 'amount') {
-            charValues.push({ characteristicId: charId, valueAmount: typeof val === 'number' ? val : parseFloat(val) })
+            const numVal = typeof val === 'number' ? val : parseFloat(val)
+            if (!isNaN(numVal)) charValues.push({ characteristicId: charId, valueAmount: numVal })
           } else if (f.type === 'date') {
             charValues.push({ characteristicId: charId, valueDate: String(val) })
           } else {

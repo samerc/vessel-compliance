@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil } from 'lucide-react'
 import { Quotation, QuotationSubLimit, QuotationVessel, QuotationPIAlternative, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { ALT_COLORS } from './shared'
+import { sanitizeHtml } from '../../utils/sanitize'
 
 export default function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
@@ -222,7 +223,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             <div style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Standard Text Preview:</div>
                 <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'var(--table-header-bg)', fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '8px' }}
-                    dangerouslySetInnerHTML={{ __html: resolvedStandardText || '<em style="color:var(--text-secondary)">No standard text configured</em>' }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(resolvedStandardText || '<em style="color:var(--text-secondary)">No standard text configured</em>') }}
                 />
                 <button
                     type="button"

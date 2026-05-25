@@ -12,7 +12,9 @@
       "Bash(xargs grep:*)",
       "Read(//z/Coding/sanctions API/**)",
       "Bash(grep -E \"\\\\.\\(js|py|json|yaml|yml\\)$|^d\")",
-      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "WebSearch",
+      "WebFetch(domain:vesselapi.com)"
     ]
   }
 }

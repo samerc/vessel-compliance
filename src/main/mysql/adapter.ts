@@ -10105,7 +10105,7 @@ export class MySQLAdapter {
     // -- Generic vessel scope update for any quotation item table --
     async updateQuotationItemVesselScope(table: string, id: string, vesselScope: string[] | null): Promise<void> {
         if (!this.pool) return
-        const allowedTables = ['quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses', 'quotation_additional_clauses', 'quotation_exclusions', 'quotation_custom_exclusions']
+        const allowedTables = ['quotation_warranties', 'quotation_custom_warranties', 'quotation_deductibles', 'quotation_text_deductibles', 'quotation_subjectivities', 'quotation_clauses', 'quotation_additional_clauses', 'quotation_exclusions', 'quotation_custom_exclusions', 'quotation_hull_conditions', 'quotation_hull_additional_conditions', 'quotation_hull_custom_conditions', 'quotation_survey_warranties', 'quotation_agreed_value_items', 'quotation_war_conditions']
         if (!allowedTables.includes(table)) return
         await this.pool.execute(`UPDATE ${table} SET vessel_scope = ? WHERE id = ?`, [vesselScope ? JSON.stringify(vesselScope) : null, id])
     }
@@ -12500,6 +12500,10 @@ export class MySQLAdapter {
     async restoreDatabase(data: { tables: Record<string, any[]> }): Promise<void> {
         if (!this.pool) throw new Error('Not connected')
 
+        // Validate table names against actual schema to prevent SQL injection via crafted backups
+        const [dbTables] = await this.pool.query("SHOW TABLES")
+        const validTables = new Set((dbTables as any[]).map(r => Object.values(r)[0] as string))
+
         const conn = await this.pool.getConnection()
         try {
             await conn.query('SET FOREIGN_KEY_CHECKS = 0')
@@ -12507,6 +12511,10 @@ export class MySQLAdapter {
             for (const [table, rows] of Object.entries(data.tables)) {
                 // Skip users table to avoid locking out
                 if (table === 'users') continue
+                // Validate table exists in actual DB schema
+                if (!validTables.has(table)) { console.warn(`[Restore] Skipping unknown table: ${table}`); continue }
+                // Validate table name contains only safe characters
+                if (!/^[a-z_][a-z0-9_]*$/i.test(table)) { console.warn(`[Restore] Skipping invalid table name: ${table}`); continue }
                 await conn.query(`TRUNCATE TABLE \`${table}\``)
 
                 if (rows.length === 0) continue
@@ -12514,7 +12522,7 @@ export class MySQLAdapter {
                 // Insert in batches of 100
                 for (let i = 0; i < rows.length; i += 100) {
                     const batch = rows.slice(i, i + 100)
-                    const columns = Object.keys(batch[0])
+                    const columns = Object.keys(batch[0]).filter(c => /^[a-z_][a-z0-9_]*$/i.test(c))
                     const placeholders = batch
                         .map(() => `(${columns.map(() => '?').join(',')})`)
                         .join(',')

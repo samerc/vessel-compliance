@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save } from 'lucide-react'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
+import { sanitizeHtml } from '../../utils/sanitize'
 
 export default function CustomSectionsTab({ quotation, showSuccess, showError, isLight }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [sections, setSections] = useState<QuotationCustomSection[]>([])
@@ -128,7 +129,7 @@ export default function CustomSectionsTab({ quotation, showSuccess, showError, i
                                 <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '4px' }}>{section.title}</div>
                                 {section.text ? (
                                     <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                                        dangerouslySetInnerHTML={{ __html: section.text.substring(0, 200) }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.text.substring(0, 200)) }}
                                     />
                                 ) : (
                                     <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No content</span>
