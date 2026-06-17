@@ -174,6 +174,14 @@ const api = {
   sanctionsRefresh: (source?: string) => ipcRenderer.invoke('sanctions:refresh', source),
   sanctionsRefreshSource: (source: string) => ipcRenderer.invoke('sanctions:refreshSource', source),
 
+  // SIC List
+  sicGetEntities: () => ipcRenderer.invoke('sic:getEntities'),
+  sicGetEntity: (id: number) => ipcRenderer.invoke('sic:getEntity', id),
+  sicAddEntity: (entity: any) => ipcRenderer.invoke('sic:addEntity', entity),
+  sicUpdateEntity: (id: number, entity: any) => ipcRenderer.invoke('sic:updateEntity', id, entity),
+  sicDeleteEntity: (id: number) => ipcRenderer.invoke('sic:deleteEntity', id),
+  sicImport: (filePath: string) => ipcRenderer.invoke('sic:import', filePath),
+
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),
   complianceSetScheduleSettings: (settings) => ipcRenderer.invoke('compliance:setScheduleSettings', settings),
@@ -989,7 +997,7 @@ const api = {
   convertCountPdfPages: (pdfPath: string) => ipcRenderer.invoke('convert:countPdfPages', pdfPath),
   convertMergePdfs: (pdfPaths: string[], outputPath: string) => ipcRenderer.invoke('convert:mergePdfs', pdfPaths, outputPath),
   convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) => ipcRenderer.invoke('convert:setDocxPageStart', data),
-  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data),
+  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string; policyNumber?: string; policyTypeTitle?: string }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data),
 }
 
 // Expose curated API to renderer via context bridge

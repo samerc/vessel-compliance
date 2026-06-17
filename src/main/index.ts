@@ -1269,6 +1269,7 @@ app.whenReady().then(() => {
       const [dtRows] = await (db as any).pool.query('SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?', [docTypeId, docTypeId])
       const docTypeName = (dtRows as any[])[0]?.name || 'document'
       db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Documents', entityType: 'vessel_document', entityId: vesselId, entityName: vesselName, details: `${docTypeName} expiry ${expiryDate ? 'set to ' + expiryDate : 'cleared'} for ${vesselName}` }).catch(() => {})
+      db.addVesselAuditEntry(vesselId, 'Document Expiry', null, `${docTypeName}: ${expiryDate || 'cleared'}`, user.username).catch(() => {})
     } catch { /* do not block */ }
     return result
   })
@@ -2173,6 +2174,74 @@ app.whenReady().then(() => {
     return result
   })
 
+  // SIC List CRUD Handlers
+  safeHandle('sic:getEntities', async (event) => {
+    requireSession(event)
+    return sanctionsService.getSicEntities()
+  })
+
+  safeHandle('sic:getEntity', async (event, id: number) => {
+    requireSession(event)
+    return sanctionsService.getSicEntity(id)
+  })
+
+  safeHandle('sic:addEntity', async (event, entity: any) => {
+    requireSession(event)
+    const { normalizeText } = require('./sanctions/normalize')
+    const e = {
+      source: 'SIC' as const,
+      source_id: entity.sourceId || null,
+      entity_type: entity.entityType || 'individual',
+      name: entity.name,
+      name_normalized: normalizeText(entity.name),
+      aliases: entity.aliases || [],
+      date_of_birth: entity.dateOfBirth || null,
+      nationality: entity.nationality || null,
+      addresses: [],
+      identifications: [],
+      programs: [],
+      vessel_imo: null,
+      remarks: entity.remarks || null,
+      listed_date: entity.listedDate || null,
+      mother_name: entity.motherName || null,
+      father_name: entity.fatherName || null
+    }
+    const id = sanctionsService.addSicEntity(e)
+    return { id }
+  })
+
+  safeHandle('sic:updateEntity', async (event, id: number, entity: any) => {
+    requireSession(event)
+    const { normalizeText } = require('./sanctions/normalize')
+    const updates: any = {}
+    if (entity.name !== undefined) {
+      updates.name = entity.name
+      updates.name_normalized = normalizeText(entity.name)
+    }
+    if (entity.sourceId !== undefined) updates.source_id = entity.sourceId
+    if (entity.entityType !== undefined) updates.entity_type = entity.entityType
+    if (entity.aliases !== undefined) updates.aliases = entity.aliases
+    if (entity.dateOfBirth !== undefined) updates.date_of_birth = entity.dateOfBirth
+    if (entity.nationality !== undefined) updates.nationality = entity.nationality
+    if (entity.remarks !== undefined) updates.remarks = entity.remarks
+    if (entity.listedDate !== undefined) updates.listed_date = entity.listedDate
+    if (entity.motherName !== undefined) updates.mother_name = entity.motherName
+    if (entity.fatherName !== undefined) updates.father_name = entity.fatherName
+    sanctionsService.updateSicEntity(id, updates)
+    return { success: true }
+  })
+
+  safeHandle('sic:deleteEntity', async (event, id: number) => {
+    requireSession(event)
+    sanctionsService.deleteSicEntity(id)
+    return { success: true }
+  })
+
+  safeHandle('sic:import', async (event, filePath: string) => {
+    await requirePermission(event, 'admin:settings')
+    return sanctionsService.importSicFromFile(filePath)
+  })
+
   // Compliance Schedule Handlers
   safeHandle('compliance:getScheduleSettings', async (event) => {
     await requirePermission(event, 'admin:settings')
@@ -2807,7 +2876,21 @@ app.whenReady().then(() => {
   safeHandle('db:deleteClassificationSociety', async (event, id) => { await requirePermission(event, 'admin:settings'); return db.deleteClassificationSociety(id) })
   safeHandle('db:reorderClassificationSocieties', async (event, ids) => { await requirePermission(event, 'admin:settings'); return db.reorderClassificationSocieties(ids) })
   safeHandle('vessels:getClassifications', (event, vesselId) => { requireSession(event); return db.getVesselClassifications(vesselId) })
-  safeHandle('vessels:setClassifications', async (event, vesselId, csIds) => { await requirePermission(event, 'vessels:edit'); return db.setVesselClassifications(vesselId, csIds) })
+  safeHandle('vessels:setClassifications', async (event, vesselId, csIds) => {
+    const user = await requirePermission(event, 'vessels:edit')
+    try {
+      // Get old classification names for audit
+      const oldIds = await db.getVesselClassifications(vesselId)
+      const allCs = await db.getClassificationSocieties()
+      const csMap = new Map((allCs as any[]).map((c: any) => [c.id, c.abbreviation || c.name]))
+      const oldNames = (Array.isArray(oldIds) ? oldIds : []).map((c: any) => csMap.get(typeof c === 'string' ? c : c.classificationSocietyId) || '?').join(', ')
+      const newNames = (csIds as string[]).map((id: string) => csMap.get(id) || '?').join(', ')
+      if (oldNames !== newNames) {
+        db.addVesselAuditEntry(vesselId, 'Classification', oldNames || null, newNames || null, user.username).catch(() => {})
+      }
+    } catch { /* do not block */ }
+    return db.setVesselClassifications(vesselId, csIds)
+  })
 
   // Vessel Types
   safeHandle('db:getVesselTypes', (event) => { requireSession(event); return db.getVesselTypes() })
@@ -4425,6 +4508,8 @@ app.whenReady().then(() => {
     policyDocxData: number[]
     tcTypeCode: string
     filePrefix: string
+    policyNumber?: string
+    policyTypeTitle?: string
   }) => {
     requireSession(event)
     const { buildPolicyWithTC } = await import('./services/DocxToPdfService')
@@ -4440,11 +4525,13 @@ app.whenReady().then(() => {
     }
 
     const outputDir = os.tmpdir()
-    const { pdfPath, tempFiles } = await buildPolicyWithTC(
+    const { pdfPath, tempFiles, totalPages } = await buildPolicyWithTC(
       policyBuf,
       tcBuf as Buffer,
       outputDir,
-      data.filePrefix
+      data.filePrefix,
+      data.policyNumber,
+      data.policyTypeTitle
     )
 
     // Read the merged PDF and return as array
@@ -4455,7 +4542,7 @@ app.whenReady().then(() => {
       try { fs.unlinkSync(f) } catch { /* ignore */ }
     }
 
-    return { data: Array.from(pdfData as Buffer), fileName: `${data.filePrefix}.pdf` }
+    return { data: Array.from(pdfData as Buffer), fileName: `${data.filePrefix}.pdf`, totalPages }
   })
 
   // ==================== File Manager ====================

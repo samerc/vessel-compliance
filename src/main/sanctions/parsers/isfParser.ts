@@ -93,7 +93,9 @@ function parseIsfRow(row: any[]): SanctionsEntity | null {
     programs,
     remarks: remarkParts.join('; ') || null,
     vessel_imo: null,
-    listed_date: listedDate
+    listed_date: listedDate,
+    mother_name: null,
+    father_name: null
   }
 }
 

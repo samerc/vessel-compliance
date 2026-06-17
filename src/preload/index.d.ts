@@ -172,6 +172,14 @@ export interface Api {
   sanctionsRefresh: (source?: string) => Promise<any>
   sanctionsRefreshSource: (source: string) => Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }>
 
+  // SIC List
+  sicGetEntities: () => Promise<any[]>
+  sicGetEntity: (id: number) => Promise<any>
+  sicAddEntity: (entity: any) => Promise<{ id: number }>
+  sicUpdateEntity: (id: number, entity: any) => Promise<{ success: boolean }>
+  sicDeleteEntity: (id: number) => Promise<{ success: boolean }>
+  sicImport: (filePath: string) => Promise<{ count: number }>
+
   // Compliance Schedule
   complianceGetScheduleSettings: () => Promise<ComplianceScheduleSettings>
   complianceSetScheduleSettings: (settings: ComplianceScheduleSettings) => Promise<{ success: boolean; message?: string }>
@@ -1072,7 +1080,7 @@ export interface Api {
   convertCountPdfPages: (pdfPath: string) => Promise<number>
   convertMergePdfs: (pdfPaths: string[], outputPath: string) => Promise<string>
   convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) => Promise<number[]>
-  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string }) => Promise<{ data: number[]; fileName: string }>
+  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string; policyNumber?: string; policyTypeTitle?: string }) => Promise<{ data: number[]; fileName: string; totalPages: number }>
 }
 
 declare global {

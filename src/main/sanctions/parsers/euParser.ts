@@ -95,6 +95,8 @@ function parseEuRow(row: string[], colIndex: Record<string, number>): SanctionsE
     programs: programs.length > 0 ? programs : ['EU FSF'],
     remarks: getValue('notes') || null,
     vessel_imo: entityType === 'vessel' ? (identifications.find(id => id.number.match(/^\d{7}$/))?.number || null) : null,
-    listed_date: getValue('first_seen') || getValue('created_at') || null
+    listed_date: getValue('first_seen') || getValue('created_at') || null,
+    mother_name: null,
+    father_name: null
   }
 }

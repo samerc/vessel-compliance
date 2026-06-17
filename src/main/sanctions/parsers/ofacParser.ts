@@ -125,7 +125,9 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
     programs,
     remarks: extractText(entry.remarks || entry.Remarks) || null,
     vessel_imo: vesselImo,
-    listed_date: null
+    listed_date: null,
+    mother_name: null,
+    father_name: null
   }
 }
 

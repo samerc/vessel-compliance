@@ -4,6 +4,7 @@ import { parseOfacSdn } from './parsers/ofacParser'
 import { parseEuSanctions } from './parsers/euParser'
 import { parseUnSanctions } from './parsers/unParser'
 import { parseIsfSanctions } from './parsers/isfParser'
+import { parseSicExcel } from './parsers/sicParser'
 
 const DATA_SOURCES = {
   OFAC: 'https://www.treasury.gov/ofac/downloads/sdn.xml',
@@ -19,7 +20,9 @@ const FUSE_OPTIONS = {
     { name: 'name', weight: 0.5 },
     { name: 'name_normalized', weight: 0.5 },
     { name: 'vessel_imo', weight: 0.8 },
-    { name: 'aliasesFlat', weight: 0.3 }
+    { name: 'aliasesFlat', weight: 0.3 },
+    { name: 'mother_name', weight: 0.3 },
+    { name: 'father_name', weight: 0.3 }
   ],
   threshold: 1.0,
   includeScore: true,
@@ -192,7 +195,7 @@ export class SanctionsService {
 
   getStatus(): { sources: (DataUpdate & { entityCount: number })[]; totalEntities: number } {
     const updates = this.db.getDataUpdates()
-    const allSources = ['OFAC', 'EU', 'UN', 'ISF']
+    const allSources = ['OFAC', 'EU', 'UN', 'ISF', 'SIC']
     const sources = allSources.map(src => {
       const update = updates.find(u => u.source === src)
       return {
@@ -205,6 +208,41 @@ export class SanctionsService {
       }
     })
     return { sources, totalEntities: this.db.getEntityCount() }
+  }
+
+  getSicEntities(): SanctionsEntity[] {
+    return this.db.getSicEntities()
+  }
+
+  getSicEntity(id: number): SanctionsEntity | null {
+    return this.db.getSicEntity(id)
+  }
+
+  addSicEntity(entity: Omit<SanctionsEntity, 'id'>): number {
+    const id = this.db.insertSicEntity(entity)
+    this.buildIndex()
+    return id
+  }
+
+  updateSicEntity(id: number, entity: Partial<SanctionsEntity>): void {
+    this.db.updateSicEntity(id, entity)
+    this.buildIndex()
+  }
+
+  deleteSicEntity(id: number): void {
+    this.db.deleteSicEntity(id)
+    this.buildIndex()
+  }
+
+  importSicFromFile(filePath: string): { count: number } {
+    const fs = require('fs')
+    const buffer = fs.readFileSync(filePath)
+    const parsed = parseSicExcel(buffer)
+    this.db.clearEntitiesBySource('SIC')
+    this.db.insertEntitiesBatch(parsed.entities)
+    this.db.upsertDataUpdate('SIC', parsed.entities.length, 'success', null)
+    this.buildIndex()
+    return { count: parsed.entities.length }
   }
 
   private async fetchText(url: string): Promise<string> {

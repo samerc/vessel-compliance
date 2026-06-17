@@ -107,7 +107,9 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
     programs,
     remarks: extractText(ind.COMMENTS1 || ind.COMMENTS) || null,
     vessel_imo: null,
-    listed_date: parseDate(ind.LISTED_ON)
+    listed_date: parseDate(ind.LISTED_ON),
+    mother_name: null,
+    father_name: null
   }
 }
 
@@ -153,7 +155,9 @@ function parseUnEntity(ent: any): SanctionsEntity | null {
     programs,
     remarks: comments,
     vessel_imo: extractImoFromText(comments),
-    listed_date: parseDate(ent.LISTED_ON)
+    listed_date: parseDate(ent.LISTED_ON),
+    mother_name: null,
+    father_name: null
   }
 }
 

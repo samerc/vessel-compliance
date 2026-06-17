@@ -4102,7 +4102,7 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
         try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) } catch { return d }
     }
 
-    const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UN: '#44cc88', ISF: '#ffb020' }
+    const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UN: '#44cc88', ISF: '#ffb020', SIC: '#ffd43b' }
 
     return (
         <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
@@ -4118,10 +4118,10 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
                 </div>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
-                Sanctions lists are stored locally for screening. Refresh to download the latest data from OFAC, EU, UN, and ISF sources.
+                Sanctions lists are stored locally for screening. Refresh to download the latest data from OFAC, EU, UN, and ISF sources. SIC entries are managed manually.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                {(status?.sources || [{ source: 'OFAC' }, { source: 'EU' }, { source: 'UN' }, { source: 'ISF' }]).map((src: any) => {
+                {(status?.sources || [{ source: 'OFAC' }, { source: 'EU' }, { source: 'UN' }, { source: 'ISF' }, { source: 'SIC' }]).map((src: any) => {
                     const color = sourceColors[src.source] || 'var(--accent-primary)'
                     const isRefreshing = refreshing === src.source || refreshing === 'ALL'
                     const hasData = src.entityCount > 0
@@ -4136,9 +4136,13 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
                                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }} />
                                     <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{src.source}</span>
                                 </div>
-                                <button onClick={() => handleRefresh(src.source)} disabled={!!refreshing} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    {isRefreshing ? <Loader2 size={12} className="spinner" /> : <Download size={12} />} Refresh
-                                </button>
+                                {src.source !== 'SIC' ? (
+                                    <button onClick={() => handleRefresh(src.source)} disabled={!!refreshing} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {isRefreshing ? <Loader2 size={12} className="spinner" /> : <Download size={12} />} Refresh
+                                    </button>
+                                ) : (
+                                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Manual</span>
+                                )}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.78rem' }}>
                                 <div>
