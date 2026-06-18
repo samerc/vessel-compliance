@@ -91,12 +91,13 @@ Global notification system for user feedback:
 ### Sanctions Screening (Built-in)
 Sanctions screening runs entirely within the Electron app — no external API dependency:
 - **Module**: `src/main/sanctions/` — self-contained sanctions engine
-- **SanctionsService** (`SanctionsService.ts`): Singleton — initialize, search, refresh, getStatus
+- **SanctionsService** (`SanctionsService.ts`): Singleton — initialize, search, refresh, getStatus, SIC CRUD
 - **SanctionsDatabase** (`SanctionsDatabase.ts`): SQLite wrapper via `better-sqlite3` (externalized in electron-vite config like mysql2)
 - **Database file**: `sanctions.db` stored alongside `db-config.json` in app data directory
-- **Search**: Fuse.js fuzzy matching (weighted: name 0.5, normalized name 0.5, IMO 0.8, aliases 0.3) + SQL LIKE exact search, combined and deduplicated
-- **Data sources**: OFAC SDN (XML), EU OpenSanctions (CSV), UN Consolidated (XML), ISF Lebanon (Excel)
-- **Parsers**: `parsers/ofacParser.ts`, `parsers/euParser.ts`, `parsers/unParser.ts`, `parsers/isfParser.ts` — ported from external API source at `Z:\Coding\sanctions API`
+- **Entity columns**: source, source_id, entity_type, name, name_normalized, aliases (JSON), date_of_birth, nationality, addresses (JSON), identifications (JSON), programs (JSON), vessel_imo, remarks, listed_date, mother_name, father_name
+- **Search**: Fuse.js fuzzy matching (weighted: name 0.5, normalized name 0.5, IMO 0.8, aliases 0.3, mother_name 0.3, father_name 0.3) + SQL LIKE exact search (also queries mother_name, father_name), combined and deduplicated
+- **Data sources**: OFAC SDN (XML), EU OpenSanctions (CSV), UN Consolidated (XML), ISF Lebanon (Excel), SIC (manual + Excel import)
+- **Parsers**: `parsers/ofacParser.ts`, `parsers/euParser.ts`, `parsers/unParser.ts`, `parsers/isfParser.ts`, `parsers/sicParser.ts`
 - **Normalize**: `normalize.ts` — lowercase, NFD unicode, strip diacritics, strip special chars
 - **Startup**: `sanctionsService.initialize(dbDir)` called in `app.whenReady()`, loads all entities into Fuse.js in-memory index
 - **Shutdown**: `sanctionsService.close()` in `window-all-closed` handler
@@ -109,7 +110,19 @@ Sanctions screening runs entirely within the Electron app — no external API de
 - **Theme-Aware Colors**: Badge colors adapt for light/dark mode (darker colors in light mode for readability)
 - **Auto-clean toggle**: `ComplianceScheduleSettings.autoMarkCleanOnCheck` — when false, a CLEARED result is not auto-saved (toast only)
 - **Data refresh IPC**: `sanctions:getStatus`, `sanctions:refresh`, `sanctions:refreshSource` — admin-only, downloads and parses lists into SQLite, rebuilds Fuse.js index
-- **Admin UI**: "Sanctions Data" section in Admin Panel with per-source status cards (entity count, last update, release date) and Refresh buttons
+- **Admin UI**: "Sanctions Data" section in Admin Panel with per-source status cards (entity count, last update, release date) and Refresh buttons. SIC card shows "Manual" instead of Refresh.
+
+### SIC Sanctions List (Manual)
+Local sanctions list managed manually within the app (source: Special Investigation Commission, Lebanon):
+- **Source**: `source = 'SIC'` in SQLite `entities` table — no online refresh URL
+- **Excel import**: `parsers/sicParser.ts` reads BDL Black List format (2 sheets: "Regist. of risks under cover" + yearly entries). Sheet 1: Last Name + First Name combined, father/mother extracted. Sheet 2: full name with "or" alias extraction, SIC reference from Subject text (prefix "SIC Ref" stripped, keeps only number e.g. `1798/26/G26.143`)
+- **Manual CRUD**: Add/edit/delete individual entries via SanctionsSearch SIC List tab
+- **Fields**: name, father_name, mother_name, nationality, date_of_birth, listed_date, source_id (SIC reference), entity_type, aliases, remarks
+- **Remark templates**: Stored in `app_settings` key `sic_remark_templates` (JSON array of `{label, text}`). 3 defaults seeded on first load. Managed via Templates modal in SIC List tab. Shown as clickable chips in entry add/edit modal.
+- **SanctionsDatabase CRUD**: `getSicEntities()`, `getSicEntity(id)`, `insertSicEntity()`, `updateSicEntity()`, `deleteSicEntity()`
+- **IPC**: `sic:getEntities`, `sic:getEntity`, `sic:addEntity`, `sic:updateEntity`, `sic:deleteEntity`, `sic:import`, `sic:getRemarkTemplates`, `sic:setRemarkTemplates`
+- **UI**: SanctionsSearch page has two tabs — "Search" (existing) + "SIC List" (table with search, Import Excel, Templates, Add Entry). SIC source button (yellow `#ffd43b`) added to search source filters.
+- **Entry modal**: Does not close on outside click. Remark templates as chips above textarea with "Manage Templates" link.
 
 ### Scheduled Compliance Checks
 Automated weekly sanctions screening for all entities and vessels:
@@ -559,7 +572,7 @@ H&M quotation type with agreed value, hull clauses, hull alternatives, and addit
 - **Hull tables**: `hull_clauses` (name, code), `hull_clause_conditions` (condition_number, text, default_selected), `hull_additional_conditions` (title, text, default_selected), `hull_agreed_value_texts` (text)
 - **Per-quotation tables**: `quotation_hull_conditions`, `quotation_hull_additional_conditions`, `quotation_agreed_value_items` — all FK to `quotations(id)` with vessel_scope support
 - **Export**: PDF and DOCX include agreed value section (amount + text items) and hull conditions section (clause + conditions + additional conditions)
-- **Additional condition/clause titles**: `title VARCHAR(255) NULL` on both `pi_additional_clauses` and `hull_additional_conditions`. Shown bold before code/text in settings, editor, and exports.
+- **Additional condition/clause titles**: `title VARCHAR(255) NULL` on both `pi_additional_clauses` and `hull_additional_conditions`. Shown bold before code/text in settings and editor only — NOT rendered in exports (PDF/DOCX). Custom hull additional conditions (`quotation_hull_custom_conditions`) DO show their title in exports.
 
 ### Hull Alternatives
 
@@ -1145,7 +1158,7 @@ Draft quotation references include the policy type code:
 - `defect_attachments` - Per-defect photo/evidence attachments (file_path, file_name)
 
 **SQLite tables** (in `sanctions.db`, separate from MySQL):
-- `entities` - Sanctions list entities (OFAC, EU, UN, ISF) with name, aliases, identifications, programs, vessel_imo
+- `entities` - Sanctions list entities (OFAC, EU, UN, ISF, SIC) with name, name_normalized, aliases, identifications, programs, vessel_imo, mother_name, father_name
 - `data_updates` - Per-source refresh metadata (last update, record count, release date)
 
 ### Commission Defaults
