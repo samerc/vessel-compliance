@@ -179,6 +179,8 @@ export interface Api {
   sicUpdateEntity: (id: number, entity: any) => Promise<{ success: boolean }>
   sicDeleteEntity: (id: number) => Promise<{ success: boolean }>
   sicImport: (filePath: string) => Promise<{ count: number }>
+  sicGetRemarkTemplates: () => Promise<{ label: string; text: string }[]>
+  sicSetRemarkTemplates: (templates: { label: string; text: string }[]) => Promise<{ success: boolean }>
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => Promise<ComplianceScheduleSettings>

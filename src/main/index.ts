@@ -2237,6 +2237,23 @@ app.whenReady().then(() => {
     return { success: true }
   })
 
+  safeHandle('sic:getRemarkTemplates', async (event) => {
+    requireSession(event)
+    const raw = await db.getSetting('sic_remark_templates')
+    if (raw) return JSON.parse(raw)
+    return [
+      { label: 'Freeze life insurance', text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the person, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.' },
+      { label: 'Freeze life insurance (persons listed)', text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the persons listed below, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.' },
+      { label: 'Circulate identity', text: 'Notification of Decision - To circulate identity photo and driving license to all banks, financial institutions, electronic payment service providers, insurance companies and category A money exchange companies operating in Lebanon.' }
+    ]
+  })
+
+  safeHandle('sic:setRemarkTemplates', async (event, templates: { label: string; text: string }[]) => {
+    requireSession(event)
+    await db.setSetting('sic_remark_templates', JSON.stringify(templates))
+    return { success: true }
+  })
+
   safeHandle('sic:import', async (event, filePath: string) => {
     await requirePermission(event, 'admin:settings')
     return sanctionsService.importSicFromFile(filePath)

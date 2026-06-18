@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users } from 'lucide-react'
+import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -32,20 +32,10 @@ const EMPTY_FORM: Omit<SicEntry, 'id'> = {
     father_name: ''
 }
 
-const REMARK_TEMPLATES = [
-    {
-        label: 'Freeze life insurance',
-        text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the person, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.'
-    },
-    {
-        label: 'Freeze life insurance (persons listed)',
-        text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the persons listed below, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.'
-    },
-    {
-        label: 'Circulate identity',
-        text: 'Notification of Decision - To circulate identity photo and driving license to all banks, financial institutions, electronic payment service providers, insurance companies and category A money exchange companies operating in Lebanon.'
-    }
-]
+interface RemarkTemplate {
+    label: string
+    text: string
+}
 
 export default function SanctionsSearch() {
     const { user } = useAuth()
@@ -74,12 +64,23 @@ export default function SanctionsSearch() {
     const [sicForm, setSicForm] = useState<Omit<SicEntry, 'id'>>(EMPTY_FORM)
     const [aliasInput, setAliasInput] = useState('')
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+    const [remarkTemplates, setRemarkTemplates] = useState<RemarkTemplate[]>([])
+    const [showTemplateManager, setShowTemplateManager] = useState(false)
+    const [templateForm, setTemplateForm] = useState<RemarkTemplate>({ label: '', text: '' })
+    const [editingTemplateIdx, setEditingTemplateIdx] = useState<number | null>(null)
 
     useEffect(() => {
         if (user?.sanctionsThreshold !== undefined) {
             setThreshold(user.sanctionsThreshold)
         }
     }, [user])
+
+    const loadRemarkTemplates = useCallback(async () => {
+        try {
+            const templates = await (window.api as any).sicGetRemarkTemplates()
+            setRemarkTemplates(Array.isArray(templates) ? templates : [])
+        } catch { /* ignore */ }
+    }, [])
 
     const loadSicEntries = useCallback(async () => {
         setSicLoading(true)
@@ -89,6 +90,10 @@ export default function SanctionsSearch() {
         } catch { /* ignore */ }
         setSicLoading(false)
     }, [])
+
+    useEffect(() => {
+        loadRemarkTemplates()
+    }, [loadRemarkTemplates])
 
     useEffect(() => {
         if (activeTab === 'sic') loadSicEntries()
@@ -242,6 +247,51 @@ export default function SanctionsSearch() {
 
     const removeAlias = (idx: number) => {
         setSicForm(prev => ({ ...prev, aliases: prev.aliases.filter((_, i) => i !== idx) }))
+    }
+
+    const openTemplateManager = () => {
+        setEditingTemplateIdx(null)
+        setTemplateForm({ label: '', text: '' })
+        setShowTemplateManager(true)
+    }
+
+    const startEditTemplate = (t: RemarkTemplate, idx: number) => {
+        setEditingTemplateIdx(idx)
+        setTemplateForm({ label: t.label, text: t.text })
+    }
+
+    const saveTemplate = async () => {
+        if (!templateForm.label.trim() || !templateForm.text.trim()) return
+        const updated = [...remarkTemplates]
+        if (editingTemplateIdx !== null) {
+            updated[editingTemplateIdx] = { ...templateForm }
+        } else {
+            updated.push({ ...templateForm })
+        }
+        try {
+            await (window.api as any).sicSetRemarkTemplates(updated)
+            setRemarkTemplates(updated)
+            setEditingTemplateIdx(null)
+            setTemplateForm({ label: '', text: '' })
+            showSuccess(editingTemplateIdx !== null ? 'Template updated' : 'Template added')
+        } catch (err: any) {
+            showError(err.message || 'Failed to save')
+        }
+    }
+
+    const deleteTemplate = async (idx: number) => {
+        const updated = remarkTemplates.filter((_, i) => i !== idx)
+        try {
+            await (window.api as any).sicSetRemarkTemplates(updated)
+            setRemarkTemplates(updated)
+            if (editingTemplateIdx === idx) {
+                setEditingTemplateIdx(null)
+                setTemplateForm({ label: '', text: '' })
+            }
+            showSuccess('Template deleted')
+        } catch (err: any) {
+            showError(err.message || 'Failed to delete')
+        }
     }
 
     const filteredSic = sicEntries.filter(e => {
@@ -641,6 +691,9 @@ export default function SanctionsSearch() {
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             {filteredSic.length} of {sicEntries.length} entries
                         </span>
+                        <button className="btn-secondary" onClick={openTemplateManager} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
+                            <Settings size={14} /> Templates
+                        </button>
                         <button className="btn-secondary" onClick={handleImportSic} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
                             <Upload size={14} /> Import Excel
                         </button>
@@ -833,9 +886,14 @@ export default function SanctionsSearch() {
                             </div>
 
                             <div>
-                                <label style={labelStyle}>Remarks / Subject</label>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <label style={labelStyle}>Remarks / Subject</label>
+                                    <button type="button" onClick={() => { setShowSicModal(false); openTemplateManager() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 600, padding: 0 }}>
+                                        Manage Templates
+                                    </button>
+                                </div>
                                 <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                                    {REMARK_TEMPLATES.map((t, i) => (
+                                    {remarkTemplates.map((t, i) => (
                                         <button
                                             key={i}
                                             type="button"
@@ -866,6 +924,114 @@ export default function SanctionsSearch() {
                             <button className="btn-primary" onClick={handleSaveSic} disabled={!sicForm.name.trim()} style={{ padding: '8px 20px', fontSize: '0.85rem' }}>
                                 {editingSic ? 'Save Changes' : 'Add Entry'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ TEMPLATE MANAGER MODAL ============ */}
+            {showTemplateManager && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                    <div style={{
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        borderRadius: '16px',
+                        padding: '28px',
+                        width: '620px',
+                        maxHeight: '85vh',
+                        overflowY: 'auto',
+                        border: '1px solid var(--glass-border)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Remark Templates</h2>
+                            <button onClick={() => setShowTemplateManager(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Existing templates */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                            {remarkTemplates.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                    No templates yet. Add one below.
+                                </div>
+                            )}
+                            {remarkTemplates.map((t, idx) => (
+                                <div key={idx} style={{
+                                    padding: '12px 14px', borderRadius: '10px',
+                                    border: editingTemplateIdx === idx ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                    background: editingTemplateIdx === idx ? (isLight ? 'rgba(0,170,200,0.04)' : 'rgba(0,170,200,0.06)') : 'transparent'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t.label}</span>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button
+                                                onClick={() => startEditTemplate(t, idx)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}
+                                                title="Edit"
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => deleteTemplate(idx)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4, whiteSpace: 'pre-wrap', maxHeight: '60px', overflow: 'hidden' }}>
+                                        {t.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Add / Edit form */}
+                        <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+                            <h4 style={{ margin: '0 0 12px', fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {editingTemplateIdx !== null ? 'Edit Template' : 'Add Template'}
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div>
+                                    <label style={labelStyle}>Label</label>
+                                    <input
+                                        value={templateForm.label}
+                                        onChange={e => setTemplateForm(p => ({ ...p, label: e.target.value }))}
+                                        placeholder="Short name for the template"
+                                        style={inputStyle}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>Text</label>
+                                    <textarea
+                                        value={templateForm.text}
+                                        onChange={e => setTemplateForm(p => ({ ...p, text: e.target.value }))}
+                                        placeholder="Full remark text..."
+                                        style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                                        rows={3}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={saveTemplate}
+                                        disabled={!templateForm.label.trim() || !templateForm.text.trim()}
+                                        style={{ padding: '7px 16px', fontSize: '0.82rem' }}
+                                    >
+                                        {editingTemplateIdx !== null ? 'Save Changes' : 'Add Template'}
+                                    </button>
+                                    {editingTemplateIdx !== null && (
+                                        <button
+                                            className="btn-secondary"
+                                            onClick={() => { setEditingTemplateIdx(null); setTemplateForm({ label: '', text: '' }) }}
+                                            style={{ padding: '7px 16px', fontSize: '0.82rem' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

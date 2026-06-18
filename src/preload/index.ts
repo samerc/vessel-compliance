@@ -181,6 +181,8 @@ const api = {
   sicUpdateEntity: (id: number, entity: any) => ipcRenderer.invoke('sic:updateEntity', id, entity),
   sicDeleteEntity: (id: number) => ipcRenderer.invoke('sic:deleteEntity', id),
   sicImport: (filePath: string) => ipcRenderer.invoke('sic:import', filePath),
+  sicGetRemarkTemplates: () => ipcRenderer.invoke('sic:getRemarkTemplates'),
+  sicSetRemarkTemplates: (templates: any[]) => ipcRenderer.invoke('sic:setRemarkTemplates', templates),
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),
