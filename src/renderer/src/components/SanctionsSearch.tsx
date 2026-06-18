@@ -32,6 +32,21 @@ const EMPTY_FORM: Omit<SicEntry, 'id'> = {
     father_name: ''
 }
 
+const REMARK_TEMPLATES = [
+    {
+        label: 'Freeze life insurance',
+        text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the person, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.'
+    },
+    {
+        label: 'Freeze life insurance (persons listed)',
+        text: 'Notification of Decision - To kindly freeze the amounts related to life insurance contracts linked to capital accumulation and the related investment units belonging to the persons listed below, and to refrain from cancelling the policies related thereto for the purpose of recovering the insurance premiums, where applicable.'
+    },
+    {
+        label: 'Circulate identity',
+        text: 'Notification of Decision - To circulate identity photo and driving license to all banks, financial institutions, electronic payment service providers, insurance companies and category A money exchange companies operating in Lebanon.'
+    }
+]
+
 export default function SanctionsSearch() {
     const { user } = useAuth()
     const { theme } = useTheme()
@@ -723,8 +738,7 @@ export default function SanctionsSearch() {
 
             {/* ============ SIC MODAL ============ */}
             {showSicModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
-                    onClick={e => { if (e.target === e.currentTarget) setShowSicModal(false) }}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
                     <div style={{
                         background: isLight ? '#ffffff' : '#1a1d28',
                         borderRadius: '16px',
@@ -820,6 +834,24 @@ export default function SanctionsSearch() {
 
                             <div>
                                 <label style={labelStyle}>Remarks / Subject</label>
+                                <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                                    {REMARK_TEMPLATES.map((t, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => setSicForm(p => ({ ...p, remarks: t.text }))}
+                                            style={{
+                                                padding: '4px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
+                                                border: `1px solid ${sicForm.remarks === t.text ? 'var(--accent-primary)' : 'var(--input-border)'}`,
+                                                background: sicForm.remarks === t.text ? 'rgba(0,170,200,0.1)' : 'transparent',
+                                                color: sicForm.remarks === t.text ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                cursor: 'pointer', transition: 'all 0.15s'
+                                            }}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
                                 <textarea
                                     value={sicForm.remarks || ''}
                                     onChange={e => setSicForm(p => ({ ...p, remarks: e.target.value }))}

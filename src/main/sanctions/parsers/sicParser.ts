@@ -74,8 +74,8 @@ export function parseSicExcel(buffer: Buffer): { entities: SanctionsEntity[]; re
 
       let sicRef: string | null = null
       if (subject) {
-        const refMatch = subject.match(/SIC\s+Ref\s+[\d/()A-Za-z.\s]+/i)
-        if (refMatch) sicRef = refMatch[0].trim()
+        const refMatch = subject.match(/SIC\s+Ref\s+([\d/()A-Za-z.\s]+)/i)
+        if (refMatch) sicRef = refMatch[1].trim()
       }
 
       entries.push({
