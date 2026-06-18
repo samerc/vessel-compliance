@@ -852,6 +852,7 @@ export default function SanctionsSearch() {
                                 <select value={sicForm.entity_type} onChange={e => setSicForm(p => ({ ...p, entity_type: e.target.value }))} style={inputStyle}>
                                     <option value="individual">Individual</option>
                                     <option value="entity">Entity / Organization</option>
+                                    <option value="vessel">Vessel</option>
                                 </select>
                             </div>
 

@@ -12254,16 +12254,18 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, amount: r.amount != null ? Number(r.amount) : null }))
     }
 
-    async setQuotationHullAdditionalConditions(quotationId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null }[]): Promise<void> {
+    async setQuotationHullAdditionalConditions(quotationId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null; order?: number }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         try {
             await this.pool.execute('DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
+                // Honor an explicit order when supplied (shared namespace with custom conditions); fall back to array index
+                const orderIdx = item.order != null ? item.order : i
                 await this.pool.execute(
                     'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), quotationId, item.hullAdditionalConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null, item.amount != null ? item.amount : null]
+                    [uuidv4(), quotationId, item.hullAdditionalConditionId, item.textOverride || null, orderIdx, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null, item.amount != null ? item.amount : null]
                 )
             }
         } finally {
@@ -12310,10 +12312,14 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM quotation_hull_custom_conditions WHERE id = ?', [id])
     }
 
-    async reorderQuotationHullCustomConditions(quotationId: string, ids: string[]): Promise<void> {
+    async reorderQuotationHullCustomConditions(quotationId: string, ids: (string | { id: string; order: number })[]): Promise<void> {
         if (!this.pool) return
         for (let i = 0; i < ids.length; i++) {
-            await this.pool.execute('UPDATE quotation_hull_custom_conditions SET order_index = ? WHERE id = ? AND quotation_id = ?', [i, ids[i], quotationId])
+            const entry = ids[i]
+            const id = typeof entry === 'string' ? entry : entry.id
+            // Honor an explicit order when supplied (shared namespace with additional conditions); fall back to array index
+            const order = typeof entry === 'string' ? i : entry.order
+            await this.pool.execute('UPDATE quotation_hull_custom_conditions SET order_index = ? WHERE id = ? AND quotation_id = ?', [order, id, quotationId])
         }
     }
 

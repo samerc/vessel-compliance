@@ -381,7 +381,7 @@ export interface Api {
   hullAddQuotationCustomCondition: (data: { quotationId: string; text: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }) => Promise<any>
   hullUpdateQuotationCustomCondition: (id: string, updates: { text?: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }) => Promise<void>
   hullDeleteQuotationCustomCondition: (id: string) => Promise<void>
-  hullReorderQuotationCustomConditions: (qId: string, ids: string[]) => Promise<void>
+  hullReorderQuotationCustomConditions: (qId: string, ids: (string | { id: string; order: number })[]) => Promise<void>
 
   warGetConditions: () => Promise<WarCondition[]>
   warAddCondition: (text: string, defaultSelected: boolean) => Promise<WarCondition>

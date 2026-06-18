@@ -1191,10 +1191,28 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     const hc = data.hullConditions
     // Sort additional conditions by per-quotation order_index (falls back to settings order)
     const addlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
-    const ha = [...data.hullAdditionalConditions].sort((a, b) => {
+    const baseHa = [...data.hullAdditionalConditions].sort((a, b) => {
         if (a.order != null && b.order != null) return a.order - b.order
         return (addlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (addlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
     })
+    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by shared order_index.
+    // Legacy data has overlapping order namespaces, so offset custom to render after additional until reordered.
+    const _aOrders = new Set(baseHa.map(x => x.order ?? -1).filter(o => o >= 0))
+    const _custOverlap = data.hullCustomConditions.some(c => _aOrders.has(c.order ?? -1))
+    const _custBase = _custOverlap ? 100000 : 0
+    const _customSynthetic = data.hullCustomConditions.map(cc => ({
+        id: cc.id,
+        quotationId: data.quotation.id,
+        hullAdditionalConditionId: '',
+        textOverride: cc.text,
+        vesselScope: cc.vesselScope ?? null,
+        alternativeId: null,
+        amount: null,
+        order: (cc.order ?? 0) + _custBase,
+        __isCustom: true,
+        __customTitle: cc.title
+    })) as any[]
+    const ha = [...baseHa, ..._customSynthetic].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
     const alts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const ivClauseId = data.quotation.ivClauseId
@@ -1282,6 +1300,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
 
       // Determine where each additional condition belongs
       const getAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+        if ((qa as any).__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
         if (!def) return { type: 'both' }
         const ids = def.hullClauseIds || []
@@ -1301,17 +1320,19 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         for (const qa of ha) {
           const belonging = getAddlBelonging(qa)
           if (!filterFn(belonging)) continue
+          const isCustom = (qa as any).__isCustom
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-          if (!def) continue
-          let condText = qa.textOverride || def.text
-          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+          if (!def && !isCustom) continue
+          let condText = qa.textOverride || def?.text || ''
+          if (def?.hasAmount && def.amountPlaceholder && qa.amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           const plain = isHtml(condText) ? stripHtml(condText) : condText
-          text += `- ${plain}${scope}\n`
+          const ttl = isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+          text += `- ${ttl}${plain}${scope}\n`
         }
         return text
       }
@@ -1477,20 +1498,23 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         })
         let addl = ''
         for (const qa of ha) {
+          const isCustom = (qa as any).__isCustom
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-          if (!def) continue
-          // Filter: only include additional conditions linked to the selected clause (or unlinked)
-          const linkedIds = def.hullClauseIds || []
+          if (!def && !isCustom) continue
+          // Filter: only include additional conditions linked to the selected clause (or unlinked). Custom conditions are always included.
+          const linkedIds = def?.hullClauseIds || []
           const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId
-          if (linkedIds.length > 0 && clauseId && !linkedIds.includes(clauseId)) continue
-          let condText = qa.textOverride || def.text
-          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+          if (!isCustom && linkedIds.length > 0 && clauseId && !linkedIds.includes(clauseId)) continue
+          let condText = qa.textOverride || def?.text || ''
+          if (def?.hasAmount && def.amountPlaceholder && qa.amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          const plain = isHtml(condText) ? stripHtml(condText) : condText
+          const ttl = isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+          const plainRaw = isHtml(condText) ? stripHtml(condText) : condText
+          const plain = `${ttl}${plainRaw}`
           addl += `- ${plain}${scope}\n`
         }
         hcBlocks.push({ desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(dedupedConds), addl })
@@ -1507,14 +1531,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         }
         if (blk.addl) hcText += blk.addl + '\n'
       }
-      // Append custom additional conditions
-      if (data.hullCustomConditions.length > 0) {
-        hcText += '\n'
-        for (const cc of data.hullCustomConditions) {
-          if (cc.title) hcText += `${cc.title}\n`
-          hcText += `${cc.text}\n\n`
-        }
-      }
+      // Custom conditions are merged into the additional-conditions flow above (see `ha`)
       // Store blocks for PDF sub-table rendering
       ;(data as any)._hullCondBlocks = hcBlocks
       sectionMap.set('hullConditions', ['Conditions', hcText.trim()])
@@ -2504,6 +2521,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (!text) return []
     if (isHtml(text)) {
       if (/<(ul|ol|li)\b/i.test(text)) {
+        // The condition mixes an intro paragraph with an embedded list
+        // (e.g. "<p>Including ...:</p><ul><li>...</li></ul>"). Bullet the leading
+        // intro <p>(s) too so the whole condition reads as a bullet like the others,
+        // while leaving the existing list intact.
+        const listStart = text.search(/<(ul|ol)\b/i)
+        if (listStart > 0) {
+          const lead = text.slice(0, listStart)
+          const rest = text.slice(listStart)
+          if (/<p\b/i.test(lead)) {
+            const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
+            return parseHtmlToParagraphs(`<ul>${leadBullets}</ul>${rest}`, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
+          }
+        }
         return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
       }
       const bulletHtml = text.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
@@ -3187,10 +3217,28 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const hc = data.hullConditions
     // Sort additional conditions by per-quotation order_index (falls back to settings order)
     const dAddlSettingsOrder = new Map(data.allHullAdditionalConditions.map((c, i) => [c.id, c.order ?? i]))
-    const ha = [...data.hullAdditionalConditions].sort((a, b) => {
+    const dBaseHa = [...data.hullAdditionalConditions].sort((a, b) => {
         if (a.order != null && b.order != null) return a.order - b.order
         return (dAddlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (dAddlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
     })
+    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by shared order_index.
+    // Legacy data has overlapping order namespaces, so offset custom to render after additional until reordered.
+    const _dAOrders = new Set(dBaseHa.map(x => x.order ?? -1).filter(o => o >= 0))
+    const _dCustOverlap = data.hullCustomConditions.some(c => _dAOrders.has(c.order ?? -1))
+    const _dCustBase = _dCustOverlap ? 100000 : 0
+    const _dCustomSynthetic = data.hullCustomConditions.map(cc => ({
+        id: cc.id,
+        quotationId: data.quotation.id,
+        hullAdditionalConditionId: '',
+        textOverride: cc.text,
+        vesselScope: cc.vesselScope ?? null,
+        alternativeId: null,
+        amount: null,
+        order: (cc.order ?? 0) + _dCustBase,
+        __isCustom: true,
+        __customTitle: cc.title
+    })) as any[]
+    const ha = [...dBaseHa, ..._dCustomSynthetic].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
     const dAlts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
       const hcContent: (Paragraph | Table)[] = []
@@ -3297,6 +3345,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       // Determine where each additional condition belongs
       const dGetAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+        if ((qa as any).__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
         if (!def) return { type: 'both' }
         const ids = def.hullClauseIds || []
@@ -3316,17 +3365,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         for (const qa of ha) {
           const belonging = dGetAddlBelonging(qa)
           if (!filterFn(belonging)) continue
+          const isCustom = (qa as any).__isCustom
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-          if (!def) continue
-          let condText = qa.textOverride || def.text
-          if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+          if (!def && !isCustom) continue
+          let condText = qa.textOverride || def?.text || ''
+          if (def?.hasAmount && def.amountPlaceholder && qa.amount != null) {
             const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          const isNewHullAddl = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
-          paras.push(...mpBullet(condText + scope, isNewHullAddl ? RED : undefined))
+          const ttl = isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+          const isNewHullAddl = !isCustom && origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
+          paras.push(...mpBullet(ttl + condText + scope, isNewHullAddl ? RED : undefined))
         }
         return paras
       }
@@ -3563,6 +3614,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Filter additional conditions by clause linkage
         const clauseId = dClauseId
         const filteredHa = ha.filter(qa => {
+          if ((qa as any).__isCustom) return true
           const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
           if (!def) return false
           const linkedIds = def.hullClauseIds || []
@@ -3571,28 +3623,23 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (filteredHa.length > 0) {
           hcContent.push(emptyP())
           for (const qa of filteredHa) {
+            const isCustom = (qa as any).__isCustom
             const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-            if (!def) continue
-            let condText = qa.textOverride || def.text
-            if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+            if (!def && !isCustom) continue
+            let condText = qa.textOverride || def?.text || ''
+            if (def?.hasAmount && def.amountPlaceholder && qa.amount != null) {
               const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               condText = condText.replace(new RegExp(escaped, 'g'), formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD'))
             }
             condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
             const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-            const isNewHullAddlInline = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
-            hcContent.push(...mpBullet(condText + scope, isNewHullAddlInline ? RED : undefined))
+            const ttl = isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+            const isNewHullAddlInline = !isCustom && origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
+            hcContent.push(...mpBullet(ttl + condText + scope, isNewHullAddlInline ? RED : undefined))
           }
         }
       }
-      // Append custom hull additional conditions
-      if (data.hullCustomConditions.length > 0) {
-        hcContent.push(emptyP())
-        for (const cc of data.hullCustomConditions) {
-          if (cc.title) hcContent.push(bup(cc.title))
-          hcContent.push(np(cc.text))
-        }
-      }
+      // Custom conditions are merged into the additional-conditions flow above (see `ha`)
       rowMap.set('hullConditions', makeRow('Conditions', hcContent))
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Plus, Trash2, ChevronDown, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, X, RefreshCw, Users, Ship, GitBranch } from 'lucide-react'
 import { Quotation, HullClause, HullClauseCondition, HullAdditionalCondition, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative, QuotationVessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
@@ -276,15 +276,42 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     const [qAdditional, setQAdditional] = useState<QuotationHullAdditionalCondition[]>([])
     const [customConditions, setCustomConditions] = useState<{ id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]>([])
     const [newCustomText, setNewCustomText] = useState('')
-    const [hullSubTab, setHullSubTab] = useState<'conditions' | 'additional' | 'custom'>('conditions')
+    const [hullSubTab, setHullSubTab] = useState<'conditions' | 'additional'>('conditions')
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [selectedVesselScope, setSelectedVesselScope] = useState<string | null>(null) // null = "All Vessels"
     const [addOverrideOpen, setAddOverrideOpen] = useState(false)
     const addOverrideRef = useRef<HTMLDivElement>(null)
     const condDefaultsApplied = useRef(false)
     const addDefaultsApplied = useRef(false)
+    const orderNormalized = useRef(false)
 
     useEffect(() => { loadData() }, [])
+
+    // Normalize the additional + custom order into a single shared, gap-free namespace.
+    // Legacy data has two independent 0-based namespaces that overlap, which makes
+    // interleaving impossible. Runs once when overlap is first detected, then persists.
+    useEffect(() => {
+        if (orderNormalized.current) return
+        if (qAdditional.length === 0 && customConditions.length === 0) return
+        const aOrders = qAdditional.map(c => c.order ?? 0)
+        const cOrders = customConditions.map(c => c.order ?? 0)
+        const overlap = cOrders.some(o => aOrders.includes(o))
+        orderNormalized.current = true
+        if (!overlap) return
+        const sortedA = [...qAdditional].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const sortedC = [...customConditions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const newA = sortedA.map((c, i) => ({ ...c, order: i }))
+        const newC = sortedC.map((c, i) => ({ ...c, order: sortedA.length + i }))
+        setQAdditional(newA)
+        setCustomConditions(newC)
+        window.api.hullSetQuotationHullAdditionalConditions(
+            quotation.id,
+            newA.map(c => ({ hullAdditionalConditionId: c.hullAdditionalConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope, alternativeId: c.alternativeId, amount: c.amount, order: c.order }))
+        ).catch(() => {})
+        if (newC.length > 0) {
+            window.api.hullReorderQuotationCustomConditions(quotation.id, newC.map(c => ({ id: c.id, order: c.order! }))).catch(() => {})
+        }
+    }, [qAdditional, customConditions, quotation.id])
 
     // Close add-override dropdown on outside click
     useEffect(() => {
@@ -693,12 +720,15 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         if (c.amount != null) additionalAmounts[c.hullAdditionalConditionId] = c.amount
     })
 
+    // Always carry the explicit order so deletes+reinserts never clobber the shared
+    // additional+custom ordering namespace.
     const mapAddForSave = (c: QuotationHullAdditionalCondition) => ({
         hullAdditionalConditionId: c.hullAdditionalConditionId,
         textOverride: c.textOverride,
         vesselScope: c.vesselScope,
         alternativeId: c.alternativeId,
-        amount: c.amount
+        amount: c.amount,
+        order: c.order
     })
 
     const toggleAdditional = async (addId: string) => {
@@ -706,9 +736,11 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         if (selectedAddIds.has(addId)) {
             updated = qAdditional.filter(c => c.hullAdditionalConditionId !== addId)
         } else {
+            // Append after the whole combined additional+custom list (shared order namespace)
+            const maxOrder = Math.max(-1, ...qAdditional.map(c => c.order ?? 0), ...customConditions.map(c => c.order ?? 0))
             updated = [
                 ...qAdditional,
-                { id: '', quotationId: quotation.id, hullAdditionalConditionId: addId, order: qAdditional.length, alternativeId: null } as QuotationHullAdditionalCondition
+                { id: '', quotationId: quotation.id, hullAdditionalConditionId: addId, order: maxOrder + 1, alternativeId: null } as QuotationHullAdditionalCondition
             ]
         }
         try {
@@ -744,6 +776,80 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
             const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(fresh) ? fresh : [])
+        } catch {}
+    }
+
+    // -- Custom conditions (now merged into the Additional Conditions tab) --
+
+    const addCustomCondition = async () => {
+        if (!newCustomText.trim()) return
+        try {
+            await window.api.hullAddQuotationCustomCondition({ quotationId: quotation.id, text: newCustomText.trim() })
+            setNewCustomText('')
+            const fresh = await window.api.hullGetQuotationCustomConditions(quotation.id)
+            setCustomConditions(Array.isArray(fresh) ? fresh : [])
+        } catch {}
+    }
+
+    const deleteCustomCondition = async (id: string) => {
+        try {
+            await window.api.hullDeleteQuotationCustomCondition(id)
+            setCustomConditions(prev => prev.filter(c => c.id !== id))
+        } catch {}
+    }
+
+    const updateCustomConditionText = async (id: string, text: string) => {
+        try {
+            await window.api.hullUpdateQuotationCustomCondition(id, { text })
+            setCustomConditions(prev => prev.map(c => c.id === id ? { ...c, text } : c))
+        } catch {}
+    }
+
+    // Build the combined additional + custom list in unified export order.
+    // Legacy data has overlapping order namespaces (each 0..N); offset custom so it renders after
+    // additional until the user reorders, which writes a single shared namespace to both tables.
+    type MergedCondItem =
+        | { kind: 'addl'; key: string; order: number; label: string; text: string }
+        | { kind: 'custom'; key: string; order: number; text: string; title?: string }
+    const buildMergedCondItems = (): MergedCondItem[] => {
+        const filteredAddIds = new Set(filteredAdditional.map(a => a.id))
+        const addlItems: MergedCondItem[] = qAdditional
+            .filter(qa => filteredAddIds.has(qa.hullAdditionalConditionId))
+            .map(qa => {
+                const def = allAdditional.find(a => a.id === qa.hullAdditionalConditionId)
+                return { kind: 'addl' as const, key: qa.hullAdditionalConditionId, order: qa.order ?? 0, label: def?.title || '', text: def?.text || '' }
+            })
+        const aOrders = new Set(addlItems.map(i => i.order))
+        const overlap = customConditions.some(c => aOrders.has(c.order ?? 0))
+        const custBase = overlap ? 100000 : 0
+        const custItems: MergedCondItem[] = customConditions.map(cc => ({ kind: 'custom' as const, key: cc.id, order: (cc.order ?? 0) + custBase, text: cc.text, title: cc.title }))
+        return [...addlItems, ...custItems].sort((a, b) => a.order - b.order)
+    }
+
+    const reorderMergedConditions = async (merged: MergedCondItem[], fromIdx: number, toIdx: number) => {
+        if (fromIdx === toIdx) return
+        const next = [...merged]
+        const [moved] = next.splice(fromIdx, 1)
+        next.splice(toIdx, 0, moved)
+        // Assign a single shared order namespace across both types
+        const customOrder: { id: string; order: number }[] = []
+        const addlOrder = new Map<string, number>()
+        next.forEach((it, i) => {
+            if (it.kind === 'custom') customOrder.push({ id: it.key, order: i })
+            else addlOrder.set(it.key, i)
+        })
+        setCustomConditions(prev => prev.map(c => {
+            const o = customOrder.find(x => x.id === c.id)
+            return o ? { ...c, order: o.order } : c
+        }))
+        const updatedAddl = qAdditional.map(qa => addlOrder.has(qa.hullAdditionalConditionId)
+            ? { ...qa, order: addlOrder.get(qa.hullAdditionalConditionId)! }
+            : qa)
+        const sortedAddl = [...updatedAddl].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        setQAdditional(sortedAddl)
+        try {
+            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, sortedAddl.map(mapAddForSave))
+            if (customOrder.length > 0) await window.api.hullReorderQuotationCustomConditions(quotation.id, customOrder)
         } catch {}
     }
 
@@ -937,10 +1043,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     Conditions
                 </button>
                 <button onClick={() => setHullSubTab('additional')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
-                    Additional Conditions <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length}</span>
-                </button>
-                <button onClick={() => setHullSubTab('custom')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'custom' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'custom' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
-                    Custom <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{customConditions.length}</span>
+                    Additional Conditions <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length + customConditions.length}</span>
                 </button>
             </div>
 
@@ -1373,7 +1476,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 </>
             )}
             </div>
-        {/* Additional Conditions — sub-tab */}
+        {/* Additional Conditions — sub-tab (additional + custom, sortable together) */}
         {hullSubTab === 'additional' && (
             <div>
                 <HullConditionPicker
@@ -1392,112 +1495,90 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     onAmountChange={(id, amount) => updateAdditionalAmount(id, amount ?? null)}
                     onAmountBlur={saveAdditionalOverrides}
                 />
-                {/* Reorder selected additional conditions */}
-                {(() => {
-                    const filteredAddIds = new Set(filteredAdditional.map(a => a.id))
-                    const selectedItems = qAdditional
-                        .filter(qa => filteredAddIds.has(qa.hullAdditionalConditionId))
-                        .map(qa => {
-                            const def = allAdditional.find(a => a.id === qa.hullAdditionalConditionId)
-                            return { ...qa, title: def?.title || '', text: def?.text || '' }
-                        })
-                    if (selectedItems.length < 2) return null
-                    return (
-                        <div style={{ marginTop: '16px', borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`, paddingTop: '12px' }}>
-                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Export Order (drag to reorder)</label>
-                            {selectedItems.map((item, idx) => (
-                                <div key={item.hullAdditionalConditionId}
-                                    draggable
-                                    onDragStart={e => e.dataTransfer.setData('addl-idx', String(idx))}
-                                    onDragOver={e => e.preventDefault()}
-                                    onDrop={async e => {
-                                        e.preventDefault()
-                                        const fromIdx = parseInt(e.dataTransfer.getData('addl-idx'))
-                                        if (isNaN(fromIdx) || fromIdx === idx) return
-                                        // Reorder within the filtered subset
-                                        const reorderedFiltered = [...selectedItems]
-                                        const [moved] = reorderedFiltered.splice(fromIdx, 1)
-                                        reorderedFiltered.splice(idx, 0, moved)
-                                        // Rebuild full array: keep non-filtered items in place, replace filtered items in new order
-                                        const nonFiltered = qAdditional.filter(qa => !filteredAddIds.has(qa.hullAdditionalConditionId))
-                                        const reordered = [...reorderedFiltered.map(r => qAdditional.find(qa => qa.hullAdditionalConditionId === r.hullAdditionalConditionId)!), ...nonFiltered]
-                                        setQAdditional(reordered)
-                                        await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, reordered.map(mapAddForSave))
-                                    }}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        padding: '6px 10px', marginBottom: '4px', borderRadius: '6px',
-                                        border: '1px solid var(--table-border)', cursor: 'grab',
-                                        fontSize: '0.8rem', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
-                                    }}
-                                >
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', cursor: 'grab' }}>⠿</span>
-                                    <span style={{ fontWeight: 600, minWidth: '18px', color: 'var(--text-secondary)' }}>{idx + 1}.</span>
-                                    <span style={{ flex: 1 }}>{item.title || item.text.substring(0, 80)}{!item.title && item.text.length > 80 ? '...' : ''}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )
-                })()}
 
-            </div>
-        )}
-
-        {/* Custom Additional Conditions — sub-tab */}
-        {hullSubTab === 'custom' && (
-            <div>
-                {/* Add new custom condition */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                {/* Add a custom condition (free text) */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
                     <textarea
                         value={newCustomText}
                         onChange={e => setNewCustomText(e.target.value)}
-                        placeholder="Enter custom condition text..."
+                        placeholder="Add a custom condition..."
                         rows={2}
                         style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
                     />
                     <button
                         className="btn-primary"
                         disabled={!newCustomText.trim()}
-                        onClick={async () => {
-                            if (!newCustomText.trim()) return
-                            try {
-                                await window.api.hullAddQuotationCustomCondition({ quotationId: quotation.id, text: newCustomText.trim() })
-                                setNewCustomText('')
-                                const fresh = await window.api.hullGetQuotationCustomConditions(quotation.id)
-                                setCustomConditions(Array.isArray(fresh) ? fresh : [])
-                            } catch {}
-                        }}
+                        onClick={addCustomCondition}
                         style={{ padding: '8px 14px', fontSize: '0.82rem', alignSelf: 'flex-start' }}
-                    >Add</button>
+                    >Add Custom</button>
                 </div>
 
-                {/* List of custom conditions */}
-                {customConditions.map((cc, idx) => (
-                    <div key={cc.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '6px', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, minWidth: '18px', paddingTop: '2px' }}>{idx + 1}.</span>
-                        <textarea
-                            defaultValue={cc.text}
-                            onBlur={e => {
-                                if (e.target.value !== cc.text) {
-                                    window.api.hullUpdateQuotationCustomCondition(cc.id, { text: e.target.value })
-                                    setCustomConditions(prev => prev.map(c => c.id === cc.id ? { ...c, text: e.target.value } : c))
-                                }
-                            }}
-                            rows={2}
-                            style={{ flex: 1, padding: '4px 8px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
-                        />
-                        <button
-                            onClick={async () => {
-                                await window.api.hullDeleteQuotationCustomCondition(cc.id)
-                                setCustomConditions(prev => prev.filter(c => c.id !== cc.id))
-                            }}
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
-                        ><Trash2 size={14} /></button>
-                    </div>
-                ))}
-                {customConditions.length === 0 && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '4px 0' }}>No custom conditions added.</div>
-                )}
+                {/* Unified order list: additional + custom, drag to reorder together */}
+                {(() => {
+                    const merged = buildMergedCondItems()
+                    if (merged.length === 0) return null
+                    return (
+                        <div style={{ marginTop: '16px', borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`, paddingTop: '12px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Conditions Order (drag to reorder)</label>
+                            {merged.map((item, idx) => (
+                                <div key={`${item.kind}-${item.key}`}
+                                    draggable
+                                    onDragStart={e => e.dataTransfer.setData('merged-idx', String(idx))}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={async e => {
+                                        e.preventDefault()
+                                        const fromIdx = parseInt(e.dataTransfer.getData('merged-idx'))
+                                        if (isNaN(fromIdx)) return
+                                        await reorderMergedConditions(merged, fromIdx, idx)
+                                    }}
+                                    style={{
+                                        display: 'flex', alignItems: 'flex-start', gap: '8px',
+                                        padding: '6px 10px', marginBottom: '4px', borderRadius: '6px',
+                                        border: '1px solid var(--table-border)', cursor: 'grab',
+                                        fontSize: '0.8rem',
+                                        background: item.kind === 'custom'
+                                            ? (isLight ? 'rgba(0,170,200,0.05)' : 'rgba(0,170,200,0.06)')
+                                            : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)')
+                                    }}
+                                >
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', cursor: 'grab', paddingTop: '3px' }}>⠿</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                                        <button
+                                            onClick={() => reorderMergedConditions(merged, idx, idx - 1)}
+                                            disabled={idx === 0}
+                                            title="Move up"
+                                            style={{ background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.25 : 0.7, padding: 0, display: 'flex' }}
+                                        ><ChevronUp size={14} /></button>
+                                        <button
+                                            onClick={() => reorderMergedConditions(merged, idx, idx + 1)}
+                                            disabled={idx === merged.length - 1}
+                                            title="Move down"
+                                            style={{ background: 'transparent', border: 'none', cursor: idx === merged.length - 1 ? 'default' : 'pointer', color: 'var(--text-secondary)', opacity: idx === merged.length - 1 ? 0.25 : 0.7, padding: 0, display: 'flex' }}
+                                        ><ChevronDown size={14} /></button>
+                                    </div>
+                                    <span style={{ fontWeight: 600, minWidth: '18px', color: 'var(--text-secondary)', paddingTop: '2px' }}>{idx + 1}.</span>
+                                    {item.kind === 'addl' ? (
+                                        <span style={{ flex: 1, paddingTop: '2px' }}>{item.label || item.text.substring(0, 80)}{!item.label && item.text.length > 80 ? '...' : ''}</span>
+                                    ) : (
+                                        <>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.4px', paddingTop: '4px', flexShrink: 0 }}>Custom</span>
+                                            <textarea
+                                                defaultValue={item.text}
+                                                onBlur={e => { if (e.target.value !== item.text) updateCustomConditionText(item.key, e.target.value) }}
+                                                rows={2}
+                                                style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
+                                            />
+                                            <button
+                                                onClick={() => deleteCustomCondition(item.key)}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                            ><Trash2 size={14} /></button>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()}
             </div>
         )}
         </div>

@@ -1335,6 +1335,17 @@ function polMpBullet(text: string): Paragraph[] {
   const decoded = decodeHtmlEntities(text)
   if (polIsHtml(decoded)) {
     if (/<(ul|ol|li)\b/i.test(decoded)) {
+      // Bullet a leading intro <p> that precedes an embedded list so the whole
+      // condition reads as a bullet (e.g. "<p>Including ...:</p><ul><li>...</li></ul>").
+      const listStart = decoded.search(/<(ul|ol)\b/i)
+      if (listStart > 0) {
+        const lead = decoded.slice(0, listStart)
+        const rest = decoded.slice(listStart)
+        if (/<p\b/i.test(lead)) {
+          const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
+          return parseHtmlToParagraphs(`<ul>${leadBullets}</ul>${rest}`, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+        }
+      }
       return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
     }
     const bulletHtml = decoded.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
