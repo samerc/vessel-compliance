@@ -1184,6 +1184,11 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN war_section2_text TEXT NULL")
                     await this.pool.query("ALTER TABLE quotations ADD COLUMN war_combined_limit_text TEXT NULL")
                 }
+                // Migration: war_section2_only toggle
+                const [ws2Col] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'war_section2_only'") as any[]
+                if ((ws2Col as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotations ADD COLUMN war_section2_only BOOLEAN DEFAULT FALSE")
+                }
                 const [weVCol] = await this.pool.query("SHOW COLUMNS FROM quotation_vessels LIKE 'war_excess_amount'") as any[]
                 if ((weVCol as any[]).length === 0) {
                     await this.pool.query("ALTER TABLE quotation_vessels ADD COLUMN war_excess_amount DECIMAL(15,2) NULL")
@@ -2697,6 +2702,7 @@ export class MySQLAdapter {
 
             // Migration: quotation_trading_intros table for per-vessel trading warranty intro text
             try {
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_trading_intros (
                     id VARCHAR(36) PRIMARY KEY,
                     quotation_id VARCHAR(36) NOT NULL,
@@ -2705,6 +2711,7 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0,
                     FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch {}
 
             // Migration: reopen_reason on survey_defects
@@ -3694,6 +3701,7 @@ export class MySQLAdapter {
         const auditFields: { updateKey: keyof Vessel; dbCol: string; label: string }[] = [
             { updateKey: 'name', dbCol: 'name', label: 'Name' },
             { updateKey: 'imoNumber', dbCol: 'imo_number', label: 'IMO Number' },
+            { updateKey: 'fleetId', dbCol: 'fleet_id', label: 'Fleet' },
             { updateKey: 'flagStateId', dbCol: 'flag_state_id', label: 'Flag State' },
             { updateKey: 'builtYear', dbCol: 'built_year', label: 'Built Year' },
             { updateKey: 'rebuiltYear', dbCol: 'rebuilt_year', label: 'Rebuilt Year' },
@@ -3776,6 +3784,26 @@ export class MySQLAdapter {
                             const placeholders = idsToResolve.map(() => '?').join(',')
                             const [nameRows] = await this.pool.query(
                                 `SELECT id, name FROM flag_states WHERE id IN (${placeholders})`,
+                                idsToResolve
+                            )
+                            for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+                        }
+                        const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
+                        const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
+                        if (oldName !== newName) {
+                            await this.addVesselAuditEntry(id, af.label, oldName, newName, who)
+                        }
+                        continue
+                    }
+
+                    // Resolve fleet UUIDs to names
+                    if (af.updateKey === 'fleetId') {
+                        const idsToResolve = [oldVal, newVal].filter(Boolean) as string[]
+                        const nameMap = new Map<string, string>()
+                        if (idsToResolve.length > 0) {
+                            const placeholders = idsToResolve.map(() => '?').join(',')
+                            const [nameRows] = await this.pool.query(
+                                `SELECT id, name FROM fleets WHERE id IN (${placeholders})`,
                                 idsToResolve
                             )
                             for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
@@ -8082,7 +8110,7 @@ export class MySQLAdapter {
                 q.insured_value_amount, q.insured_value_currency, q.insured_value_text,
                 q.port_of_loading, q.port_of_destination, q.estimated_departure,
                 q.subject_matter, q.any_other_vessel, q.premium_rate, q.premium_type,
-                q.war_excess_enabled, q.war_excess_amount, q.war_excess_rate,
+                q.war_excess_enabled, q.war_excess_amount, q.war_excess_rate, q.war_section2_only,
                 q.war_section1_text, q.war_section2_text, q.war_combined_limit_text,
                 q.voyage_text,
                 q.cargo_clause_id as cargoClauseId,
@@ -8155,6 +8183,7 @@ export class MySQLAdapter {
             premiumRate: r.premium_rate != null ? Number(r.premium_rate) : null,
             premiumType: r.premium_type || 'amount',
             warExcessEnabled: Boolean(r.war_excess_enabled),
+            warSection2Only: Boolean(r.war_section2_only),
             warExcessAmount: r.war_excess_amount != null ? Number(r.war_excess_amount) : null,
             warExcessRate: r.war_excess_rate != null ? Number(r.war_excess_rate) : null,
             warSection1Text: r.war_section1_text || null,
@@ -8258,6 +8287,7 @@ export class MySQLAdapter {
             premiumRate: 'premium_rate',
             premiumType: 'premium_type',
             warExcessEnabled: 'war_excess_enabled',
+            warSection2Only: 'war_section2_only',
             warExcessAmount: 'war_excess_amount',
             warExcessRate: 'war_excess_rate',
             warSection1Text: 'war_section1_text',
@@ -8826,7 +8856,7 @@ export class MySQLAdapter {
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id,
-                    war_excess_enabled, war_excess_amount, war_excess_rate,
+                    war_excess_enabled, war_excess_amount, war_excess_rate, war_section2_only,
                     war_section1_text, war_section2_text, war_combined_limit_text,
                     outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
                     full_premium_loss_enabled, full_premium_loss_text,
@@ -8853,7 +8883,7 @@ export class MySQLAdapter {
                     port_of_loading, port_of_destination, estimated_departure,
                     subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
                     cargo_clause_id,
-                    war_excess_enabled, war_excess_amount, war_excess_rate,
+                    war_excess_enabled, war_excess_amount, war_excess_rate, war_section2_only,
                     war_section1_text, war_section2_text, war_combined_limit_text,
                     outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
                     full_premium_loss_enabled, full_premium_loss_text,
@@ -10804,6 +10834,7 @@ export class MySQLAdapter {
         if (!this.pool) return null
         const [rows] = await this.pool.query(`
             SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
+                   q.reference_number as quotationReference,
                    v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
                    v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage,
                    v.classification_society as classificationSociety, v.fleet_id as fleetId, v.call_sign as callSign,
@@ -10837,6 +10868,7 @@ export class MySQLAdapter {
             selectedAlternativeId: r.selected_alternative_id || null,
             revisionNumber: Number(r.revision_number || 0),
             quotationId: r.quotation_id,
+            quotationReference: r.quotationReference || null,
             vesselId: r.vessel_id,
             policyNumber: r.policy_number,
             inceptionDate: r.inception_date,

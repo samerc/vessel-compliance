@@ -3847,7 +3847,9 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
             <form onSubmit={handleAdd} style={{ marginBottom: '16px', padding: '14px', borderRadius: '8px', border: '1px dashed var(--table-border)' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '10px' }}>
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. War Exclusion)" style={{ width: '200px', flexShrink: 0 }} />
-                    <textarea value={newText} onChange={e => setNewText(e.target.value)} placeholder="Condition text (e.g., Excluding all claims of whatsoever nature...)" style={{ flex: 1, minHeight: '100px', minWidth: '200px', fontSize: '0.85rem', padding: '8px' }} />
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                    <RichTextEditor value={newText} onChange={setNewText} placeholder="Condition text (e.g., Excluding all claims of whatsoever nature...)" minHeight={80} />
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {hullClauses.length > 0 && (
@@ -3895,7 +3897,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                         {editingId === c.id ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" style={{ width: '240px' }} />
-                                <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ width: '100%', minHeight: '100px', fontSize: '0.82rem', padding: '8px', resize: 'vertical' }} />
+                                <RichTextEditor value={editText} onChange={setEditText} minHeight={80} />
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                         <input type="checkbox" checked={editHasAmount} onChange={e => setEditHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
@@ -3906,7 +3908,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                                 </div>
                             </div>
                         ) : (
-                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{c.text}</div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: c.text }} />
                         )}
                     </div>
                     {/* Footer: clause pills */}

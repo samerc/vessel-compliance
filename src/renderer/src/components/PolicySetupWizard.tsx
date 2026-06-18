@@ -296,6 +296,23 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Auto-calculate expiry date/time when inception changes
+  useEffect(() => {
+    if (!data.inceptionDate) return
+    const [y, m, d] = data.inceptionDate.split('-').map(Number)
+    if (data.inceptionTime === '00:00') {
+      // 00:00 inception → expiry = 1 year minus 1 day at 23:59
+      const exp = new Date(y + 1, m - 1, d - 1)
+      const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
+      setData(prev => ({ ...prev, expiryDate, expiryTime: '23:59' }))
+    } else {
+      // Other times → expiry = 1 year same time
+      const exp = new Date(y + 1, m - 1, d)
+      const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
+      setData(prev => ({ ...prev, expiryDate, expiryTime: data.inceptionTime }))
+    }
+  }, [data.inceptionDate, data.inceptionTime])
+
   // Recalculate instalment dates when inception date changes
   useEffect(() => {
     if (!data.inceptionDate || instalments.length === 0) return

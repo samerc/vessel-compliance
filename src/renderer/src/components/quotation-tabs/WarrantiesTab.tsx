@@ -611,9 +611,11 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                         <RichTextEditor
                                             value={quotation.sectionTextsOverride?.warrantiesAdditionalText ?? getEffectiveText('warrantiesAdditionalText')}
                                             onChange={val => {
-                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesAdditionalText: val }
-                                                setQ(p => ({ ...p, sectionTextsOverride: override }))
-                                                updateField('sectionTextsOverride', override)
+                                                setQ(p => {
+                                                    const override = { ...(p.sectionTextsOverride || {}), warrantiesAdditionalText: val }
+                                                    updateField('sectionTextsOverride', override)
+                                                    return { ...p, sectionTextsOverride: override }
+                                                })
                                             }}
                                             minHeight={60}
                                             showFontSize showAlignment showLineSpacing
@@ -633,9 +635,11 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                         <RichTextEditor
                                             value={quotation.sectionTextsOverride?.warrantiesBreach ?? getEffectiveText('warrantiesBreach')}
                                             onChange={val => {
-                                                const override = { ...(quotation.sectionTextsOverride || {}), warrantiesBreach: val }
-                                                setQ(p => ({ ...p, sectionTextsOverride: override }))
-                                                updateField('sectionTextsOverride', override)
+                                                setQ(p => {
+                                                    const override = { ...(p.sectionTextsOverride || {}), warrantiesBreach: val }
+                                                    updateField('sectionTextsOverride', override)
+                                                    return { ...p, sectionTextsOverride: override }
+                                                })
                                             }}
                                             minHeight={60}
                                             showFontSize showAlignment showLineSpacing

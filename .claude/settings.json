@@ -14,7 +14,8 @@
       "Bash(grep -E \"\\\\.\\(js|py|json|yaml|yml\\)$|^d\")",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
       "WebSearch",
-      "WebFetch(domain:vesselapi.com)"
+      "WebFetch(domain:vesselapi.com)",
+      "Bash(npm run:*)"
     ]
   }
 }

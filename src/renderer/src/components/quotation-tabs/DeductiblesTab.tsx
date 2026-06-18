@@ -192,9 +192,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         </div>
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
-                        {!(qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts)) && (
-                            <MoneyInput value={d.amount || undefined} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, amount: val || 0 } : dd))} onBlur={val => handleUpdate(d.id, { amount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
-                        )}
+                        <MoneyInput value={d.amount || undefined} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, amount: val || 0 } : dd))} onBlur={val => handleUpdate(d.id, { amount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                         {(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description)) && (
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>2nd:</span>
@@ -339,9 +337,11 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         <RichTextEditor
                             value={quotation.sectionTextsOverride?.deductiblesAdditionalText ?? getEffectiveText('deductiblesAdditionalText')}
                             onChange={val => {
-                                const override = { ...(quotation.sectionTextsOverride || {}), deductiblesAdditionalText: val }
-                                setQ(p => ({ ...p, sectionTextsOverride: override }))
-                                updateField('sectionTextsOverride', override)
+                                setQ(p => {
+                                    const override = { ...(p.sectionTextsOverride || {}), deductiblesAdditionalText: val }
+                                    updateField('sectionTextsOverride', override)
+                                    return { ...p, sectionTextsOverride: override }
+                                })
                             }}
                             minHeight={60}
                             showFontSize showAlignment showLineSpacing

@@ -27,6 +27,8 @@ interface TaxSettings {
   muniTaxPct: number
   commissionPct: number
   nrTaxPct: number
+  feesRate: number
+  feesDivisor: number
 }
 
 const DEFAULT_SETTINGS: TaxSettings = {
@@ -38,18 +40,33 @@ const DEFAULT_SETTINGS: TaxSettings = {
   muniTaxPct: 6,
   commissionPct: 15,
   nrTaxPct: 2.25,
+  feesRate: 0.4005,
+  feesDivisor: 1.09,
 }
 
-// ── Tax calculation (mirrors Premium Calculation - Taxes.xlsx) ────────────────
+// ── Tax calculation (mirrors Premium Calculation - Taxes.xlsx, columns C–K) ───
+// Maps to the Excel sheet cell-for-cell:
+//   A = grossPremUSD, B = exchangeRate, J = A*B, C = A*netPremium%*B
+//   E = IF(A<1000, 0, costOfPolicy)
+//   D = feesRate/feesDivisor*J - fixedStamps/feesDivisor - E   (NOT rounded)
+//   base = SUM(C:E) = C + D + E        (E cancels with the -E inside D)
+//   F = ROUND(base*propStamps%, -3)    (nearest 1,000)
+//   H = ROUND(base*muniTax%, 0)        (nearest 1)
+//   K (For War RI) = F + fixedStamps + H   →  taxes USD = K / B
 
 function calcTaxesUSD(grossPremUSD: number, s: TaxSettings): number {
   if (grossPremUSD <= 0) return 0
   const { exchangeRate, netPremiumPct, costOfPolicy, propStampsPct, fixedStamps, muniTaxPct } = s
+  const feesRate = s.feesRate ?? 0.4005
+  const feesDivisor = s.feesDivisor || 1.09
   const j = grossPremUSD * exchangeRate
   const c = grossPremUSD * (netPremiumPct / 100) * exchangeRate
-  const d = Math.round(((j * 0.4005) - 19531000) / 1.09)
-  const base = c + d + costOfPolicy
-  const k = Math.round(base * (propStampsPct / 100)) + fixedStamps + Math.round(base * (muniTaxPct / 100))
+  const e = grossPremUSD < 1000 ? 0 : costOfPolicy
+  const d = (feesRate / feesDivisor) * j - fixedStamps / feesDivisor - e
+  const base = c + d + e
+  const f = Math.round((base * (propStampsPct / 100)) / 1000) * 1000
+  const h = Math.round(base * (muniTaxPct / 100))
+  const k = f + fixedStamps + h
   return k / exchangeRate
 }
 
@@ -578,6 +595,8 @@ export default function WarBreachCalculator() {
                 { label: 'Proportional Stamps %', field: 'propStampsPct', step: '0.1', note: 'default 3%' },
                 { label: 'Fixed Stamps (LBP)', field: 'fixedStamps', step: '1000', note: 'default 200 000 for war' },
                 { label: 'Municipal Tax %', field: 'muniTaxPct', step: '0.1', note: 'default 6%' },
+                { label: 'Fees Rate', field: 'feesRate', step: '0.0001', note: 'default 0.4005' },
+                { label: 'Fees Divisor', field: 'feesDivisor', step: '0.01', note: 'default 1.09' },
                 { label: 'Commission %', field: 'commissionPct', step: '0.25', note: 'broker commission' },
                 { label: 'Non-Resident Tax %', field: 'nrTaxPct', step: '0.01', note: 'default 2.25%' },
               ] as { label: string; field: keyof TaxSettings; step: string; note: string }[]).map(({ label, field, step, note }) => (

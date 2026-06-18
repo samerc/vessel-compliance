@@ -104,6 +104,8 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLa
 
 // ==================== Hull Condition Picker (shared) ====================
 
+const stripTags = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
 function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, onOverrideChange, onOverrideBlur, scopes, onScopeChange, vessels, emptyText, amounts, onAmountChange, onAmountBlur, allConditions: _allConds, vesselAmountsMap, onVesselAmountChange, onVesselAmountBlur }: {
     label: string
     items: { id: string; label: string; text: string; hasAmount?: boolean; amountPlaceholder?: string }[]
@@ -182,7 +184,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                                                 <input type="checkbox" checked={checked} readOnly style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)', pointerEvents: 'none' }} />
                                                 <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem' }}>
                                                     {item.label && <span style={{ fontWeight: 600, marginRight: '4px' }}>{item.label}</span>}
-                                                    <span style={{ color: 'var(--text-secondary)' }}>{item.text.length > 100 ? item.text.slice(0, 100) + '...' : item.text}</span>
+                                                    <span style={{ color: 'var(--text-secondary)' }}>{(() => { const t = stripTags(item.text); return t.length > 100 ? t.slice(0, 100) + '...' : t })()}</span>
                                                 </div>
                                             </div>
                                         )
@@ -202,7 +204,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                                 <button type="button" onClick={e => { e.stopPropagation(); onToggle(item.id) }} title="Remove"
                                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', flexShrink: 0 }}><X size={12} /></button>
                                 {item.label && <span style={{ fontWeight: 600, fontSize: '0.78rem', flexShrink: 0 }}>{item.label}</span>}
-                                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{overrides[item.id] || item.text}</span>
+                                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripTags(overrides[item.id] || item.text)}</span>
                                 {item.hasAmount && amounts && amounts[item.id] != null && (
                                     <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', flexShrink: 0 }}>{Number(amounts[item.id]).toLocaleString()}</span>
                                 )}

@@ -29,6 +29,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showAddForm, setShowAddForm] = useState(false)
+  const defectNumberRef = useRef<HTMLInputElement>(null)
   const [closeModalDefect, setCloseModalDefect] = useState<SurveyDefect | null>(null)
   const [closureNotes, setClosureNotes] = useState('')
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
@@ -67,6 +68,10 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   useEffect(() => {
     loadDefects()
   }, [survey.id])
+
+  useEffect(() => {
+    if (showAddForm) defectNumberRef.current?.focus()
+  }, [showAddForm])
 
   const sortDefects = (data: SurveyDefect[]): SurveyDefect[] => {
     const sorter = (a: SurveyDefect, b: SurveyDefect) => {
@@ -474,12 +479,13 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
         }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
             <input
+              ref={defectNumberRef}
               type="text"
               placeholder="Number (auto)"
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value)}
               aria-label="Defect number"
-              style={{ width: '80px', flexShrink: 0 }}
+              style={{ width: '120px', flexShrink: 0 }}
             />
             <select
               value={newSeverity}

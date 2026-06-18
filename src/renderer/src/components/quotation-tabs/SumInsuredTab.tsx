@@ -305,6 +305,18 @@ export default function SumInsuredTab({ quotation, updateField, setQ }: {
 
                 {quotation.warExcessEnabled && (
                     <>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            <input
+                                type="checkbox"
+                                checked={quotation.warSection2Only || false}
+                                onChange={e => {
+                                    setQ(q => ({ ...q, warSection2Only: e.target.checked }))
+                                    updateField('warSection2Only', e.target.checked)
+                                }}
+                                style={{ width: '15px', height: '15px', accentColor: 'var(--accent-primary)' }}
+                            />
+                            Section 2 only <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.7 }}>(hides Section 1 from export)</span>
+                        </label>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '16px' }}>
                             <div style={{ flex: 1, maxWidth: '260px' }}>
                                 <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Section 2 Amount (default for all vessels)</label>

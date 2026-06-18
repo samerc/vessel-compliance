@@ -67,9 +67,9 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
   const absDocx = path.resolve(docxPath)
   const outDir = path.dirname(path.resolve(pdfPath))
 
-  // Try common LibreOffice locations
+  // Try common LibreOffice locations — check file existence instead of --version
+  // (soffice --version can hang on Windows if a GUI instance is running)
   const loPaths = [
-    'soffice',
     'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
     'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
     '/usr/bin/soffice',
@@ -78,15 +78,23 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
 
   let loPath = ''
   for (const p of loPaths) {
-    try {
-      await execAsync(`"${p}" --version`, { timeout: 5000 })
+    if (fs.existsSync(p)) {
       loPath = p
       break
-    } catch { /* try next */ }
+    }
   }
 
-  if (!loPath) throw new Error('LibreOffice not found')
+  // Fallback: try 'soffice' on PATH
+  if (!loPath) {
+    try {
+      await execAsync('soffice --version', { timeout: 5000 })
+      loPath = 'soffice'
+    } catch { /* not on PATH */ }
+  }
 
+  if (!loPath) throw new Error('LibreOffice not found. Checked: ' + loPaths.join(', '))
+
+  console.log(`[DocxToPdf] Using LibreOffice at: ${loPath}`)
   await execAsync(
     `"${loPath}" --headless --convert-to pdf --outdir "${outDir}" "${absDocx}"`,
     { timeout: 120000 }
@@ -124,13 +132,17 @@ export async function mergePdfs(pdfPaths: string[], outputPath: string): Promise
 }
 
 /**
- * Modify a DOCX buffer to set the starting page number.
+ * Modify a DOCX buffer to set the starting page number and optionally inject a footer.
  * This injects a <w:pgNumType w:start="N"/> into the section properties,
  * so the footer page number field starts at the given offset.
+ * If policyNumber/policyTypeTitle are provided, adds a footer with "{Type} Cover {Number}".
  */
 export async function setDocxPageStart(
   docxBuffer: Buffer,
-  startPage: number
+  startPage: number,
+  policyNumber?: string,
+  policyTypeTitle?: string,
+  totalPages?: number
 ): Promise<Buffer> {
   const JSZip = require('jszip')
   const zip = await JSZip.loadAsync(docxBuffer)
@@ -150,6 +162,77 @@ export async function setDocxPageStart(
     /<\/w:sectPr>/,
     `<w:pgNumType w:start="${startPage}"/></w:sectPr>`
   )
+
+  // Inject a footer with policy type title + number + page numbers
+  if (policyNumber && policyTypeTitle) {
+    // Footer XML: centered "{Type} Cover {PolicyNumber}" + "Page X of Y" (Y = totalPages if known)
+    const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/><w:spacing w:after="0" w:line="240"/></w:pPr>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:t xml:space="preserve">${policyTypeTitle} Cover ${policyNumber}</w:t></w:r>
+  </w:p>
+  <w:p>
+    <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:t xml:space="preserve">Page </w:t></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:fldChar w:fldCharType="begin"/></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:instrText> PAGE </w:instrText></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:fldChar w:fldCharType="end"/></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:t xml:space="preserve"> of </w:t></w:r>${totalPages
+    ? `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:t>${totalPages}</w:t></w:r>`
+    : `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:fldChar w:fldCharType="begin"/></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:instrText> NUMPAGES </w:instrText></w:r>
+    <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:fldChar w:fldCharType="end"/></w:r>`}
+  </w:p>
+</w:ftr>`
+    zip.file('word/footer_tc.xml', footerXml)
+
+    // Add the footer relationship
+    const relsFile = zip.file('word/_rels/document.xml.rels')
+    if (relsFile) {
+      let relsXml: string = await relsFile.async('string')
+      const footerRelId = 'rIdTcFooter'
+      if (!relsXml.includes(footerRelId)) {
+        relsXml = relsXml.replace(
+          '</Relationships>',
+          `<Relationship Id="${footerRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer_tc.xml"/></Relationships>`
+        )
+        zip.file('word/_rels/document.xml.rels', relsXml)
+      }
+
+      // Remove any existing footer references from sectPr so ours takes priority
+      docXml = docXml.replace(/<w:footerReference[^/]*\/>/g, '')
+
+      // Add our footer reference inside sectPr
+      docXml = docXml.replace(
+        /<\/w:sectPr>/,
+        `<w:footerReference w:type="default" r:id="${footerRelId}"/></w:sectPr>`
+      )
+
+      // Add footer content type if not already present
+      const ctFile = zip.file('[Content_Types].xml')
+      if (ctFile) {
+        let ctXml: string = await ctFile.async('string')
+        if (!ctXml.includes('footer_tc.xml')) {
+          ctXml = ctXml.replace(
+            '</Types>',
+            '<Override PartName="/word/footer_tc.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>'
+          )
+          zip.file('[Content_Types].xml', ctXml)
+        }
+      }
+    }
+  }
 
   zip.file('word/document.xml', docXml)
   const result = await zip.generateAsync({ type: 'nodebuffer' })
@@ -172,8 +255,10 @@ export async function buildPolicyWithTC(
   policyDocxBuffer: Buffer,
   tcDocxBuffer: Buffer,
   outputDir: string,
-  filePrefix: string
-): Promise<{ pdfPath: string; tempFiles: string[] }> {
+  filePrefix: string,
+  policyNumber?: string,
+  policyTypeTitle?: string
+): Promise<{ pdfPath: string; tempFiles: string[]; totalPages: number }> {
   const tempFiles: string[] = []
 
   try {
@@ -189,13 +274,24 @@ export async function buildPolicyWithTC(
     // 3. Count pages in policy PDF
     const policyPageCount = await countPdfPages(policyPdfPath)
 
-    // 4. Modify T&C DOCX to start page numbering after policy
-    const modifiedTcBuffer = await setDocxPageStart(tcDocxBuffer, policyPageCount + 1)
+    // 4. First pass T&C: get page count (no hardcoded total yet, use NUMPAGES field)
+    const tcPass1Buffer = await setDocxPageStart(tcDocxBuffer, policyPageCount + 1, policyNumber, policyTypeTitle)
+    const tcPass1Path = path.join(outputDir, `${filePrefix}_tc_pass1.docx`)
+    fs.writeFileSync(tcPass1Path, tcPass1Buffer)
+    tempFiles.push(tcPass1Path)
+
+    const tcPass1PdfPath = await convertDocxToPdf(tcPass1Path)
+    tempFiles.push(tcPass1PdfPath)
+
+    const tcPageCount = await countPdfPages(tcPass1PdfPath)
+    const totalPages = policyPageCount + tcPageCount
+
+    // 5. Second pass T&C: inject hardcoded combined total
+    const tcFinalBuffer = await setDocxPageStart(tcDocxBuffer, policyPageCount + 1, policyNumber, policyTypeTitle, totalPages)
     const tcDocxPath = path.join(outputDir, `${filePrefix}_tc.docx`)
-    fs.writeFileSync(tcDocxPath, modifiedTcBuffer)
+    fs.writeFileSync(tcDocxPath, tcFinalBuffer)
     tempFiles.push(tcDocxPath)
 
-    // 5. Convert T&C DOCX to PDF
     const tcPdfPath = await convertDocxToPdf(tcDocxPath)
     tempFiles.push(tcPdfPath)
 
@@ -204,7 +300,7 @@ export async function buildPolicyWithTC(
     await mergePdfs([policyPdfPath, tcPdfPath], mergedPdfPath)
     tempFiles.push(mergedPdfPath)
 
-    return { pdfPath: mergedPdfPath, tempFiles }
+    return { pdfPath: mergedPdfPath, tempFiles, totalPages }
   } catch (error) {
     // Clean up temp files on error
     for (const f of tempFiles) {

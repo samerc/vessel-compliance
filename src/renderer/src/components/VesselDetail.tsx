@@ -419,6 +419,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
     const [showAddVesselType, setShowAddVesselType] = useState(false)
     const [newVesselTypeName, setNewVesselTypeName] = useState('')
+    const [showAddClass, setShowAddClass] = useState(false)
+    const [newClassName, setNewClassName] = useState('')
+    const [newClassAbbr, setNewClassAbbr] = useState('')
     const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
     const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
     const [classDropdownOpen, setClassDropdownOpen] = useState(false)
@@ -485,6 +488,21 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             showSuccess('Vessel type added')
         } catch (err: any) {
             showError(err.message || 'Failed to add vessel type')
+        }
+    }
+
+    const handleAddClassSociety = async () => {
+        if (!newClassName.trim()) return
+        try {
+            const created = await window.api.addClassificationSociety({ name: newClassName.trim(), abbreviation: newClassAbbr.trim() || undefined, isIacs: false } as any)
+            setClassSocieties(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+            setVesselClassificationIds(prev => new Set(prev).add(created.id))
+            setShowAddClass(false)
+            setNewClassName('')
+            setNewClassAbbr('')
+            showSuccess('Classification society added')
+        } catch (err: any) {
+            showError(err.message || 'Failed to add classification society')
         }
     }
 
@@ -941,6 +959,25 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         })
                                                     })()}
                                                 </div>
+                                                {/* Add new classification inline */}
+                                                {showAddClass ? (
+                                                    <div style={{ padding: '8px', borderTop: '1px solid var(--table-border)', display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }} onMouseDown={e => e.preventDefault()}>
+                                                        <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="Name" autoFocus
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleAddClassSociety(); if (e.key === 'Escape') { setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') } }}
+                                                            style={{ padding: '3px 6px', borderRadius: '4px', width: '110px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)' }} />
+                                                        <input value={newClassAbbr} onChange={e => setNewClassAbbr(e.target.value)} placeholder="Abbr"
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleAddClassSociety(); if (e.key === 'Escape') { setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') } }}
+                                                            style={{ padding: '3px 6px', borderRadius: '4px', width: '60px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)' }} />
+                                                        <button onMouseDown={e => { e.preventDefault(); handleAddClassSociety() }} disabled={!newClassName.trim()} className="btn-primary" style={{ padding: '2px 6px', fontSize: '0.72rem' }}>Add</button>
+                                                        <button onMouseDown={e => { e.preventDefault(); setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ padding: '6px 8px', borderTop: '1px solid var(--table-border)' }} onMouseDown={e => e.preventDefault()}>
+                                                        <button onMouseDown={e => { e.preventDefault(); setShowAddClass(true) }} style={{ background: 'none', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', padding: '3px 8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+                                                            <Plus size={11} /> Add new
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

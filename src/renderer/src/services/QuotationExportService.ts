@@ -785,8 +785,13 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   {
     let insuredText = ''
     if (data.assuredGroups.length > 0) {
-      // Render by group — resolve group name to vessel name if possible
-      for (const group of data.assuredGroups) {
+      // Render by group — sort groups to match vessel order
+      const sortedGroups = [...data.assuredGroups].sort((a, b) => {
+        const aIdx = data.quotationVessels.findIndex(qv => qv.vesselLabel === a.name)
+        const bIdx = data.quotationVessels.findIndex(qv => qv.vesselLabel === b.name)
+        return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx)
+      })
+      for (const group of sortedGroups) {
         const groupAssureds = data.assureds.filter(a => a.groupId === group.id)
         if (groupAssureds.length === 0) continue
         if (insuredText.length > 0) insuredText += '\n'
@@ -802,6 +807,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       const ungrouped = data.assureds.filter(a => !a.groupId)
       if (ungrouped.length > 0) {
         if (insuredText.length > 0) insuredText += '\n'
+        if (data.quotationVessels.length > 1) insuredText += 'APPLICABLE TO ALL VESSELS\n'
         for (const a of ungrouped) {
           insuredText += `${a.name}\n`
           if (a.role) insuredText += `"as ${a.role}"\n`
@@ -810,8 +816,15 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     } else {
       // Legacy — flat list with optional vessel labels
       const hasVesselLabels = data.quotationVessels.length > 1 && data.assureds.some(a => a.vesselLabel)
+      // Sort assureds by vessel order
+      const vesselOrderMap = new Map(data.quotationVessels.map((qv, i) => [qv.vesselLabel, i]))
+      const sortedAssureds = [...data.assureds].sort((a, b) => {
+        const aIdx = vesselOrderMap.get(a.vesselLabel || '') ?? 999
+        const bIdx = vesselOrderMap.get(b.vesselLabel || '') ?? 999
+        return aIdx - bIdx
+      })
       const pdfSeenLabels = new Set<string>()
-      for (const a of data.assureds) {
+      for (const a of sortedAssureds) {
         const labelKey = a.vesselLabel || ''
         const isFirstOfLabel = !pdfSeenLabels.has(labelKey)
         pdfSeenLabels.add(labelKey)
@@ -1297,7 +1310,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          text += `- ${condText}${scope}\n`
+          const plain = isHtml(condText) ? stripHtml(condText) : condText
+          text += `- ${plain}${scope}\n`
         }
         return text
       }
@@ -1476,7 +1490,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
           }
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          addl += `- ${condText}${scope}\n`
+          const plain = isHtml(condText) ? stripHtml(condText) : condText
+          addl += `- ${plain}${scope}\n`
         }
         hcBlocks.push({ desc: selectedClause ? (selectedClause.description || selectedClause.name) : undefined, condPairs: getCondPairs(dedupedConds), addl })
       }
@@ -1511,24 +1526,42 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   if (data.quotation.quotationTypeCode === 'W' && hasWarValues) {
     const wCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
+      const isSection2Only = Boolean(data.quotation.warSection2Only)
+
       // Interest section
       const s1Text = data.quotation.warSection1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
       const s2Text = data.quotation.warSection2Text || 'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
-      sectionMap.set('interest', ['Interest', `Section 1\n${s1Text}\n\nSection 2\n${s2Text}`])
+      if (isSection2Only) {
+        sectionMap.set('interest', ['Interest', s2Text])
+      } else {
+        sectionMap.set('interest', ['Interest', `Section 1\n${s1Text}\n\nSection 2\n${s2Text}`])
+      }
 
       // Sum Insured / Limits
-      let limitsText = 'Section 1\n'
-      for (const qv of data.quotationVessels) {
-        const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
-        const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
-        limitsText += `${vi.name} ${formatCurrency(s1Amt, wCur)}\n`
-      }
       const excessAmt = data.quotation.warExcessAmount || 0
-      limitsText += `\nSection 2\n${formatCurrency(excessAmt, wCur)}\n`
-      const combinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
-        .replace('{amount}', formatCurrency(excessAmt, wCur))
-      limitsText += `\n${combinedText}`
-      sectionMap.set('sumInsured', ['Sum Insured / Limits', limitsText.trim()])
+      if (isSection2Only) {
+        // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
+        let limitsText = ''
+        for (const qv of data.quotationVessels) {
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const primaryAmt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+          if (data.quotationVessels.length > 1) limitsText += `${vi.name}\n`
+          limitsText += `${formatCurrency(excessAmt, wCur)} in excess of ${formatCurrency(primaryAmt, wCur)} primary war P&I risks.\n\n`
+        }
+        sectionMap.set('sumInsured', ['Sum Insured / Limits', limitsText.trim()])
+      } else {
+        let limitsText = 'Section 1\n'
+        for (const qv of data.quotationVessels) {
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+          limitsText += `${vi.name} ${formatCurrency(s1Amt, wCur)}\n`
+        }
+        limitsText += `\nSection 2\n${formatCurrency(excessAmt, wCur)}\n`
+        const combinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
+          .replace('{amount}', formatCurrency(excessAmt, wCur))
+        limitsText += `\n${combinedText}`
+        sectionMap.set('sumInsured', ['Sum Insured / Limits', limitsText.trim()])
+      }
     } else {
       // Per-vessel values or single quotation-level value
       if (data.quotationVessels.length >= 2 && data.quotationVessels.some(v => v.agreedValue != null)) {
@@ -1918,20 +1951,32 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
     // War P&I Excess: per-vessel Section 1 + Section 2 premiums
     const warExcessPrem = q.quotationTypeCode === 'W' && q.warExcessEnabled
     if (warExcessPrem) {
-      const s1Rate = q.premiumRate ?? data.warSettings?.defaultRate ?? 0
-      const s2Rate = q.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
+      const pS1Rate = q.premiumRate ?? data.warSettings?.defaultRate ?? 0
+      const pS2Rate = q.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
       const wCur = q.premiumCurrency || q.agreedValueCurrency || 'USD'
-      for (const v of data.quotationVessels) {
-        const vi = getVesselInfo(v, data.allVessels, data.flagStates)
-        const s1Amt = v.agreedValue ?? q.agreedValue ?? 0
-        const s2Amt = (v as any).warExcessAmount ?? q.warExcessAmount ?? 0
-        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
-        const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
-        premText += `${vi.name}\n`
-        const prevS1 = v.previousSection1Premium
-        const prevS2 = v.previousSection2Premium
-        premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum${prevS1 != null && prevS1 !== s1Prem ? ` (previously ${formatCurrency(prevS1, wCur)})` : ''}\n`
-        premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum${prevS2 != null && prevS2 !== s2Prem ? ` (previously ${formatCurrency(prevS2, wCur)})` : ''}\n\n`
+      const pIsS2Only = Boolean(q.warSection2Only)
+      if (pIsS2Only) {
+        // Section 2 only: use pdfPremLines for bold table rendering (like other quotation types)
+        for (const v of data.quotationVessels) {
+          const s1Amt = v.agreedValue ?? q.agreedValue ?? 0
+          const s2Amt = (v as any).warExcessAmount ?? q.warExcessAmount ?? 0
+          const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * pS2Rate / 100 * 100) / 100
+          const label = data.quotationVessels.length > 1 ? (v.name || v.vesselLabel).toUpperCase() : ''
+          pdfPremLines.push({ label, tech: s2Prem, prev: v.previousSection2Premium ?? undefined, vessel: v })
+        }
+      } else {
+        for (const v of data.quotationVessels) {
+          const vi = getVesselInfo(v, data.allVessels, data.flagStates)
+          const s1Amt = v.agreedValue ?? q.agreedValue ?? 0
+          const s2Amt = (v as any).warExcessAmount ?? q.warExcessAmount ?? 0
+          const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * pS1Rate / 100 * 100) / 100
+          const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * pS2Rate / 100 * 100) / 100
+          if (data.quotationVessels.length > 1) premText += `${vi.name}\n`
+          const prevS1 = v.previousSection1Premium
+          const prevS2 = v.previousSection2Premium
+          premText += `Section 1: ${formatCurrency(s1Prem, wCur)} per annum${prevS1 != null && prevS1 !== s1Prem ? ` (previously ${formatCurrency(prevS1, wCur)})` : ''}\n`
+          premText += `Section 2: ${formatCurrency(s2Prem, wCur)} per annum${prevS2 != null && prevS2 !== s2Prem ? ` (previously ${formatCurrency(prevS2, wCur)})` : ''}\n\n`
+        }
       }
     } else if (hasVesselPremiums) {
       for (const v of data.quotationVessels) {
@@ -2455,6 +2500,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     )
   }
 
+  const mpBullet = (text: string, color?: string): Paragraph[] => {
+    if (!text) return []
+    if (isHtml(text)) {
+      if (/<(ul|ol|li)\b/i.test(text)) {
+        return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
+      }
+      const bulletHtml = text.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
+      return parseHtmlToParagraphs(`<ul>${bulletHtml}</ul>`, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
+    }
+    return [bulletP(text, color)]
+  }
+
   // Border helpers for main table
   const thin = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
   const thinBorders = () => ({ top: thin, bottom: thin, left: thin, right: thin })
@@ -2491,9 +2548,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const insuredContent: (Paragraph | Table)[] = []
     if (data.assureds.length > 0) {
       if (data.assuredGroups.length > 0) {
-        // Render by group — resolve group name to vessel name if possible
+        // Render by group — sort groups to match vessel order
+        const dSortedGroups = [...data.assuredGroups].sort((a, b) => {
+          const aIdx = data.quotationVessels.findIndex(qv => qv.vesselLabel === a.name)
+          const bIdx = data.quotationVessels.findIndex(qv => qv.vesselLabel === b.name)
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx)
+        })
         const groupRows: TableRow[] = []
-        for (const group of data.assuredGroups) {
+        for (const group of dSortedGroups) {
           const groupAssureds = data.assureds.filter(a => a.groupId === group.id)
           if (groupAssureds.length === 0) continue
           const matchedVessel = data.quotationVessels.find(qv => qv.vesselLabel === group.name)
@@ -2529,6 +2591,18 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
         // Ungrouped assureds (if any)
         const ungrouped = data.assureds.filter(a => !a.groupId)
+        if (ungrouped.length > 0 && data.quotationVessels.length > 1) {
+          groupRows.push(new TableRow({
+            children: [new TableCell({
+              borders: noBorders(),
+              columnSpan: 2,
+              children: [new Paragraph({
+                spacing: { before: groupRows.length > 0 ? 120 : 0, after: 0 },
+                children: [new TextRun({ text: 'APPLICABLE TO ALL VESSELS', bold: true, size: 22, font: 'Arial', color: '000000' })]
+              })]
+            })]
+          }))
+        }
         for (const a of ungrouped) {
           groupRows.push(new TableRow({
             children: [
@@ -2536,7 +2610,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                 borders: noBorders(),
                 width: { size: Math.round(BODY_W * 0.60), type: WidthType.DXA },
                 children: [new Paragraph({
-                  spacing: { before: groupRows.length > 0 && ungrouped.indexOf(a) === 0 ? 120 : 0, after: 0 },
+                  spacing: { before: 0, after: 0 },
                   children: [new TextRun({ text: a.name, size: 22, font: 'Arial', color: '000000' })]
                 })]
               }),
@@ -2559,8 +2633,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Legacy — flat list with optional vessel labels
         const wordHasVesselLabels = data.quotationVessels.length > 1 && data.assureds.some(a => a.vesselLabel)
         if (wordHasVesselLabels) {
-          // Group by vessel label, show vessel name as header
-          const vesselLabels = [...new Set(data.assureds.map(a => a.vesselLabel).filter(Boolean))] as string[]
+          // Group by vessel label, sorted by vessel order
+          const vesselLabels = data.quotationVessels.map(qv => qv.vesselLabel).filter(label => data.assureds.some(a => a.vesselLabel === label))
           for (const label of vesselLabels) {
             const vessel = data.quotationVessels.find(qv => qv.vesselLabel === label)
             const vesselName = vessel ? (vessel.name || vessel.vesselLabel).toUpperCase() : label
@@ -2822,8 +2896,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const lolRawHasPlaceholder = (data.quotation.limitOfLiabilityText || st(data, 'limitOfLiabilityDefaultText') || '').includes('{sub_limits}')
     if (!lolRawHasPlaceholder && !dSubLimitsInserted && wordSubLimitParas.length > 0) {
       liabContent.push(emptyP(), ...wordSubLimitParas)
-      liabContent.push(emptyP())
-      liabContent.push(np('Under no circumstances is the Combined Single Limit detailed above to be exceeded.'))
+      liabContent.push(emptyP(), np('Under no circumstances is the Combined Single Limit detailed above to be exceeded.'))
     }
     if (liabContent.length > 0) rowMap.set('liability', makeRow('Limit of Liability', liabContent))
   }
@@ -3220,12 +3293,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return def?.hullClauseId || ''
       }
 
-      const dAddlBullet = (condText: string, color?: string) => new Paragraph({
-        numbering: { reference: 'dash-bullet', level: 0 },
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: 100 },
-        children: [new TextRun({ text: condText, size: 22, font: 'Arial', color: color || '000000' })]
-      })
+
 
       // Determine where each additional condition belongs
       const dGetAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
@@ -3258,7 +3326,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
           const isNewHullAddl = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
-          paras.push(dAddlBullet(condText + scope, isNewHullAddl ? RED : undefined))
+          paras.push(...mpBullet(condText + scope, isNewHullAddl ? RED : undefined))
         }
         return paras
       }
@@ -3513,7 +3581,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             condText = condText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD').replace(/\{amount\}/g, qa.amount != null ? formatCurrency(qa.amount, data.quotation.premiumCurrency || 'USD') : '')
             const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
             const isNewHullAddlInline = origData && !origHullAdditionalConditionIds.has(qa.hullAdditionalConditionId)
-            hcContent.push(dAddlBullet(condText + scope, isNewHullAddlInline ? RED : undefined))
+            hcContent.push(...mpBullet(condText + scope, isNewHullAddlInline ? RED : undefined))
           }
         }
       }
@@ -3534,35 +3602,53 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   if (data.quotation.quotationTypeCode === 'W' && dHasWarValues) {
     const dWCur = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
+      const dIsS2Only = Boolean(data.quotation.warSection2Only)
+
       // Interest section
       const dS1Text = data.quotation.warSection1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
       const dS2Text = data.quotation.warSection2Text || 'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
-      rowMap.set('interest', makeRow('Interest', [
-        bup('Section 1'), np(dS1Text), emptyP(),
-        bup('Section 2'), np(dS2Text)
-      ]))
+      if (dIsS2Only) {
+        rowMap.set('interest', makeRow('Interest', [np(dS2Text)]))
+      } else {
+        rowMap.set('interest', makeRow('Interest', [
+          bup('Section 1'), np(dS1Text), emptyP(),
+          bup('Section 2'), np(dS2Text)
+        ]))
+      }
 
-      // Sum Insured / Limits — Section 1 as table
-      const limContent: (Paragraph | Table)[] = [bup('Section 1')]
-      const nameW = Math.round(BODY_W * 0.55)
-      const amtW = BODY_W - nameW
-      const s1Rows = data.quotationVessels.map(qv => {
-        const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
-        const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
-        return new TableRow({ children: [
-          new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
-          new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(s1Amt, dWCur))] })
-        ]})
-      })
-      limContent.push(new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: s1Rows }))
-      limContent.push(emptyP(), bup('Section 2'))
       const dExcessAmt = data.quotation.warExcessAmount || 0
-      limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
-      limContent.push(emptyP())
-      const dCombinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
-        .replace('{amount}', formatCurrency(dExcessAmt, dWCur))
-      limContent.push(np(dCombinedText))
-      rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
+      if (dIsS2Only) {
+        // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
+        const limContent: (Paragraph | Table)[] = []
+        for (const qv of data.quotationVessels) {
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const primaryAmt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+          if (data.quotationVessels.length > 1) limContent.push(bp(vi.name))
+          limContent.push(np(`${formatCurrency(dExcessAmt, dWCur)} in excess of ${formatCurrency(primaryAmt, dWCur)} primary war P&I risks.`))
+        }
+        rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
+      } else {
+        // Sum Insured / Limits — Section 1 as table
+        const limContent: (Paragraph | Table)[] = [bup('Section 1')]
+        const nameW = Math.round(BODY_W * 0.55)
+        const amtW = BODY_W - nameW
+        const s1Rows = data.quotationVessels.map(qv => {
+          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+          const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+          return new TableRow({ children: [
+            new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
+            new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(s1Amt, dWCur))] })
+          ]})
+        })
+        limContent.push(new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: s1Rows }))
+        limContent.push(emptyP(), bup('Section 2'))
+        limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
+        limContent.push(emptyP())
+        const dCombinedText = (data.quotation.warCombinedLimitText || 'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.')
+          .replace('{amount}', formatCurrency(dExcessAmt, dWCur))
+        limContent.push(np(dCombinedText))
+        rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
+      }
     } else if (data.quotationVessels.length > 1) {
       // Multi-vessel without excess — table of per-vessel amounts
       const nameW = Math.round(BODY_W * 0.55)
@@ -4199,24 +4285,36 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       // War P&I Excess: per-vessel Section 1 + Section 2 premiums
       const dWarExcessPrem = wq.quotationTypeCode === 'W' && wq.warExcessEnabled
       if (dWarExcessPrem) {
-        const dS1Rate = wq.premiumRate ?? data.warSettings?.defaultRate ?? 0
-        const dS2Rate = wq.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
-        for (const v of data.quotationVessels) {
-          const vi = getVesselInfo(v, data.allVessels, data.flagStates)
-          const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
-          const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
-          const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * dS1Rate / 100 * 100) / 100
-          const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * dS2Rate / 100 * 100) / 100
-          premContent.push(bp(vi.name))
-          const dPrevS1 = v.previousSection1Premium
-          const dPrevS2 = v.previousSection2Premium
-          const s1Runs: TextRun[] = [new TextRun({ text: `Section 1: ${formatCurrency(s1Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
-          if (dPrevS1 != null && dPrevS1 !== s1Prem) s1Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS1, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
-          premContent.push(new Paragraph({ children: s1Runs }))
-          const s2Runs: TextRun[] = [new TextRun({ text: `Section 2: ${formatCurrency(s2Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
-          if (dPrevS2 != null && dPrevS2 !== s2Prem) s2Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS2, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
-          premContent.push(new Paragraph({ children: s2Runs }))
-          premContent.push(emptyP())
+        const dpS1Rate = wq.premiumRate ?? data.warSettings?.defaultRate ?? 0
+        const dpS2Rate = wq.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
+        const dpIsS2Only = Boolean(wq.warSection2Only)
+        if (dpIsS2Only) {
+          // Section 2 only: use lines array for bold table rendering (like other types)
+          for (const v of data.quotationVessels) {
+            const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
+            const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+            const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * dpS2Rate / 100 * 100) / 100
+            const label = data.quotationVessels.length > 1 ? (v.name || v.vesselLabel).toUpperCase() : ''
+            lines.push({ label, tech: s2Prem, prev: v.previousSection2Premium ?? undefined })
+          }
+        } else {
+          for (const v of data.quotationVessels) {
+            const vi = getVesselInfo(v, data.allVessels, data.flagStates)
+            const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
+            const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+            const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * dpS1Rate / 100 * 100) / 100
+            const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * dpS2Rate / 100 * 100) / 100
+            if (data.quotationVessels.length > 1) premContent.push(bp(vi.name))
+            const dPrevS1 = v.previousSection1Premium
+            const dPrevS2 = v.previousSection2Premium
+            const s1Runs: TextRun[] = [new TextRun({ text: `Section 1: ${formatCurrency(s1Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
+            if (dPrevS1 != null && dPrevS1 !== s1Prem) s1Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS1, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+            premContent.push(new Paragraph({ children: s1Runs }))
+            const s2Runs: TextRun[] = [new TextRun({ text: `Section 2: ${formatCurrency(s2Prem, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial' })]
+            if (dPrevS2 != null && dPrevS2 !== s2Prem) s2Runs.push(new TextRun({ text: ` (previously ${formatCurrency(dPrevS2, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+            premContent.push(new Paragraph({ children: s2Runs }))
+            premContent.push(emptyP())
+          }
         }
       } else if (wPiMultiAlt) {
         for (let ai = 0; ai < data.piAlternatives.length; ai++) {
@@ -4297,6 +4395,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           premContent.push(premTable(rows))
         }
         premContent.push(np('per annum'))
+        premContent.push(emptyP())
+      } else if (lines.length === 1) {
+        // Single line (S2-only war or plain single premium) — bold text
+        const singleLine = lines[0]
+        const singlePremRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(singleLine.tech, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
+        const prevAmt = singleLine.prev ?? wq.previousPremiumAmount
+        if (prevAmt != null && prevAmt !== singleLine.tech) {
+          singlePremRuns.push(new TextRun({ text: ` (previously ${formatCurrency(prevAmt, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+        }
+        premContent.push(new Paragraph({ children: singlePremRuns }))
         premContent.push(emptyP())
       } else if (!dWarExcessPrem) {
         // Single premium, no discount — plain bold text (skip if war excess already rendered)
@@ -4656,7 +4764,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // Header: parsed from rich text (supports font sizes, alignment, line spacing, Arabic)
   const headerParas = headerHtml
-    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Arial', color: '666666', lineSpacing: headerSpacing })
+    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Arial', color: '666666', lineSpacing: headerSpacing, spacingAfter: 0 })
     : []
   const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [emptyP()] })
 

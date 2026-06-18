@@ -91,6 +91,7 @@ interface PolicyRecord {
   exportedAt: string | null
   createdBy: string
   createdAt: string
+  quotationReference: string | null
   quotationTypeCode: string
   quotationTypeName: string
   vesselName: string
@@ -2270,8 +2271,17 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           {policy.quotationId && (
             <div>
               <div style={labelStyle}>Source Quotation</div>
-              <div style={{ ...valueStyle, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                {policy.quotationId}
+              <div style={valueStyle}>
+                {onNavigateToQuotation ? (
+                  <span
+                    onClick={() => onNavigateToQuotation(policy.quotationId, { policyId: policy.id, policyNumber: policy.policyNumber })}
+                    style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                  >
+                    {policy.quotationReference || quotationData?.referenceNumber || policy.quotationId}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.85rem' }}>{policy.quotationReference || quotationData?.referenceNumber || policy.quotationId}</span>
+                )}
               </div>
             </div>
           )}
@@ -3622,6 +3632,30 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             </div>
           )
         })()
+      )}
+
+      {/* Export overlay */}
+      {exportingPdfTC && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '32px 40px',
+            textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', maxWidth: '360px'
+          }}>
+            <div style={{
+              width: '36px', height: '36px', border: '3px solid var(--glass-border)',
+              borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 16px',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '6px' }}>Exporting Policy</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Converting to PDF and merging with T&C. Please wait...
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

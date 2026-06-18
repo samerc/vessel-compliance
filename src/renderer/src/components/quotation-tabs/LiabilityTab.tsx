@@ -197,7 +197,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                         return (
                             <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: '80px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
                                 <input
                                     type="number"
                                     value={vesselAmount ?? ''}
@@ -242,9 +242,11 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                         <RichTextEditor
                             value={String(quotation.sectionTextsOverride?.limitOfLiabilityDefaultText ?? getEffectiveText('limitOfLiabilityDefaultText'))}
                             onChange={val => {
-                                const override = { ...(quotation.sectionTextsOverride || {}), limitOfLiabilityDefaultText: val }
-                                setQ(p => ({ ...p, sectionTextsOverride: override }))
-                                updateField('sectionTextsOverride', override)
+                                setQ(p => {
+                                    const override = { ...(p.sectionTextsOverride || {}), limitOfLiabilityDefaultText: val }
+                                    updateField('sectionTextsOverride', override)
+                                    return { ...p, sectionTextsOverride: override }
+                                })
                             }}
                             minHeight={60}
                             showFontSize showAlignment showLineSpacing
@@ -253,10 +255,12 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                             <button
                                 type="button"
                                 onClick={() => {
-                                    const override = { ...(quotation.sectionTextsOverride || {}) }
-                                    delete override.limitOfLiabilityDefaultText
-                                    setQ(p => ({ ...p, sectionTextsOverride: override }))
-                                    updateField('sectionTextsOverride', override)
+                                    setQ(p => {
+                                        const override = { ...(p.sectionTextsOverride || {}) }
+                                        delete override.limitOfLiabilityDefaultText
+                                        updateField('sectionTextsOverride', override)
+                                        return { ...p, sectionTextsOverride: override }
+                                    })
                                     showSuccess('Reset to global default')
                                 }}
                                 className="btn-secondary"

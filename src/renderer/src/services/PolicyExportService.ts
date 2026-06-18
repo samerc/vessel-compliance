@@ -789,6 +789,7 @@ interface PolicyExportData {
   allWarConditions: WarCondition[]
   warSettings: WarSettings | null
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
+  tradingIntros: { id: string; text: string; vesselScope: string[] | null; order: number }[]
   companyName: string
   assuredGroups: QuotationAssuredGroup[]
   customSections: { id: string; title: string; text?: string; order: number }[]
@@ -846,7 +847,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, banks,
-    assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw
+    assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw,
+    tradingIntrosRaw
   ] = await Promise.all([
     window.api.policyGetInstalments(policyId),
     window.api.policyGetAddresses(policyId),
@@ -889,14 +891,25 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.getQuotationAssuredGroups(policy.quotationId),
     window.api.getQuotationCustomSections(policy.quotationId),
     window.api.hullGetAgreedValueOptions(policy.quotationId),
-    window.api.getFleets()
+    window.api.getFleets(),
+    window.api.tradingGetIntros(policy.quotationId)
   ])
 
-  // Filter by selected alternative if policy has one
+  // Filter by selected alternative and vessel scope
   const altId = policy.selectedAlternativeId || null
   const filterByAlt = (items: any[]) => {
-    if (!altId) return items
-    return items.filter((item: any) => !item.alternativeId || item.alternativeId === altId)
+    let result = items
+    if (altId) {
+      result = result.filter((item: any) => !item.alternativeId || item.alternativeId === altId)
+    }
+    // Also filter by vessel scope if multi-vessel quotation
+    if (vessel && safeQVessels.length > 1) {
+      result = result.filter((item: any) => {
+        if (!item.vesselScope || !Array.isArray(item.vesselScope) || item.vesselScope.length === 0) return true
+        return item.vesselScope.includes(vessel!.id)
+      })
+    }
+    return result
   }
 
   const safeClauseRows = filterByAlt(Array.isArray(clauseRows) ? clauseRows : [])
@@ -999,7 +1012,20 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     quotationVessels: safeQVessels,
     allVessels: safeAllVessels,
     flagStates: safeFlagStates,
-    assureds: Array.isArray(assureds) ? assureds : [],
+    assureds: (() => {
+      const all = Array.isArray(assureds) ? assureds : []
+      if (!vessel || safeQVessels.length <= 1) return all
+      // Filter assureds to only those belonging to this vessel
+      const vLabel = vessel.vesselLabel
+      // Find the group matching this vessel's label
+      const safeGroups = Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : []
+      const vesselGroup = safeGroups.find((g: any) => g.name === vLabel)
+      if (vesselGroup) {
+        return all.filter((a: any) => a.groupId === vesselGroup.id)
+      }
+      // Legacy: filter by vesselLabel
+      return all.filter((a: any) => !a.vesselLabel || a.vesselLabel === vLabel)
+    })(),
     subLimits: Array.isArray(subLimits) ? subLimits : [],
     selectedClauseIds,
     allClauses: Array.isArray(allClauses) ? allClauses : [],
@@ -1029,11 +1055,17 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
     allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [],
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
-    hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
+    hullCustomConditions: filterByAlt(Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : []),
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
     warSettings: (warSettingsRaw && !(warSettingsRaw as any).error) ? warSettingsRaw : null,
-    surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => ({
+    surveyWarranties: filterByAlt((Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
+      .filter((sw: any) => {
+        // Filter by vessel scope: null/empty = all vessels, array = specific vessels
+        if (!sw.vesselScope || !Array.isArray(sw.vesselScope) || sw.vesselScope.length === 0) return true
+        return vessel ? sw.vesselScope.includes(vessel.id) : true
+      })
+      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => ({
       ...sw,
       text: (sw.text || '')
         .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
@@ -1041,9 +1073,15 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         .replace(/\{event\}/g, sw.eventValue || '{event}')
         .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
         .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
-    })),
+    }))),
+    tradingIntros: Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : [],
     companyName: reportSettings.companyName || 'Insurance Company',
-    assuredGroups: Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : [],
+    assuredGroups: (() => {
+      const all = Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : []
+      if (!vessel || safeQVessels.length <= 1) return all
+      // Only include the group matching this vessel's label
+      return all.filter((g: any) => g.name === vessel.vesselLabel)
+    })(),
     customSections: Array.isArray(customSectionsRaw) ? customSectionsRaw : [],
     lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
     agreedValueOptions: Array.isArray(agreedValueOptionsRaw) ? agreedValueOptionsRaw : [],
@@ -1290,6 +1328,19 @@ function polMp(text: string): Paragraph[] {
   return decoded.split('\n').map(p =>
     p.trim() ? polNp(p) : polEmptyP()
   )
+}
+
+function polMpBullet(text: string): Paragraph[] {
+  if (!text) return []
+  const decoded = decodeHtmlEntities(text)
+  if (polIsHtml(decoded)) {
+    if (/<(ul|ol|li)\b/i.test(decoded)) {
+      return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+    }
+    const bulletHtml = decoded.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
+    return parseHtmlToParagraphs(`<ul>${bulletHtml}</ul>`, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+  }
+  return [polBulletP(decoded)]
 }
 
 function polCenteredP(text: string, bold = false) {
@@ -1802,7 +1853,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       }
       // Issue 3: resolve generic {currency} and {amount} placeholders
       condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
-      content.push(polBulletP(decodeHtmlEntities(condText)))
+      content.push(...polMpBullet(condText))
     }
   }
   // Custom hull additional conditions
@@ -1926,17 +1977,29 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
   } else if (typeCode === 'W') {
     const wCurrency = data.quotation.agreedValueCurrency || 'USD'
     if (data.quotation.warExcessEnabled) {
-      // War P&I Excess: Section 1 (Hull) + Section 2 (P&I in excess)
+      const vIsS2Only = Boolean(data.quotation.warSection2Only)
+
       const vesselAV = data.vessel?.agreedValue ?? data.quotation.agreedValue ?? 0
       const sec2Amt = (data.vessel as any)?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
-      content.push(polNp(`Section 1: ${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
-      content.push(polNp(`Section 2: ${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+      if (vIsS2Only) {
+        // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
+        content.push(polNp(`${polFormatCurrency(sec2Amt, wCurrency)} in excess of ${polFormatCurrency(vesselAV, wCurrency)} primary war P&I risks.`))
+      } else {
+        content.push(polBp('Section 1'))
+        content.push(polNp(`${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
+        content.push(polEmptyP())
+        content.push(polBp('Section 2'))
+        content.push(polNp(`${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+      }
       if (data.quotation.warCombinedLimitText) {
         content.push(polEmptyP())
-        content.push(polNp(data.quotation.warCombinedLimitText))
+        content.push(polNp(data.quotation.warCombinedLimitText.replace(/\{amount\}/g, polFormatCurrency(sec2Amt, wCurrency))))
       }
-    } else if (data.quotation.agreedValue != null) {
-      content.push(polBp(`${polFormatCurrency(data.quotation.agreedValue, wCurrency)} (${numberToWords(data.quotation.agreedValue, wCurrency)})`))
+    } else {
+      const warAV = data.vessel?.agreedValue ?? data.quotation.agreedValue
+      if (warAV != null) {
+        content.push(polBp(`${polFormatCurrency(warAV, wCurrency)} (${numberToWords(warAV, wCurrency)})`))
+      }
     }
   }
 
@@ -1958,7 +2021,13 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   const excCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
   const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
 
-  if (wq.tradingWarrantyIntro) content.push(...polMp(wq.tradingWarrantyIntro))
+  // Per-vessel trading intro: find the intro scoped to this vessel, falling back to quotation-level intro
+  const policyVesselQvId = data.vessel?.id || null
+  const perVesselIntro = policyVesselQvId
+    ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(policyVesselQvId))
+    : null
+  const effectiveIntro = perVesselIntro ? perVesselIntro.text : wq.tradingWarrantyIntro
+  if (effectiveIntro) content.push(...polMp(effectiveIntro))
   if (wq.tradingCustomMode && wq.tradingCustomWording) {
     content.push(polEmptyP())
     content.push(...polMp(wq.tradingCustomWording))
@@ -2320,12 +2389,21 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(polVesselIv, data.quotation.ivCurrency || hmCurrency)})`))
       rows.push(makeRow('Agreed Insured\nValue', avContent))
     } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
-      // War P&I Excess: Interest section (Section 1/2 descriptions) + Sum Insured (amounts)
+      const polIsS2Only = Boolean(data.quotation.warSection2Only)
+
+      // War P&I Excess: Interest section
       const intContent: (Paragraph | Table)[] = []
       const sec1Text = data.quotation.warSection1Text || data.warSettings?.section1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
       const sec2Text = data.quotation.warSection2Text || data.warSettings?.section2Text || 'War P&I in excess of Hull value'
-      intContent.push(polNp(`Section 1: ${sec1Text}`))
-      intContent.push(polNp(`Section 2: ${sec2Text}`))
+      if (polIsS2Only) {
+        intContent.push(polNp(sec2Text))
+      } else {
+        intContent.push(polBp('Section 1'))
+        intContent.push(polNp(sec1Text))
+        intContent.push(polEmptyP())
+        intContent.push(polBp('Section 2'))
+        intContent.push(polNp(sec2Text))
+      }
       if (intContent.length > 0) rows.push(makeRow('Interest', intContent))
       const valueContent = polBuildValueSection(data)
       if (valueContent.length > 0) rows.push(makeRow('Sum Insured / Limits', valueContent))
@@ -2349,8 +2427,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   if (typeCode !== 'W') {
     const tradingContent = polBuildTradingSection(data)
     if (tradingContent.length > 0) rows.push(makeRow('Trading Warranty', tradingContent))
-  } else if (data.quotation.tradingWarrantyIntro) {
-    rows.push(makeRow('Trading Warranty', [polNp(data.quotation.tradingWarrantyIntro)]))
+  } else {
+    // War: use per-vessel intro or quotation-level intro
+    const warVesselQvId = data.vessel?.id || null
+    const warPerVIntro = warVesselQvId
+      ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(warVesselQvId))
+      : null
+    const warEffIntro = warPerVIntro ? warPerVIntro.text : data.quotation.tradingWarrantyIntro
+    if (warEffIntro) rows.push(makeRow('Trading Warranty', polMp(warEffIntro)))
   }
 
   // WARRANTIES
@@ -2413,8 +2497,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     rows.push(makeRow('Subjectivities', subjContent))
   }
 
-  // NCB (No Claims Bonus)
-  if (data.quotation.ncbEnabled && data.quotation.ncbText) {
+  // NCB (No Claims Bonus) — skip if this vessel is excluded from NCB
+  if (data.quotation.ncbEnabled && data.quotation.ncbText && !data.vessel?.ncbExcluded) {
     const ncbContent: (Paragraph | Table)[] = []
     let ncbText = decodeHtmlEntities(htmlToPlainText(data.quotation.ncbText))
     const ncbPct = data.quotation.ncbDiscountPercent
@@ -2431,8 +2515,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     rows.push(makeRow('No Claims\nBonus (NCB)', ncbContent))
   }
 
-  // UPCC (Upfront Continuity Credit)
-  if (data.quotation.upccEnabled && data.quotation.upccText) {
+  // UPCC (Upfront Continuity Credit) — skip if this vessel is excluded from UPCC
+  if (data.quotation.upccEnabled && data.quotation.upccText && !data.vessel?.upccExcluded) {
     const upccContent: (Paragraph | Table)[] = []
     let upccText = decodeHtmlEntities(htmlToPlainText(data.quotation.upccText))
     if (data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
@@ -2675,75 +2759,70 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       children: [new TextRun({ text: cancelReplaceResolved, size: 16, font: 'Arial', color: '000000', italics: true })]
     }))
   }
+  // Page number paragraph (consistent styling — all runs use identical rPr)
+  const pnStyle = { size: 16, font: 'Arial', color: '999999', bold: false, italics: false } as const
+  const pageNumPara = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 40, after: 0 },
+    children: [
+      new TextRun({ text: 'Page ', ...pnStyle }),
+      new TextRun({ children: [PageNumber.CURRENT], ...pnStyle }),
+      new TextRun({ text: ' of ', ...pnStyle }),
+      ...(configTotalPages
+        ? [new TextRun({ text: String(configTotalPages), ...pnStyle })]
+        : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])
+    ]
+  })
+
+  // Parse footer text lines
+  const footerTextLines: string[] = []
   if (footerText) {
-    // Strip HTML tags, split by <br> and newlines, render each as a line
     const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
     for (const line of plainFooter.split('\n')) {
-      if (line.trim()) {
-        footerChildren.push(new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line.trim(), size: 18, font: 'Arial', color: '999999' })]
-        }))
-      }
+      if (line.trim()) footerTextLines.push(line.trim())
     }
   }
-  // Footer layout: left=empty/text, center=page number, right=signature
-  if (signatureFooterRun) {
-    // Use a table for footer layout: 3 columns (left text | center page | right signature)
+
+  // Footer layout: Row 1 = 2-column table (left=stamps text, right=signature), Row 2 = centered page number
+  if (signatureFooterRun || footerTextLines.length > 0) {
     const footerW = POL_CONTENT_W || 9000
-    const fColW = Math.round(footerW / 3)
+    const leftW = Math.round(footerW * 0.75)
+    const rightW = footerW - leftW
+    // Left column: stamps/registration text
+    const leftParas: Paragraph[] = footerTextLines.length > 0
+      ? footerTextLines.map(line => new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
+        }))
+      : [new Paragraph({ spacing: { after: 0 }, children: [] })]
     footerChildren.push(new Table({
       width: { size: footerW, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
-      columnWidths: [fColW, fColW, fColW],
+      columnWidths: [leftW, rightW],
       rows: [new TableRow({
         children: [
           new TableCell({
-            width: { size: fColW, type: WidthType.DXA },
+            width: { size: leftW, type: WidthType.DXA },
             borders: polNoBorders(),
             verticalAlign: VerticalAlign.BOTTOM,
-            children: [new Paragraph({ spacing: { after: 0 }, children: [] })]
+            children: leftParas
           }),
           new TableCell({
-            width: { size: fColW, type: WidthType.DXA },
+            width: { size: rightW, type: WidthType.DXA },
             borders: polNoBorders(),
             verticalAlign: VerticalAlign.BOTTOM,
-            children: [new Paragraph({
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 0, after: 0 },
-              children: [
-                new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
-                new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
-                new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
-              ]
-            })]
-          }),
-          new TableCell({
-            width: { size: fColW, type: WidthType.DXA },
-            borders: polNoBorders(),
-            verticalAlign: VerticalAlign.BOTTOM,
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.RIGHT,
-                spacing: { after: 0 },
-                children: [signatureFooterRun]
-              })
-            ]
+            children: signatureFooterRun
+              ? [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [signatureFooterRun] })]
+              : [new Paragraph({ spacing: { after: 0 }, children: [] })]
           })
         ]
       })]
     }))
+    footerChildren.push(pageNumPara)
   } else {
-    footerChildren.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0 },
-      children: [
-        new TextRun({ text: 'Page ', size: 16, font: 'Arial', color: '999999' }),
-        new TextRun({ children: [PageNumber.CURRENT], size: 16, font: 'Arial', color: '999999' }),
-        new TextRun({ text: configTotalPages ? ` of ${configTotalPages}` : '', size: 16, font: 'Arial', color: '999999' })
-      ]
-    }))
+    // No signature or footer text — just centered page number
+    footerChildren.push(pageNumPara)
   }
   const policyFooter = new Footer({ children: footerChildren })
 
@@ -2763,14 +2842,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
 
   // Mark policy as exported
-  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString() }) } catch { /* non-critical */ }
+  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
 }
 
 /**
  * Generate a policy DOCX as an ArrayBuffer (without downloading).
  * Uses capture mode to intercept the blob from exportPolicyDocx.
+ * @param totalPages - if provided, hardcodes "Page X of N" instead of using auto NUMPAGES
  */
-async function generatePolicyDocxBuffer(policyId: string): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
+async function generatePolicyDocxBuffer(policyId: string, totalPages?: number): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const vName = data.vesselInfo?.name || ''
@@ -2781,7 +2861,7 @@ async function generatePolicyDocxBuffer(policyId: string): Promise<{ buffer: Arr
   _polCaptureMode = true
   _polCapturedBlob = null
   try {
-    await exportPolicyDocx(policyId)
+    await exportPolicyDocx(policyId, totalPages)
     // _polCapturedBlob is set by polDownloadBlob during exportPolicyDocx (TS can't track this)
     const captured = _polCapturedBlob as Blob | null
     if (!captured) throw new Error('Failed to generate policy document')
@@ -2795,11 +2875,9 @@ async function generatePolicyDocxBuffer(policyId: string): Promise<{ buffer: Arr
 
 /**
  * Export a policy as PDF with T&C appended.
- * Pipeline:
- * 1. Generate policy DOCX in renderer
- * 2. Send to main process for Word COM conversion to PDF
- * 3. Main process appends T&C with correct page numbering
- * 4. Download the merged PDF
+ * Two-pass pipeline:
+ * Pass 1: Generate DOCX (auto page count) → convert + merge → get combined total
+ * Pass 2: Re-generate DOCX with hardcoded total → convert + merge → final PDF
  */
 export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   // Check if T&C template exists for this policy type
@@ -2811,15 +2889,34 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     throw new Error('No T&C template uploaded for this policy type. Upload one in Policy Settings > T&C Templates.')
   }
 
-  // Generate the policy DOCX blob
-  const { buffer, fileName } = await generatePolicyDocxBuffer(policyId)
-  const policyDocxData = Array.from(new Uint8Array(buffer))
+  // Resolve policy type title for T&C footer
+  const typeTitleMap: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War Risk', F: 'FDD', L: 'Loss of Hire', C: 'Cargo' }
+  const policyTypeTitle = typeTitleMap[typeCode] || data.quotation.quotationTypeName || 'Insurance'
+  const policyNumber = data.policy.policyNumber
 
-  // Send to main process for conversion and merging
-  const result = await window.api.convertBuildPolicyWithTC({
-    policyDocxData,
+  // Pass 1: generate policy DOCX with auto page count, convert to get combined total
+  const { buffer: buf1, fileName } = await generatePolicyDocxBuffer(policyId)
+  const pass1Result = await window.api.convertBuildPolicyWithTC({
+    policyDocxData: Array.from(new Uint8Array(buf1)),
     tcTypeCode: typeCode,
-    filePrefix: fileName
+    filePrefix: fileName,
+    policyNumber,
+    policyTypeTitle
+  })
+
+  if (!pass1Result || (pass1Result as any).error) {
+    throw new Error((pass1Result as any)?.message || 'PDF conversion failed')
+  }
+
+  // Pass 2: re-generate with hardcoded combined total
+  const combinedTotal = pass1Result.totalPages || 0
+  const { buffer: buf2 } = await generatePolicyDocxBuffer(policyId, combinedTotal)
+  const result = await window.api.convertBuildPolicyWithTC({
+    policyDocxData: Array.from(new Uint8Array(buf2)),
+    tcTypeCode: typeCode,
+    filePrefix: fileName,
+    policyNumber,
+    policyTypeTitle
   })
 
   if (!result || (result as any).error) {
@@ -2831,7 +2928,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
-  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString() }) } catch { /* non-critical */ }
+  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
 }
 
 // ==================== Shared DA/CA Helpers ====================

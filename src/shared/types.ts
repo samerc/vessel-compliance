@@ -1133,6 +1133,7 @@ export interface Quotation {
   premiumRate?: number
   premiumType?: 'amount' | 'rate'
   warExcessEnabled?: boolean
+  warSection2Only?: boolean
   warExcessAmount?: number
   warExcessRate?: number
   warSection1Text?: string

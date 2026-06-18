@@ -126,7 +126,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         await window.api.setQuotationInstalments(quotation.id, insts)
         loadInstalments()
 
-        // Auto-set non-refundable default based on instalment count
+        // Auto-set non-refundable based on instalment count
         if (!quotation.nonRefundableType) {
             if (count > 1) {
                 setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined }))
@@ -137,8 +137,13 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 updateField('nonRefundableType', 'percentage')
                 updateField('nonRefundablePercent', 25)
             }
+        } else if (quotation.nonRefundableType === 'percentage' && count > 1) {
+            // Switch to 1st instalment when user increases instalment count
+            setQ(p => ({ ...p, nonRefundableType: 'first_instalment', nonRefundablePercent: undefined }))
+            updateField('nonRefundableType', 'first_instalment')
+            updateField('nonRefundablePercent', null)
         } else if (quotation.nonRefundableType === 'first_instalment' && count <= 1) {
-            // Switch to percentage if only 1 instalment
+            // Switch to percentage when user goes back to 1 instalment
             setQ(p => ({ ...p, nonRefundableType: 'percentage', nonRefundablePercent: 25 }))
             updateField('nonRefundableType', 'percentage')
             updateField('nonRefundablePercent', 25)
@@ -456,11 +461,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
             {/* Instalments (always visible) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '16px' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
-                <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
+                <input type="text" inputMode="numeric" pattern="[0-9]*"
+                    value={quotation.numInstalments ?? ''}
                     onChange={e => {
-                        const raw = e.target.value
+                        const raw = e.target.value.replace(/\D/g, '')
                         if (raw === '') { setQ(p => ({ ...p, numInstalments: undefined as any })); return }
                         const v = Math.max(1, Math.min(12, parseInt(raw) || 1))
+                        setQ(p => ({ ...p, numInstalments: v }))
+                    }}
+                    onBlur={e => {
+                        const v = Math.max(1, Math.min(12, parseInt(e.target.value) || 1))
                         setQ(p => ({ ...p, numInstalments: v }))
                         updateField('numInstalments', v)
                         handleSaveInstalments(v)
@@ -574,18 +584,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             </tr>
                         </tbody>
                     </table>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Instalments</label>
-                        <input type="number" min={1} max={12} value={quotation.numInstalments || 1}
-                            onChange={e => {
-                                const v = parseInt(e.target.value) || 1
-                                setQ(p => ({ ...p, numInstalments: v }))
-                                updateField('numInstalments', v)
-                                handleSaveInstalments(v)
-                            }}
-                            style={{ width: '80px' }}
-                        />
-                    </div>
+                    {/* Instalments input is above — no duplicate here */}
                 </div>
             )})()}
 
@@ -846,13 +845,14 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             }
                             onChange={e => {
                                 const key = quotation.nonRefundableType === 'first_instalment' ? 'nonRefundableFirstText' : 'nonRefundablePercentText'
-                                const override = { ...(quotation.sectionTextsOverride || {}), [key]: e.target.value }
-                                setQ(p => ({ ...p, sectionTextsOverride: override }))
+                                const val = e.target.value
+                                setQ(p => ({ ...p, sectionTextsOverride: { ...(p.sectionTextsOverride || {}), [key]: val } }))
                             }}
-                            onBlur={e => {
-                                const key = quotation.nonRefundableType === 'first_instalment' ? 'nonRefundableFirstText' : 'nonRefundablePercentText'
-                                const override = { ...(quotation.sectionTextsOverride || {}), [key]: e.target.value }
-                                updateField('sectionTextsOverride', override)
+                            onBlur={() => {
+                                setQ(p => {
+                                    updateField('sectionTextsOverride', p.sectionTextsOverride)
+                                    return p
+                                })
                             }}
                             style={{ width: '100%', maxWidth: '600px', minHeight: '40px', resize: 'vertical', fontSize: '0.82rem', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                         />
