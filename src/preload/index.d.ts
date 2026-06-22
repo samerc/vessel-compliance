@@ -821,6 +821,8 @@ export interface Api {
   warBreachSave: (record: any) => Promise<{ id: string }>
   warBreachGetAll: () => Promise<any[]>
   warBreachDelete: (id: string) => Promise<void>
+  sanctionsReportSave: (data: import('../shared/types').SanctionsReportCheckInput) => Promise<{ id: string }>
+  sanctionsReportList: () => Promise<import('../shared/types').SanctionsReportCheck[]>
   analyticsGetPresets: () => Promise<import('../shared/types').AnalyticsPreset[]>
   analyticsAddPreset: (name: string, filters: any) => Promise<import('../shared/types').AnalyticsPreset>
   analyticsUpdatePreset: (id: string, name: string, filters: any) => Promise<void>

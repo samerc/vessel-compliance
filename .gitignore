@@ -109,3 +109,5 @@ db/db-config.json
 sanctions.db
 documents
 .deploy-config.json
+# Production DB dumps (PII) — never commit
+policies/*.sql

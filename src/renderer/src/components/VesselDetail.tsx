@@ -3196,12 +3196,14 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     const [loading, setLoading] = useState(true)
     const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
     const [typeFilter, setTypeFilter] = useState<string>('all')
+    // Local YYYY-MM-DD (NOT UTC) so the range matches the server-local audit timestamps
+    const localDateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const [dateFrom, setDateFrom] = useState<string>(() => {
         const d = new Date()
         d.setFullYear(d.getFullYear() - 1)
-        return d.toISOString().split('T')[0]
+        return localDateKey(d)
     })
-    const [dateTo, setDateTo] = useState<string>(() => new Date().toISOString().split('T')[0])
+    const [dateTo, setDateTo] = useState<string>(() => localDateKey(new Date()))
     const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
     const [activitySearch, setActivitySearch] = useState('')
 
@@ -3355,7 +3357,9 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     const filteredEvents = events.filter(ev => {
         if (typeFilter !== 'all' && ev.type !== typeFilter) return false
         if (ev.date) {
-            const evDate = ev.date.split('T')[0]
+            // Date strings come back space-separated ("2026-06-22 06:46:11"), not ISO with 'T',
+            // so take the first 10 chars (YYYY-MM-DD) rather than split on 'T'.
+            const evDate = String(ev.date).slice(0, 10)
             if (dateFrom && evDate < dateFrom) return false
             if (dateTo && evDate > dateTo) return false
         }

@@ -1778,3 +1778,25 @@ export const ENDORSEMENT_PRESET_SECTIONS = [
   { key: 'deductibles', title: 'Deductibles' },
   { key: 'general', title: 'General' },
 ] as const
+
+// Sanctions Report Check — ad-hoc named screening report saved for audit
+export interface SanctionsReportListResult {
+  source: string
+  status: 'CLEAR' | 'POTENTIAL_MATCH'
+  matchCount: number
+}
+
+export interface SanctionsReportCheckInput {
+  subjectName: string
+  entityId?: string | null
+  entityType?: string | null
+  threshold: number
+  decision: 'CLEARED' | 'SANCTIONED'
+  results: SanctionsReportListResult[]
+  checkedBy?: string | null
+}
+
+export interface SanctionsReportCheck extends SanctionsReportCheckInput {
+  id: string
+  checkedAt: string
+}

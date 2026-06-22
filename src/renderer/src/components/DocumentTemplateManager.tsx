@@ -9,6 +9,7 @@ import { useToast } from '../contexts/ToastContext'
 import type { DocumentTemplate } from '../../../shared/types'
 import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/types'
 import RichTextEditor from './RichTextEditor'
+import { confirmDialog } from './DialogHost'
 import {
   resolveTemplatePlaceholders,
   htmlToPlainText,
@@ -137,7 +138,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
   const handleDelete = async () => {
     if (!selected) return
-    if (!confirm(`Delete template "${selected.name}"?`)) return
+    if (!(await confirmDialog(`Delete template "${selected.name}"?`))) return
     try {
       await window.api.docTemplateDelete(selected.id)
       setSelectedId(null)

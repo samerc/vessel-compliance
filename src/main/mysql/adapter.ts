@@ -1369,6 +1369,23 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
+            // Migration: Create sanctions_report_checks table (ad-hoc named screening reports)
+            const [srcTables] = await this.pool.query("SHOW TABLES LIKE 'sanctions_report_checks'")
+            if ((srcTables as any[]).length === 0) {
+                await this.pool.query(`CREATE TABLE sanctions_report_checks (
+                    id VARCHAR(36) PRIMARY KEY,
+                    subject_name VARCHAR(255) NOT NULL,
+                    entity_id VARCHAR(36) NULL,
+                    entity_type VARCHAR(20) NULL,
+                    threshold INT NOT NULL DEFAULT 60,
+                    decision VARCHAR(20) NOT NULL,
+                    results_json MEDIUMTEXT NULL,
+                    checked_by VARCHAR(100) NULL,
+                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_src_checked (checked_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            }
+
             // Warranty sets tables (disable FK checks to avoid collation mismatch)
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
@@ -11771,6 +11788,42 @@ export class MySQLAdapter {
     async deleteWarBreachRecord(id: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM war_breach_records WHERE id = ?', [id])
+    }
+
+    // --- Sanctions Report Checks (ad-hoc named screening reports) ---
+
+    async createSanctionsReportCheck(data: {
+        subjectName: string
+        entityId?: string | null
+        entityType?: string | null
+        threshold: number
+        decision: string
+        results?: any[]
+        checkedBy?: string | null
+    }): Promise<{ id: string }> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        await this.pool.execute(
+            `INSERT INTO sanctions_report_checks (id, subject_name, entity_id, entity_type, threshold, decision, results_json, checked_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.subjectName, data.entityId || null, data.entityType || null, data.threshold,
+             data.decision, JSON.stringify(data.results || []), data.checkedBy || null]
+        )
+        return { id }
+    }
+
+    async getSanctionsReportChecks(limit = 200): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, subject_name AS subjectName, entity_id AS entityId, entity_type AS entityType,
+                    threshold, decision, results_json AS resultsJson, checked_by AS checkedBy, checked_at AS checkedAt
+             FROM sanctions_report_checks ORDER BY checked_at DESC LIMIT ?`,
+            [limit]
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            results: (() => { try { return JSON.parse(r.resultsJson || '[]') } catch { return [] } })()
+        }))
     }
 
     // ==================== Hull Agreed Value Texts ====================

@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
 import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { confirmDialog } from './DialogHost'
 
 interface PolicyRenewalsProps {
     onNavigateToVessel?: (vesselId: string) => void
@@ -268,7 +269,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     }
 
     const handleDeleteStatus = async (id: string) => {
-        if (!confirm('Delete this status? Policies using it will have their status cleared.')) return
+        if (!(await confirmDialog('Delete this status? Policies using it will have their status cleared.'))) return
         await window.api.deleteRenewalStatusType(id)
         loadStatusTypes()
         loadRenewals()

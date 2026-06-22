@@ -1195,11 +1195,8 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         if (a.order != null && b.order != null) return a.order - b.order
         return (addlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (addlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
     })
-    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by shared order_index.
-    // Legacy data has overlapping order namespaces, so offset custom to render after additional until reordered.
-    const _aOrders = new Set(baseHa.map(x => x.order ?? -1).filter(o => o >= 0))
-    const _custOverlap = data.hullCustomConditions.some(c => _aOrders.has(c.order ?? -1))
-    const _custBase = _custOverlap ? 100000 : 0
+    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by
+    // the shared order_index namespace (additional + custom share one gap-free sequence).
     const _customSynthetic = data.hullCustomConditions.map(cc => ({
         id: cc.id,
         quotationId: data.quotation.id,
@@ -1208,7 +1205,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         vesselScope: cc.vesselScope ?? null,
         alternativeId: null,
         amount: null,
-        order: (cc.order ?? 0) + _custBase,
+        order: cc.order ?? 0,
         __isCustom: true,
         __customTitle: cc.title
     })) as any[]
@@ -1298,8 +1295,9 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         return pairs
       }
 
-      // Determine where each additional condition belongs
-      const getAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+      // Determine where each additional condition belongs ('none' = orphaned: linked only to
+      // clauses that no active alternative/IV uses, so it is hidden from the export entirely)
+      const getAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } | { type: 'none' } => {
         if ((qa as any).__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
         if (!def) return { type: 'both' }
@@ -1310,7 +1308,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
         if (matchedAlts.length === effectiveAlts.length && matchesIv) return { type: 'both' }
         if (matchedAlts.length === effectiveAlts.length && !matchesIv) return multiAlt ? { type: 'allAlts' } : { type: 'both' }
         if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
-        if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
+        if (matchedAlts.length === 0 && !matchesIv) return { type: 'none' }
         if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
         return { type: 'allAlts' }
       }
@@ -2530,8 +2528,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const lead = text.slice(0, listStart)
           const rest = text.slice(listStart)
           if (/<p\b/i.test(lead)) {
+            const baseOpt = { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED }
             const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
-            return parseHtmlToParagraphs(`<ul>${leadBullets}</ul>${rest}`, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
+            // Intro renders as a normal bullet; the sub-list + any closing text nest under it.
+            const introParas = parseHtmlToParagraphs(`<ul>${leadBullets}</ul>`, baseOpt)
+            const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 140 })
+            return [...introParas, ...restParas]
           }
         }
         return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED })
@@ -3221,11 +3223,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (a.order != null && b.order != null) return a.order - b.order
         return (dAddlSettingsOrder.get(a.hullAdditionalConditionId) ?? 999) - (dAddlSettingsOrder.get(b.hullAdditionalConditionId) ?? 999)
     })
-    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by shared order_index.
-    // Legacy data has overlapping order namespaces, so offset custom to render after additional until reordered.
-    const _dAOrders = new Set(dBaseHa.map(x => x.order ?? -1).filter(o => o >= 0))
-    const _dCustOverlap = data.hullCustomConditions.some(c => _dAOrders.has(c.order ?? -1))
-    const _dCustBase = _dCustOverlap ? 100000 : 0
+    // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by
+    // the shared order_index namespace (additional + custom share one gap-free sequence).
     const _dCustomSynthetic = data.hullCustomConditions.map(cc => ({
         id: cc.id,
         quotationId: data.quotation.id,
@@ -3234,7 +3233,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         vesselScope: cc.vesselScope ?? null,
         alternativeId: null,
         amount: null,
-        order: (cc.order ?? 0) + _dCustBase,
+        order: cc.order ?? 0,
         __isCustom: true,
         __customTitle: cc.title
     })) as any[]
@@ -3344,7 +3343,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
 
       // Determine where each additional condition belongs
-      const dGetAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } => {
+      const dGetAddlBelonging = (qa: typeof ha[0]): { type: 'alt'; altId: string } | { type: 'allAlts' } | { type: 'iv' } | { type: 'both' } | { type: 'none' } => {
         if ((qa as any).__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
         if (!def) return { type: 'both' }
@@ -3355,7 +3354,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (matchedAlts.length === dEffectiveAlts.length && matchesIv) return { type: 'both' }
         if (matchedAlts.length === dEffectiveAlts.length && !matchesIv) return dMultiAlt ? { type: 'allAlts' } : { type: 'both' }
         if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
-        if (matchedAlts.length === 0 && !matchesIv) return { type: 'both' }
+        if (matchedAlts.length === 0 && !matchesIv) return { type: 'none' }
         if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }
         return { type: 'allAlts' }
       }

@@ -831,13 +831,25 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         const next = [...merged]
         const [moved] = next.splice(fromIdx, 1)
         next.splice(toIdx, 0, moved)
-        // Assign a single shared order namespace across both types
+        // Assign a single shared, gap-free order namespace across both types.
         const customOrder: { id: string; order: number }[] = []
         const addlOrder = new Map<string, number>()
-        next.forEach((it, i) => {
-            if (it.kind === 'custom') customOrder.push({ id: it.key, order: i })
-            else addlOrder.set(it.key, i)
-        })
+        let pos = 0
+        for (const it of next) {
+            if (it.kind === 'custom') customOrder.push({ id: it.key, order: pos })
+            else addlOrder.set(it.key, pos)
+            pos++
+        }
+        // Append hidden (orphaned) additional conditions — selected but not linked to the
+        // current clause, so not shown — after the visible ones, so their orders never
+        // collide with the reordered visible/custom items.
+        const visibleAddlKeys = new Set(merged.filter(m => m.kind === 'addl').map(m => m.key))
+        for (const qa of qAdditional) {
+            if (!visibleAddlKeys.has(qa.hullAdditionalConditionId) && !addlOrder.has(qa.hullAdditionalConditionId)) {
+                addlOrder.set(qa.hullAdditionalConditionId, pos)
+                pos++
+            }
+        }
         setCustomConditions(prev => prev.map(c => {
             const o = customOrder.find(x => x.id === c.id)
             return o ? { ...c, order: o.order } : c

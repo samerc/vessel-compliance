@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import RichTextEditor from './RichTextEditor'
+import { confirmDialog } from './DialogHost'
 import type { EmailTemplate } from '../../../shared/types'
 
 const CATEGORIES = [
@@ -84,9 +85,9 @@ export default function EmailTemplates(): React.JSX.Element {
     }
   }, [selectedId])
 
-  const handleSelect = (id: string) => {
+  const handleSelect = async (id: string) => {
     if (dirty && selectedId) {
-      if (!confirm('You have unsaved changes. Discard them?')) return
+      if (!(await confirmDialog('You have unsaved changes. Discard them?'))) return
     }
     setSelectedId(id)
   }
@@ -129,7 +130,7 @@ export default function EmailTemplates(): React.JSX.Element {
 
   const handleDelete = async () => {
     if (!canManage || !selectedId || selected?.isSystem) return
-    if (!confirm(`Delete "${selected?.name}"?`)) return
+    if (!(await confirmDialog(`Delete "${selected?.name}"?`))) return
     try {
       await window.api.emailDeleteTemplate(selectedId)
       setSelectedId(null)

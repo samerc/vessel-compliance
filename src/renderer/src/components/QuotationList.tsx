@@ -106,6 +106,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'>('active')
   const [deletedQuotations, setDeletedQuotations] = useState<any[]>([])
   const [deletedLoading, setDeletedLoading] = useState(false)
+  const [permDeleteId, setPermDeleteId] = useState<string | null>(null)
   const [createdByFilter, setCreatedByFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -318,12 +319,12 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   }
 
   const handlePermanentDelete = async (id: string) => {
-    if (!confirm('Permanently delete this quotation? This cannot be undone.')) return
     try {
       await window.api.permanentlyDeleteQuotation(id)
       showSuccess('Quotation permanently deleted')
       loadDeletedQuotations()
     } catch (e: any) { showError(e.message || 'Failed to delete') }
+    finally { setPermDeleteId(null) }
   }
 
   // Grouping
@@ -1149,7 +1150,7 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
                         <RotateCcw size={13} /> Restore
                       </button>
                       {hasPermission('quotations:bulkDelete') && (
-                        <button onClick={() => handlePermanentDelete(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
+                        <button onClick={() => setPermDeleteId(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
                           <Trash2 size={13} /> Delete
                         </button>
                       )}
@@ -2114,6 +2115,17 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {permDeleteId && (
+        <ConfirmationModal
+          title="Permanently Delete?"
+          message="Permanently delete this quotation? This cannot be undone."
+          confirmLabel="Delete Permanently"
+          isDangerous
+          onConfirm={() => handlePermanentDelete(permDeleteId)}
+          onCancel={() => setPermDeleteId(null)}
+        />
       )}
 
       {deleteModal?.show &&

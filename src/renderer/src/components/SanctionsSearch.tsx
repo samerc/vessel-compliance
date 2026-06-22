@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings } from 'lucide-react'
+import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
+import SanctionsCheckReport from './SanctionsCheckReport'
 
 interface SicEntry {
     id: number
@@ -43,7 +44,7 @@ export default function SanctionsSearch() {
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light' || theme === 'aurora'
 
-    const [activeTab, setActiveTab] = useState<'search' | 'sic'>('search')
+    const [activeTab, setActiveTab] = useState<'search' | 'sic' | 'report'>('search')
 
     // Search state
     const [query, setQuery] = useState('')
@@ -342,7 +343,8 @@ export default function SanctionsSearch() {
             <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0' }}>
                 {[
                     { key: 'search' as const, label: 'Search', icon: <Search size={15} /> },
-                    { key: 'sic' as const, label: 'SIC List', icon: <Users size={15} /> }
+                    { key: 'sic' as const, label: 'SIC List', icon: <Users size={15} /> },
+                    { key: 'report' as const, label: 'Check Report', icon: <FileText size={15} /> }
                 ].map(tab => (
                     <button
                         key={tab.key}
@@ -1037,6 +1039,9 @@ export default function SanctionsSearch() {
                     </div>
                 </div>
             )}
+
+            {/* ============ CHECK REPORT TAB ============ */}
+            {activeTab === 'report' && <SanctionsCheckReport />}
         </div>
     )
 }

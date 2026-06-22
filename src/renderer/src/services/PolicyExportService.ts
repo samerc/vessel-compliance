@@ -895,6 +895,10 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.tradingGetIntros(policy.quotationId)
   ])
 
+  // Resolve the target vessel up-front — filterByAlt (below) references these.
+  const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
+  const vessel = safeQVessels.find(v => v.vesselId === policy.vesselId) || safeQVessels[0] || null
+
   // Filter by selected alternative and vessel scope
   const altId = policy.selectedAlternativeId || null
   const filterByAlt = (items: any[]) => {
@@ -969,8 +973,6 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   const mergedTexts: PISectionTexts = { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}), ...(quotation.sectionTextsOverride || {}) }
 
-  const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
-  const vessel = safeQVessels.find(v => v.vesselId === policy.vesselId) || safeQVessels[0] || null
   const safeFlagStates: { id: string; name: string }[] = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
   const safeAllVessels: Vessel[] = Array.isArray(allVessels) ? allVessels : []
 
@@ -1342,8 +1344,11 @@ function polMpBullet(text: string): Paragraph[] {
         const lead = decoded.slice(0, listStart)
         const rest = decoded.slice(listStart)
         if (/<p\b/i.test(lead)) {
+          const baseOpt = { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED }
           const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
-          return parseHtmlToParagraphs(`<ul>${leadBullets}</ul>${rest}`, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+          const introParas = parseHtmlToParagraphs(`<ul>${leadBullets}</ul>`, baseOpt)
+          const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 140 })
+          return [...introParas, ...restParas]
         }
       }
       return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
@@ -1848,31 +1853,55 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
         return merged
       })()
     : ha
-  if (filteredHa.length > 0) {
+
+  // Active hull clauses for this policy — used to hide orphaned additional conditions
+  // (linked only to clauses no active alternative/IV uses), mirroring the quotation export.
+  const activeClauseIds: string[] = []
+  if (selectedAlt) activeClauseIds.push(selectedAlt.hullClauseId)
+  else if (dAlts.length > 1) activeClauseIds.push(...dAlts.map(a => a.hullClauseId))
+  else {
+    const sc = dAlts[0]?.hullClauseId || data.quotation.hullClauseId
+    if (sc) activeClauseIds.push(sc)
+  }
+  if (data.quotation.ivEnabled && ivClauseId) activeClauseIds.push(ivClauseId)
+
+  const visibleHa = filteredHa.filter(qa => {
+    const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+    if (!def) return false
+    const linked = def.hullClauseIds || []
+    // No links = applies to all; links present = keep only if at least one matches an active clause
+    return linked.length === 0 || linked.some(id => activeClauseIds.includes(id))
+  })
+
+  // Merge additional + custom conditions by the shared order_index so they interleave
+  // as bullets (matching the quotation export), instead of a separate trailing block.
+  const mergedAddl: { order: number; kind: 'addl' | 'custom'; qa?: any; cc?: any }[] = [
+    ...visibleHa.map(qa => ({ order: (qa as any).order ?? 0, kind: 'addl' as const, qa })),
+    ...data.hullCustomConditions.map(cc => ({ order: (cc as any).order ?? 0, kind: 'custom' as const, cc }))
+  ].sort((a, b) => a.order - b.order)
+
+  if (mergedAddl.length > 0) {
     if (selectedAlt && data.quotation.ivEnabled && ivClauseId) {
       content.push(polEmptyP())
       content.push(polBup('Applicable to all sections'))
     }
     content.push(polEmptyP())
-    for (const qa of filteredHa) {
-      const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
-      if (!def) continue
-      let condText = qa.textOverride || def.text
-      if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
-        const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        condText = condText.replace(new RegExp(escaped, 'g'), polFormatCurrency(qa.amount, currency))
+    for (const it of mergedAddl) {
+      if (it.kind === 'addl') {
+        const qa = it.qa
+        const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+        if (!def) continue
+        let condText = qa.textOverride || def.text
+        if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
+          const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          condText = condText.replace(new RegExp(escaped, 'g'), polFormatCurrency(qa.amount, currency))
+        }
+        condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
+        content.push(...polMpBullet(condText))
+      } else {
+        const cc = it.cc
+        content.push(...polMpBullet(cc.title ? `${cc.title} — ${cc.text}` : cc.text))
       }
-      // Issue 3: resolve generic {currency} and {amount} placeholders
-      condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
-      content.push(...polMpBullet(condText))
-    }
-  }
-  // Custom hull additional conditions
-  if (data.hullCustomConditions.length > 0) {
-    content.push(polEmptyP())
-    for (const cc of data.hullCustomConditions) {
-      if (cc.title) content.push(polBp(cc.title))
-      content.push(polBulletP(decodeHtmlEntities(cc.text)))
     }
   }
 }

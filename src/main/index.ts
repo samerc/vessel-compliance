@@ -1819,6 +1819,16 @@ app.whenReady().then(() => {
     return db.deleteWarBreachRecord(id)
   })
 
+  // ── Sanctions Report Checks (ad-hoc named screening reports) ──
+  safeHandle('sanctionsReport:save', async (event, data: any) => {
+    requireSession(event)
+    return db.createSanctionsReportCheck(data)
+  })
+  safeHandle('sanctionsReport:list', (event) => {
+    requireSession(event)
+    return db.getSanctionsReportChecks()
+  })
+
   // ── Analytics Presets ──
   safeHandle('analytics:getPresets', (event) => {
     const user = requireSession(event)

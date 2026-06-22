@@ -46,7 +46,7 @@ function parseLineHeight(css: string | null | undefined, fallbackMultiplier?: nu
 
 export function parseHtmlToParagraphs(
   html: string,
-  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number }
+  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number; indentOffset?: number }
 ): Paragraph[] {
   if (!html || html.trim() === '') return []
 
@@ -55,6 +55,9 @@ export function parseHtmlToParagraphs(
   const color = opts?.color ?? '000000'
   const spacingAfter = opts?.spacingAfter ?? 80
   const defaultLineSpacing = parseLineHeight(null, opts?.lineSpacing)
+  // Extra left indent (twips) added to every paragraph/list item — used to nest a
+  // condition's sub-list and continuation text under its bullet.
+  const indentOffset = opts?.indentOffset ?? 0
 
   // If no HTML tags, treat as plain text with line breaks
   if (!/<[a-z][\s\S]*>/i.test(html)) {
@@ -136,7 +139,9 @@ export function parseHtmlToParagraphs(
       spacing: { after: spacingAfter, ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {}) },
       alignment: alignment || opts?.alignment,
       bidirectional: bidirectional || undefined,
-      ...(listPrefix ? { indent: { left: 140, hanging: 140 } } : {}),
+      ...(listPrefix
+        ? { indent: { left: 140 + indentOffset, hanging: 140 } }
+        : (indentOffset ? { indent: { left: indentOffset } } : {})),
       children
     } as any)
   }
@@ -157,6 +162,7 @@ export function parseHtmlToParagraphs(
             spacing: { after: spacingAfter, ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {}) },
             alignment: rtl ? AlignmentType.RIGHT : opts?.alignment,
             bidirectional: rtl || undefined,
+            ...(indentOffset ? { indent: { left: indentOffset } } : {}),
             children: [new TextRun({ text, size, font, color, rightToLeft: rtl || undefined } as any)]
           } as any))
         }

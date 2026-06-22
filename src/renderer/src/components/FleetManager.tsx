@@ -28,6 +28,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { confirmDialog } from './DialogHost'
 
 interface CustomerGroup {
   entity: Entity
@@ -126,7 +127,7 @@ export default function FleetManager() {
   }
 
   const handleDeleteFleet = async (fleet: Fleet) => {
-    if (!confirm(`Delete "${fleet.name}"? All vessels will be unassigned.`)) return
+    if (!(await confirmDialog(`Delete "${fleet.name}"? All vessels will be unassigned.`))) return
     await window.api.deleteFleet(fleet.id)
     if (panelFleet?.id === fleet.id) setPanelFleet(null)
     await loadData()

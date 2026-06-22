@@ -7,6 +7,7 @@ import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { DialogHost } from './components/DialogHost'
 
 
 // Block keyboard up/down arrows on number inputs to prevent accidental value changes
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <ToastProvider>
           <App />
+          <DialogHost />
         </ToastProvider>
       </ThemeProvider>
     </AuthProvider>

@@ -11,6 +11,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { confirmDialog } from './DialogHost'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -199,7 +200,7 @@ export default function SurveyorDirectory() {
   }
 
   const handleDelete = async (surveyor: Surveyor) => {
-    if (!confirm(`Delete ${surveyor.companyName}? This will fail if they are referenced in any surveys.`)) return
+    if (!(await confirmDialog(`Delete ${surveyor.companyName}? This will fail if they are referenced in any surveys.`))) return
     try {
       await window.api.deleteSurveyor(surveyor.id)
       if (selectedSurveyor?.id === surveyor.id) setSelectedSurveyor(null)

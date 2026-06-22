@@ -8,6 +8,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { confirmDialog } from './DialogHost'
 
 interface FleetDetailProps {
     fleet: Fleet
@@ -80,7 +81,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     }
 
     const handleRemoveVessel = async (vessel: Vessel) => {
-        if (confirm(`Remove ${vessel.name} from this fleet?`)) {
+        if (await confirmDialog(`Remove ${vessel.name} from this fleet?`)) {
             await window.api.updateVessel(vessel.id, { fleetId: null as any })
             showSuccess(`${vessel.name} removed from fleet`)
             loadData()

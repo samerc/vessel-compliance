@@ -8,6 +8,7 @@ import { Extension, Node as TipTapNode } from '@tiptap/react'
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ChevronDown, WrapText, Link as LinkIcon, Unlink } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { promptDialog } from './DialogHost'
 import './RichTextEditor.css'
 
 // Custom FontFamily extension using TextStyle marks
@@ -218,13 +219,13 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
     return () => document.removeEventListener('mousedown', handler)
   }, [fontSizeOpen, fontFamilyOpen, lineSpacingOpen, placeholderOpen])
 
-  const toggleLink = useCallback(() => {
+  const toggleLink = useCallback(async () => {
     if (!editor) return
     if (editor.isActive('link')) {
       editor.chain().focus().unsetLink().run()
       return
     }
-    const url = window.prompt('Enter URL:')
+    const url = await promptDialog('Enter URL:')
     if (url) {
       editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
     }

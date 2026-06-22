@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { countryNameToIso3 } from '../utils/countryCodeMap'
 import RichTextEditor from './RichTextEditor'
+import { confirmDialog } from './DialogHost'
 
 import { StickyNote } from 'lucide-react'
 
@@ -2876,7 +2877,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                         <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
                                         <button onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
                                         <button onClick={() => startEdit(s)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                        <button onClick={async () => { if (confirm('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                        <button onClick={async () => { if (await confirmDialog('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -3016,7 +3017,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
                                     <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
                                     <button onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
                                     <button onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                    <button onClick={async () => { if (confirm(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                    <button onClick={async () => { if (await confirmDialog(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                 </div>
                             </div>
                         )}
@@ -4276,7 +4277,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
 
     const handleDeleteStep = async (id: string) => {
         const step = steps.find(s => s.id === id)
-        if (!confirm(`Delete step "${step?.name || 'this step'}"? This will also remove all transitions involving it.`)) return
+        if (!(await confirmDialog(`Delete step "${step?.name || 'this step'}"? This will also remove all transitions involving it.`))) return
         try {
             const result = await window.api.workflowDeleteStep(id)
             if (result && !(result as any).success) {

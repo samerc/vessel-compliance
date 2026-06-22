@@ -4,6 +4,7 @@ import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantySt
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
+import { confirmDialog } from './DialogHost'
 
 interface WarrantyManagerProps {
   vesselId: string
@@ -313,7 +314,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   // ── Delete ───────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this warranty? This cannot be undone.')) return
+    if (!(await confirmDialog('Delete this warranty? This cannot be undone.'))) return
     try {
       await window.api.surveyWarrantyDelete(id)
       showSuccess('Warranty deleted')

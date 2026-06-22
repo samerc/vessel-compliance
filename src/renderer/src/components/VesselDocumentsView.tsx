@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import type { Vessel, DocumentType, VesselDocument, VesselCustomDocType, VesselDynamicPolicy } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
+import { confirmDialog } from './DialogHost'
 
 interface Props {
   vessel: Vessel
@@ -182,7 +183,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   }
 
   const handleUnlinkFile = async (doc: VesselDocument) => {
-    if (!confirm('Unlink this file? The record will remain.')) return
+    if (!(await confirmDialog('Unlink this file? The record will remain.'))) return
     await window.api.upsertVesselDocument({ ...doc, filePath: '' })
     loadData(); onReload?.()
   }
@@ -202,7 +203,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   }
 
   const handleDeleteCustomType = async (id: string) => {
-    if (!confirm('Delete this custom document type?')) return
+    if (!(await confirmDialog('Delete this custom document type?'))) return
     await window.api.deleteVesselCustomDocType(id)
     loadData()
   }

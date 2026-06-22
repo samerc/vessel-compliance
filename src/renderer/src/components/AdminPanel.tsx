@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import RichTextEditor from './RichTextEditor'
+import { confirmDialog, alertDialog } from './DialogHost'
 
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
@@ -239,7 +240,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteNotifGroup = async (id: string) => {
-        if (!confirm('Delete this notification group?')) return
+        if (!(await confirmDialog('Delete this notification group?'))) return
         try {
             await window.api.notifGroupDelete(id)
             if (selectedNotifGroupId === id) setSelectedNotifGroupId(null)
@@ -416,7 +417,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteBank = async (id: string) => {
-        if (!confirm('Delete this bank?')) return
+        if (!(await confirmDialog('Delete this bank?'))) return
         try {
             await window.api.bankDelete(id)
             await loadBanks()
@@ -506,7 +507,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteGroup = async (id: string) => {
-        if (!confirm('Delete this group? Users in this group will lose its permissions.')) return
+        if (!(await confirmDialog('Delete this group? Users in this group will lose its permissions.'))) return
         try {
             await window.api.rbacDeleteGroup(id)
             if (selectedGroupId === id) {
@@ -719,7 +720,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeletePolicyType = async (id: string) => {
-        if (!confirm('Delete this policy type? It will be removed from all vessels.')) return
+        if (!(await confirmDialog('Delete this policy type? It will be removed from all vessels.'))) return
         await window.api.deletePolicyType(id)
         loadPolicyTypes()
         showSuccess('Policy type deleted')
@@ -765,7 +766,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteClassSociety = async (id: string) => {
-        if (!confirm('Delete this classification society?')) return
+        if (!(await confirmDialog('Delete this classification society?'))) return
         await window.api.deleteClassificationSociety(id)
         loadClassSocieties()
         showSuccess('Classification society deleted')
@@ -805,7 +806,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteVesselType = async (id: string) => {
-        if (!confirm('Delete this vessel type?')) return
+        if (!(await confirmDialog('Delete this vessel type?'))) return
         await window.api.deleteVesselType(id)
         loadVesselTypes()
         showSuccess('Vessel type deleted')
@@ -940,7 +941,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteEntityDocType = async (id: string) => {
-        if (confirm('Delete this entity document type? All uploaded entity documents of this type will be removed.')) {
+        if (await confirmDialog('Delete this entity document type? All uploaded entity documents of this type will be removed.')) {
             await window.api.deleteEntityDocumentType(id)
             await loadEntityDocTypes()
         }
@@ -997,7 +998,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteDocType = async (id: string) => {
-        if (confirm('Delete this document type? It will be removed from all vessels.')) {
+        if (await confirmDialog('Delete this document type? It will be removed from all vessels.')) {
             await window.api.deleteDocumentType(id)
             await loadDocTypes()
         }
@@ -1075,7 +1076,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteRole = async (id: string) => {
-        if (confirm('Delete this role? Existing vessel assignments will keep the name but the role will be removed from suggestions.')) {
+        if (await confirmDialog('Delete this role? Existing vessel assignments will keep the name but the role will be removed from suggestions.')) {
             await window.api.deleteAssuredRole(id)
             await loadRoles()
         }
@@ -1098,7 +1099,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleDeleteSurveyType = async (id: string) => {
-        if (confirm('Delete this survey type? Existing surveys will keep their type.')) {
+        if (await confirmDialog('Delete this survey type? Existing surveys will keep their type.')) {
             await window.api.deleteConditionSurveyType(id)
             await loadSurveyTypes()
         }
@@ -1238,7 +1239,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             if (result.success) {
                 window.location.reload()
             } else {
-                alert(result.message || 'Failed to load configuration')
+                await alertDialog(result.message || 'Failed to load configuration')
             }
         }
     }
@@ -1250,7 +1251,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             if (result.success) {
                 window.location.reload()
             } else {
-                alert(result.message || 'Failed to load configuration')
+                await alertDialog(result.message || 'Failed to load configuration')
             }
         }
     }

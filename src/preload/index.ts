@@ -770,6 +770,8 @@ const api = {
   warBreachSave: (record: any) => ipcRenderer.invoke('warBreach:save', record),
   warBreachGetAll: () => ipcRenderer.invoke('warBreach:getAll'),
   warBreachDelete: (id: string) => ipcRenderer.invoke('warBreach:delete', id),
+  sanctionsReportSave: (data: any) => ipcRenderer.invoke('sanctionsReport:save', data),
+  sanctionsReportList: () => ipcRenderer.invoke('sanctionsReport:list'),
 
   // Analytics
   analyticsGetPresets: () => ipcRenderer.invoke('analytics:getPresets'),

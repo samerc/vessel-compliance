@@ -333,6 +333,18 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 - **Source Filters**: Toggle OFAC, UN, EU, ISF sanctions lists independently
 - **Results**: Expandable cards with match score, aliases, remarks, source IDs
 - **Local search**: All searches run against local SQLite database via `SanctionsService.search()`
+- **Tabs**: Search · SIC List · Check Report (see below)
+
+### Sanctions Check Report
+
+Named screening report generated from the Sanctions Search page ("Check Report" tab, `src/renderer/src/components/SanctionsCheckReport.tsx`):
+
+- **Subject**: free-text name OR a linked entity (searchable picker over `getEntities()`). Linking an entity lets the decision update that entity's stored status.
+- **Per-list table**: screens all 5 lists (OFAC, EU, UN, ISF, SIC) via `checkSanctions(name, threshold/100, sources)`, groups matches by `source`, and shows each list as **Clear** or **Potential Match** with match count and date. Threshold filter mirrors the Search tab (`score*100 >= threshold`).
+- **Clear/Sanction gate**: if any list has potential matches, the user must choose **Clear Subject** or **Sanction Subject** before export unlocks; all-clear auto-resolves to Cleared.
+- **Export PDF**: mirrors other report exports (`getReportSettings` header band/accent/footer, jsPDF + autoTable). Shows subject meta, an overall RESULT: CLEARED/SANCTIONED badge, and the per-list status table.
+- **On export**: saves an audit record (`sanctions_report_checks`: subject, entity, threshold, decision, per-list results JSON, checked-by, date) and — if an entity was linked — updates its `ofac_status` (CLEARED/MATCH) + check date via `updateEntity`.
+- **IPC**: `sanctionsReport:save`, `sanctionsReport:list`. Adapter: `createSanctionsReportCheck`, `getSanctionsReportChecks`.
 
 ### Admin Panel
 
@@ -741,6 +753,7 @@ Bootstrap + overlay architecture for code-only deployments without full installe
 - **Danger color**: always `color: 'var(--danger)'` — never hardcode `#ff4d4d`, `#c00`, or `red`
 - **Modal background**: `isLight ? '#ffffff' : '#1a1d28'` — never use `glass-card` class or `var(--bg-sidebar)` for modals
 - **Input borders**: use `var(--input-border)` (color-only token), NOT `var(--glass-border)` (full border shorthand) for form controls
+- **No native dialogs**: NEVER use `window.confirm`/`alert`/`prompt` — in Electron they steal keyboard focus and leave inputs "stuck". Use the promise-based in-app replacements from `src/renderer/src/components/DialogHost.tsx`: `confirmDialog(msg)`, `alertDialog(msg)`, `promptDialog(msg)`. `<DialogHost />` is mounted once in `main.tsx`.
 
 ## Database Setup
 
@@ -1156,6 +1169,7 @@ Draft quotation references include the policy type code:
 - `quotation_hull_custom_conditions` - Per-quotation custom hull additional conditions (free text)
 - `quotation_trading_intros` - Per-vessel trading warranty intro text overrides (vessel_scope JSON)
 - `defect_attachments` - Per-defect photo/evidence attachments (file_path, file_name)
+- `sanctions_report_checks` - Saved ad-hoc sanctions screening reports (subject_name, entity_id, entity_type, threshold, decision, results_json, checked_by, checked_at)
 
 **SQLite tables** (in `sanctions.db`, separate from MySQL):
 - `entities` - Sanctions list entities (OFAC, EU, UN, ISF, SIC) with name, name_normalized, aliases, identifications, programs, vessel_imo, mother_name, father_name
@@ -1184,8 +1198,10 @@ Reinsurance declaration document for War policies:
 
 Per-quotation free-text hull conditions (not from master settings list):
 - **Table**: `quotation_hull_custom_conditions` (id, quotation_id, text, title, order_index, vessel_scope, alternative_id)
-- **UI**: "Custom Additional Conditions" collapsible section in HullConditionsTab
-- **Export**: Appended after master additional conditions in both quotation and policy exports
+- **UI**: Custom conditions are merged into the **Additional Conditions** sub-tab in HullConditionsTab (the separate "Custom" tab was removed). One "Conditions Order" list shows additional + custom together with up/down reorder buttons (drag also works).
+- **Shared order namespace**: additional and custom conditions share ONE gap-free `order_index` sequence so they interleave. `mapAddForSave` always carries `order`; the reorder renumbers the FULL set (including hidden/orphaned additional) to avoid collisions; `addQuotationHullCustomCondition`/toggle assign order = max(additional+custom)+1; a normalize-on-load fixes legacy overlapping namespaces once.
+- **Export**: custom rendered as interleaved bullets with additional (by shared order) in BOTH quotation and policy exports — NOT appended as a separate trailing block. `getAddlBelonging` returns `'none'` (excluded) for additional conditions linked only to clauses no active alternative/IV uses (orphan hiding); the policy export mirrors this with an `activeClauseIds` filter.
+- **Bullet/list rendering**: `mpBullet`/`polMpBullet` bullet a leading intro `<p>` that precedes an embedded `<ul>/<ol>` (e.g. GA clause), and nest the list + closing paragraph under it via the `indentOffset` option on `parseHtmlToParagraphs`.
 - **Cloned**: On quotation duplicate/renewal via `cloneQuotationJunctions`
 
 ### Quotation Editing Lock
