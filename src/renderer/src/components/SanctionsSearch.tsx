@@ -203,15 +203,17 @@ export default function SanctionsSearch() {
                 motherName: sicForm.mother_name || null,
                 fatherName: sicForm.father_name || null
             }
-            if (editingSic) {
-                await (window.api as any).sicUpdateEntity(editingSic.id, payload)
-                showSuccess('SIC entry updated')
-            } else {
-                await (window.api as any).sicAddEntity(payload)
-                showSuccess('SIC entry added')
+            const res = editingSic
+                ? await (window.api as any).sicUpdateEntity(editingSic.id, payload)
+                : await (window.api as any).sicAddEntity(payload)
+            // safeHandle returns { error: true, message } instead of throwing
+            if (res && res.error) {
+                showError(res.message || 'Failed to save SIC entry')
+                return
             }
+            showSuccess(editingSic ? 'SIC entry updated' : 'SIC entry added')
             setShowSicModal(false)
-            loadSicEntries()
+            await loadSicEntries()
         } catch (err: any) {
             showError(err.message || 'Failed to save')
         }
@@ -219,10 +221,11 @@ export default function SanctionsSearch() {
 
     const handleDeleteSic = async (id: number) => {
         try {
-            await (window.api as any).sicDeleteEntity(id)
+            const res = await (window.api as any).sicDeleteEntity(id)
+            if (res && res.error) { showError(res.message || 'Failed to delete'); return }
             showSuccess('SIC entry deleted')
             setDeleteConfirm(null)
-            loadSicEntries()
+            await loadSicEntries()
         } catch (err: any) {
             showError(err.message || 'Failed to delete')
         }
@@ -233,6 +236,7 @@ export default function SanctionsSearch() {
             const filePath = await window.api.dialogOpenFile()
             if (!filePath) return
             const importResult = await (window.api as any).sicImport(filePath)
+            if (importResult && importResult.error) { showError(importResult.message || 'Failed to import'); return }
             showSuccess(`Imported ${importResult.count} SIC entries`)
             loadSicEntries()
         } catch (err: any) {

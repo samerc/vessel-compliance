@@ -14,6 +14,7 @@ import { formatDateForMySQL } from './mysql/utils'
 import { assignRegistryNumber, markRegistryCancelled } from './services/QuotationRegistryService'
 import { hotUpdateService } from './services/HotUpdateService'
 import { sanctionsService } from './sanctions/SanctionsService'
+import { normalizeText } from './sanctions/normalize'
 import Store from 'electron-store'
 import { createPool } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
@@ -2196,8 +2197,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:addEntity', async (event, entity: any) => {
-    requireSession(event)
-    const { normalizeText } = require('./sanctions/normalize')
+    requireSession(event)
     const e = {
       source: 'SIC' as const,
       source_id: entity.sourceId || null,
@@ -2221,8 +2221,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:updateEntity', async (event, id: number, entity: any) => {
-    requireSession(event)
-    const { normalizeText } = require('./sanctions/normalize')
+    requireSession(event)
     const updates: any = {}
     if (entity.name !== undefined) {
       updates.name = entity.name
