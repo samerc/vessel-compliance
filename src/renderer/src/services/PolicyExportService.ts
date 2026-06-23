@@ -1344,10 +1344,11 @@ function polMpBullet(text: string): Paragraph[] {
         const lead = decoded.slice(0, listStart)
         const rest = decoded.slice(listStart)
         if (/<p\b/i.test(lead)) {
-          const baseOpt = { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED }
-          const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
-          const introParas = parseHtmlToParagraphs(`<ul>${leadBullets}</ul>`, baseOpt)
-          const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 140 })
+          // Intro as the SAME native dash-bullet as plain conditions; sub-list + closing nest under it.
+          const introText = stripHtml(lead).trim()
+          const baseOpt = { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED, spacingAfter: 40 }
+          const introParas = introText ? [polBulletP(introText)] : []
+          const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 280 })
           return [...introParas, ...restParas]
         }
       }

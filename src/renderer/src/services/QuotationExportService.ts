@@ -2528,11 +2528,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const lead = text.slice(0, listStart)
           const rest = text.slice(listStart)
           if (/<p\b/i.test(lead)) {
-            const baseOpt = { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED }
-            const leadBullets = lead.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
-            // Intro renders as a normal bullet; the sub-list + any closing text nest under it.
-            const introParas = parseHtmlToParagraphs(`<ul>${leadBullets}</ul>`, baseOpt)
-            const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 140 })
+            // Intro renders as the SAME native dash-bullet as the plain conditions (text @280,
+            // tight spacing); the sub-list + closing nest under it at matching indent.
+            const introText = stripHtml(lead).trim()
+            const baseOpt = { size: 22, font: 'Arial', color: color || '000000', alignment: AlignmentType.JUSTIFIED, spacingAfter: 40 }
+            const introParas = introText ? [bulletP(introText, color)] : []
+            const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 280 })
             return [...introParas, ...restParas]
           }
         }
