@@ -1667,7 +1667,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
       if (q.tradingCustomText) {
         tradingText += stripHtml(q.tradingCustomText) + '\n\n'
       }
-      if (excCountries.length > 0) {
+      if (q.tradingShowExcluded !== false && excCountries.length > 0) {
         tradingText += 'Excluding ' + excCountries.map(c => c.name).join(', ') + '.\n\n'
       }
       let sectionNum = 1
@@ -3805,7 +3805,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         tradContent.push(emptyP())
         tradContent.push(...mp(wq.tradingCustomText, customTextChanged ? RED : undefined))
       }
-      if (wExcCountries.length > 0) {
+      if (wq.tradingShowExcluded !== false && wExcCountries.length > 0) {
         // Highlight if excluded countries list changed
         const excCountriesChanged = origData && (
           wExcCountries.length !== origExcCountryNames.size ||

@@ -1072,6 +1072,7 @@ export interface Quotation {
   premiumCurrency?: string
   numInstalments?: number
   tradingWarrantyIntro?: string
+  tradingShowExcluded: boolean
   tradingShowDdqList: boolean
   tradingShowDdqWarranties: boolean
   tradingShowIsrael: boolean

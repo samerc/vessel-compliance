@@ -232,6 +232,17 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
             </div>}
 
             {!quotation.tradingCustomMode && <>
+            {/* Section A2: Excluded Countries toggle */}
+            <div style={sectionStyle}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={quotation.tradingShowExcluded !== false} onChange={e => toggle('tradingShowExcluded', e.target.checked)} style={checkboxStyle} />
+                    <span style={{ fontWeight: 600 }}>Excluded Countries</span>
+                </label>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '6px 0 0 26px' }}>
+                    Includes the &quot;Excluding {excluded.map(c => c.name).join(', ') || '(none)'}&quot; line in the export. Uncheck to omit it.
+                </p>
+            </div>
+
             {/* Section B: DDQ Countries List */}
             <div style={sectionStyle}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', marginBottom: '10px' }}>
@@ -277,9 +288,9 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                 )}
             </div>
 
-            {/* Section E: Custom Exclusion Text (not for P&I) */}
+            {/* Section E: Additional Trading Text (not for P&I) */}
             {quotation.quotationTypeCode !== 'P' && <div style={sectionStyle}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Custom Trading Section (optional)</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Additional Trading Text</label>
                 {templates.length > 0 && (
                     <div style={{ marginBottom: '10px' }}>
                         <select
@@ -303,7 +314,7 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
                 <RichTextEditor
                     value={quotation.tradingCustomText || ''}
                     onChange={val => { setQ(p => ({ ...p, tradingCustomText: val })); updateField('tradingCustomText', val) }}
-                    placeholder="Add custom trading exclusion or condition text..."
+                    placeholder="Add additional trading exclusion or condition text..."
                     minHeight={60}
                     showFontSize showAlignment showLineSpacing
                 />

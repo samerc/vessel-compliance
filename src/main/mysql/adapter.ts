@@ -648,6 +648,11 @@ export class MySQLAdapter {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_show_israel BOOLEAN DEFAULT TRUE')
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_custom_text TEXT NULL')
             }
+            // Migration: Add trading_show_excluded toggle (gates the "Excluding <countries>" line)
+            const [tradExclCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'trading_show_excluded'")
+            if ((tradExclCol as any[]).length === 0) {
+                await this.pool.query('ALTER TABLE quotations ADD COLUMN trading_show_excluded BOOLEAN DEFAULT TRUE')
+            }
             // Migration: Add trading_custom_mode + trading_custom_wording
             const [tCustModeCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'trading_custom_mode'")
             if ((tCustModeCol as any[]).length === 0) {
@@ -8101,6 +8106,7 @@ export class MySQLAdapter {
                 q.premium_amount as premiumAmount, q.premium_currency as premiumCurrency,
                 q.num_instalments as numInstalments,
                 q.trading_warranty_intro as tradingWarrantyIntro,
+                q.trading_show_excluded as tradingShowExcluded,
                 q.trading_show_ddq_list as tradingShowDdqList,
                 q.trading_show_ddq_warranties as tradingShowDdqWarranties,
                 q.trading_show_israel as tradingShowIsrael,
@@ -8158,6 +8164,7 @@ export class MySQLAdapter {
             vdrDeductibleEnabled: Boolean(r.vdrDeductibleEnabled),
             ncbEnabled: Boolean(r.ncbEnabled),
             upccEnabled: Boolean(r.upccEnabled),
+            tradingShowExcluded: r.tradingShowExcluded == null ? true : Boolean(r.tradingShowExcluded),
             tradingShowDdqList: r.tradingShowDdqList == null ? true : Boolean(r.tradingShowDdqList),
             tradingShowDdqWarranties: r.tradingShowDdqWarranties == null ? true : Boolean(r.tradingShowDdqWarranties),
             tradingShowIsrael: r.tradingShowIsrael == null ? true : Boolean(r.tradingShowIsrael),
@@ -8279,6 +8286,7 @@ export class MySQLAdapter {
             limitOfLiabilityAmount: 'limit_of_liability_amount', limitOfLiabilityCurrency: 'limit_of_liability_currency',
             limitOfLiabilityText: 'limit_of_liability_text', premiumAmount: 'premium_amount', premiumCurrency: 'premium_currency',
             numInstalments: 'num_instalments', tradingWarrantyIntro: 'trading_warranty_intro',
+            tradingShowExcluded: 'trading_show_excluded',
             tradingShowDdqList: 'trading_show_ddq_list', tradingShowDdqWarranties: 'trading_show_ddq_warranties',
             tradingShowIsrael: 'trading_show_israel', tradingCustomText: 'trading_custom_text',
             tradingCustomMode: 'trading_custom_mode', tradingCustomWording: 'trading_custom_wording',
@@ -8408,8 +8416,8 @@ export class MySQLAdapter {
                         )
                     }
                     await this.pool.execute(
-                        'UPDATE quotations SET trading_warranty_intro = ?, trading_show_ddq_list = ?, trading_show_ddq_warranties = ?, trading_show_israel = ?, trading_custom_text = ?, trading_custom_mode = ?, trading_custom_wording = ? WHERE id = ?',
-                        [source.trading_warranty_intro, source.trading_show_ddq_list, source.trading_show_ddq_warranties, source.trading_show_israel, source.trading_custom_text, source.trading_custom_mode, source.trading_custom_wording, targetQuotationId]
+                        'UPDATE quotations SET trading_warranty_intro = ?, trading_show_excluded = ?, trading_show_ddq_list = ?, trading_show_ddq_warranties = ?, trading_show_israel = ?, trading_custom_text = ?, trading_custom_mode = ?, trading_custom_wording = ? WHERE id = ?',
+                        [source.trading_warranty_intro, source.trading_show_excluded, source.trading_show_ddq_list, source.trading_show_ddq_warranties, source.trading_show_israel, source.trading_custom_text, source.trading_custom_mode, source.trading_custom_wording, targetQuotationId]
                     )
                     break
                 }
@@ -8857,7 +8865,7 @@ export class MySQLAdapter {
                     id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
                     is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, limit_of_liability_vessel_amounts, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, trading_custom_mode, trading_custom_wording,
                     sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
@@ -8884,7 +8892,7 @@ export class MySQLAdapter {
                     ?, ?, quotation_type_id, quotation_date, policy_type_id, vessel_id,
                     is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, limit_of_liability_vessel_amounts, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, trading_custom_mode, trading_custom_wording,
                     sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
@@ -8975,7 +8983,7 @@ export class MySQLAdapter {
                     id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
                     is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
                     premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
@@ -8994,7 +9002,7 @@ export class MySQLAdapter {
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
                     is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
                     premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
@@ -9057,7 +9065,7 @@ export class MySQLAdapter {
                     id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
                     is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
                     premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
@@ -9081,7 +9089,7 @@ export class MySQLAdapter {
                     ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
                     TRUE, 'draft', ?, limit_of_liability_amount, limit_of_liability_currency,
                     limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
+                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
                     trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
                     deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
                     premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,

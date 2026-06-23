@@ -2074,7 +2074,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     content.push(...polMp(wq.tradingCustomWording))
   } else {
     if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMp(wq.tradingCustomText)) }
-    if (excCountries.length > 0) { content.push(polEmptyP()); content.push(polNp('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
+    if (wq.tradingShowExcluded !== false && excCountries.length > 0) { content.push(polEmptyP()); content.push(polNp('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
       const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
       const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
