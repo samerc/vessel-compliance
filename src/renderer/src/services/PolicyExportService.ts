@@ -2742,7 +2742,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   let configTotalPages = totalPages
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   let pageCountMap: Record<string, Record<string, number>> = {}
@@ -3140,7 +3140,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // Load header title setting
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   try {
@@ -3344,7 +3344,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   // Load header title setting
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   try {
@@ -3794,7 +3794,7 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   try {
@@ -3975,7 +3975,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   try {
@@ -4157,7 +4157,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
 
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
+    H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
   try {

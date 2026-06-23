@@ -12,6 +12,7 @@ import { Entity, SanctionsMatch, SanctionsReportListResult } from '../../../shar
 const SOURCES: { code: string; label: string }[] = [
   { code: 'OFAC', label: 'OFAC (US Treasury)' },
   { code: 'EU', label: 'European Union' },
+  { code: 'UK', label: 'UK (FCDO)' },
   { code: 'UN', label: 'United Nations' },
   { code: 'ISF', label: 'ISF (Lebanon)' },
   { code: 'SIC', label: 'SIC (Lebanon)' }
@@ -316,7 +317,7 @@ async function exportPdf(opts: {
 
   // Per-list table
   const SRC_LABELS: Record<string, string> = {
-    OFAC: 'OFAC (US Treasury)', EU: 'European Union', UN: 'United Nations', ISF: 'ISF (Lebanon)', SIC: 'SIC (Lebanon)'
+    OFAC: 'OFAC (US Treasury)', EU: 'European Union', UK: 'UK (FCDO)', UN: 'United Nations', ISF: 'ISF (Lebanon)', SIC: 'SIC (Lebanon)'
   }
   const dateStr = formatDate(opts.checkedAt)
   const body = opts.results.map(r => {

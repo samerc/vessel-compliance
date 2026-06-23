@@ -49,7 +49,7 @@ export default function SanctionsSearch() {
     // Search state
     const [query, setQuery] = useState('')
     const [threshold, setThreshold] = useState(user?.sanctionsThreshold || 60)
-    const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu', 'isf', 'sic'])
+    const [sources, setSources] = useState<string[]>(['ofac', 'un', 'eu', 'uk', 'isf', 'sic'])
     const [results, setResults] = useState<SanctionsMatch[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [hasSearched, setHasSearched] = useState(false)
@@ -147,6 +147,7 @@ export default function SanctionsSearch() {
         switch (source.toLowerCase()) {
             case 'ofac': return '#ff6b6b'
             case 'eu': return '#4dabf7'
+            case 'uk': return '#ff922b'
             case 'un': return '#69db7c'
             case 'isf': return '#e599f7'
             case 'sic': return '#ffd43b'
@@ -446,7 +447,7 @@ export default function SanctionsSearch() {
                                 SANCTIONS LISTS
                             </label>
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                {['OFAC', 'UN', 'EU', 'ISF', 'SIC'].map(source => (
+                                {['OFAC', 'UN', 'EU', 'UK', 'ISF', 'SIC'].map(source => (
                                     <button
                                         key={source}
                                         type="button"

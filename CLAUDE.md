@@ -96,7 +96,7 @@ Sanctions screening runs entirely within the Electron app — no external API de
 - **Database file**: `sanctions.db` stored alongside `db-config.json` in app data directory
 - **Entity columns**: source, source_id, entity_type, name, name_normalized, aliases (JSON), date_of_birth, nationality, addresses (JSON), identifications (JSON), programs (JSON), vessel_imo, remarks, listed_date, mother_name, father_name
 - **Search**: Fuse.js fuzzy matching (weighted: name 0.5, normalized name 0.5, IMO 0.8, aliases 0.3, mother_name 0.3, father_name 0.3) + SQL LIKE exact search (also queries mother_name, father_name), combined and deduplicated
-- **Data sources**: OFAC SDN (XML), EU OpenSanctions (CSV), UN Consolidated (XML), ISF Lebanon (Excel), SIC (manual + Excel import)
+- **Data sources**: OFAC SDN (XML), EU OpenSanctions (CSV), UK FCDO via OpenSanctions (CSV — `gb_fcdo_sanctions`, reuses the EU simple-CSV parser), UN Consolidated (XML), ISF Lebanon (Excel), SIC (manual + Excel import)
 - **Parsers**: `parsers/ofacParser.ts`, `parsers/euParser.ts`, `parsers/unParser.ts`, `parsers/isfParser.ts`, `parsers/sicParser.ts`
 - **Normalize**: `normalize.ts` — lowercase, NFD unicode, strip diacritics, strip special chars
 - **Startup**: `sanctionsService.initialize(dbDir)` called in `app.whenReady()`, loads all entities into Fuse.js in-memory index
@@ -330,7 +330,7 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 
 - **Per-User Threshold**: Minimum match threshold (10-95%) persisted to `users.sanctions_threshold` column
 - **IPC Handler**: `users:updateSanctionsThreshold` saves to DB and updates session cache
-- **Source Filters**: Toggle OFAC, UN, EU, ISF sanctions lists independently
+- **Source Filters**: Toggle OFAC, UN, EU, UK, ISF sanctions lists independently
 - **Results**: Expandable cards with match score, aliases, remarks, source IDs
 - **Local search**: All searches run against local SQLite database via `SanctionsService.search()`
 - **Tabs**: Search · SIC List · Check Report (see below)
@@ -358,7 +358,7 @@ System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with co
 6. **Vessel Reminder Settings**: Snooze period and clipboard template
 7. **File Upload Security**: Allowed/blocked file extensions for uploads
 8. **Report Settings**: Company name, logo, accent color used in PDF reports
-9. **Sanctions Data**: Per-source status cards (OFAC, EU, UN, ISF) with entity count, last update, release date; per-source and bulk refresh buttons
+9. **Sanctions Data**: Per-source status cards (OFAC, EU, UK, UN, ISF) with entity count, last update, release date; per-source and bulk refresh buttons
 10. **Database Configuration**: View/change MySQL connection settings
 
 - **Collapsible Pattern**: Uses `collapsedSections` state (`Set<string>`) with `toggleSection` function; each section header has ChevronRight/ChevronDown toggle

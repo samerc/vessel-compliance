@@ -5,11 +5,13 @@ import { parseEuSanctions } from './parsers/euParser'
 import { parseUnSanctions } from './parsers/unParser'
 import { parseIsfSanctions } from './parsers/isfParser'
 import { parseSicExcel } from './parsers/sicParser'
+import { parseUkSanctions } from './parsers/ukParser'
 
 const DATA_SOURCES = {
   OFAC: 'https://www.treasury.gov/ofac/downloads/sdn.xml',
   EU: 'https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv',
   UN: 'https://scsanctions.un.org/resources/xml/en/consolidated.xml',
+  UK: 'https://data.opensanctions.org/datasets/latest/gb_fcdo_sanctions/targets.simple.csv',
   ISF_PAGE: 'https://isf.gov.lb/national-terrorism-financial-list'
 }
 
@@ -152,6 +154,11 @@ export class SanctionsService {
         const parsed = await parseUnSanctions(xmlData)
         entities = parsed.entities
         releaseDate = parsed.releaseDate
+      } else if (src === 'UK') {
+        const csvData = await this.fetchText(DATA_SOURCES.UK)
+        const parsed = parseUkSanctions(csvData)
+        entities = parsed.entities
+        releaseDate = parsed.releaseDate
       } else if (src === 'ISF') {
         const downloadUrl = await this.getIsfDownloadUrl()
         if (!downloadUrl) throw new Error('Could not find Excel download link on ISF page')
@@ -184,7 +191,7 @@ export class SanctionsService {
   }
 
   async refreshAll(onProgress?: (msg: string) => void): Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }[]> {
-    const sources = ['OFAC', 'EU', 'UN', 'ISF']
+    const sources = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
     const results: { source: string; count: number; status: string; releaseDate: string | null; error?: string }[] = []
     for (const src of sources) {
       onProgress?.(`Refreshing ${src}...`)
@@ -195,7 +202,7 @@ export class SanctionsService {
 
   getStatus(): { sources: (DataUpdate & { entityCount: number })[]; totalEntities: number } {
     const updates = this.db.getDataUpdates()
-    const allSources = ['OFAC', 'EU', 'UN', 'ISF', 'SIC']
+    const allSources = ['OFAC', 'EU', 'UK', 'UN', 'ISF', 'SIC']
     const sources = allSources.map(src => {
       const update = updates.find(u => u.source === src)
       return {

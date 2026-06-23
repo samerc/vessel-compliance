@@ -766,7 +766,7 @@ export async function exportQuotationToPDF(quotation: Quotation): Promise<void> 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(0, 0, 0)
   const isCargoPdf = data.quotation.quotationTypeCode === 'C'
-  const typeLabel = isCargoPdf ? 'Marine Cargo' : data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'
+  const typeLabel = isCargoPdf ? 'Marine Cargo' : data.quotation.quotationTypeCode === 'H' ? 'HULL' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'
   const pdfTitleText = isCargoPdf
     ? `${typeLabel} Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
     : `${typeLabel} QUOTATION FOR ${docTitle}`
@@ -4781,7 +4781,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       children: [
         new TextRun({ text: data.quotation.quotationTypeCode === 'C'
           ? `Marine Cargo Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
-          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL AND MACHINERY' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
+          : `${data.quotation.quotationTypeCode === 'H' ? 'HULL' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
       ]
     }),
     new Paragraph({

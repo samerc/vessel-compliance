@@ -4103,7 +4103,7 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
         try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) } catch { return d }
     }
 
-    const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UN: '#44cc88', ISF: '#ffb020', SIC: '#ffd43b' }
+    const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UK: '#e8590c', UN: '#44cc88', ISF: '#ffb020', SIC: '#ffd43b' }
 
     return (
         <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
@@ -4119,10 +4119,10 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
                 </div>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
-                Sanctions lists are stored locally for screening. Refresh to download the latest data from OFAC, EU, UN, and ISF sources. SIC entries are managed manually.
+                Sanctions lists are stored locally for screening. Refresh to download the latest data from OFAC, EU, UK, UN, and ISF sources. SIC entries are managed manually.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                {(status?.sources || [{ source: 'OFAC' }, { source: 'EU' }, { source: 'UN' }, { source: 'ISF' }, { source: 'SIC' }]).map((src: any) => {
+                {(status?.sources || [{ source: 'OFAC' }, { source: 'EU' }, { source: 'UK' }, { source: 'UN' }, { source: 'ISF' }, { source: 'SIC' }]).map((src: any) => {
                     const color = sourceColors[src.source] || 'var(--accent-primary)'
                     const isRefreshing = refreshing === src.source || refreshing === 'ALL'
                     const hasData = src.entityCount > 0
