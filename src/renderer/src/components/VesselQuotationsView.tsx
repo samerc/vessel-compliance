@@ -128,7 +128,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
           const vLabel = `V${i + 1}`
           const vassureds = await window.api.getVesselAssureds(v.id)
           const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-            .filter((va: any) => !existingEntityIds.has(va.entityId))
+            .filter((va: any) => !existingEntityIds.has(`${va.entityId}:${vLabel}`))
             .sort((a: any, b: any) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
           for (const va of toAdd) {
             const entity = allEntities.find((e: any) => e.id === va.entityId)
@@ -145,7 +145,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
               vesselLabel: vesselsToAdd.length > 1 ? vLabel : undefined,
               order: assuredOrder++
             })
-            existingEntityIds.add(va.entityId)
+            existingEntityIds.add(`${va.entityId}:${vLabel}`)
           }
         }
       } catch { /* ignore assured loading errors */ }

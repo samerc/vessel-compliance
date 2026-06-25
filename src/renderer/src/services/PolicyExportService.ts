@@ -848,7 +848,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, banks,
     assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw,
-    tradingIntrosRaw
+    tradingIntrosRaw, assuredRolesRaw
   ] = await Promise.all([
     window.api.policyGetInstalments(policyId),
     window.api.policyGetAddresses(policyId),
@@ -892,8 +892,18 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     window.api.getQuotationCustomSections(policy.quotationId),
     window.api.hullGetAgreedValueOptions(policy.quotationId),
     window.api.getFleets(),
-    window.api.tradingGetIntros(policy.quotationId)
+    window.api.tradingGetIntros(policy.quotationId),
+    window.api.getAssuredRoles()
   ])
+
+  // Sort assureds by the configured role order (Registered Owners → Managers → …) so the
+  // Insured section renders them in role order within each vessel.
+  const assuredRoleOrder = new Map(
+    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx])
+  )
+  const assuredsSorted = [...(Array.isArray(assureds) ? assureds : [])].sort(
+    (a: any, b: any) => (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) - (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
+  )
 
   // Resolve the target vessel up-front — filterByAlt (below) references these.
   const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
@@ -1015,7 +1025,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     allVessels: safeAllVessels,
     flagStates: safeFlagStates,
     assureds: (() => {
-      const all = Array.isArray(assureds) ? assureds : []
+      const all = assuredsSorted
       if (!vessel || safeQVessels.length <= 1) return all
       // Filter assureds to only those belonging to this vessel
       const vLabel = vessel.vesselLabel

@@ -9269,6 +9269,45 @@ export class MySQLAdapter {
             existingAssureds.map((a: any) => a.entityId ? `${a.entityId}:${a.vesselLabel || ''}` : null).filter(Boolean)
         )
 
+        // Role order from settings — used to add assureds in Registered Owners → Managers → … order
+        const fleetAssuredRoles = await this.getAssuredRoles()
+        const fleetRoleOrder = new Map(
+            (Array.isArray(fleetAssuredRoles) ? fleetAssuredRoles : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx])
+        )
+        const sortByRole = (list: any[]) => [...list].sort(
+            (a: any, b: any) => (fleetRoleOrder.get(a.role?.toLowerCase()) ?? 999) - (fleetRoleOrder.get(b.role?.toLowerCase()) ?? 999)
+        )
+
+        // Ensure the PRIMARY vessel has assureds. Its quotation is cloned from the source policy's
+        // quotation; if that source carried none, the primary vessel would be empty in the export
+        // while non-primary vessels (handled below) get theirs. Fall back to the vessel registry.
+        {
+            const primaryLabel = vesselIdToLabel.get(primaryVesselId) || 'V1'
+            const primaryHasAssureds = allQVessels.length > 1
+                ? existingAssureds.some((a: any) => (a.vesselLabel || '') === primaryLabel)
+                : existingAssureds.length > 0
+            if (!primaryHasAssureds) {
+                const pvAssureds = await this.getVesselAssureds(primaryVesselId)
+                const entities = await this.getEntities()
+                let assuredOrder = existingAssureds.length
+                for (const va of sortByRole(Array.isArray(pvAssureds) ? pvAssureds : [])) {
+                    if (existingEntityKeys.has(`${va.entityId}:${primaryLabel}`)) continue
+                    const entity = entities.find((e: any) => e.id === va.entityId)
+                    if (!entity) continue
+                    if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') continue
+                    await this.addQuotationAssured({
+                        quotationId: newQuotationId,
+                        entityId: va.entityId,
+                        name: entity.name,
+                        role: va.role || undefined,
+                        vesselLabel: allQVessels.length > 1 ? primaryLabel : undefined,
+                        order: assuredOrder++
+                    })
+                    existingEntityKeys.add(`${va.entityId}:${primaryLabel}`)
+                }
+            }
+        }
+
         // For each non-primary vessel that has a policy, merge their data
         for (const vid of vesselIds) {
             if (vid === primaryVesselId) continue
@@ -9279,7 +9318,7 @@ export class MySQLAdapter {
                 const entities = await this.getEntities()
                 const vLabel = vesselIdToLabel.get(vid) || ''
                 let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
-                for (const va of vassureds) {
+                for (const va of sortByRole(Array.isArray(vassureds) ? vassureds : [])) {
                     if (existingEntityKeys.has(`${va.entityId}:${vLabel}`)) continue
                     const entity = entities.find((e: any) => e.id === va.entityId)
                     if (!entity) continue

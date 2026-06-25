@@ -143,7 +143,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
     warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
     flagStatesRaw, surveyWarrantiesRaw, fleetsRaw, assuredGroupsRaw,
-    tradingIntrosRaw
+    tradingIntrosRaw, assuredRolesRaw
   ] = await Promise.all([
     window.api.getQuotationVessels(quotation.id),
     window.api.getVessels(),
@@ -188,8 +188,18 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     window.api.quotationSurveyWarrantyGetAll(quotation.id),
     window.api.getFleets(),
     window.api.getQuotationAssuredGroups(quotation.id),
-    window.api.tradingGetIntros(quotation.id)
+    window.api.tradingGetIntros(quotation.id),
+    window.api.getAssuredRoles()
   ])
+
+  // Sort assureds by the configured role order (Registered Owners → Managers → …) so every
+  // downstream render path (group + legacy, PDF + DOCX) emits them in role order within each vessel.
+  const assuredRoleOrder = new Map(
+    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx])
+  )
+  const assuredsSorted = [...(Array.isArray(assureds) ? assureds : [])].sort(
+    (a: any, b: any) => (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) - (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
+  )
 
   // Extract IDs and vessel scope / alternative maps from new object return format
   const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
@@ -325,7 +335,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   }
 
   return {
-    quotation, quotationVessels, allVessels, flagStates: Array.isArray(flagStatesRaw) ? flagStatesRaw : [], assureds,
+    quotation, quotationVessels, allVessels, flagStates: Array.isArray(flagStatesRaw) ? flagStatesRaw : [], assureds: assuredsSorted,
     assuredGroups: Array.isArray(assuredGroupsRaw) ? (assuredGroupsRaw as QuotationAssuredGroup[]).sort((a, b) => a.order - b.order) : [],
     subLimits,
     selectedClauseIds, clauseVesselScopes, clauseAltIds,
