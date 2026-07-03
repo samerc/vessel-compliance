@@ -333,6 +333,42 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     setData(prev => ({ ...prev, ...partial }))
   }
 
+  // Default day-from-inception spacing per instalment count (mirrors PremiumTab)
+  const instalmentDaysFor = (count: number, index: number): number => {
+    const known: Record<number, number[]> = {
+      1: [0], 2: [0, 180], 3: [0, 120, 240], 4: [0, 90, 180, 270],
+      12: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+    }
+    return known[count]?.[index] ?? Math.round((index * 360) / count)
+  }
+
+  // Change the number of instalments: rebuild dates (from inception) and split the premium evenly
+  const changeInstalmentCount = (rawCount: number) => {
+    const count = Math.max(1, Math.min(24, Math.floor(rawCount) || 1))
+    const newInstalments: QuotationInstalment[] = Array.from({ length: count }, (_, i) => ({
+      id: `wiz-inst-${i}`,
+      quotationId,
+      instalmentNumber: i + 1,
+      daysFromInception: instalmentDaysFor(count, i)
+    }))
+    const dates = data.inceptionDate
+      ? newInstalments.map(inst => {
+          const [y, m, day] = data.inceptionDate.split('-').map(Number)
+          const months = Math.round(inst.daysFromInception / 30)
+          const d = new Date(y, m - 1 + months, day)
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        })
+      : Array.from({ length: count }, () => '')
+    const total = data.totalPremium || 0
+    const per = Math.round((total / count) * 100) / 100
+    const amounts = Array.from({ length: count }, (_, i) =>
+      i === count - 1 ? Math.round((total - per * (count - 1)) * 100) / 100 : per
+    )
+    const nr = Array.from({ length: count }, (_, i) => data.instalmentNonRefundable[i] || false)
+    setInstalments(newInstalments)
+    setData(prev => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts, instalmentNonRefundable: nr }))
+  }
+
   const computePayable = (techPremium: number): number => {
     if (!quotation) return techPremium
     let pay = techPremium
@@ -645,6 +681,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             isLight={isLight}
             onUpdate={updateData}
             recalcPremiumFromInstalments={recalcPremiumFromInstalments}
+            onChangeCount={changeInstalmentCount}
             inputStyle={inputStyle}
           />
         )}
@@ -939,58 +976,74 @@ function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputS
   )
 }
 
-function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, inputStyle }: {
+function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, inputStyle }: {
   data: WizardData
   quotation: Quotation
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
   recalcPremiumFromInstalments: (amounts: number[]) => void
+  onChangeCount: (count: number) => void
   inputStyle: React.CSSProperties
 }) {
-  if (data.instalmentDates.length === 0) {
-    return (
-      <div>
-        <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Instalment Schedule</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '20px 0' }}>
-          No instalments configured on this quotation. The full premium will be due on a single instalment.
-        </p>
-      </div>
-    )
-  }
+  const labelUpper: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }
+  const count = data.instalmentDates.length
 
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Premium & Instalments</h2>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        Set the payable premium and review instalment dates and amounts.
+        Set the payable premium, the number of instalments, and review dates and amounts.
       </p>
 
-      {/* Premium */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }}>Payable Premium</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
+      {/* Premium + number of instalments */}
+      <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        <div>
+          <div style={labelUpper}>Payable Premium</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
+            <input
+              type="number"
+              value={data.totalPremium}
+              onChange={e => {
+                const val = parseFloat(e.target.value) || 0
+                const c = data.instalmentDates.length || 1
+                const perInst = Math.round((val / c) * 100) / 100
+                const newAmounts = Array.from({ length: c }, (_, idx) =>
+                  idx === c - 1 ? Math.round((val - perInst * (c - 1)) * 100) / 100 : perInst
+                )
+                onUpdate({ totalPremium: val, instalmentAmounts: newAmounts })
+              }}
+              style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
+              placeholder="Premium amount"
+            />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation?.premiumCurrency || 'USD'}</span>
+          </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+            Changing premium will recalculate instalment amounts
+          </p>
+        </div>
+        <div>
+          <div style={labelUpper}>Number of Instalments</div>
           <input
             type="number"
-            value={data.totalPremium}
-            onChange={e => {
-              const val = parseFloat(e.target.value) || 0
-              const count = data.instalmentDates.length || 1
-              const perInst = Math.round((val / count) * 100) / 100
-              const newAmounts = Array.from({ length: count }, (_, idx) =>
-                idx === count - 1 ? Math.round((val - perInst * (count - 1)) * 100) / 100 : perInst
-              )
-              onUpdate({ totalPremium: val, instalmentAmounts: newAmounts })
-            }}
-            style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
-            placeholder="Premium amount"
+            min={1}
+            max={24}
+            value={count || 1}
+            onChange={e => onChangeCount(parseInt(e.target.value) || 1)}
+            style={{ ...inputStyle, width: '120px', textAlign: 'right' }}
           />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation?.premiumCurrency || 'USD'}</span>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+            Regenerates dates & splits the premium evenly
+          </p>
         </div>
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-          Changing premium will recalculate instalment amounts
-        </p>
       </div>
 
+      {count === 0 && (
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+          Full premium is due as a single payment on inception. Increase the count above to split it into instalments.
+        </p>
+      )}
+
+      {count > 0 && (<>
       <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 16px' }} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1058,6 +1111,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
       <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
         NR = Non-refundable. Each 30 days from inception equals 1 calendar month.
       </p>
+      </>)}
     </div>
   )
 }
