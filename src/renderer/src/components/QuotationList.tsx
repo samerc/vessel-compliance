@@ -69,6 +69,8 @@ const PAGE_SIZE = 25
 
 interface QuotationListProps {
   onOpenQuotation: (quotation: Quotation) => void
+  initialSearch?: string
+  onSearchChange?: (search: string) => void
 }
 
 interface PaginatedData {
@@ -88,7 +90,7 @@ interface SavedFilter {
   order: number
 }
 
-export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
+export default function QuotationList({ onOpenQuotation, initialSearch, onSearchChange }: QuotationListProps) {
   const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
   const [data, setData] = useState<PaginatedData>({
     rows: [],
@@ -98,8 +100,8 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   const [loading, setLoading] = useState(false)
 
   // Filter state
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch || '')
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch || '')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [renewalFilter, setRenewalFilter] = useState<string>('all')
@@ -184,6 +186,11 @@ export default function QuotationList({ onOpenQuotation }: QuotationListProps) {
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(timer)
+  }, [search])
+
+  // Keep the parent in sync so the search survives opening a quotation and coming back
+  useEffect(() => {
+    onSearchChange?.(search)
   }, [search])
 
   // Month navigation → auto-set dateFrom/dateTo (M-1, M, M+1)

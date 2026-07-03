@@ -25,6 +25,7 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
     const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
     const [activePolicyContext, setActivePolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
     const [listKey, setListKey] = useState(0)
+    const [listSearch, setListSearch] = useState('')
     const initialLoadRef = useRef(false)
 
     // Auto-open quotation when navigating from policy
@@ -107,7 +108,7 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
                 </div>
             )}
 
-            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} />}
+            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} initialSearch={listSearch} onSearchChange={setListSearch} />}
             {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
                 <QuotationEditor
