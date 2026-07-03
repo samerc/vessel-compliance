@@ -325,6 +325,7 @@ Ad-hoc sanctions lookup page (`src/renderer/src/components/SanctionsSearch.tsx`)
 - **Results**: Expandable cards with match score, aliases, remarks, source IDs
 - **Local search**: All searches run against local SQLite database via `SanctionsService.search()`
 - **Tabs**: Search · SIC List · Check Report (see below)
+- **Update Lists button**: Header button downloads the latest OFAC/EU/UK/UN/ISF lists **one source at a time** with live per-source progress in the button label ("Updating EU (2/5)…") + final toast of total entities loaded. Available to any authenticated user — the `sanctions:refresh` IPC was relaxed from admin-only to `requireSession` (per-source `sanctions:refreshSource` stays admin, used by the Admin Panel).
 
 ### Sanctions Check Report
 
@@ -350,7 +351,8 @@ System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with co
 7. **File Upload Security**: Allowed/blocked file extensions for uploads
 8. **Report Settings**: Company name, logo, accent color used in PDF reports
 9. **Sanctions Data**: Per-source status cards (OFAC, EU, UK, UN, ISF) with entity count, last update, release date; per-source and bulk refresh buttons
-10. **Database Configuration**: View/change MySQL connection settings
+10. **File Manager**: Moved here from the top-level sidebar (section id `fileManager`, gated by `fileManager:view`, lazy-loaded). Not a menu item anymore.
+11. **Database Configuration**: View/change MySQL connection settings
 
 - **Collapsible Pattern**: Uses `collapsedSections` state (`Set<string>`) with `toggleSection` function; each section header has ChevronRight/ChevronDown toggle
 - **All sections collapsed by default**: Initial state includes all section IDs
@@ -680,7 +682,10 @@ The audit loop in `updateVessel` has two special normalizations:
 ### Vessel List
 
 - **Sanctions Column**: OfacBadge displayed in separate column (not inline with vessel name)
-- **Flag Icons**: Flag state shown as icon next to vessel name using `flag-icons` CSS package
+- **Flag Icons**: Flag state shown as icon next to vessel name using `flag-icons` CSS package. Hover tooltip shows `Name (ISO3)` e.g. "Panama (PAN)" (also on the VesselDetail header flag).
+- **Customer (Legacy) column removed**: customer is policy-level now; the column, its inline editor, and the customer-type modal were deleted from VesselManager.
+- **Quick Register (Add Vessel)**: customer field removed; Cancel sits next to Register inside the form (header button is open-only); fleet field is a searchable + sorted combobox with inline "Create Fleet", rendered via `createPortal` to avoid clipping by the card.
+- **VesselDetail "Copy details" button**: copies `M/V <name>, Type <type>, Flag <flag>, Built <year>, GT <gt>, IMO <imo>`.
 
 ### Table + Slide-in Panel UI Pattern
 
@@ -808,6 +813,8 @@ P&I insurance certificates:
 - **Issue/Reissue**: Per-type with auto-incremented numbers (P26200001/BBC, P26200001-2/BBC)
 - **Owner Override**: Per-card owner entity selection
 - **Port of Registry**: From flag state ports, auto-selected if single
+- **Auto-populate on conversion**: `convertQuotationToPolicy` sets each card's `port_of_registry` (flag's single/default port) AND owner (`owner_entity_id`/`owner_name`/`owner_address` from the Registered-Owner assured + entity_addresses). Previously conversion set only type/dates, leaving port/owner blank. (addressed-to for BBC/WRC still not auto-filled on conversion.)
+- **Export port format**: `PORT / COUNTRY` (both uppercased); when no port is set it prints just the country — never `COUNTRY / COUNTRY`.
 - **Addressed To**: BBC/WRC addressed to flag authority; warns if flag not ratified, offers alternative
 - **Cancel & Replace**: Auto-checked if periods overlap, configurable text with placeholders
 - **Status**: Active / Superseded (one active per type)
