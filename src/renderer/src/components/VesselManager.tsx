@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
 import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -61,6 +62,9 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [isAdding, setIsAdding] = useState(false)
     const [showQuickAdd, setShowQuickAdd] = useState(false)
 
+    // Add-form fleet combo trigger position (dropdown rendered via portal to avoid clipping)
+    const addFleetBtnRef = useRef<HTMLButtonElement>(null)
+    const [addFleetRect, setAddFleetRect] = useState<DOMRect | null>(null)
     // Customer type prompt (legacy per-row customer editing)
     const [customerTypePrompt, setCustomerTypePrompt] = useState<{ vesselId: string; customerId: string } | null>(null)
     // Per-vessel customer search in table
@@ -553,18 +557,23 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         />
                         <div style={{ position: 'relative', flex: 1, minWidth: '150px' }}>
                             <button
+                                ref={addFleetBtnRef}
                                 type="button"
-                                onClick={() => { setFleetComboOpen(fleetComboOpen === '__add__' ? null : '__add__'); setFleetComboSearch(''); setFleetComboCreating(false); setFleetComboNewName('') }}
+                                onClick={() => {
+                                    if (fleetComboOpen === '__add__') { setFleetComboOpen(null); return }
+                                    setAddFleetRect(addFleetBtnRef.current?.getBoundingClientRect() || null)
+                                    setFleetComboOpen('__add__'); setFleetComboSearch(''); setFleetComboCreating(false); setFleetComboNewName('')
+                                }}
                                 style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', fontSize: '0.9rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                                 aria-label="Fleet assignment"
                             >
                                 <span>{newVessel.fleetId ? (fleets.find(f => f.id === newVessel.fleetId)?.name || 'Unknown') : 'Standalone'}</span>
                                 <ChevronDown size={14} style={{ opacity: 0.5 }} />
                             </button>
-                            {fleetComboOpen === '__add__' && (
+                            {fleetComboOpen === '__add__' && addFleetRect && createPortal(
                                 <>
-                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setFleetComboOpen(null)} />
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '360px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 2999 }} onClick={() => setFleetComboOpen(null)} />
+                                    <div style={{ position: 'fixed', top: addFleetRect.bottom + 2, left: addFleetRect.left, width: addFleetRect.width, zIndex: 3000, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '360px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                         <input
                                             type="text"
                                             value={fleetComboSearch}
@@ -624,7 +633,8 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             )}
                                         </div>
                                     </div>
-                                </>
+                                </>,
+                                document.body
                             )}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
