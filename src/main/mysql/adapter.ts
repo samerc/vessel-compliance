@@ -11226,14 +11226,29 @@ export class MySQLAdapter {
 
             // Create blue cards (P&I only)
             if (options.blueCards.length > 0) {
+                // Resolve the port of registry from the vessel's flag state (single port, or the default one)
+                let defaultPort: string | null = null
+                try {
+                    const [vFlagRows] = await this.pool.query('SELECT flag_state_id FROM vessels WHERE id = ?', [actualVesselId])
+                    const flagStateId = (vFlagRows as any[])[0]?.flag_state_id
+                    if (flagStateId) {
+                        const [portRows] = await this.pool.query(
+                            'SELECT name, is_default FROM flag_state_ports WHERE flag_state_id = ? ORDER BY name ASC',
+                            [flagStateId]
+                        )
+                        const ports = portRows as any[]
+                        defaultPort = ports.length === 1 ? ports[0].name : (ports.find(p => p.is_default)?.name || null)
+                    }
+                } catch { /* non-critical — port can be set later in the blue card editor */ }
+
                 for (const cardType of options.blueCards) {
                     const cardNumber = policyNumber + '/' + cardType
                     await this.pool.execute(`
                         INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
-                            inception_date, expiry_date, revision_number, issued_date)
-                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE)
+                            inception_date, expiry_date, revision_number, issued_date, port_of_registry)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?)
                     `, [uuidv4(), policyId, cardType, cardNumber,
-                        options.inceptionDate, options.expiryDate])
+                        options.inceptionDate, options.expiryDate, defaultPort])
                 }
             }
 

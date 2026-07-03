@@ -232,7 +232,7 @@ function buildBbcWrcPage(
   const expiryFmt = bcFormatDate(data.expiryDate)
   const gtNum = typeof data.grossTonnage === 'number' ? data.grossTonnage : parseFloat(String(data.grossTonnage))
   const gt = !isNaN(gtNum) ? gtNum.toLocaleString('en-US', { maximumFractionDigits: gtNum % 1 === 0 ? 0 : 2 }) : String(data.grossTonnage || '')
-  const portOfRegistry = data.portOfRegistry || data.flagState || ''
+  const portOfRegistry = data.portOfRegistry || ''
   const today = bcFormatDate(new Date().toISOString())
   const city = data.closingCity || ''
 
@@ -286,7 +286,7 @@ function buildBbcWrcPage(
   }
   vesselRows.push(
     bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
+    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
     bcDetailRow('IMO NUMBER', data.imoNumber),
   )
 
@@ -403,7 +403,7 @@ function buildMlcPage(
   const ref = `${data.policyNumber}/${is42 ? 'MLC REG 4.2' : 'MLC REG 2.5.2'}`
   const inceptionFmt = bcFormatDate(data.inceptionDate)
   const expiryFmt = bcFormatDate(data.expiryDate)
-  const portOfRegistry = data.portOfRegistry || data.flagState || ''
+  const portOfRegistry = data.portOfRegistry || ''
   const today = bcFormatDate(new Date().toISOString())
   const city = data.closingCity || ''
 
@@ -434,7 +434,7 @@ function buildMlcPage(
     bcDetailRow('NAME OF SHIP', data.vesselName),
     bcDetailRow('IMO NUMBER', data.imoNumber),
     bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
+    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
     bcDetailRow('PERIOD OF INSURANCE', `FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`),
   ]
 
