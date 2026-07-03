@@ -2207,16 +2207,18 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       rows: dedRows
     }))
   }
+  // Aggregate clause ("When one incident gives rise to...") comes immediately after the
+  // deductibles table, before any text deductibles (matches the quotation export order).
+  const dedAggText = data.quotation.deductibleAggregateEnabled
+    ? (data.quotation.deductibleAggregateText || (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : ''))
+    : ''
+  if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
+
   if (data.textDeductibles.length > 0) {
     for (const td of data.textDeductibles) {
       content.push(...polMp(td.text))
     }
   }
-
-  const dedAggText = data.quotation.deductibleAggregateEnabled
-    ? (data.quotation.deductibleAggregateText || (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : ''))
-    : ''
-  if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
 
   if (polSt(data, 'deductiblesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'deductiblesAdditionalText'))) }
 
