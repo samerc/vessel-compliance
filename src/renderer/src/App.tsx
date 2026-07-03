@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, FolderOpen, Sparkles, Eye, EyeOff, Download } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -36,7 +36,6 @@ const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
 const PolicySetupWizard = lazy(() => import('./components/PolicySetupWizard'))
 const NotificationsPage = lazy(() => import('./components/NotificationsPage'))
-const FileManager = lazy(() => import('./components/FileManager'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -45,7 +44,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications' | 'file-manager'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -328,7 +327,7 @@ function App(): React.JSX.Element {
     'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
     quotations: 'Quotations', 'vessel-filter': 'Vessel Filter', renewals: 'Renewals',
     reports: 'Reports', analytics: 'Fleet Analytics', 'activity-log': 'Activity Log',
-    templates: 'Templates', 'file-manager': 'File Manager',
+    templates: 'Templates',
     'policies-list': 'Policies',
     'policy-detail': 'Policies', notifications: 'Notifications', 'policy-setup': 'Policy Setup'
   }
@@ -656,7 +655,6 @@ function App(): React.JSX.Element {
             >
               {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
-              {hasPermission('fileManager:view') && navItem('file-manager', <FolderOpen size={18} />, 'File Manager')}
             </NavGroup>
           </nav>
 
@@ -789,7 +787,6 @@ function App(): React.JSX.Element {
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
           {activeTab === 'templates' && <Suspense fallback={<LoadingFallback />}><TemplatesPage /></Suspense>}
-          {activeTab === 'file-manager' && <Suspense fallback={<LoadingFallback />}><FileManager /></Suspense>}
           {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
             <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>

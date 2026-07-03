@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
+const FileManager = lazy(() => import('./FileManager'))
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import RichTextEditor from './RichTextEditor'
@@ -1320,6 +1321,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('compliance') ? [{ id: 'compliance', label: 'Compliance Schedule', icon: <Clock size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('reminders') ? [{ id: 'reminders', label: 'Annual Doc Grace', icon: <Bell size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
+        ...(hasPermission('fileManager:view') ? [{ id: 'fileManager', label: 'File Manager', icon: <FolderOpen size={16} /> }] : []),
         ...(isAdmin ? [
             { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
             { id: 'policySettings', label: 'Policy Settings', icon: <Clock size={16} />, adminOnly: true },
@@ -1435,6 +1437,12 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
             {/* ── Content area ── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 36px' }}>
+
+            {effectiveSection === 'fileManager' && (
+                <Suspense fallback={<div style={{ padding: '40px', color: 'var(--text-secondary)' }}>Loading File Manager…</div>}>
+                    <FileManager />
+                </Suspense>
+            )}
 
             {/* Read-only notice when user lacks admin:settings permission */}
             {!canSettings && sidebarSections.length > 0 && (
