@@ -2,7 +2,7 @@ import { createPool, Pool } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
-import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, ReminderSettings, VesselReminder, AssuredDocAlert, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig, EntityDocumentType, EntityDocument } from '../../shared/types'
+import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig, EntityDocumentType, EntityDocument } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
@@ -487,15 +487,8 @@ export class MySQLAdapter {
                 await this.pool.query("ALTER TABLE compliance_check_results ADD COLUMN decision VARCHAR(20) AFTER status")
             }
 
-            // Create vessel reminder snoozes table
-            await this.pool.query(`CREATE TABLE IF NOT EXISTS vessel_reminder_snoozes (
-                vessel_id VARCHAR(36) NOT NULL,
-                snoozed_at DATETIME NOT NULL,
-                snoozed_by VARCHAR(100) NOT NULL,
-                snooze_until DATETIME NOT NULL,
-                PRIMARY KEY (vessel_id),
-                FOREIGN KEY (vessel_id) REFERENCES vessels(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            // Reminders feature removed — drop the obsolete snooze table if present
+            await this.pool.query('DROP TABLE IF EXISTS vessel_reminder_snoozes')
 
             // Add performance indexes (idempotent)
             const addIndexIfNotExists = async (table: string, indexName: string, columns: string): Promise<void> => {
@@ -6355,180 +6348,6 @@ export class MySQLAdapter {
                     [entityId]
                 )
             }
-        }
-    }
-    // --- Reminder Settings ---
-    async getReminderSettings(): Promise<ReminderSettings> {
-        const defaultTemplate = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
-        const defaults: ReminderSettings = { periodDays: 7, reminderTemplate: defaultTemplate }
-        const settingValue = await this.getSetting('reminder_settings')
-        if (!settingValue) return defaults
-        try {
-            return { ...defaults, ...JSON.parse(settingValue) }
-        } catch {
-            return defaults
-        }
-    }
-
-    async setReminderSettings(settings: ReminderSettings): Promise<void> {
-        await this.setSetting('reminder_settings', JSON.stringify(settings))
-    }
-
-    async getVesselReminders(): Promise<VesselReminder[]> {
-        if (!this.pool) return []
-
-        // Get all active vessels with fleet info
-        const [vessels]: any[] = await this.pool.query(
-            `SELECT v.id, v.name, v.imo_number, v.fleet_id, f.name as fleet_name
-             FROM vessels v
-             LEFT JOIN fleets f ON v.fleet_id = f.id
-             WHERE v.is_active = 1
-             ORDER BY v.name`
-        )
-
-        // Get all required document types
-        const [docTypes]: any[] = await this.pool.query(
-            'SELECT id, name FROM document_types WHERE required = 1'
-        )
-
-        // Get all vessel documents
-        const [vesselDocs]: any[] = await this.pool.query(
-            'SELECT vessel_id, document_type_id, file_path, expiry_date FROM vessel_documents'
-        )
-
-        // Get all vessel assureds with entity info and role names
-        const [assureds]: any[] = await this.pool.query(
-            `SELECT va.id as assured_id, va.vessel_id, va.entity_id, va.role as role_name,
-                    e.name as entity_name, e.type as entity_type,
-                    e.passport_file_path, e.certificate_of_incorporation_path,
-                    e.articles_of_association_path, e.kyc_file_path
-             FROM vessel_assureds va
-             JOIN entities e ON va.entity_id = e.id`
-        )
-
-        // Get active snoozes
-        const [snoozes]: any[] = await this.pool.query(
-            'SELECT vessel_id, snoozed_at, snoozed_by, snooze_until FROM vessel_reminder_snoozes WHERE snooze_until > NOW()'
-        )
-
-        const snoozeMap = new Map<string, { snoozedBy: string; snoozeUntil: string }>()
-        for (const s of snoozes) {
-            snoozeMap.set(s.vessel_id, { snoozedBy: s.snoozed_by, snoozeUntil: s.snooze_until })
-        }
-
-        // Build doc map: vesselId -> docTypeId -> { filePath, expiryDate }
-        const docMap = new Map<string, Map<string, { filePath: string; expiryDate: string | null }>>()
-        for (const d of vesselDocs) {
-            if (!docMap.has(d.vessel_id)) docMap.set(d.vessel_id, new Map())
-            docMap.get(d.vessel_id)!.set(d.document_type_id, {
-                filePath: d.file_path || '',
-                expiryDate: d.expiry_date
-            })
-        }
-
-        // Build assured map: vesselId -> assured[]
-        const assuredMap = new Map<string, any[]>()
-        for (const a of assureds) {
-            if (!assuredMap.has(a.vessel_id)) assuredMap.set(a.vessel_id, [])
-            assuredMap.get(a.vessel_id)!.push(a)
-        }
-
-        const now = new Date()
-        const reminders: VesselReminder[] = []
-
-        for (const vessel of vessels) {
-            const missingVesselDocs: { docTypeName: string; status: 'missing' | 'expired'; expiryDate?: string }[] = []
-            const vesselDocMap = docMap.get(vessel.id) || new Map()
-
-            // Check required vessel documents
-            for (const dt of docTypes) {
-                const doc = vesselDocMap.get(dt.id)
-                if (!doc || !doc.filePath) {
-                    missingVesselDocs.push({ docTypeName: dt.name, status: 'missing' })
-                } else if (doc.expiryDate && new Date(doc.expiryDate) < now) {
-                    missingVesselDocs.push({ docTypeName: dt.name, status: 'expired', expiryDate: doc.expiryDate })
-                }
-            }
-
-            // Check assured entity documents
-            const assuredAlerts: AssuredDocAlert[] = []
-            const vesselAssureds = assuredMap.get(vessel.id) || []
-
-            for (const a of vesselAssureds) {
-                const missing: string[] = []
-
-                if (a.entity_type === 'person') {
-                    if (!a.passport_file_path) missing.push('ID/Passport')
-                } else {
-                    // company
-                    if (!a.certificate_of_incorporation_path) missing.push('Certificate of Incorporation')
-                    if (!a.articles_of_association_path) missing.push('Articles of Association')
-                    if (!a.kyc_file_path) missing.push('KYC')
-                }
-
-                if (missing.length > 0) {
-                    assuredAlerts.push({
-                        assuredId: a.assured_id,
-                        entityId: a.entity_id,
-                        entityName: a.entity_name,
-                        roleName: a.role_name,
-                        entityType: a.entity_type,
-                        missingDocs: missing
-                    })
-                }
-            }
-
-            const totalIssues = missingVesselDocs.length + assuredAlerts.reduce((sum, a) => sum + a.missingDocs.length, 0)
-
-            if (totalIssues > 0) {
-                const snooze = snoozeMap.get(vessel.id)
-                reminders.push({
-                    vesselId: vessel.id,
-                    vesselName: vessel.name,
-                    imoNumber: vessel.imo_number,
-                    fleetId: vessel.fleet_id || null,
-                    fleetName: vessel.fleet_name || null,
-                    missingVesselDocs,
-                    assuredAlerts,
-                    isSnoozed: !!snooze,
-                    snoozeUntil: snooze?.snoozeUntil,
-                    snoozedBy: snooze?.snoozedBy,
-                    totalIssues
-                })
-            }
-        }
-
-        return reminders
-    }
-
-    async snoozeVessel(vesselId: string, username: string, periodDays: number): Promise<void> {
-        if (!this.pool) return
-        await this.pool.execute(
-            `INSERT INTO vessel_reminder_snoozes (vessel_id, snoozed_at, snoozed_by, snooze_until)
-             VALUES (?, NOW(), ?, DATE_ADD(NOW(), INTERVAL ? DAY))
-             ON DUPLICATE KEY UPDATE snoozed_at = NOW(), snoozed_by = ?, snooze_until = DATE_ADD(NOW(), INTERVAL ? DAY)`,
-            [vesselId, username, periodDays, username, periodDays]
-        )
-    }
-
-    async unsnoozeVessel(vesselId: string): Promise<void> {
-        if (!this.pool) return
-        await this.pool.execute('DELETE FROM vessel_reminder_snoozes WHERE vessel_id = ?', [vesselId])
-    }
-
-    async autoSnoozeVessel(vesselId: string): Promise<void> {
-        const settings = await this.getReminderSettings()
-        await this.snoozeVessel(vesselId, 'system', settings.periodDays)
-    }
-
-    async autoSnoozeVesselsForEntity(entityId: string): Promise<void> {
-        if (!this.pool) return
-        const [rows]: any[] = await this.pool.query(
-            'SELECT DISTINCT vessel_id FROM vessel_assureds WHERE entity_id = ?',
-            [entityId]
-        )
-        for (const row of rows) {
-            await this.autoSnoozeVessel(row.vessel_id)
         }
     }
 

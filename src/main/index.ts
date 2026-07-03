@@ -1240,9 +1240,6 @@ app.whenReady().then(() => {
   safeHandle('db:upsertVesselDocument', async (event, doc) => {
     const user = await requirePermission(event, 'documents:upload')
     await db.upsertVesselDocument(doc)
-    if (doc.filePath) {
-      await db.autoSnoozeVessel(doc.vesselId)
-    }
     const [vDocRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [doc.vesselId])
     const vDocName = (vDocRows as any[])[0]?.name || doc.vesselId
     const [dtRows] = await (db as any).pool.query(
@@ -1305,9 +1302,6 @@ app.whenReady().then(() => {
     const docFields = ['passportFilePath', 'certificateOfIncorporationPath', 'articlesOfAssociationPath', 'kycFilePath']
     const hasDocChange = docFields.some(f => updates[f] !== undefined)
     await db.updateEntity(id, updates)
-    if (hasDocChange) {
-      await db.autoSnoozeVesselsForEntity(id)
-    }
     const changes: string[] = []
     if (updates.name && updates.name !== old.name) changes.push(`name: ${old.name} → ${updates.name}`)
     if (updates.email !== undefined && updates.email !== old.email) changes.push('email changed')
@@ -2336,12 +2330,6 @@ app.whenReady().then(() => {
     return { success: true }
   })
 
-  // Reminder IPC Handlers
-  safeHandle('reminders:getSettings', (event) => { requireSession(event); return db.getReminderSettings() })
-  safeHandle('reminders:setSettings', async (event, settings) => { await requirePermission(event, 'reminders:manage'); return db.setReminderSettings(settings) })
-  safeHandle('reminders:getVesselReminders', (event) => { requireSession(event); return db.getVesselReminders() })
-  safeHandle('reminders:snoozeVessel', async (event, vesselId, username, periodDays) => { await requirePermission(event, 'reminders:manage'); return db.snoozeVessel(vesselId, username, periodDays) })
-  safeHandle('reminders:unsnoozeVessel', async (event, vesselId) => { await requirePermission(event, 'reminders:manage'); return db.unsnoozeVessel(vesselId) })
 
   // P&I Clauses
   safeHandle('pi:getClauses', (event) => { requireSession(event); return db.getPIClauses() })

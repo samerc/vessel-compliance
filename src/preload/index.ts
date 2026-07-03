@@ -297,13 +297,6 @@ const api = {
   onUpdateDownloaded: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:downloaded', h); return () => ipcRenderer.removeListener('update:downloaded', h) },
   onUpdateError: (callback) => { const h = (_, error) => callback(error); ipcRenderer.on('update:error', h); return () => ipcRenderer.removeListener('update:error', h) },
 
-  // Reminders
-  remindersGetSettings: () => ipcRenderer.invoke('reminders:getSettings'),
-  remindersSetSettings: (settings: any) => ipcRenderer.invoke('reminders:setSettings', settings),
-  remindersGetVesselReminders: () => ipcRenderer.invoke('reminders:getVesselReminders'),
-  remindersSnoozeVessel: (vesselId: string, username: string, periodDays: number) => ipcRenderer.invoke('reminders:snoozeVessel', vesselId, username, periodDays),
-  remindersUnsnoozeVessel: (vesselId: string) => ipcRenderer.invoke('reminders:unsnoozeVessel', vesselId),
-
   // P&I Settings
   piGetClauses: () => ipcRenderer.invoke('pi:getClauses'),
   piAddClause: (clause: any) => ipcRenderer.invoke('pi:addClause', clause),

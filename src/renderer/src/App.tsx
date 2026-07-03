@@ -22,7 +22,6 @@ import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
 const SanctionsSearch = lazy(() => import('./components/SanctionsSearch'))
-const ReminderCenter = lazy(() => import('./components/ReminderCenter'))
 const Calculators = lazy(() => import('./components/Calculators'))
 const QuotationManager = lazy(() => import('./components/QuotationManager'))
 const ConditionSurveyList = lazy(() => import('./components/ConditionSurveyList'))
@@ -46,7 +45,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'reminders' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications' | 'file-manager'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications' | 'file-manager'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -325,7 +324,7 @@ function App(): React.JSX.Element {
   const TAB_LABELS: Record<string, string> = {
     dashboard: 'Dashboard', vessels: 'Vessels', fleets: 'Fleets', admin: 'Settings',
     directory: 'Directory', compliance: 'Compliance', users: 'Users',
-    'sanctions-search': 'Sanctions Search', reminders: 'Reminders', surveys: 'Surveys',
+    'sanctions-search': 'Sanctions Search', surveys: 'Surveys',
     'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
     quotations: 'Quotations', 'vessel-filter': 'Vessel Filter', renewals: 'Renewals',
     reports: 'Reports', analytics: 'Fleet Analytics', 'activity-log': 'Activity Log',
@@ -624,7 +623,6 @@ function App(): React.JSX.Element {
             >
               {hasPermission('compliance:view') && navItem('compliance', <ShieldAlert size={18} />, 'Compliance Center')}
               {hasPermission('sanctions:search') && navItem('sanctions-search', <Search size={18} />, 'Sanctions Search')}
-              {hasPermission('reminders:view') && navItem('reminders', <Bell size={18} />, 'Reminders')}
             </NavGroup>
 
             <NavGroup id="business" label="Business" icon={<FileText size={14} />}
@@ -763,7 +761,6 @@ function App(): React.JSX.Element {
               'vessel-filter': 'Back to Vessel Filter',
               'renewals': 'Back to Renewals',
               'admin': 'Back to System Setup',
-              'reminders': 'Back to Reminders',
               'survey-followup': 'Back to Survey Follow-Up',
               'policies-list': 'Back to Policies',
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
@@ -776,7 +773,6 @@ function App(): React.JSX.Element {
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} />}
           {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter initialTab={complianceSubTab} onTabChange={setComplianceSubTab} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
-          {activeTab === 'reminders' && <Suspense fallback={<LoadingFallback />}><ReminderCenter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('documents'); setNavigateBackTab('reminders'); setActiveTab('vessels') }} /></Suspense>}
           {activeTab === 'surveys' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'survey-followup' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}

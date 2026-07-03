@@ -300,13 +300,6 @@ export interface Api {
   surveyWarrantyWaive: (id: string, reason: string) => Promise<void>
   surveyWarrantyCompleteWithSurvey: (warrantyId: string, completionNotes: string | null, userId: string) => Promise<void>
 
-  // Reminders
-  remindersGetSettings: () => Promise<ReminderSettings>
-  remindersSetSettings: (settings: ReminderSettings) => Promise<void>
-  remindersGetVesselReminders: () => Promise<VesselReminder[]>
-  remindersSnoozeVessel: (vesselId: string, username: string, periodDays: number) => Promise<void>
-  remindersUnsnoozeVessel: (vesselId: string) => Promise<void>
-
   // P&I Settings
   piGetClauses: () => Promise<PIClause[]>
   piAddClause: (clause: Omit<PIClause, 'id'>) => Promise<PIClause>

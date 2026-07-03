@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle } from 'lucide-react'
-import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ReminderSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
+import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,7 +19,7 @@ const GRANTABLE_SECTIONS = [
     { id: 'classSocieties',label: 'Classification Societies' },
     { id: 'policyTypes',   label: 'Policy Types' },
     { id: 'compliance',    label: 'Compliance Schedule' },
-    { id: 'reminders',     label: 'Vessel Reminders' },
+    { id: 'reminders',     label: 'Annual Doc Grace' },
     { id: 'reportSettings',label: 'Report Settings' },
 ]
 
@@ -114,9 +114,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [savingReportSettings, setSavingReportSettings] = useState(false)
 
     // Reminder settings state
-    const DEFAULT_TEMPLATE = `Vessel: {vesselName} (IMO: {imoNumber})\n\nVessel Documents:\n{vesselDocuments}\n\nAssured Documents:\n{assuredDocuments}`
-    const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({ periodDays: 7, reminderTemplate: DEFAULT_TEMPLATE })
-    const [savingReminder, setSavingReminder] = useState(false)
+    const [savingGrace, setSavingGrace] = useState(false)
     const [annualGraceDays, setAnnualGraceDays] = useState(90)
 
     // User Groups state
@@ -189,7 +187,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadFileTypeSettings()
         loadConfigPath()
         loadComplianceSettings()
-        loadReminderSettings()
+        loadGraceSettings()
         loadReportSettings()
         loadUserGroups()
         loadLastBackupDate()
@@ -653,10 +651,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
 
 
-    const loadReminderSettings = async () => {
+    const loadGraceSettings = async () => {
         try {
-            const settings = await window.api.remindersGetSettings()
-            if (settings && !(settings as any).error) setReminderSettings(settings)
             const grace = await window.api.getSetting('annual_grace_days')
             if (grace) setAnnualGraceDays(parseInt(grace) || 90)
         } catch { /* ignore */ }
@@ -679,16 +675,15 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         }
     }
 
-    const handleSaveReminderSettings = async () => {
-        setSavingReminder(true)
+    const handleSaveGraceSettings = async () => {
+        setSavingGrace(true)
         try {
-            await window.api.remindersSetSettings(reminderSettings)
             await window.api.setSetting('annual_grace_days', String(annualGraceDays))
-            showSuccess('Reminder settings saved')
+            showSuccess('Settings saved')
         } catch (error: any) {
             showError(error.message || 'Failed to save reminder settings')
         } finally {
-            setSavingReminder(false)
+            setSavingGrace(false)
         }
     }
 
@@ -1323,7 +1318,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('classSocieties') ? [{ id: 'classSocieties', label: 'Classification Societies', icon: <Tag size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('policyTypes') ? [{ id: 'policyTypes', label: 'Policy Types', icon: <Shield size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('compliance') ? [{ id: 'compliance', label: 'Compliance Schedule', icon: <Clock size={16} /> }] : []),
-        ...(isAdmin || userSectionAccess.includes('reminders') ? [{ id: 'reminders', label: 'Vessel Reminders', icon: <Bell size={16} /> }] : []),
+        ...(isAdmin || userSectionAccess.includes('reminders') ? [{ id: 'reminders', label: 'Annual Doc Grace', icon: <Bell size={16} /> }] : []),
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
         ...(isAdmin ? [
             { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
@@ -2114,29 +2109,17 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             </section>
             )}
 
-            {/* 4. Vessel Reminder Settings */}
+            {/* 4. Annual Document Grace */}
             {effectiveSection === 'reminders' && (
             <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
                 <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Bell size={20} color="var(--accent-primary)" /> Vessel Reminder Settings
+                    <Bell size={20} color="var(--accent-primary)" /> Annual Document Grace
                 </h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                    Configure the snooze period and copy-to-clipboard template for document reminders.
+                    Configure the grace window for annually-renewed documents.
                 </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '200px 200px 1fr', gap: '20px', marginBottom: '20px' }}>
-                        <div>
-                            <label htmlFor="admin-reminder-period" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Snooze Period (days)</label>
-                            <input
-                                id="admin-reminder-period"
-                                type="number"
-                                min={1}
-                                max={90}
-                                value={reminderSettings.periodDays}
-                                onChange={e => setReminderSettings({ ...reminderSettings, periodDays: Number(e.target.value) })}
-                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
-                            />
-                        </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', marginBottom: '20px' }}>
                         <div>
                             <label htmlFor="admin-annual-grace" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Annual Doc Grace (days)</label>
                             <input
@@ -2152,31 +2135,16 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                 Annual docs received within this many days of P&I expiry are treated as compliant during the renewal window.
                             </p>
                         </div>
-                        <div>
-                            <label htmlFor="admin-reminder-template" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                Copy Template
-                                <span style={{ marginLeft: '8px', fontSize: '0.8rem', opacity: 0.7 }}>
-                                    Placeholders: {'{vesselName}'}, {'{imoNumber}'}, {'{vesselDocuments}'}, {'{assuredDocuments}'}
-                                </span>
-                            </label>
-                            <textarea
-                                id="admin-reminder-template"
-                                value={reminderSettings.reminderTemplate}
-                                onChange={e => setReminderSettings({ ...reminderSettings, reminderTemplate: e.target.value })}
-                                rows={6}
-                                style={{ width: '100%', padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '8px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.85rem', resize: 'vertical' }}
-                            />
-                        </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button
-                            onClick={handleSaveReminderSettings}
-                            disabled={savingReminder}
+                            onClick={handleSaveGraceSettings}
+                            disabled={savingGrace}
                             className="btn-primary"
                             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
-                            {savingReminder && <Loader2 size={16} className="spinner" />}
+                            {savingGrace && <Loader2 size={16} className="spinner" />}
                             Save Settings
                         </button>
                     </div>

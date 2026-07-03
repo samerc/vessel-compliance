@@ -282,14 +282,6 @@ export const PERMISSION_CATEGORIES = [
     ],
   },
   {
-    key: 'reminders',
-    label: 'Reminders',
-    permissions: [
-      { key: 'reminders:view', label: 'View reminders' },
-      { key: 'reminders:manage', label: 'Manage snooze / templates' },
-    ],
-  },
-  {
     key: 'email',
     label: 'Email Templates',
     permissions: [
@@ -533,34 +525,6 @@ export interface ComplianceResultQueryParams {
   entityType?: 'all' | 'entity' | 'vessel'
   sortField?: 'matchScore' | 'createdAt' | 'entityName'
   sortOrder?: 'asc' | 'desc'
-}
-
-export interface ReminderSettings {
-  periodDays: number
-  reminderTemplate: string
-}
-
-export interface AssuredDocAlert {
-  assuredId: string
-  entityId: string
-  entityName: string
-  roleName: string
-  entityType: 'company' | 'person'
-  missingDocs: string[]
-}
-
-export interface VesselReminder {
-  vesselId: string
-  vesselName: string
-  imoNumber: string
-  fleetId: string | null
-  fleetName: string | null
-  missingVesselDocs: { docTypeName: string; status: 'missing' | 'expired'; expiryDate?: string }[]
-  assuredAlerts: AssuredDocAlert[]
-  isSnoozed: boolean
-  snoozeUntil?: string
-  snoozedBy?: string
-  totalIssues: number
 }
 
 export interface PolicyType {

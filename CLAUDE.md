@@ -271,18 +271,9 @@ Centralized compliance monitoring with four tabs:
 - **Data Quality Tab**: Auto-refreshes after rule save/delete/toggle
 - **Tab persistence**: Active sub-tab remembered when navigating away and back (`complianceSubTab` state in `App.tsx`)
 
-### Document Reminders
+### Document Reminders (REMOVED)
 
-Vessel document expiry monitoring and notification system:
-
-- **ReminderCenter** (`src/renderer/src/components/ReminderCenter.tsx`): Main reminders page with vessel-level grouping
-- **Data**: Aggregates missing/expired vessel documents and assured entity documents per vessel
-- **Filters**: Search by vessel name/IMO, filter by fleet, toggle snoozed vessels
-- **Snooze**: Per-vessel snooze with configurable period (admin-set default in System Setup)
-- **Copy to Clipboard**: Generates formatted text per vessel or per fleet using admin-configured template
-- **Template Variables**: `{vesselName}`, `{imoNumber}`, `{vesselDocuments}`, `{assuredDocuments}`
-- **Settings** (Admin Panel → Vessel Reminder Settings): Snooze period (days) and clipboard template
-- **IPC Handlers**: `reminders:getSettings`, `reminders:setSettings`, `reminders:getVesselReminders`, `reminders:snoozeVessel`, `reminders:unsnoozeVessel`
+The standalone Document Reminders page (ReminderCenter) and its per-vessel snooze system were removed — document expiry is covered by the Compliance Center, Dashboard alerts, and the vessel Documents tab. The `vessel_reminder_snoozes` table is dropped on migration. The old Admin "Vessel Reminders" section was repurposed to **Annual Doc Grace** (still section id `reminders`), which configures only `annual_grace_days`.
 
 ### Dashboard
 
@@ -355,7 +346,7 @@ System configuration page (`src/renderer/src/components/AdminPanel.tsx`) with co
 3. **Survey Types**: CRUD for condition survey types
 4. **Policy Types**: CRUD with reorder for vessel policy classifications
 5. **Scheduled Compliance Check**: Enable/disable, schedule, threshold, include vessels, skip cleared
-6. **Vessel Reminder Settings**: Snooze period and clipboard template
+6. **Annual Doc Grace**: Annual document grace-window (days) for renewal compliance
 7. **File Upload Security**: Allowed/blocked file extensions for uploads
 8. **Report Settings**: Company name, logo, accent color used in PDF reports
 9. **Sanctions Data**: Per-source status cards (OFAC, EU, UK, UN, ISF) with entity count, last update, release date; per-source and bulk refresh buttons
