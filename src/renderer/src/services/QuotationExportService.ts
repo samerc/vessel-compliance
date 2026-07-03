@@ -1987,19 +1987,27 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
         rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
       } else {
-        // Sum Insured / Limits — Section 1 as table
+        // Sum Insured / Limits — Section 1
         const limContent: (Paragraph | Table)[] = [bup('Section 1')]
-        const nameW = Math.round(BODY_W * 0.55)
-        const amtW = BODY_W - nameW
-        const s1Rows = data.quotationVessels.map(qv => {
-          const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
-          const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
-          return new TableRow({ children: [
-            new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
-            new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(s1Amt, dWCur))] })
-          ]})
-        })
-        limContent.push(new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: s1Rows }))
+        if (data.quotationVessels.length > 1) {
+          // Per-vessel table (name + amount) — only meaningful with multiple vessels
+          const nameW = Math.round(BODY_W * 0.55)
+          const amtW = BODY_W - nameW
+          const s1Rows = data.quotationVessels.map(qv => {
+            const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+            const s1Amt = qv.agreedValue ?? data.quotation.agreedValue ?? 0
+            return new TableRow({ children: [
+              new TableCell({ borders: noBorders(), width: { size: nameW, type: WidthType.DXA }, children: [np(vi.name)] }),
+              new TableCell({ borders: noBorders(), width: { size: amtW, type: WidthType.DXA }, children: [np(formatCurrency(s1Amt, dWCur))] })
+            ]})
+          })
+          limContent.push(new Table({ width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [nameW, amtW], layout: TableLayoutType.FIXED, rows: s1Rows }))
+        } else {
+          // Single vessel: just the Section 1 amount (vessel name is redundant here)
+          const qv0 = data.quotationVessels[0]
+          const s1Amt = qv0?.agreedValue ?? data.quotation.agreedValue ?? 0
+          limContent.push(np(formatCurrency(s1Amt, dWCur)))
+        }
         limContent.push(emptyP(), bup('Section 2'))
         limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
         limContent.push(emptyP())
