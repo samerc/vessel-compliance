@@ -2781,7 +2781,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   }
 
   // Add policy title (configurable per type)
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
   const vesselName = data.vesselInfo?.name || ''
   headerParas.push(new Paragraph({
     alignment: AlignmentType.CENTER,
@@ -3163,7 +3163,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature (for closing section — not in footer for DA)
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -3367,7 +3367,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature (for closing section — not in footer for CA)
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -3817,7 +3817,7 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature
   const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -3998,7 +3998,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
@@ -4180,7 +4180,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = headerTitles[typeCode] || 'Certificate'
+  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
 
