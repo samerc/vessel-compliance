@@ -2170,7 +2170,8 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sanctions:refresh', async (event, source?: string) => {
-    await requirePermission(event, 'admin:settings')
+    // Refreshing sanctions lists is available to any authenticated user
+    requireSession(event)
     if (source) {
       return await sanctionsService.refreshSource(source)
     }
@@ -2197,7 +2198,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:addEntity', async (event, entity: any) => {
-    requireSession(event)
+    requireSession(event)
     const e = {
       source: 'SIC' as const,
       source_id: entity.sourceId || null,
@@ -2221,7 +2222,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:updateEntity', async (event, id: number, entity: any) => {
-    requireSession(event)
+    requireSession(event)
     const updates: any = {}
     if (entity.name !== undefined) {
       updates.name = entity.name

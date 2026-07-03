@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText } from 'lucide-react'
+import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText, RefreshCw, Loader2 } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -45,6 +45,8 @@ export default function SanctionsSearch() {
     const isLight = theme === 'light' || theme === 'aurora'
 
     const [activeTab, setActiveTab] = useState<'search' | 'sic' | 'report'>('search')
+    const [updatingLists, setUpdatingLists] = useState(false)
+    const [updateProgress, setUpdateProgress] = useState('')
 
     // Search state
     const [query, setQuery] = useState('')
@@ -333,6 +335,38 @@ export default function SanctionsSearch() {
         display: 'block'
     }
 
+    const handleUpdateLists = async () => {
+        const SANCTION_SOURCES = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
+        setUpdatingLists(true)
+        let total = 0
+        const failed: string[] = []
+        try {
+            // Refresh one source at a time so the user sees live progress
+            for (let i = 0; i < SANCTION_SOURCES.length; i++) {
+                const src = SANCTION_SOURCES[i]
+                setUpdateProgress(`${src} (${i + 1}/${SANCTION_SOURCES.length})`)
+                try {
+                    const res = await window.api.sanctionsRefresh(src)
+                    if (res && ((res as any).error || (res as any).status === 'error')) {
+                        failed.push(src)
+                    } else {
+                        total += (res as any)?.count || 0
+                    }
+                } catch {
+                    failed.push(src)
+                }
+            }
+            if (failed.length > 0) {
+                showError(`Updated with errors — failed: ${failed.join(', ')}. ${total.toLocaleString()} entities loaded from the rest.`)
+            } else {
+                showSuccess(`All sanctions lists updated — ${total.toLocaleString()} entities loaded`)
+            }
+        } finally {
+            setUpdatingLists(false)
+            setUpdateProgress('')
+        }
+    }
+
     return (
         <div style={{ padding: '24px', height: '100%', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
@@ -342,6 +376,16 @@ export default function SanctionsSearch() {
                         Ad-hoc lookup across global sanctions databases and local SIC list.
                     </p>
                 </div>
+                <button
+                    onClick={handleUpdateLists}
+                    disabled={updatingLists}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, cursor: updatingLists ? 'default' : 'pointer', opacity: updatingLists ? 0.7 : 1 }}
+                    title="Download the latest OFAC, EU, UK, UN and ISF sanctions lists"
+                >
+                    {updatingLists ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
+                    {updatingLists ? `Updating ${updateProgress}…` : 'Update Lists'}
+                </button>
             </div>
 
             {/* Tab bar */}
