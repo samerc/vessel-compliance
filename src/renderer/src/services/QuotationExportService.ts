@@ -799,7 +799,25 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     children: [new TextRun({ text, size: 22, font: 'Arial', color: RED, strike: true })]
   })
 
-  const emptyP = () => new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
+  const emptyParas = new WeakSet<object>()
+  const emptyP = () => {
+    const p = new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
+    emptyParas.add(p as unknown as object)
+    return p
+  }
+  // Collapse runs of blank paragraphs to a single one and strip leading/trailing blanks
+  const collapseEmptyParas = (items: (Paragraph | Table)[]): (Paragraph | Table)[] => {
+    const out: (Paragraph | Table)[] = []
+    for (const it of items) {
+      if (emptyParas.has(it as unknown as object)) {
+        const prev = out[out.length - 1]
+        if (!prev || emptyParas.has(prev as unknown as object)) continue
+      }
+      out.push(it)
+    }
+    while (out.length && emptyParas.has(out[out.length - 1] as unknown as object)) out.pop()
+    return out
+  }
 
   const mp = (text: string, color?: string): Paragraph[] => {
     if (!text) return []
@@ -1225,7 +1243,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       liabContent.push(emptyP(), ...wordSubLimitParas)
       liabContent.push(emptyP(), np('Under no circumstances is the Combined Single Limit detailed above to be exceeded.'))
     }
-    if (liabContent.length > 0) rowMap.set('liability', makeRow('Limit of Liability', liabContent))
+    if (liabContent.length > 0) rowMap.set('liability', makeRow('Limit of Liability', collapseEmptyParas(liabContent)))
   }
 
   // ---- Period ----
