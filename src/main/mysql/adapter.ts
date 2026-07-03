@@ -11241,14 +11241,53 @@ export class MySQLAdapter {
                     }
                 } catch { /* non-critical — port can be set later in the blue card editor */ }
 
+                // Resolve the registered owner (name + address) for the blue cards — the assured
+                // with a "Registered Owner" role, else the first assured on the vessel.
+                let ownerEntityId: string | null = null
+                let ownerName: string | null = null
+                let ownerAddress: string | null = null
+                try {
+                    const [assuredRows] = await this.pool.query(
+                        `SELECT va.entity_id AS entityId, va.role AS role, va.address_id AS addressId, e.name AS name
+                         FROM vessel_assureds va JOIN entities e ON e.id = va.entity_id
+                         WHERE va.vessel_id = ?`, [actualVesselId]
+                    )
+                    const assureds = (assuredRows as any[]).slice().sort((a, b) => {
+                        const ao = (a.role || '').toLowerCase().includes('registered owner') ? 0 : 1
+                        const bo = (b.role || '').toLowerCase().includes('registered owner') ? 0 : 1
+                        return ao - bo
+                    })
+                    const owner = assureds[0]
+                    if (owner) {
+                        ownerEntityId = owner.entityId
+                        ownerName = owner.name
+                        let addrRow: any = null
+                        if (owner.addressId) {
+                            const [r] = await this.pool.query('SELECT * FROM entity_addresses WHERE id = ?', [owner.addressId])
+                            addrRow = (r as any[])[0]
+                        }
+                        if (!addrRow) {
+                            const [r2] = await this.pool.query('SELECT * FROM entity_addresses WHERE entity_id = ? ORDER BY created_at LIMIT 1', [owner.entityId])
+                            addrRow = (r2 as any[])[0]
+                        }
+                        if (addrRow) {
+                            const parts = [addrRow.address_line1, addrRow.address_line2, [addrRow.city, addrRow.postal_code].filter(Boolean).join(' '), addrRow.country]
+                                .map((s: any) => (s || '').trim()).filter(Boolean)
+                            ownerAddress = parts.length ? parts.join('\n') : null
+                        }
+                    }
+                } catch { /* non-critical — owner can be set later in the blue card editor */ }
+
                 for (const cardType of options.blueCards) {
                     const cardNumber = policyNumber + '/' + cardType
                     await this.pool.execute(`
                         INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
-                            inception_date, expiry_date, revision_number, issued_date, port_of_registry)
-                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?)
+                            inception_date, expiry_date, revision_number, issued_date, port_of_registry,
+                            owner_entity_id, owner_name, owner_address)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?, ?, ?, ?)
                     `, [uuidv4(), policyId, cardType, cardNumber,
-                        options.inceptionDate, options.expiryDate, defaultPort])
+                        options.inceptionDate, options.expiryDate, defaultPort,
+                        ownerEntityId, ownerName, ownerAddress])
                 }
             }
 
