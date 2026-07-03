@@ -1267,9 +1267,8 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
           <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>None</span>
         </label>
 
-        {/* Card options */}
-        {!data.blueCardNone && (
-          <div>
+        {/* Card options — always visible so selecting a card clears "None" and you never get locked */}
+        <div>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
             <button
               onClick={() => { const all = ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']; onUpdate({ blueCards: all, blueCardNone: false }) }}
@@ -1302,7 +1301,6 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
             ))}
           </div>
           </div>
-        )}
       </div>
 
       {/* BBC ratification warning */}
