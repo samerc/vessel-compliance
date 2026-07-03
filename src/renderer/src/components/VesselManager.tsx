@@ -61,8 +61,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [isAdding, setIsAdding] = useState(false)
     const [showQuickAdd, setShowQuickAdd] = useState(false)
 
-    // Customer search state
-    const [customerSearch, setCustomerSearch] = useState('')
+    // Customer type prompt (legacy per-row customer editing)
     const [customerTypePrompt, setCustomerTypePrompt] = useState<{ vesselId: string; customerId: string } | null>(null)
     // Per-vessel customer search in table
     const [editingCustomerVesselId, setEditingCustomerVesselId] = useState<string | null>(null)
@@ -518,14 +517,14 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessel Registry</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Search, filter, and manage all vessels across your fleets.</p>
                 </div>
-                {hasPermission('vessels:create') && (
+                {hasPermission('vessels:create') && !showQuickAdd && (
                     <button
-                        onClick={() => setShowQuickAdd(!showQuickAdd)}
-                        className={showQuickAdd ? 'btn-secondary' : 'btn-primary'}
+                        onClick={() => setShowQuickAdd(true)}
+                        className="btn-primary"
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
                     >
-                        {showQuickAdd ? <X size={20} /> : <Plus size={20} />}
-                        {showQuickAdd ? 'Cancel' : 'Add Vessel'}
+                        <Plus size={20} />
+                        Add Vessel
                     </button>
                 )}
             </header>
@@ -552,67 +551,96 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                             placeholder="IMO No."
                             aria-label="IMO number"
                         />
-                        <select
-                            value={newVessel.fleetId}
-                            onChange={e => setNewVessel({ ...newVessel, fleetId: e.target.value })}
-                            style={{ flex: 1, minWidth: '150px', color: 'var(--text-primary)' }}
-                            aria-label="Fleet assignment"
-                        >
-                            <option value="">Standalone</option>
-                            {fleets.map(f => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                            ))}
-                        </select>
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                            <input
-                                type="text"
-                                value={newVessel.customerId ? (entities.find(e => e.id === newVessel.customerId)?.name || '') + (newVessel.customerType ? ` (${newVessel.customerType})` : '') : customerSearch}
-                                onChange={e => { setCustomerSearch(e.target.value); setNewVessel({ ...newVessel, customerId: '', customerType: '' }); }}
-                                style={{ width: '100%', color: 'var(--text-primary)' }}
-                                placeholder="Search or create customer..."
-                                aria-label="Customer"
-                            />
-                            {customerSearch && !newVessel.customerId && (
-                                <div style={{
-                                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                                    marginTop: '4px', padding: '8px', maxHeight: '200px', overflowY: 'auto',
-                                    background: isLight ? '#ffffff' : '#1e222a',
-                                    border: '1px solid var(--accent-primary)', borderRadius: '8px',
-                                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                }}>
-                                    {entities.filter(e => e.name.toLowerCase().includes(customerSearch.toLowerCase())).map(ent => (
-                                        <div key={ent.id} onClick={() => { setCustomerTypePrompt({ vesselId: '', customerId: ent.id }); }}
-                                            style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }} className="hover-effect">
-                                            {ent.name} {ent.identifier ? `[${ent.identifier}]` : ''}
+                        <div style={{ position: 'relative', flex: 1, minWidth: '150px' }}>
+                            <button
+                                type="button"
+                                onClick={() => { setFleetComboOpen(fleetComboOpen === '__add__' ? null : '__add__'); setFleetComboSearch(''); setFleetComboCreating(false); setFleetComboNewName('') }}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', fontSize: '0.9rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                aria-label="Fleet assignment"
+                            >
+                                <span>{newVessel.fleetId ? (fleets.find(f => f.id === newVessel.fleetId)?.name || 'Unknown') : 'Standalone'}</span>
+                                <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                            </button>
+                            {fleetComboOpen === '__add__' && (
+                                <>
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setFleetComboOpen(null)} />
+                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '2px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '360px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                        <input
+                                            type="text"
+                                            value={fleetComboSearch}
+                                            onChange={e => setFleetComboSearch(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
+                                            placeholder="Search fleets..."
+                                            autoFocus
+                                            style={{ padding: '6px 10px', border: 'none', borderBottom: '1px solid var(--table-border)', fontSize: '0.82rem', background: 'transparent', color: 'var(--text-primary)', outline: 'none' }}
+                                        />
+                                        <div style={{ overflowY: 'auto', flex: 1 }}>
+                                            <div
+                                                onClick={() => { setNewVessel({ ...newVessel, fleetId: '' }); setFleetComboOpen(null) }}
+                                                style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !newVessel.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: !newVessel.fleetId ? 600 : 400 }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = !newVessel.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                            >Standalone</div>
+                                            {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).filter(f => !fleetComboSearch || f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())).map(f => (
+                                                <div
+                                                    key={f.id}
+                                                    onClick={() => { setNewVessel({ ...newVessel, fleetId: f.id }); setFleetComboOpen(null) }}
+                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: newVessel.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: newVessel.fleetId === f.id ? 600 : 400 }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = newVessel.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                >{f.name}</div>
+                                            ))}
                                         </div>
-                                    ))}
-                                    {entities.filter(e => e.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
-                                        <div
-                                            onClick={async () => {
-                                                const newEntity = await window.api.addEntity({ name: customerSearch, type: 'company' })
-                                                const eData = await window.api.getEntities()
-                                                setEntities(Array.isArray(eData) ? eData : [])
-                                                setCustomerTypePrompt({ vesselId: '', customerId: newEntity.id })
-                                            }}
-                                            style={{ padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--accent-primary)' }}
-                                            className="hover-effect"
-                                        >
-                                            + Create &quot;{customerSearch}&quot; as customer
+                                        <div style={{ borderTop: '1px solid var(--table-border)', padding: '4px 6px' }}>
+                                            {fleetComboCreating ? (
+                                                <input
+                                                    type="text"
+                                                    value={fleetComboNewName}
+                                                    onChange={e => setFleetComboNewName(e.target.value)}
+                                                    placeholder="New fleet name..."
+                                                    autoFocus
+                                                    style={{ width: '100%', padding: '4px 8px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                                                    onKeyDown={async e => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault()
+                                                            if (fleetComboNewName.trim()) {
+                                                                const newFleet = await window.api.addFleet({ name: fleetComboNewName.trim() })
+                                                                setFleets(prev => [...prev, newFleet])
+                                                                setNewVessel({ ...newVessel, fleetId: newFleet.id })
+                                                                setFleetComboOpen(null)
+                                                            }
+                                                        }
+                                                        if (e.key === 'Escape') setFleetComboCreating(false)
+                                                    }}
+                                                />
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setFleetComboCreating(true); setFleetComboNewName('') }}
+                                                    style={{ width: '100%', padding: '4px 8px', fontSize: '0.78rem', background: 'transparent', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+                                                >
+                                                    <Plus size={12} /> Create Fleet
+                                                </button>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            )}
-                            {newVessel.customerId && (
-                                <button onClick={() => { setNewVessel({ ...newVessel, customerId: '', customerType: '' }); setCustomerSearch(''); }}
-                                    style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
-                                    <X size={14} />
-                                </button>
+                                    </div>
+                                </>
                             )}
                         </div>
-                        <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {isAdding && <Loader2 size={16} className="spinner" />}
-                            {isAdding ? 'Registering...' : 'Register'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => { setShowQuickAdd(false); setNewVessel({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' }) }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                <X size={16} /> Cancel
+                            </button>
+                            <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {isAdding && <Loader2 size={16} className="spinner" />}
+                                {isAdding ? 'Registering...' : 'Register'}
+                            </button>
+                        </div>
                     </form>
                 </section>
             )}
@@ -1191,9 +1219,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                 onClick={() => {
                                     if (customerTypePrompt.vesselId) {
                                         handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'broker')
-                                    } else {
-                                        setNewVessel({ ...newVessel, customerId: customerTypePrompt.customerId, customerType: 'broker' })
-                                        setCustomerSearch('')
                                     }
                                     setCustomerTypePrompt(null)
                                 }}
@@ -1204,9 +1229,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                 onClick={() => {
                                     if (customerTypePrompt.vesselId) {
                                         handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'direct')
-                                    } else {
-                                        setNewVessel({ ...newVessel, customerId: customerTypePrompt.customerId, customerType: 'direct' })
-                                        setCustomerSearch('')
                                     }
                                     setCustomerTypePrompt(null)
                                 }}
