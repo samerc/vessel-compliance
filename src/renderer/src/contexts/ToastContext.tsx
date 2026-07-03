@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
@@ -19,9 +19,13 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const idCounter = useRef(0)
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Date.now().toString()
+    // Unique id — Date.now() alone collides when several toasts fire in the same ms
+    // (e.g. exporting multiple blue cards), producing duplicate React keys that leave
+    // toasts stuck on screen.
+    const id = `toast-${Date.now()}-${idCounter.current++}`
     setToasts(prev => [...prev, { id, message, type }])
 
     // Auto-dismiss after 5 seconds
