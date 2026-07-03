@@ -1060,7 +1060,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 {(() => {
                                     const currentFlag = flagStates.find(f => f.id === selectedFlagStateId)
                                     const flagCls = currentFlag ? getFlagClass(currentFlag.iso3Code) : ''
-                                    return flagCls ? <span className={flagCls} style={{ fontSize: '1.4rem' }}></span> : null
+                                    return flagCls ? <span className={flagCls} title={`${currentFlag!.name} (${currentFlag!.iso3Code})`} style={{ fontSize: '1.4rem', cursor: 'help' }}></span> : null
                                 })()}
                             </h1>
                             <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
@@ -1077,6 +1077,24 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     ].filter(Boolean).join(' · ')}
                                 </p>
                             )}
+                            <button
+                                onClick={() => {
+                                    const vt = vessel.vesselTypeId ? vesselTypes.find(t => t.id === vessel.vesselTypeId) : vesselTypes.find(t => t.name === vessel.vesselType)
+                                    const typeName = vt?.name || vessel.vesselType || ''
+                                    const currentFlag = flagStates.find(f => f.id === selectedFlagStateId)
+                                    const flagName = currentFlag?.name || ''
+                                    const built = vessel.rebuiltYear ? `${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}` : (vessel.builtYear || '')
+                                    const gt = vessel.grossTonnage ? vessel.grossTonnage.toLocaleString('en-US') : ''
+                                    const text = `M/V ${vessel.name}, Type ${typeName}, Flag ${flagName}, Built ${built}, GT ${gt}, IMO ${vessel.imoNumber || ''}`
+                                    navigator.clipboard.writeText(text)
+                                    showSuccess('Vessel details copied')
+                                }}
+                                className="btn-secondary"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.78rem', marginTop: '8px' }}
+                                title="Copy vessel details"
+                            >
+                                <Copy size={13} /> Copy details
+                            </button>
                             {nameHistory.length > 0 && (
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                                     Former name{nameHistory.length > 1 ? 's' : ''}: {nameHistory.map((h, i) => (

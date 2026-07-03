@@ -916,7 +916,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                         const fs = flagStates.find(f => f.id === v.flagStateId)
                                                         const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
                                                         return flagCls
-                                                            ? <span className={flagCls} style={{ fontSize: '1.2rem' }}></span>
+                                                            ? <span className={flagCls} title={`${fs!.name} (${fs!.iso3Code})`} style={{ fontSize: '1.2rem', cursor: 'help' }}></span>
                                                             : <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: '500' }}>N/A</span>
                                                     })()}
                                                 </div>
