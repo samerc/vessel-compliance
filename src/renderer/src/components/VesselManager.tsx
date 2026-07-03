@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
-import { Vessel, Fleet, Entity, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
+import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
 import { OfacService } from '../services/OfacService'
@@ -27,7 +27,6 @@ function useDebounceValue<T>(value: T, delay: number): T {
 export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel, onNavigateToQuotation }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string; onNavigateToQuotation?: (quotationId: string) => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
-    const [entities, setEntities] = useState<Entity[]>([])
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
     const [openInEditMode, setOpenInEditMode] = useState(false)
     const { showError, showSuccess } = useToast()
@@ -65,11 +64,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     // Add-form fleet combo trigger position (dropdown rendered via portal to avoid clipping)
     const addFleetBtnRef = useRef<HTMLButtonElement>(null)
     const [addFleetRect, setAddFleetRect] = useState<DOMRect | null>(null)
-    // Customer type prompt (legacy per-row customer editing)
-    const [customerTypePrompt, setCustomerTypePrompt] = useState<{ vesselId: string; customerId: string } | null>(null)
-    // Per-vessel customer search in table
-    const [editingCustomerVesselId, setEditingCustomerVesselId] = useState<string | null>(null)
-    const [tableCustomerSearch, setTableCustomerSearch] = useState('')
 
     const [flagStates, setFlagStates] = useState<FlagState[]>([])
 
@@ -85,7 +79,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         { id: 'name', label: 'Vessel Name', defaultVisible: true },
         { id: 'imo', label: 'IMO Number', defaultVisible: true },
         { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
-        { id: 'customer', label: 'Customer (Legacy)', defaultVisible: false },
         { id: 'fleet', label: 'Fleet', defaultVisible: true },
         { id: 'actions', label: 'Actions', defaultVisible: true }
     ]
@@ -110,13 +103,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     // Load initial fleets
     useEffect(() => {
         const loadStaticData = async () => {
-            const [fData, eData, fsData] = await Promise.all([
+            const [fData, fsData] = await Promise.all([
                 window.api.getFleets(),
-                window.api.getEntities(),
                 window.api.getFlagStates()
             ])
             setFleets(Array.isArray(fData) ? fData : [])
-            setEntities(Array.isArray(eData) ? eData : [])
             setFlagStates(Array.isArray(fsData) ? fsData : [])
         }
         loadStaticData()
@@ -228,14 +219,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
 
     const handleUpdateFleet = async (vesselId: string, fleetId: string) => {
         await window.api.updateVessel(vesselId, { fleetId: fleetId })
-        loadData()
-    }
-
-    const handleUpdateCustomer = async (vesselId: string, customerId: string, customerType: 'broker' | 'direct' | '') => {
-        await window.api.updateVessel(vesselId, {
-            customerId: customerId || undefined,
-            customerType: (customerType || undefined) as Vessel['customerType']
-        })
         loadData()
     }
 
@@ -353,12 +336,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         const selected = vessels.filter(v => selectedVesselIds.has(v.id))
         if (selected.length === 0) return
         // Build CSV content
-        const headers = ['Name', 'IMO Number', 'Fleet', 'Customer', 'Status', 'Sanctions']
+        const headers = ['Name', 'IMO Number', 'Fleet', 'Status', 'Sanctions']
         const rows = selected.map(v => [
             v.name,
             v.imoNumber,
             fleets.find(f => f.id === v.fleetId)?.name || 'Standalone',
-            entities.find(e => e.id === v.customerId)?.name || '',
             v.isActive ? 'Active' : 'Inactive',
             v.ofacStatus || 'NOT CHECKED'
         ])
@@ -883,9 +865,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                 {visibleSet.has('sanctions') && (
                                     <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', width: '120px' }}>Sanctions</th>
                                 )}
-                                {visibleSet.has('customer') && (
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Customer</th>
-                                )}
                                 {visibleSet.has('fleet') && (
                                     <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Fleet</th>
                                 )}
@@ -980,70 +959,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         {visibleSet.has('sanctions') && (
                                         <td style={{ padding: '16px' }}>
                                             <OfacBadge vessel={v} />
-                                        </td>
-                                        )}
-                                        {visibleSet.has('customer') && (
-                                        <td style={{ padding: '16px' }}>
-                                            <div style={{ position: 'relative' }}>
-                                                {editingCustomerVesselId === v.id ? (
-                                                    <>
-                                                        <input
-                                                            type="text"
-                                                            value={tableCustomerSearch}
-                                                            onChange={e => setTableCustomerSearch(e.target.value)}
-                                                            autoFocus
-                                                            onBlur={() => setTimeout(() => setEditingCustomerVesselId(null), 200)}
-                                                            placeholder="Search customer..."
-                                                            style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', width: '200px', boxSizing: 'border-box' }}
-                                                            aria-label="Search customer"
-                                                        />
-                                                        <div style={{
-                                                            position: 'absolute', top: '100%', left: 0, zIndex: 100,
-                                                            marginTop: '4px', padding: '4px', maxHeight: '150px', overflowY: 'auto',
-                                                            background: isLight ? '#ffffff' : '#1e222a', minWidth: '200px',
-                                                            border: '1px solid var(--accent-primary)', borderRadius: '8px',
-                                                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                                        }}>
-                                                            <div onClick={() => { handleUpdateCustomer(v.id, '', ''); setEditingCustomerVesselId(null); }}
-                                                                style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }} className="hover-effect">
-                                                                None
-                                                            </div>
-                                                            {entities.filter(e => !tableCustomerSearch || e.name.toLowerCase().includes(tableCustomerSearch.toLowerCase())).map(ent => (
-                                                                <div key={ent.id}
-                                                                    onClick={() => { setCustomerTypePrompt({ vesselId: v.id, customerId: ent.id }); setEditingCustomerVesselId(null); }}
-                                                                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }} className="hover-effect">
-                                                                    {ent.name}
-                                                                </div>
-                                                            ))}
-                                                            {tableCustomerSearch && entities.filter(e => e.name.toLowerCase().includes(tableCustomerSearch.toLowerCase())).length === 0 && (
-                                                                <div
-                                                                    onClick={async () => {
-                                                                        const newEntity = await window.api.addEntity({ name: tableCustomerSearch, type: 'company' })
-                                                                        const eData = await window.api.getEntities()
-                                                                        setEntities(Array.isArray(eData) ? eData : [])
-                                                                        setCustomerTypePrompt({ vesselId: v.id, customerId: newEntity.id })
-                                                                        setEditingCustomerVesselId(null)
-                                                                    }}
-                                                                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--accent-primary)' }}
-                                                                    className="hover-effect">
-                                                                    + Create &quot;{tableCustomerSearch}&quot;
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div
-                                                        onClick={() => { setEditingCustomerVesselId(v.id); setTableCustomerSearch(''); }}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: v.customerId ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit', width: '200px', boxSizing: 'border-box' }}
-                                                    >
-                                                        <span style={{ flex: 1 }}>
-                                                            {v.customerId ? `${entities.find(e => e.id === v.customerId)?.name || 'Unknown'}` : 'None'}
-                                                            {v.customerType ? ` (${v.customerType})` : ''}
-                                                        </span>
-                                                        <ChevronDown size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
-                                                    </div>
-                                                )}
-                                            </div>
                                         </td>
                                         )}
                                         {visibleSet.has('fleet') && (
@@ -1214,44 +1129,6 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 />
             )}
 
-            {customerTypePrompt && (
-                <div style={{
-                    position: 'fixed', inset: 0,
-                    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-                }}>
-                    <div style={{ padding: '28px', maxWidth: '360px', width: '90%', background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-                        <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', color: 'var(--text-primary)' }}>Customer Type</h3>
-                        <p style={{ margin: '0 0 20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                            How is this customer related to the vessel?
-                        </p>
-                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                            <button
-                                onClick={() => {
-                                    if (customerTypePrompt.vesselId) {
-                                        handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'broker')
-                                    }
-                                    setCustomerTypePrompt(null)
-                                }}
-                                className="btn-primary" style={{ flex: 1, padding: '10px' }}>
-                                Broker
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (customerTypePrompt.vesselId) {
-                                        handleUpdateCustomer(customerTypePrompt.vesselId, customerTypePrompt.customerId, 'direct')
-                                    }
-                                    setCustomerTypePrompt(null)
-                                }}
-                                className="btn-secondary" style={{ flex: 1, padding: '10px' }}>
-                                Direct Client
-                            </button>
-                        </div>
-                        <button onClick={() => setCustomerTypePrompt(null)} className="btn-secondary" style={{ width: '100%' }}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
