@@ -162,17 +162,6 @@ export interface FlagStatePort {
   isDefault: boolean
 }
 
-export interface AppData {
-  documentTypes: DocumentType[]
-  fleets: Fleet[]
-  vessels: Vessel[]
-  vesselDocuments: VesselDocument[]
-  entities: Entity[]
-  assuredRoles: AssuredRole[]
-  vesselAssureds: VesselAssured[]
-  entityUBOs: EntityUBO[]
-}
-
 export interface User {
   id: string
   username: string
@@ -330,8 +319,6 @@ export const PERMISSION_CATEGORIES = [
   },
 ] as const
 
-export type PermissionKey = typeof PERMISSION_CATEGORIES[number]['permissions'][number]['key']
-
 export const ALL_PERMISSION_KEYS: string[] = PERMISSION_CATEGORIES.flatMap(c => c.permissions.map(p => p.key))
 
 export interface UserGroup {
@@ -340,12 +327,6 @@ export interface UserGroup {
   description?: string
   isSystem: boolean
   createdAt?: string
-}
-
-export interface UserPermissionOverride {
-  userId: string
-  permissionKey: string
-  granted: boolean // true = grant, false = revoke
 }
 
 export interface SanctionsMatch {
@@ -557,13 +538,6 @@ export interface ComplianceResultQueryParams {
 export interface ReminderSettings {
   periodDays: number
   reminderTemplate: string
-}
-
-export interface VesselReminderSnooze {
-  vesselId: string
-  snoozedAt: string
-  snoozedBy: string
-  snoozeUntil: string
 }
 
 export interface AssuredDocAlert {
@@ -1338,8 +1312,6 @@ export const NOTIFICATION_EVENT_TYPES = [
   { key: 'entity_change', label: 'Entity Changes', category: 'Entities' },
 ] as const
 
-export type NotificationEventType = typeof NOTIFICATION_EVENT_TYPES[number]['key']
-
 export interface PISectionTexts {
   docHeader?: string
   docHeaderSpacing?: number
@@ -1621,14 +1593,6 @@ export interface ReportConfig {
 
 // ==================== User Signatures ====================
 
-export interface UserSignature {
-  id: string
-  userId: string
-  imageData: Buffer | number[]
-  fileName: string
-  uploadedAt?: string
-}
-
 export interface CustomValidationRule {
   id: string
   name: string
@@ -1640,14 +1604,6 @@ export interface CustomValidationRule {
   severity: string
   isEnabled: boolean
   order: number
-}
-
-export interface CustomValidationViolation {
-  ruleId: string
-  ruleName: string
-  severity: string
-  count: number
-  items: { id: string; name: string }[]
 }
 
 export interface DocumentTemplate {
@@ -1680,8 +1636,6 @@ export const TEMPLATE_CATEGORIES = [
   'certificate',
   'email',
 ] as const
-
-export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
 
 export const TEMPLATE_PLACEHOLDERS = [
   // Vessel
