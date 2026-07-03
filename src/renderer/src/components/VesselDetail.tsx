@@ -2715,28 +2715,26 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                         await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' })
                     }
 
-                    // 2. Find old expiry date for new inception
+                    // 2. Roll every policy date forward by exactly 1 calendar year.
+                    // Each date keeps its own day/month — inception must NOT be set to the old
+                    // expiry (e.g. 03/07/2025–02/07/2026 renews to 03/07/2026–02/07/2027).
                     const policyTypeCharsAll = characteristics.filter(c => c.policyTypeId === p.policyTypeId)
-                    const endChar = policyTypeCharsAll.find(c => {
-                        const n = c.name.toLowerCase()
-                        return n.includes('end') || n.includes('expiry') || n.includes('expiration')
-                    })
-
-                    let oldExpiryDate: string | null = null
-                    if (endChar && p.values) {
-                        const ev = p.values.find(v => v.characteristicId === endChar.id)
-                        if (ev?.valueDate) oldExpiryDate = ev.valueDate
+                    const addOneYear = (iso: string): string => {
+                        const parts = iso.split('-')
+                        if (parts.length !== 3) return iso
+                        const yr = parseInt(parts[0], 10) + 1
+                        return `${yr}-${parts[1]}-${parts[2]}`
                     }
 
-                    // New inception = old expiry, new expiry = new inception + 1 year
+                    // New inception = existing inception + 1 year — used for the new policy number's year
+                    const inceptionChar = policyTypeCharsAll.find(c => {
+                        const n = c.name.toLowerCase()
+                        return n.includes('inception') || n.includes('start') || (n.includes('from') && n.includes('date'))
+                    })
                     let newInception: string | null = null
-                    let newExpiry: string | null = null
-                    if (oldExpiryDate) {
-                        newInception = oldExpiryDate
-                        // Add 1 year using string manipulation to avoid timezone issues
-                        const parts = oldExpiryDate.split('-')
-                        const yr = parseInt(parts[0], 10) + 1
-                        newExpiry = `${yr}-${parts[1]}-${parts[2]}`
+                    if (inceptionChar && p.values) {
+                        const iv = p.values.find(v => v.characteristicId === inceptionChar.id)
+                        if (iv?.valueDate) newInception = addOneYear(iv.valueDate)
                     }
 
                     // Generate new policy number: type letter + inverted year from new inception
@@ -2760,24 +2758,13 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                         notes: p.notes
                     })
 
-                    // 4. Copy values — only update inception/expiry dates, clear others
+                    // 4. Copy values — every date field keeps its day/month and advances 1 year
                     if (p.values) {
                         const newVals = p.values.map(v => {
-                            const charName = policyTypeCharsAll.find(c => c.id === v.characteristicId)?.name?.toLowerCase() || ''
-                            const isInception = charName.includes('inception') || charName.includes('start') || (charName.includes('from') && charName.includes('date'))
-                            const isExpiry = charName.includes('end') || charName.includes('expiry') || charName.includes('expiration')
-
                             let valDate = v.valueDate
                             if (v.fieldType === 'date') {
-                                if (isInception && newInception) {
-                                    valDate = newInception
-                                } else if (isExpiry && newExpiry) {
-                                    valDate = newExpiry
-                                } else {
-                                    valDate = undefined // clear other dates for user to fill
-                                }
+                                valDate = v.valueDate ? addOneYear(v.valueDate) : undefined
                             }
-
                             return {
                                 characteristicId: v.characteristicId,
                                 valueText: v.valueText,
