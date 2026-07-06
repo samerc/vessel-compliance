@@ -1364,6 +1364,46 @@ function polMpTight(text: string): Paragraph[] {
   return out
 }
 
+// Aligned "Section A / Section B / Total" amount breakdown, shared by the Debit Advice
+// premium split and the Hull Agreed Insured Value section. Amounts left-aligned; the
+// Total row is bold with a top rule, and the total is spelled out in words below.
+function polBuildAmountBreakdown(
+  sections: { label: string; amount: number }[],
+  totalLabel: string,
+  total: number,
+  currency: string
+): (Paragraph | Table)[] {
+  const labelW = Math.round(POL_BODY_W * 0.45)
+  const amtW = POL_BODY_W - labelW
+  const totalTop = {
+    top: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
+    bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  }
+  const brRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) => new TableRow({
+    children: [
+      new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] }),
+      new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
+    ]
+  })
+  return [
+    new Table({
+      width: { size: POL_BODY_W, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [labelW, amtW],
+      rows: [
+        ...sections.map(s => brRow(s.label, s.amount)),
+        brRow(totalLabel, total, { bold: true, total: true })
+      ]
+    }),
+    new Paragraph({
+      spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text: `(${numberToWords(total, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+    })
+  ]
+}
+
 function polMpBullet(text: string): Paragraph[] {
   if (!text) return []
   const decoded = decodeHtmlEntities(text)
@@ -2472,11 +2512,20 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
         if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
         rows.push(makeRow('Interest', intContent))
       }
-      // Agreed Insured Value (amounts)
+      // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
       const avContent: (Paragraph | Table)[] = []
       const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
-      if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
-      avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(polVesselIv, data.quotation.ivCurrency || hmCurrency)})`))
+      const ivCurrency = data.quotation.ivCurrency || hmCurrency
+      if (ivCurrency === hmCurrency) {
+        const avSections: { label: string; amount: number }[] = []
+        if (polVesselAv != null) avSections.push({ label: 'Section A', amount: polVesselAv })
+        avSections.push({ label: 'Section B', amount: polVesselIv })
+        avContent.push(...polBuildAmountBreakdown(avSections, 'Total', (polVesselAv || 0) + polVesselIv, hmCurrency))
+      } else {
+        // Mixed currencies — a combined total isn't meaningful; keep the per-section lines
+        if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
+        avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, ivCurrency)} (${numberToWords(polVesselIv, ivCurrency)})`))
+      }
       rows.push(makeRow('Agreed Insured\nValue', avContent))
     } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
       const polIsS2Only = Boolean(data.quotation.warSection2Only)
@@ -3277,29 +3326,10 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
     if (data.quotation.upccEnabled && data.quotation.upccDiscountPercent) ivPay *= (1 - data.quotation.upccDiscountPercent / 100)
     ivPay = Math.round(ivPay * 100) / 100
     const hmPay = Math.round((totalPremium - ivPay) * 100) / 100
-    const splitLabelW = Math.round(POL_BODY_W * 0.45)
-    const splitAmtW = POL_BODY_W - splitLabelW
-    const totalTop = { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } }
-    const splitRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) => new TableRow({
-      children: [
-        new TableCell({ width: { size: splitLabelW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] }),
-        new TableCell({ width: { size: splitAmtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
-      ]
-    })
-    premiumContent.push(new Table({
-      width: { size: POL_BODY_W, type: WidthType.DXA },
-      layout: TableLayoutType.FIXED,
-      columnWidths: [splitLabelW, splitAmtW],
-      rows: [
-        splitRow('Section A: H&M', hmPay),
-        splitRow('Section B: IV', ivPay),
-        splitRow('Total', totalPremium, { bold: true, total: true })
-      ]
-    }))
-    premiumContent.push(new Paragraph({
-      spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: `(${numberToWords(totalPremium, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-    }))
+    premiumContent.push(...polBuildAmountBreakdown(
+      [{ label: 'Section A: H&M', amount: hmPay }, { label: 'Section B: IV', amount: ivPay }],
+      'Total', totalPremium, currency
+    ))
   } else {
     premiumContent.push(new Paragraph({
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
