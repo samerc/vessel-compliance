@@ -1320,6 +1320,23 @@ function polBup(text: string) {
   })
 }
 
+// Tight variants (no trailing `after`) — for a heading/line immediately followed by a
+// polEmptyP() spacer, so the gap is exactly one blank line (matching the insured section).
+function polBupTight(text: string) {
+  return new Paragraph({
+    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })]
+  })
+}
+
+function polNpTight(text: string) {
+  return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+  })
+}
+
 function polBulletP(text: string) {
   return new Paragraph({
     numbering: { reference: 'dash-bullet', level: 0 },
@@ -1632,7 +1649,7 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['IMO Number', vi.imo || '-'],
     ['Classification', (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || '-']
   ]
-  if (vi.callSign) rows.push(['Call Sign', vi.callSign])
+  // Call sign is intentionally omitted from policy documents — it only appears on blue cards.
 
   const labelW = Math.round(POL_BODY_W * 0.25)
   const sepW = Math.round(POL_BODY_W * 0.05)
@@ -1868,11 +1885,11 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
 
     // "Hull and Machinery" sub-heading when IV exists
     if (data.quotation.ivEnabled && ivClauseId) {
-      content.push(polBup('Hull and Machinery'))
+      content.push(polBupTight('Hull and Machinery'))
       content.push(polEmptyP())
     }
     if (clause) {
-      content.push(polNp(decodeHtmlEntities(clause.description || clause.name)))
+      content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
       content.push(polEmptyP())
     }
     if (dedupedMain.length > 0) content.push(makeCondTable(dedupedMain))
@@ -1883,10 +1900,10 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       const dedupedIV = dedupConds(ivConds)
       const ivClause = data.hullClauses.find(c => c.id === ivClauseId)
       content.push(polEmptyP())
-      content.push(polBup('Increased Value'))
+      content.push(polBupTight('Increased Value'))
       content.push(polEmptyP())
       if (ivClause) {
-        content.push(polNp(decodeHtmlEntities(ivClause.description || ivClause.name)))
+        content.push(polNpTight(decodeHtmlEntities(ivClause.description || ivClause.name)))
         content.push(polEmptyP())
       }
       if (dedupedIV.length > 0) content.push(makeCondTable(dedupedIV))
@@ -1907,9 +1924,9 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
         const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
         return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
       })
-      content.push(polBup(`Alternative ${i + 1}`))
+      content.push(polBupTight(`Alternative ${i + 1}`))
       content.push(polEmptyP())
-      if (clause) { content.push(polNp(decodeHtmlEntities(clause.description || clause.name))); content.push(polEmptyP()) }
+      if (clause) { content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name))); content.push(polEmptyP()) }
       if (altMerged.length > 0) content.push(makeCondTable(altMerged))
       content.push(polEmptyP())
     }
@@ -1917,7 +1934,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
     const singleAlt = dAlts[0]
     const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
     if (selectedClause) {
-      content.push(polNp(decodeHtmlEntities(selectedClause.description || selectedClause.name)))
+      content.push(polNpTight(decodeHtmlEntities(selectedClause.description || selectedClause.name)))
       content.push(polEmptyP())
     }
     if (hc.length > 0) content.push(makeCondTable(hc))
