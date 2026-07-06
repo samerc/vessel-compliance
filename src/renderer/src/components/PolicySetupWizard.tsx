@@ -285,9 +285,11 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         const firstAlt = allAltsLocal[0]
         if (firstAlt.premiumAmount) {
           techPremium = firstAlt.premiumAmount
-          if (quot.ivEnabled && quot.ivPremiumAmount) techPremium += quot.ivPremiumAmount
         }
       }
+      // Increased Value (Hull): the IV premium adds on top of the hull technical premium,
+      // regardless of how many alternatives exist (single-alt hull must still include it).
+      if (quot.ivEnabled && quot.ivPremiumAmount) techPremium += quot.ivPremiumAmount
       let payable = techPremium
       if (quot.ncbEnabled && quot.ncbDiscountPercent) payable = payable * (1 - quot.ncbDiscountPercent / 100)
       if (quot.upccEnabled && quot.upccDiscountPercent) payable = payable * (1 - quot.upccDiscountPercent / 100)
@@ -770,7 +772,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
                 !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled)
               if (plainPerVessel && newSelection.length === 1) {
                 const qv = qVessels.find(v => (v.vesselId || v.id) === newSelection[0])
-                const tech = qv?.premiumAmount || quotation!.premiumAmount || 0
+                let tech = qv?.premiumAmount || quotation!.premiumAmount || 0
+                if (quotation!.ivEnabled && quotation!.ivPremiumAmount) tech += quotation!.ivPremiumAmount
                 if (tech > 0) {
                   const pay = computePayable(tech)
                   const count = data.instalmentAmounts.length
