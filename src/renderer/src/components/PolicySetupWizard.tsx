@@ -1051,6 +1051,17 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             Regenerates dates & splits the premium evenly
           </p>
         </div>
+        {quotation.ivEnabled && quotation.ivPremiumAmount != null && (
+          <div>
+            <div style={labelUpper}>Increased Value (IV)</div>
+            <div style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'rgba(0,170,200,0.05)', fontSize: '0.88rem', fontWeight: 600, minWidth: '150px', textAlign: 'right' }}>
+              {quotation.premiumCurrency || 'USD'} {quotation.ivPremiumAmount.toLocaleString()}
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+              Included in the payable premium{quotation.ivValue != null ? ` · IV value ${quotation.ivCurrency || quotation.premiumCurrency || 'USD'} ${quotation.ivValue.toLocaleString()}` : ''}
+            </p>
+          </div>
+        )}
       </div>
 
       {count === 0 && (
