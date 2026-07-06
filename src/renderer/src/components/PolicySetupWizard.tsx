@@ -159,7 +159,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         window.api.getEntities(),
         window.api.getQuotationAssureds(quotationId),
         window.api.getEntityAddresses(),
-        window.api.policyGetConvertedVesselIds(quotationId)
+        // Guard: preload may lag renderer on a hot-update (main/preload need a full rebuild)
+        typeof window.api.policyGetConvertedVesselIds === 'function'
+          ? window.api.policyGetConvertedVesselIds(quotationId)
+          : Promise.resolve([])
       ])
       const alreadyConverted = Array.isArray(convRes) ? convRes : []
       setConvertedVesselIds(alreadyConverted)
