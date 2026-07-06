@@ -1164,7 +1164,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     } else if (hasDifferentLol) {
       amountDisplay = 'values as per above'
     } else if (multiVessel && baseAmt != null) {
-      amountDisplay = `${formatAmountOnly(baseAmt)} (all vessels)`
+      amountDisplay = `${formatAmountOnly(baseAmt)} (each vessel)`
     } else {
       amountDisplay = baseAmt != null ? formatAmountOnly(baseAmt) : ''
     }
