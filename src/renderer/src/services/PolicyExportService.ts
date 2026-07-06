@@ -1313,13 +1313,6 @@ function polBp(text: string) {
   })
 }
 
-function polBup(text: string) {
-  return new Paragraph({
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })]
-  })
-}
-
 // Tight variants (no trailing `after`) — for a heading/line immediately followed by a
 // polEmptyP() spacer, so the gap is exactly one blank line (matching the insured section).
 function polBupTight(text: string) {
@@ -1453,6 +1446,14 @@ function polCenteredP(text: string, bold = false) {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })]
+  })
+}
+
+function polCenteredPTight(text: string, bold = false) {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })]
   })
 }
@@ -1982,7 +1983,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   if (mergedAddl.length > 0) {
     if (selectedAlt && data.quotation.ivEnabled && ivClauseId) {
       content.push(polEmptyP())
-      content.push(polBup('Applicable to all sections'))
+      content.push(polBupTight('Applicable to all sections'))
     }
     content.push(polEmptyP())
     for (const it of mergedAddl) {
@@ -2125,10 +2126,10 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         content.push(polNp(`${polFormatCurrency(sec2Amt, wCurrency)} in excess of ${polFormatCurrency(vesselAV, wCurrency)} primary war P&I risks.`))
       } else {
         content.push(polBp('Section 1'))
-        content.push(polNp(`${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
+        content.push(polNpTight(`${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
         content.push(polEmptyP())
         content.push(polBp('Section 2'))
-        content.push(polNp(`${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+        content.push(polNpTight(`${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
       }
       if (data.quotation.warCombinedLimitText) {
         content.push(polEmptyP())
@@ -2166,13 +2167,13 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(policyVesselQvId))
     : null
   const effectiveIntro = perVesselIntro ? perVesselIntro.text : wq.tradingWarrantyIntro
-  if (effectiveIntro) content.push(...polMp(effectiveIntro))
+  if (effectiveIntro) content.push(...polMpTight(effectiveIntro))
   if (wq.tradingCustomMode && wq.tradingCustomWording) {
     content.push(polEmptyP())
     content.push(...polMp(wq.tradingCustomWording))
   } else {
-    if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMp(wq.tradingCustomText)) }
-    if (wq.tradingShowExcluded !== false && excCountries.length > 0) { content.push(polEmptyP()); content.push(polNp('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
+    if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMpTight(wq.tradingCustomText)) }
+    if (wq.tradingShowExcluded !== false && excCountries.length > 0) { content.push(polEmptyP()); content.push(polNpTight('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
       const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
       const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
@@ -2240,8 +2241,8 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
   if (data.quotation.quotationTypeCode !== 'W') {
     for (const sw of data.surveyWarranties) content.push(polBulletP(decodeHtmlEntities(sw.text)))
   }
-  if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesAdditionalText'))) }
-  if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'warrantiesBreach'))) }
+  if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'warrantiesAdditionalText'))) }
+  if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'warrantiesBreach'))) }
 
   // H&M warranty NOTE — from warrantiesNote section text or hardcoded default
   if (data.quotation.quotationTypeCode === 'H') {
@@ -2303,12 +2304,12 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
   if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
 
   if (data.textDeductibles.length > 0) {
-    for (const td of data.textDeductibles) {
-      content.push(...polMp(td.text))
-    }
+    data.textDeductibles.forEach((td, i) => {
+      content.push(...(i === data.textDeductibles.length - 1 ? polMpTight(td.text) : polMp(td.text)))
+    })
   }
 
-  if (polSt(data, 'deductiblesAdditionalText')) { content.push(polEmptyP()); content.push(...polMp(polSt(data, 'deductiblesAdditionalText'))) }
+  if (polSt(data, 'deductiblesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'deductiblesAdditionalText'))) }
 
   return content
 }
@@ -2345,17 +2346,17 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate))
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, timezone)
-    content.push(polNp(singleIntro))
+    content.push(polNpTight(singleIntro))
     content.push(polEmptyP())
 
     // Non-refundable text for single instalment
     if (wq.nonRefundableType === 'first_instalment' || (instalments[0].isNonRefundable)) {
-      content.push(polNp('Non-refundable in case of cancellation, whether before or after inception.'))
+      content.push(polNpTight('Non-refundable in case of cancellation, whether before or after inception.'))
       content.push(polEmptyP())
     }
     if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
       const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
-      if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
+      if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
     }
   } else {
     // Multiple instalments
@@ -2366,24 +2367,24 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       .replace(/\{instalments\}/g, String(numInst))
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, timezone)
-    content.push(polNp(premIntro))
+    content.push(polNpTight(premIntro))
     content.push(polEmptyP())
 
     // Instalment lines
     if (instalments.length > 0) {
       const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
-      for (const inst of instalments) {
+      instalments.forEach((inst, i) => {
         let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
         if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
           line += ' (non-refundable in case of cancellation, whether before or after inception)'
         }
-        content.push(polNp(line))
-      }
+        content.push(i === instalments.length - 1 ? polNpTight(line) : polNp(line))
+      })
       content.push(polEmptyP())
 
       if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
         const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
-        if (nrText) { content.push(polNp(nrText)); content.push(polEmptyP()) }
+        if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
       }
     }
   }
@@ -2397,7 +2398,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     : wq.outstandingPremiumText
   if (outstandingEnabled && outstandingText) {
     content.push(new Paragraph({
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({
         text: outstandingText,
         size: POL_FONT_SIZE, font: 'Arial', color: '000000',
@@ -2410,15 +2411,15 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
 
   // 2c. Full premium in case of loss
   if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
-    content.push(polNp(wq.fullPremiumLossText))
+    content.push(polNpTight(wq.fullPremiumLossText))
     content.push(polEmptyP())
   }
 
   // 3. Additional premium text
-  if (wq.premiumAdditionalText) { content.push(...polMp(wq.premiumAdditionalText)); content.push(polEmptyP()) }
+  if (wq.premiumAdditionalText) { content.push(...polMpTight(wq.premiumAdditionalText)); content.push(polEmptyP()) }
 
   // 4. Condition precedent text
-  if (polSt(data, 'premiumCondition')) { content.push(...polMp(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
+  if (polSt(data, 'premiumCondition')) { content.push(...polMpTight(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
 
   // 5. Premium earned text
   if (polSt(data, 'premiumEarned')) { content.push(...polMp(polSt(data, 'premiumEarned'))) }
@@ -2467,13 +2468,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   // Opening Clause
   const openingClause = data.policy.openingClause || polGetDefaultOpeningClause(typeCode)
   if (openingClause) {
-    children.push(...polMp(openingClause))
+    children.push(...polMpTight(openingClause))
     children.push(polEmptyP())
   }
 
   // THE SCHEDULE header (Hull/War only)
   if (typeCode === 'H' || typeCode === 'W') {
-    children.push(polCenteredP('THE SCHEDULE', true))
+    children.push(polCenteredPTight('THE SCHEDULE', true))
     children.push(polEmptyP())
   }
 
@@ -2555,7 +2556,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
         intContent.push(polNp(sec2Text))
       } else {
         intContent.push(polBp('Section 1'))
-        intContent.push(polNp(sec1Text))
+        intContent.push(polNpTight(sec1Text))
         intContent.push(polEmptyP())
         intContent.push(polBp('Section 2'))
         intContent.push(polNp(sec2Text))
@@ -2701,7 +2702,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
 
   // Terms reference
   children.push(polEmptyP())
-  children.push(polNp('The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'))
+  children.push(polNpTight('The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'))
   children.push(polEmptyP())
 
   // Important Notice — make type-aware by replacing P&I references for other types
