@@ -880,6 +880,7 @@ export interface Api {
   policyGetById: (id: string) => Promise<any>
   policyGetInstalments: (policyId: string) => Promise<any[]>
   policyGetAddresses: (policyId: string) => Promise<any[]>
+  policyGetConvertedVesselIds: (quotationId: string) => Promise<string[]>
   policyGetBlueCards: (policyId: string) => Promise<any[]>
   policyGetRevisions: (policyNumber: string) => Promise<{ id: string; policyNumber: string; revisionNumber: number; status: string; createdAt: string; exportedAt: string | null; createdByName: string }[]>
   policyAddBlueCard: (data: any) => Promise<any>
@@ -887,7 +888,7 @@ export interface Api {
   policySupersedeBlueCard: (id: string) => Promise<void>
   policyUpdate: (id: string, fields: Record<string, any>) => Promise<void>
   policySetInstalments: (policyId: string, instalments: { instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]) => Promise<void>
-  policySetAddresses: (policyId: string, addresses: { entityId: string; role: string; addressText: string }[]) => Promise<void>
+  policySetAddresses: (policyId: string, addresses: { entityId: string; entityName?: string; role: string; addressText: string }[]) => Promise<void>
   policyCreateRevision: (policyId: string) => Promise<string>
   policyDelete: (id: string) => Promise<void>
   policyConvertFromQuotation: (quotationId: string, options: {
@@ -907,7 +908,7 @@ export interface Api {
     selectedLolOptionId?: string | null
     selectedAgreedValueOptionId?: string | null
     premiumAmount?: number | null
-    insured?: { vesselId: string; entityId: string; role: string; addressText: string; isNewAddress?: boolean }[]
+    insured?: { vesselId: string; entityId: string; entityName?: string; role: string; addressText: string; addressLabel?: string; isNewAddress?: boolean }[]
     outstandingPremiumEnabled?: boolean | null
     outstandingPremiumText?: string | null
     blueCardInception?: string | null

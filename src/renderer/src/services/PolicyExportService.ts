@@ -198,11 +198,11 @@ function bcDetailRow(label: string, value: string): TableRow {
 }
 
 /** Multi-line address block */
-function bcAddressBlock(lines: string[], spacingAfter: number = 120): Paragraph[] {
+function bcAddressBlock(lines: string[], spacingAfter: number = 120, bold: boolean = false): Paragraph[] {
   return lines.filter(Boolean).map((line, i) =>
     new Paragraph({
       spacing: { after: i === lines.length - 1 ? spacingAfter : 20 },
-      children: [bcText(line)],
+      children: [bcText(line, { bold })],
     })
   )
 }
@@ -456,7 +456,7 @@ function buildMlcPage(
     children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 40 }))
   }
   if (data.ownerAddress) {
-    children.push(...bcAddressBlock(data.ownerAddress.split('\n').map(l => l.toUpperCase()), 240))
+    children.push(...bcAddressBlock(data.ownerAddress.split('\n').map(l => l.toUpperCase()), 240, true))
   } else {
     children.push(bcSpacer(200))
   }
@@ -1499,15 +1499,9 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       if (addr.country) nameRuns.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
       leftChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
 
-      // Right: role + address lines
+      // Right: role only ("As <role>") — the address goes on its own full-width row below
       const rightChildren: Paragraph[] = []
       if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-      const addrText = addr.addressText || addr.address || ''
-      if (addrText) {
-        for (const line of addrText.split('\n')) {
-          if (line.trim()) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-        }
-      }
       if (rightChildren.length === 0) rightChildren.push(polEmptyP())
 
       tableRows.push(new TableRow({
@@ -1516,6 +1510,21 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
           new TableCell({ borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: rightChildren })
         ]
       }))
+
+      // Address as a full-width row (spanning both columns) directly under the insured
+      const addrText = addr.addressText || addr.address || ''
+      if (addrText) {
+        const addrParas: Paragraph[] = []
+        const addrLines = addrText.split('\n').filter((l: string) => l.trim())
+        for (let li = 0; li < addrLines.length; li++) {
+          addrParas.push(new Paragraph({ spacing: { after: li === addrLines.length - 1 ? 120 : 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: addrLines[li].trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+        }
+        tableRows.push(new TableRow({
+          children: [
+            new TableCell({ columnSpan: 2, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: addrParas })
+          ]
+        }))
+      }
     }
   } else if (data.assureds.length > 0) {
     for (const a of data.assureds) {
@@ -3213,7 +3222,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
             spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
         }),
         new TableCell({
@@ -3459,7 +3468,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
             spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
         }),
         new TableCell({

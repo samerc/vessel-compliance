@@ -3131,6 +3131,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: entity_name column on policy_doc_addresses (holds custom insured names with no linked entity)
+            try {
+                const [enCols] = await this.pool.query("SHOW COLUMNS FROM policy_doc_addresses LIKE 'entity_name'") as any[]
+                if ((enCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_doc_addresses ADD COLUMN entity_name VARCHAR(255) NULL")
+                }
+            } catch {}
+
             // Migration: custom hull additional conditions per quotation
             try {
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_custom_conditions (
@@ -10821,7 +10829,7 @@ export class MySQLAdapter {
             const [rows] = await this.pool.query(`
                 SELECT pda.id, pda.policy_doc_id as policyDocId, pda.entity_id as entityId,
                        pda.role, pda.address_text as addressText,
-                       e.name as entityName, pda.\`order\` as \`order\`
+                       COALESCE(e.name, pda.entity_name) as entityName, pda.\`order\` as \`order\`
                 FROM policy_doc_addresses pda
                 LEFT JOIN entities e ON pda.entity_id = e.id
                 WHERE pda.policy_doc_id = ?
@@ -11020,14 +11028,17 @@ export class MySQLAdapter {
         }
     }
 
-    async setPolicyAddresses(policyId: string, addresses: { entityId: string; role: string; addressText: string }[]): Promise<void> {
+    async setPolicyAddresses(policyId: string, addresses: { entityId: string; entityName?: string; role: string; addressText: string }[]): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [policyId])
+        let ai = 0
         for (const addr of addresses) {
+            // Preserve custom insured names (no linked entity) so they survive an edit
+            const customName = addr.entityId ? null : ((addr.entityName || '').trim() || null)
             await this.pool.execute(`
-                INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
-                VALUES (?, ?, ?, ?, ?)
-            `, [uuidv4(), policyId, addr.entityId || null, addr.role || '', addr.addressText || ''])
+                INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, entity_name, role, address_text, \`order\`)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [uuidv4(), policyId, addr.entityId || null, customName, addr.role || '', addr.addressText || '', ai++])
         }
     }
 
@@ -11140,7 +11151,7 @@ export class MySQLAdapter {
         selectedAlternativeId?: string | null
         exchangeRate?: number
         // Per-vessel insured list edited in the wizard (overrides auto-derivation when present)
-        insured?: { vesselId: string; entityId: string; role: string; addressText: string; isNewAddress?: boolean }[]
+        insured?: { vesselId: string; entityId: string; entityName?: string; role: string; addressText: string; addressLabel?: string; isNewAddress?: boolean }[]
         // Outstanding-premium override for the policy (null = inherit from quotation)
         outstandingPremiumEnabled?: boolean | null
         outstandingPremiumText?: string | null
@@ -11214,14 +11225,16 @@ export class MySQLAdapter {
                         try {
                             const [exist] = await this.pool.query('SELECT id FROM entity_addresses WHERE entity_id = ? AND TRIM(address_line1) = TRIM(?) LIMIT 1', [r.entityId, r.addressText])
                             if ((exist as any[]).length === 0) {
-                                await this.addEntityAddress({ entityId: r.entityId, label: r.role || 'Policy Address', addressLine1: r.addressText.trim() } as any)
+                                await this.addEntityAddress({ entityId: r.entityId, label: (r.addressLabel || '').trim() || r.role || 'Policy Address', addressLine1: r.addressText.trim() } as any)
                             }
                         } catch { /* non-critical */ }
                     }
+                    // Store the typed name for custom insured (no linked entity) so it renders on the policy
+                    const customName = r.entityId ? null : ((r.entityName || '').trim() || null)
                     await this.pool.execute(`
-                        INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text, \`order\`)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    `, [uuidv4(), policyId, r.entityId || null, r.role || '', r.addressText || '', ai])
+                        INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, entity_name, role, address_text, \`order\`)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `, [uuidv4(), policyId, r.entityId || null, customName, r.role || '', r.addressText || '', ai])
                 }
             } else {
             // Create addresses from quotation assureds (preserves order) with vessel assured fallback
@@ -11382,21 +11395,42 @@ export class MySQLAdapter {
         // Save updated draft policy sequence
         await this.setSetting('draft_policy_seq', String(polDraftSeq))
 
-        // Auto-move quotation to "Converted" workflow step
+        // Auto-move quotation to "Converted" workflow step — only once EVERY vessel has a policy
+        // (multi-vessel quotations can be converted one vessel at a time).
         try {
-            const [convertedSteps] = await this.pool.query(
-                "SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1"
+            const [convertedRows] = await this.pool.query(
+                'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?', [quotationId]
             )
-            const convertedStep = (convertedSteps as any[])[0]
-            if (convertedStep) {
-                await this.pool.execute(
-                    'UPDATE quotations SET workflow_step_id = ? WHERE id = ?',
-                    [convertedStep.id, quotationId]
+            const convertedIds = new Set((convertedRows as any[]).map(r => r.vessel_id))
+            const allConverted = vessels.length > 0 && vessels.every(v => convertedIds.has(v.vesselId || v.id))
+            if (allConverted) {
+                const [convertedSteps] = await this.pool.query(
+                    "SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1"
                 )
+                const convertedStep = (convertedSteps as any[])[0]
+                if (convertedStep) {
+                    await this.pool.execute(
+                        'UPDATE quotations SET workflow_step_id = ? WHERE id = ?',
+                        [convertedStep.id, quotationId]
+                    )
+                }
             }
         } catch { /* ignore if step doesn't exist */ }
 
         return createdPolicies
+    }
+
+    // Vessel IDs of a quotation that already have at least one policy document (for the conversion wizard)
+    async getConvertedVesselIdsForQuotation(quotationId: string): Promise<string[]> {
+        if (!this.pool) return []
+        try {
+            const [rows] = await this.pool.query(
+                'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?', [quotationId]
+            )
+            return (rows as any[]).map(r => r.vessel_id).filter(Boolean)
+        } catch {
+            return []
+        }
     }
 
     async addVesselDynamicPolicy(policy: Omit<VesselDynamicPolicy, 'id' | 'createdAt' | 'updatedAt' | 'policyTypeName' | 'conditionName' | 'brokerName' | 'customerName' | 'values'>): Promise<string> {

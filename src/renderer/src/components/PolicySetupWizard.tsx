@@ -25,11 +25,12 @@ const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck
 
 interface InsuredRow {
   entityId: string
-  entityName: string
+  entityName: string   // typed/selected name — may be a custom name with no matching entity
   role: string
   addressText: string
-  addressId: string  // id of a picked existing entity_address, '' when typing a new one
-  isNew: boolean     // true when addressText is a new address to save back to the entity
+  addressLabel: string // internal name for a NEW address saved back to the entity
+  addressId: string    // id of a picked existing entity_address, '' when typing a new one
+  isNew: boolean       // true when addressText is a new address to save back to the entity
 }
 
 interface WizardData {
@@ -122,6 +123,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   // Insured editor data
   const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([])
   const [entityAddrs, setEntityAddrs] = useState<Record<string, { id: string; addressLine1: string; label?: string }[]>>({})
+  // Vessels of this quotation that already have a policy (multi-vessel: convert the rest later)
+  const [convertedVesselIds, setConvertedVesselIds] = useState<string[]>([])
 
   const isPI = quotation?.quotationTypeCode === 'P'
   const allAlts = useMemo(() => [...piAlts, ...hullAlts], [piAlts, hullAlts])
@@ -145,7 +148,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes] = await Promise.all([
+      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes, convRes] = await Promise.all([
         window.api.getQuotation(quotationId),
         window.api.getQuotationVessels(quotationId),
         window.api.bankGetAll(),
@@ -155,8 +158,11 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         window.api.getFlagStates(),
         window.api.getEntities(),
         window.api.getQuotationAssureds(quotationId),
-        window.api.getEntityAddresses()
+        window.api.getEntityAddresses(),
+        window.api.policyGetConvertedVesselIds(quotationId)
       ])
+      const alreadyConverted = Array.isArray(convRes) ? convRes : []
+      setConvertedVesselIds(alreadyConverted)
 
       if (!q || (q as any).error) {
         showError('Failed to load quotation')
@@ -198,6 +204,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               entityName: a.name || entName(a.entityId) || '',
               role: a.role || '',
               addressText: firstAddr?.addressLine1 || '',
+              addressLabel: '',
               addressId: firstAddr?.id || '',
               isNew: false
             } as InsuredRow
@@ -336,7 +343,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
       setData(prev => ({
         ...prev,
-        selectedVesselIds: vessels.map(v => v.vesselId || v.id),
+        // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
+        selectedVesselIds: vessels.map(v => v.vesselId || v.id).filter(id => !alreadyConverted.includes(id)),
         selectedAltId: firstAltId,
         selectedLolOptionId: firstLolId,
         inceptionDate: inception,
@@ -566,8 +574,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       const commPct = data.commissionEnabled && typeof data.commissionPercent === 'number' ? data.commissionPercent : 0
       // Flatten the per-vessel insured lists into a single array with vesselId
       const insured = Object.entries(data.insuredByVessel).flatMap(([vesselId, rows]) =>
-        (rows || []).filter(r => r.entityId).map(r => ({
-          vesselId, entityId: r.entityId, role: r.role, addressText: r.addressText || '', isNewAddress: !!r.isNew
+        (rows || []).filter(r => r.entityId || (r.entityName || '').trim()).map(r => ({
+          vesselId, entityId: r.entityId, entityName: (r.entityName || '').trim(), role: r.role,
+          addressText: r.addressText || '', addressLabel: (r.addressLabel || '').trim(), isNewAddress: !!r.isNew
         }))
       )
       const result = await window.api.policyConvertFromQuotation(quotation.id, {
@@ -741,7 +750,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             isLight={isLight}
             lolOptions={lolOptions}
             agreedValueOptions={agreedValueOptions}
+            convertedVesselIds={convertedVesselIds}
             onToggleVessel={(id) => {
+              if (convertedVesselIds.includes(id)) return
               updateData({
                 selectedVesselIds: data.selectedVesselIds.includes(id)
                   ? data.selectedVesselIds.filter(v => v !== id)
@@ -879,7 +890,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
 // ==================== Step Components ====================
 
-function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data, quotation, isLight, lolOptions, agreedValueOptions, onToggleVessel, onSelectAlt, onSelectLolOption, onSelectAgreedValueOption, labelStyle }: {
+function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data, quotation, isLight, lolOptions, agreedValueOptions, convertedVesselIds, onToggleVessel, onSelectAlt, onSelectLolOption, onSelectAgreedValueOption, labelStyle }: {
   qVessels: QuotationVessel[]
   allAlts: (QuotationPIAlternative | QuotationHullAlternative)[]
   hasAlts: boolean
@@ -889,6 +900,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
   isLight: boolean
   lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
   agreedValueOptions: QuotationAgreedValueOption[]
+  convertedVesselIds: string[]
   onToggleVessel: (id: string) => void
   onSelectAlt: (id: string) => void
   onSelectLolOption: (id: string) => void
@@ -908,6 +920,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {qVessels.map(v => {
             const id = v.vesselId || v.id
+            const isConverted = convertedVesselIds.includes(id)
             const selected = data.selectedVesselIds.includes(id)
             return (
               <label key={v.id} style={{
@@ -915,13 +928,15 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 padding: '10px 14px', borderRadius: '10px',
                 border: selected ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
                 background: selected ? 'rgba(0,170,200,0.06)' : 'transparent',
-                cursor: isMultiVessel ? 'pointer' : 'default',
+                cursor: isConverted ? 'not-allowed' : (isMultiVessel ? 'pointer' : 'default'),
+                opacity: isConverted ? 0.55 : 1,
                 transition: 'all 0.15s'
               }}>
                 {isMultiVessel && (
                   <input
                     type="checkbox"
                     checked={selected}
+                    disabled={isConverted}
                     onChange={() => onToggleVessel(id)}
                     style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
                   />
@@ -936,7 +951,10 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name || v.vesselLabel}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {v.name || v.vesselLabel}
+                    {isConverted && <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#b464ff', background: 'rgba(180,100,255,0.14)', border: '1px solid rgba(180,100,255,0.35)', borderRadius: '5px', padding: '1px 6px' }}>Converted</span>}
+                  </div>
                   <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                     {v.imoNumber && <span>IMO {v.imoNumber}</span>}
                     {v.vesselType && <span>{v.vesselType}</span>}
@@ -1325,12 +1343,17 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
   const rows = data.insuredByVessel[vid] || []
   const setRows = (newRows: InsuredRow[]) => onUpdate({ insuredByVessel: { ...data.insuredByVessel, [vid]: newRows } })
   const updateRow = (idx: number, patch: Partial<InsuredRow>) => setRows(rows.map((r, i) => i === idx ? { ...r, ...patch } : r))
-  const addRow = () => setRows([...rows, { entityId: '', entityName: '', role: '', addressText: '', addressId: '', isNew: false }])
+  const addRow = () => setRows([...rows, { entityId: '', entityName: '', role: '', addressText: '', addressLabel: '', addressId: '', isNew: false }])
   const removeRow = (idx: number) => setRows(rows.filter((_, i) => i !== idx))
-  const onEntityChange = (idx: number, entityId: string) => {
-    const name = allEntities.find(e => e.id === entityId)?.name || ''
-    const first = (entityAddrs[entityId] || [])[0]
-    updateRow(idx, { entityId, entityName: name, addressText: first?.addressLine1 || '', addressId: first?.id || '', isNew: false })
+  // Typed value matches an existing entity → link it (and default its address); otherwise keep as a custom name
+  const onEntityInput = (idx: number, text: string) => {
+    const match = allEntities.find(e => e.name.toLowerCase() === text.trim().toLowerCase())
+    if (match) {
+      const first = (entityAddrs[match.id] || [])[0]
+      updateRow(idx, { entityId: match.id, entityName: match.name, addressText: first?.addressLine1 || '', addressId: first?.id || '', isNew: false })
+    } else {
+      updateRow(idx, { entityId: '', entityName: text, addressId: '', isNew: false })
+    }
   }
   const onAddrChange = (idx: number, r: InsuredRow, val: string) => {
     if (val === '__new__') { updateRow(idx, { addressId: '', isNew: true, addressText: '' }); return }
@@ -1418,21 +1441,31 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
             return (
               <div key={idx} style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr auto', gap: '8px', alignItems: 'center' }}>
-                  <select value={r.entityId} onChange={e => onEntityChange(idx, e.target.value)} style={cellInput}>
-                    <option value="">Select entity…</option>
-                    {allEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
+                  <input type="text" list={`wiz-ent-${vid}-${idx}`} value={r.entityName} onChange={e => onEntityInput(idx, e.target.value)} placeholder="Type to search or add a name…" style={cellInput} />
+                  <datalist id={`wiz-ent-${vid}-${idx}`}>
+                    {allEntities.map(e => <option key={e.id} value={e.name} />)}
+                  </datalist>
                   <input type="text" value={r.role} onChange={e => updateRow(idx, { role: e.target.value })} placeholder="Role (e.g. Registered Owners)" style={cellInput} />
                   <button type="button" onClick={() => removeRow(idx)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', fontSize: '0.9rem' }}>✕</button>
                 </div>
+                {!r.entityId && (r.entityName || '').trim() && (
+                  <p style={{ fontSize: '0.68rem', color: 'var(--accent-primary)', margin: '4px 0 0' }}>Custom insured — not linked to an existing entity.</p>
+                )}
                 <div style={{ marginTop: '8px' }}>
-                  <select value={r.isNew ? '__new__' : r.addressId} onChange={e => onAddrChange(idx, r, e.target.value)} style={{ ...cellInput, width: '100%' }} disabled={!r.entityId}>
-                    {addrs.map(a => <option key={a.id} value={a.id}>{a.addressLine1}{a.label ? ` (${a.label})` : ''}</option>)}
-                    {addrs.length === 0 && !r.isNew && <option value="">No saved address — add new</option>}
-                    <option value="__new__">+ New address…</option>
-                  </select>
-                  {(r.isNew || addrs.length === 0) && (
-                    <textarea value={r.addressText} onChange={e => updateRow(idx, { addressText: e.target.value, isNew: true, addressId: '' })} rows={2} placeholder="Full address…" style={{ ...cellInput, width: '100%', marginTop: '6px', resize: 'vertical', fontFamily: 'inherit' }} />
+                  {r.entityId && (
+                    <select value={r.isNew ? '__new__' : r.addressId} onChange={e => onAddrChange(idx, r, e.target.value)} style={{ ...cellInput, width: '100%' }}>
+                      {addrs.map(a => <option key={a.id} value={a.id}>{a.addressLine1}{a.label ? ` (${a.label})` : ''}</option>)}
+                      {addrs.length === 0 && !r.isNew && <option value="">No saved address — add new</option>}
+                      <option value="__new__">+ New address…</option>
+                    </select>
+                  )}
+                  {(r.isNew || addrs.length === 0 || !r.entityId) && (
+                    <>
+                      {r.entityId && (
+                        <input type="text" value={r.addressLabel} onChange={e => updateRow(idx, { addressLabel: e.target.value })} placeholder="Address name (internal, optional)" style={{ ...cellInput, width: '100%', marginTop: '6px' }} />
+                      )}
+                      <textarea value={r.addressText} onChange={e => updateRow(idx, { addressText: e.target.value, isNew: !!r.entityId, addressId: '' })} rows={2} placeholder="Full address…" style={{ ...cellInput, width: '100%', marginTop: '6px', resize: 'vertical', fontFamily: 'inherit' }} />
+                    </>
                   )}
                 </div>
               </div>

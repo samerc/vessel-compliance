@@ -854,6 +854,7 @@ const api = {
   policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
+  policyGetConvertedVesselIds: (quotationId: string) => ipcRenderer.invoke('policy:getConvertedVesselIds', quotationId),
   policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),
   policyGetRevisions: (policyNumber: string) => ipcRenderer.invoke('policy:getRevisions', policyNumber),
   policyAddBlueCard: (data: any) => ipcRenderer.invoke('policy:addBlueCard', data),

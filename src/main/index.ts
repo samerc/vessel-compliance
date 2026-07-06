@@ -2994,6 +2994,7 @@ app.whenReady().then(() => {
   safeHandle('policy:getById', (event, id) => { requireSession(event); return db.getPolicyDocumentById(id) })
   safeHandle('policy:getInstalments', (event, policyId) => { requireSession(event); return db.getPolicyInstalments(policyId) })
   safeHandle('policy:getAddresses', (event, policyId) => { requireSession(event); return db.getPolicyAddresses(policyId) })
+  safeHandle('policy:getConvertedVesselIds', (event, quotationId) => { requireSession(event); return db.getConvertedVesselIdsForQuotation(quotationId) })
   safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
   safeHandle('policy:getRevisions', (event, policyNumber) => { requireSession(event); return db.getPolicyRevisions(policyNumber) })
   safeHandle('policy:addBlueCard', async (event, data) => {

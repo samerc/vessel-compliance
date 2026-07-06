@@ -442,6 +442,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       await window.api.policySetInstalments(policyId, editInstalments)
       await window.api.policySetAddresses(policyId, editAddresses.map(a => ({
         entityId: a.entityId,
+        entityName: a.entityName,
         role: a.role,
         addressText: a.addressText
       })))
