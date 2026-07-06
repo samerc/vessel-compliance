@@ -2412,7 +2412,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
             spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
         }),
         new TableCell({
