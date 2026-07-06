@@ -242,13 +242,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         if (bcSetting) setBaseCurrency(bcSetting)
       } catch { /* use default USD */ }
 
-      // Calculate payable premium — use per-vessel premium when multi-vessel
+      // Calculate payable premium — use per-vessel premium when multi-vessel.
+      // Seed from the first vessel we're actually converting (skip already-converted ones)
+      // so converting the 2nd vessel of a quotation doesn't inherit the 1st vessel's premium.
       const quot = q as Quotation
       let techPremium = quot.premiumAmount || 0
+      const premiumVessel = vessels.find(v => !alreadyConverted.includes(v.vesselId || v.id)) || vessels[0]
 
       // War excess: premium = Section 1 + Section 2 for the vessel
       if (quot.quotationTypeCode === 'W' && quot.warExcessEnabled && vessels.length > 0) {
-        const v = vessels[0]
+        const v = premiumVessel
         const s1Rate = quot.premiumRate || 0
         const s2Rate = quot.warExcessRate || 0
         const s1Amt = v.agreedValue ?? quot.agreedValue ?? 0
@@ -257,8 +260,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
         techPremium = s1Prem + s2Prem
       } else if (vessels.length > 1) {
-        // Multi-vessel: use first vessel's premium (each vessel gets its own policy)
-        const firstVesselPrem = vessels[0]?.premiumAmount || 0
+        // Multi-vessel: each vessel gets its own policy — seed from the vessel being converted
+        const firstVesselPrem = premiumVessel?.premiumAmount || 0
         if (firstVesselPrem > 0) techPremium = firstVesselPrem
       } else if (vessels.length === 1) {
         const singlePrem = vessels[0]?.premiumAmount || 0
@@ -753,11 +756,29 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             convertedVesselIds={convertedVesselIds}
             onToggleVessel={(id) => {
               if (convertedVesselIds.includes(id)) return
-              updateData({
-                selectedVesselIds: data.selectedVesselIds.includes(id)
-                  ? data.selectedVesselIds.filter(v => v !== id)
-                  : [...data.selectedVesselIds, id]
-              })
+              const newSelection = data.selectedVesselIds.includes(id)
+                ? data.selectedVesselIds.filter(v => v !== id)
+                : [...data.selectedVesselIds, id]
+              const patch: Partial<WizardData> = { selectedVesselIds: newSelection }
+              // Plain per-vessel premium (no alternatives/LOL/war-excess): when exactly one
+              // vessel is selected, follow that vessel's own premium and re-split instalments.
+              const plainPerVessel = !!quotation && allAlts.length <= 1 &&
+                !lolOptions.some(o => o.premiumAmount != null) &&
+                !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled)
+              if (plainPerVessel && newSelection.length === 1) {
+                const qv = qVessels.find(v => (v.vesselId || v.id) === newSelection[0])
+                const tech = qv?.premiumAmount || quotation!.premiumAmount || 0
+                if (tech > 0) {
+                  const pay = computePayable(tech)
+                  const count = data.instalmentAmounts.length
+                  if (count > 0) {
+                    const per = Math.round((pay / count) * 100) / 100
+                    patch.instalmentAmounts = data.instalmentAmounts.map((_, i) => i === 0 ? Math.round((pay - per * (count - 1)) * 100) / 100 : per)
+                  }
+                  patch.totalPremium = pay
+                }
+              }
+              updateData(patch)
             }}
             onSelectAlt={handleAltChange}
             onSelectLolOption={(id) => {
