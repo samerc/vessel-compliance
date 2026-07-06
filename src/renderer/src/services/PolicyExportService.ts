@@ -1342,6 +1342,28 @@ function polMp(text: string): Paragraph[] {
   )
 }
 
+// Like polMp but the last text paragraph carries no trailing `after`, so a following
+// polEmptyP() spacer produces exactly one blank line — matching a block that ends with a
+// table (which has no trailing spacing). Keeps inter-paragraph spacing for multi-line text.
+function polMpTight(text: string): Paragraph[] {
+  if (!text) return []
+  const decoded = decodeHtmlEntities(text)
+  if (polIsHtml(decoded)) return polMp(text) // HTML paths keep their own spacing
+  const lines = decoded.split('\n')
+  let lastNonEmpty = -1
+  for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim()) { lastNonEmpty = i; break } }
+  const out: Paragraph[] = []
+  lines.forEach((p, i) => {
+    if (!p.trim()) { if (i < lastNonEmpty) out.push(polEmptyP()); return }
+    out.push(new Paragraph({
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: i === lastNonEmpty ? 0 : 80, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text: p, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+    }))
+  })
+  return out
+}
+
 function polMpBullet(text: string): Paragraph[] {
   if (!text) return []
   const decoded = decodeHtmlEntities(text)
@@ -1547,7 +1569,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
   if (polSt(data, 'insuredFooter')) {
     content.push(polEmptyP())
-    content.push(...polMp(polSt(data, 'insuredFooter')))
+    content.push(...polMpTight(polSt(data, 'insuredFooter')))
   }
 
   const brokerName = data.quotation.coName || data.assureds.find(a => a.role?.toLowerCase().includes('broker'))?.name
