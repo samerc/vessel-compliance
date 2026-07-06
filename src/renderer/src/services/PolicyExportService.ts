@@ -3261,7 +3261,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
     const splitRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) => new TableRow({
       children: [
         new TableCell({ width: { size: splitLabelW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] }),
-        new TableCell({ width: { size: splitAmtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
+        new TableCell({ width: { size: splitAmtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
       ]
     })
     premiumContent.push(new Table({
