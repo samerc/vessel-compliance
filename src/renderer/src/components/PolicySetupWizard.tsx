@@ -915,6 +915,22 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
           </div>
         </div>
       )}
+
+      {/* Increased Value (IV) — shown for Hull quotations with IV enabled, regardless of alternatives */}
+      {quotation.ivEnabled && (
+        <div style={{ marginTop: '24px' }}>
+          <label style={labelStyle}>Increased Value (IV)</label>
+          <div style={{
+            padding: '10px 14px', borderRadius: '10px',
+            border: '1px solid var(--input-border)', background: 'rgba(0,170,200,0.05)',
+            fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'
+          }}>
+            <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Included</span>
+            {quotation.ivValue != null && <span>{quotation.ivCurrency || quotation.premiumCurrency || 'USD'} {quotation.ivValue.toLocaleString()}</span>}
+            {quotation.ivPremiumAmount != null && <span style={{ color: 'var(--text-secondary)' }}>· premium {quotation.premiumCurrency || 'USD'} {quotation.ivPremiumAmount.toLocaleString()}</span>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
