@@ -3244,15 +3244,49 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
 
   // PREMIUM — amount bold + words on same line: "USD 45,000 (US Dollars Forty-Five Thousand Only)"
   const totalPremium = data.instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
-  const premiumContent: (Paragraph | Table)[] = [
-    new Paragraph({
+  // Increased Value (Hull): split the premium into Section A (H&M) + Section B (IV) + Total.
+  // IV payable = ivPremium after NCB/UPCC discounts (mirrors the wizard); H&M = Total − IV.
+  const ivPremRaw = data.quotation.ivPremiumAmount || 0
+  const showIvSplit = data.quotation.ivEnabled === true && ivPremRaw > 0
+  const premiumContent: (Paragraph | Table)[] = []
+  if (showIvSplit) {
+    let ivPay = ivPremRaw
+    if (data.quotation.ncbEnabled && data.quotation.ncbDiscountPercent) ivPay *= (1 - data.quotation.ncbDiscountPercent / 100)
+    if (data.quotation.upccEnabled && data.quotation.upccDiscountPercent) ivPay *= (1 - data.quotation.upccDiscountPercent / 100)
+    ivPay = Math.round(ivPay * 100) / 100
+    const hmPay = Math.round((totalPremium - ivPay) * 100) / 100
+    const splitLabelW = Math.round(POL_BODY_W * 0.45)
+    const splitAmtW = POL_BODY_W - splitLabelW
+    const totalTop = { top: { style: BorderStyle.SINGLE, size: 8, color: '000000' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } }
+    const splitRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) => new TableRow({
+      children: [
+        new TableCell({ width: { size: splitLabelW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] }),
+        new TableCell({ width: { size: splitAmtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
+      ]
+    })
+    premiumContent.push(new Table({
+      width: { size: POL_BODY_W, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [splitLabelW, splitAmtW],
+      rows: [
+        splitRow('Section A: H&M', hmPay),
+        splitRow('Section B: IV', ivPay),
+        splitRow('Total', totalPremium, { bold: true, total: true })
+      ]
+    }))
+    premiumContent.push(new Paragraph({
+      spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text: `(${numberToWords(totalPremium, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+    }))
+  } else {
+    premiumContent.push(new Paragraph({
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: polFormatCurrency(totalPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
         new TextRun({ text: ` (${numberToWords(totalPremium, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
-    })
-  ]
+    }))
+  }
   rows.push(makeRow('Premium', premiumContent))
 
   // PREMIUM PAYMENT CONDITION PRECEDENT
