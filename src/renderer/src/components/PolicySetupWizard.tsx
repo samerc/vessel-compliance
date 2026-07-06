@@ -377,6 +377,14 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     return Math.round(pay * 100) / 100
   }
 
+  // Hull technical premium (selected alternative, else quotation premium) — excludes IV
+  const hullTechnical = (() => {
+    const piAlt = piAlts.find(a => a.id === data.selectedAltId)
+    const hullAlt = hullAlts.find(a => a.id === data.selectedAltId)
+    const altPremium = piAlt?.premiumAmount ?? hullAlt?.premiumAmount ?? null
+    return altPremium != null ? altPremium : (quotation?.premiumAmount || 0)
+  })()
+
   const handleAltChange = (altId: string) => {
     if (!quotation) return
     const piAlt = piAlts.find(a => a.id === altId)
@@ -682,6 +690,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             onUpdate={updateData}
             recalcPremiumFromInstalments={recalcPremiumFromInstalments}
             onChangeCount={changeInstalmentCount}
+            hullTechnical={hullTechnical}
             inputStyle={inputStyle}
           />
         )}
@@ -992,13 +1001,14 @@ function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputS
   )
 }
 
-function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, inputStyle }: {
+function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, hullTechnical, inputStyle }: {
   data: WizardData
   quotation: Quotation
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
   recalcPremiumFromInstalments: (amounts: number[]) => void
   onChangeCount: (count: number) => void
+  hullTechnical: number
   inputStyle: React.CSSProperties
 }) {
   const labelUpper: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }
@@ -1051,18 +1061,49 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             Regenerates dates & splits the premium evenly
           </p>
         </div>
-        {quotation.ivEnabled && quotation.ivPremiumAmount != null && (
-          <div>
-            <div style={labelUpper}>Increased Value (IV)</div>
-            <div style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'rgba(0,170,200,0.05)', fontSize: '0.88rem', fontWeight: 600, minWidth: '150px', textAlign: 'right' }}>
-              {quotation.premiumCurrency || 'USD'} {quotation.ivPremiumAmount.toLocaleString()}
-            </div>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-              Included in the payable premium{quotation.ivValue != null ? ` · IV value ${quotation.ivCurrency || quotation.premiumCurrency || 'USD'} ${quotation.ivValue.toLocaleString()}` : ''}
-            </p>
-          </div>
-        )}
       </div>
+
+      {/* Hull + IV premium breakdown (Hull quotations with IV). Technical/Payable split
+          only shown when there's an NCB/UPCC discount — otherwise a single amount. */}
+      {quotation.ivEnabled && (() => {
+        const hasDiscount = !!(quotation.ncbEnabled && quotation.ncbDiscountPercent) || !!(quotation.upccEnabled && quotation.upccDiscountPercent)
+        const cp = (t: number) => {
+          let p = t
+          if (quotation.ncbEnabled && quotation.ncbDiscountPercent) p *= (1 - quotation.ncbDiscountPercent / 100)
+          if (quotation.upccEnabled && quotation.upccDiscountPercent) p *= (1 - quotation.upccDiscountPercent / 100)
+          return Math.round(p * 100) / 100
+        }
+        const cur = quotation.premiumCurrency || 'USD'
+        const fmt = (n: number) => `${cur} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+        const rows = [
+          { label: 'Hull', tech: hullTechnical, pay: cp(hullTechnical) },
+          { label: 'IV', tech: quotation.ivPremiumAmount || 0, pay: cp(quotation.ivPremiumAmount || 0) }
+        ]
+        const totalTech = rows.reduce((s, r) => s + r.tech, 0)
+        const totalPay = rows.reduce((s, r) => s + r.pay, 0)
+        const cols = hasDiscount ? '1.2fr 1fr 1fr' : '1.2fr 1fr'
+        return (
+          <div style={{ marginBottom: '20px', border: '1px solid var(--glass-border)', borderRadius: '10px', overflow: 'hidden', maxWidth: '540px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', background: 'rgba(0,170,200,0.06)', ...labelUpper, marginBottom: 0 }}>
+              <span>Premium</span>
+              {hasDiscount && <span style={{ textAlign: 'right' }}>Technical</span>}
+              <span style={{ textAlign: 'right' }}>{hasDiscount ? 'Payable' : 'Amount'}</span>
+            </div>
+            {rows.map(r => (
+              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--table-border)' }}>
+                <span style={{ fontWeight: 600 }}>{r.label}</span>
+                {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(r.tech)}</span>}
+                <span style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(hasDiscount ? r.pay : r.tech)}</span>
+              </div>
+            ))}
+            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,170,200,0.04)' }}>
+              <span style={{ fontWeight: 700 }}>Total</span>
+              {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(totalTech)}</span>}
+              <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>{fmt(hasDiscount ? totalPay : totalTech)}</span>
+            </div>
+          </div>
+        )
+      })()}
 
       {count === 0 && (
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
