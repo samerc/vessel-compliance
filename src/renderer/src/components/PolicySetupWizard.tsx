@@ -1468,11 +1468,11 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
                   {r.entityId && (
                     <select value={r.isNew ? '__new__' : r.addressId} onChange={e => onAddrChange(idx, r, e.target.value)} style={{ ...cellInput, width: '100%' }}>
                       {addrs.map(a => <option key={a.id} value={a.id}>{a.addressLine1}{a.label ? ` (${a.label})` : ''}</option>)}
-                      {addrs.length === 0 && !r.isNew && <option value="">No saved address — add new</option>}
+                      {addrs.length === 0 && !r.isNew && <option value="">No saved address</option>}
                       <option value="__new__">+ New address…</option>
                     </select>
                   )}
-                  {(r.isNew || addrs.length === 0 || !r.entityId) && (
+                  {(r.isNew || !r.entityId) && (
                     <>
                       {r.entityId && (
                         <input type="text" value={r.addressLabel} onChange={e => updateRow(idx, { addressLabel: e.target.value })} placeholder="Address name (internal, optional)" style={{ ...cellInput, width: '100%', marginTop: '6px' }} />
