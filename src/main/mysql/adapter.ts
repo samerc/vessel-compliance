@@ -3279,6 +3279,14 @@ export class MySQLAdapter {
                     await this.pool.query("ALTER TABLE policy_documents ADD COLUMN subjectivity_days INT DEFAULT 7")
                 }
             } catch {}
+            // Outstanding-premium override (NULL = inherit from quotation)
+            try {
+                const [opeCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'outstanding_premium_enabled'") as any[]
+                if ((opeCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN outstanding_premium_enabled BOOLEAN DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN outstanding_premium_text TEXT DEFAULT NULL")
+                }
+            } catch {}
 
             // ---- Policy Endorsements tables ----
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
@@ -10744,6 +10752,8 @@ export class MySQLAdapter {
         return {
             ...r,
             showAddresses: Boolean(r.show_addresses),
+            outstandingPremiumEnabled: r.outstanding_premium_enabled == null ? null : Boolean(r.outstanding_premium_enabled),
+            outstandingPremiumText: r.outstanding_premium_text ?? null,
             proRata: Boolean(r.pro_rata),
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
@@ -11129,6 +11139,15 @@ export class MySQLAdapter {
         createdBy: string
         selectedAlternativeId?: string | null
         exchangeRate?: number
+        // Per-vessel insured list edited in the wizard (overrides auto-derivation when present)
+        insured?: { vesselId: string; entityId: string; role: string; addressText: string; isNewAddress?: boolean }[]
+        // Outstanding-premium override for the policy (null = inherit from quotation)
+        outstandingPremiumEnabled?: boolean | null
+        outstandingPremiumText?: string | null
+        // Blue-card period (falls back to policy period) + per-card named assured (entity id)
+        blueCardInception?: string | null
+        blueCardExpiry?: string | null
+        blueCardOwners?: Record<string, string>
     }): Promise<any[]> {
         if (!this.pool) throw new Error('DB not connected')
 
@@ -11160,15 +11179,18 @@ export class MySQLAdapter {
                     revision_number, inception_date, inception_time, expiry_date, expiry_time,
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
                     per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
-                    section_order, selected_lol_option_id, selected_agreed_value_option_id)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?)
+                    section_order, selected_lol_option_id, selected_agreed_value_option_id,
+                    outstanding_premium_enabled, outstanding_premium_text)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
                 premiumAmount, options.selectedAlternativeId || null, options.createdBy, options.exchangeRate || 1,
                 quotation.sectionOrder ? JSON.stringify(quotation.sectionOrder) : null,
                 (options as any).selectedLolOptionId || null,
-                (options as any).selectedAgreedValueOptionId || null])
+                (options as any).selectedAgreedValueOptionId || null,
+                options.outstandingPremiumEnabled == null ? null : (options.outstandingPremiumEnabled ? 1 : 0),
+                options.outstandingPremiumText ?? null])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {
@@ -11181,6 +11203,27 @@ export class MySQLAdapter {
                     inst.commissionAmount, inst.isNonRefundable])
             }
 
+            // Insured / addresses: use the wizard-edited list for this vessel when provided,
+            // otherwise auto-derive from the quotation assureds (with vessel-assured fallback).
+            const insuredForVessel = (options.insured || []).filter(r => r.vesselId === vid || r.vesselId === actualVesselId)
+            if (Array.isArray(options.insured)) {
+                for (let ai = 0; ai < insuredForVessel.length; ai++) {
+                    const r = insuredForVessel[ai]
+                    // Persist a brand-new address back to the entity (dedup against existing line 1)
+                    if (r.isNewAddress && r.entityId && r.addressText && r.addressText.trim()) {
+                        try {
+                            const [exist] = await this.pool.query('SELECT id FROM entity_addresses WHERE entity_id = ? AND TRIM(address_line1) = TRIM(?) LIMIT 1', [r.entityId, r.addressText])
+                            if ((exist as any[]).length === 0) {
+                                await this.addEntityAddress({ entityId: r.entityId, label: r.role || 'Policy Address', addressLine1: r.addressText.trim() } as any)
+                            }
+                        } catch { /* non-critical */ }
+                    }
+                    await this.pool.execute(`
+                        INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text, \`order\`)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `, [uuidv4(), policyId, r.entityId || null, r.role || '', r.addressText || '', ai])
+                }
+            } else {
             // Create addresses from quotation assureds (preserves order) with vessel assured fallback
             const qAssureds = await this.getQuotationAssureds(quotationId)
             const safeQAssureds = Array.isArray(qAssureds) ? qAssureds : []
@@ -11222,6 +11265,7 @@ export class MySQLAdapter {
                         VALUES (?, ?, ?, ?, ?)
                     `, [uuidv4(), policyId, assured.entity_id, assured.role, assured.addressText || ''])
                 }
+            }
             }
 
             // Create blue cards (P&I only)
@@ -11278,16 +11322,39 @@ export class MySQLAdapter {
                     }
                 } catch { /* non-critical — owner can be set later in the blue card editor */ }
 
+                // Resolve owner name + address for a specific entity (per-card named-assured override)
+                const resolveOwnerFor = async (entId: string | null): Promise<{ id: string | null; name: string | null; address: string | null }> => {
+                    if (!entId || entId === ownerEntityId) return { id: ownerEntityId, name: ownerName, address: ownerAddress }
+                    try {
+                        const [eRows] = await this.pool!.query('SELECT name FROM entities WHERE id = ?', [entId])
+                        const nm = (eRows as any[])[0]?.name || null
+                        let addrRow: any = null
+                        const [vaRows] = await this.pool!.query('SELECT address_id FROM vessel_assureds WHERE vessel_id = ? AND entity_id = ? LIMIT 1', [actualVesselId, entId])
+                        const addrId = (vaRows as any[])[0]?.address_id
+                        if (addrId) { const [r] = await this.pool!.query('SELECT * FROM entity_addresses WHERE id = ?', [addrId]); addrRow = (r as any[])[0] }
+                        if (!addrRow) { const [r2] = await this.pool!.query('SELECT * FROM entity_addresses WHERE entity_id = ? ORDER BY created_at LIMIT 1', [entId]); addrRow = (r2 as any[])[0] }
+                        let addr: string | null = null
+                        if (addrRow) {
+                            const parts = [addrRow.address_line1, addrRow.address_line2, [addrRow.city, addrRow.postal_code].filter(Boolean).join(' '), addrRow.country].map((s: any) => (s || '').trim()).filter(Boolean)
+                            addr = parts.length ? parts.join('\n') : null
+                        }
+                        return { id: entId, name: nm, address: addr }
+                    } catch { return { id: ownerEntityId, name: ownerName, address: ownerAddress } }
+                }
+
+                const bcInception = options.blueCardInception || options.inceptionDate
+                const bcExpiry = options.blueCardExpiry || options.expiryDate
                 for (const cardType of options.blueCards) {
                     const cardNumber = policyNumber + '/' + cardType
+                    const ov = await resolveOwnerFor(options.blueCardOwners?.[cardType] || null)
                     await this.pool.execute(`
                         INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
                             inception_date, expiry_date, revision_number, issued_date, port_of_registry,
                             owner_entity_id, owner_name, owner_address)
                         VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?, ?, ?, ?)
                     `, [uuidv4(), policyId, cardType, cardNumber,
-                        options.inceptionDate, options.expiryDate, defaultPort,
-                        ownerEntityId, ownerName, ownerAddress])
+                        bcInception, bcExpiry, defaultPort,
+                        ov.id, ov.name, ov.address])
                 }
             }
 

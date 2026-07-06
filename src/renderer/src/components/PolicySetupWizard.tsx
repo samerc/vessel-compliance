@@ -23,6 +23,15 @@ const DEFAULT_TIMEZONE_OPTIONS = [
 const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review']
 const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck]
 
+interface InsuredRow {
+  entityId: string
+  entityName: string
+  role: string
+  addressText: string
+  addressId: string  // id of a picked existing entity_address, '' when typing a new one
+  isNew: boolean     // true when addressText is a new address to save back to the entity
+}
+
 interface WizardData {
   // Step 1
   selectedVesselIds: string[]
@@ -38,15 +47,21 @@ interface WizardData {
   instalmentDates: string[]
   instalmentAmounts: number[]
   instalmentNonRefundable: boolean[]
+  outstandingPremiumEnabled: boolean
+  outstandingPremiumText: string
   // Step 4
+  commissionEnabled: boolean
   commissionPercent: number | ''
   bankId: string
-  showAddresses: boolean
   exchangeRate: number
+  insuredByVessel: Record<string, InsuredRow[]>  // vesselId → insured rows
   // Step 5
   blueCards: string[]
   blueCardNone: boolean
   blueCardAddressedTo: Record<string, string>
+  blueCardInception: string
+  blueCardExpiry: string
+  blueCardOwners: Record<string, string>  // cardType → entityId
   // LOL / Agreed Value Option selection
   selectedLolOptionId: string
   selectedAgreedValueOptionId: string
@@ -85,19 +100,28 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     instalmentDates: [],
     instalmentAmounts: [],
     instalmentNonRefundable: [],
+    outstandingPremiumEnabled: false,
+    outstandingPremiumText: '',
+    commissionEnabled: false,
     commissionPercent: '',
     bankId: '',
-    showAddresses: false,
     exchangeRate: 1,
+    insuredByVessel: {},
     blueCards: [],
     blueCardNone: false,
     blueCardAddressedTo: {},
+    blueCardInception: '',
+    blueCardExpiry: '',
+    blueCardOwners: {},
     selectedLolOptionId: '',
     selectedAgreedValueOptionId: ''
   })
 
   const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
   const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
+  // Insured editor data
+  const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([])
+  const [entityAddrs, setEntityAddrs] = useState<Record<string, { id: string; addressLine1: string; label?: string }[]>>({})
 
   const isPI = quotation?.quotationTypeCode === 'P'
   const allAlts = useMemo(() => [...piAlts, ...hullAlts], [piAlts, hullAlts])
@@ -121,14 +145,17 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs] = await Promise.all([
+      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes] = await Promise.all([
         window.api.getQuotation(quotationId),
         window.api.getQuotationVessels(quotationId),
         window.api.bankGetAll(),
         window.api.getQuotationInstalments(quotationId),
         window.api.piGetQuotationAlternatives(quotationId),
         window.api.hullGetQuotationAlternatives(quotationId),
-        window.api.getFlagStates()
+        window.api.getFlagStates(),
+        window.api.getEntities(),
+        window.api.getQuotationAssureds(quotationId),
+        window.api.getEntityAddresses()
       ])
 
       if (!q || (q as any).error) {
@@ -148,6 +175,39 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       const safeHullAlts = Array.isArray(hullAltsRes) ? hullAltsRes : []
       setPiAlts(safePiAlts)
       setHullAlts(safeHullAlts)
+
+      // Insured editor: entities, per-entity address map, per-vessel insured rows (from quotation assureds)
+      setAllEntities((Array.isArray(entRes) ? entRes : []).map((e: any) => ({ id: e.id, name: e.name })))
+      const addrMap: Record<string, { id: string; addressLine1: string; label?: string }[]> = {}
+      for (const a of (Array.isArray(eaRes) ? eaRes : []) as any[]) {
+        if (!addrMap[a.entityId]) addrMap[a.entityId] = []
+        addrMap[a.entityId].push({ id: a.id, addressLine1: a.addressLine1 || '', label: a.label })
+      }
+      setEntityAddrs(addrMap)
+      const entName = (id: string) => (Array.isArray(entRes) ? entRes : []).find((e: any) => e.id === id)?.name || ''
+      const safeQA = Array.isArray(qaRes) ? qaRes : []
+      const insuredByVessel: Record<string, InsuredRow[]> = {}
+      for (const v of vessels) {
+        const vid = (v.vesselId || v.id) as string
+        insuredByVessel[vid] = safeQA
+          .filter((a: any) => !a.vesselLabel || a.vesselLabel === v.vesselLabel)
+          .map((a: any) => {
+            const firstAddr = (addrMap[a.entityId] || [])[0]
+            return {
+              entityId: a.entityId || '',
+              entityName: a.name || entName(a.entityId) || '',
+              role: a.role || '',
+              addressText: firstAddr?.addressLine1 || '',
+              addressId: firstAddr?.id || '',
+              isNew: false
+            } as InsuredRow
+          })
+      }
+      const allInsuredRows = Object.values(insuredByVessel).flat()
+      const regOwner = allInsuredRows.find(r => r.role.toLowerCase().includes('registered owner')) || allInsuredRows[0]
+      const defaultOwnerId = regOwner?.entityId || ''
+      const defaultBlueCardOwners: Record<string, string> = {}
+      for (const ct of ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']) defaultBlueCardOwners[ct] = defaultOwnerId
 
       // Load LOL options and agreed value options
       let safeLolOptions: typeof lolOptions = []
@@ -285,7 +345,14 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         instalmentDates: initDates,
         instalmentAmounts: initAmounts,
         instalmentNonRefundable: initNR,
-        commissionPercent: resolvedCommission
+        commissionEnabled: resolvedCommission !== '' && Number(resolvedCommission) > 0,
+        commissionPercent: resolvedCommission,
+        insuredByVessel,
+        outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
+        outstandingPremiumText: quot.outstandingPremiumText || '',
+        blueCardInception: inception,
+        blueCardExpiry: expiry,
+        blueCardOwners: defaultBlueCardOwners
       }))
     } catch (err: any) {
       showError(err.message || 'Failed to load data')
@@ -385,6 +452,25 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     return altPremium != null ? altPremium : (quotation?.premiumAmount || 0)
   })()
 
+  // Named-assured options for blue cards — unique insured entities across selected vessels (Registered Owner first)
+  const ownerOptions = (() => {
+    const seen = new Set<string>()
+    const opts: { id: string; name: string; role: string }[] = []
+    for (const vid of data.selectedVesselIds) {
+      for (const r of (data.insuredByVessel[vid] || [])) {
+        if (!r.entityId || seen.has(r.entityId)) continue
+        seen.add(r.entityId)
+        opts.push({ id: r.entityId, name: r.entityName, role: r.role })
+      }
+    }
+    opts.sort((a, b) => {
+      const ao = a.role.toLowerCase().includes('registered owner') ? 0 : 1
+      const bo = b.role.toLowerCase().includes('registered owner') ? 0 : 1
+      return ao - bo
+    })
+    return opts
+  })()
+
   const handleAltChange = (altId: string) => {
     if (!quotation) return
     const piAlt = piAlts.find(a => a.id === altId)
@@ -477,7 +563,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
     setConverting(true)
     try {
-      const commPct = typeof data.commissionPercent === 'number' ? data.commissionPercent : 0
+      const commPct = data.commissionEnabled && typeof data.commissionPercent === 'number' ? data.commissionPercent : 0
+      // Flatten the per-vessel insured lists into a single array with vesselId
+      const insured = Object.entries(data.insuredByVessel).flatMap(([vesselId, rows]) =>
+        (rows || []).filter(r => r.entityId).map(r => ({
+          vesselId, entityId: r.entityId, role: r.role, addressText: r.addressText || '', isNewAddress: !!r.isNew
+        }))
+      )
       const result = await window.api.policyConvertFromQuotation(quotation.id, {
         vesselIds: data.selectedVesselIds,
         inceptionDate: data.inceptionDate,
@@ -491,15 +583,21 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           commissionAmount: Math.round((data.instalmentAmounts[i] || 0) * commPct / 100 * 100) / 100,
           isNonRefundable: data.instalmentNonRefundable[i] || false
         })),
-        commissionPercent: commPct || null,
+        commissionPercent: data.commissionEnabled ? (commPct || null) : null,
         bankId: data.bankId || null,
-        showAddresses: data.showAddresses,
+        showAddresses: true,
         blueCards: data.blueCardNone ? [] : data.blueCards,
         selectedAlternativeId: data.selectedAltId || null,
         exchangeRate: data.exchangeRate || 1,
         selectedLolOptionId: data.selectedLolOptionId || null,
         selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null,
-        premiumAmount: data.totalPremium || null
+        premiumAmount: data.totalPremium || null,
+        insured,
+        outstandingPremiumEnabled: data.outstandingPremiumEnabled,
+        outstandingPremiumText: data.outstandingPremiumEnabled ? data.outstandingPremiumText : null,
+        blueCardInception: data.blueCardInception || null,
+        blueCardExpiry: data.blueCardExpiry || null,
+        blueCardOwners: data.blueCardOwners
       })
       if ((result as any)?.error) {
         showError((result as any).message || 'Conversion failed')
@@ -703,6 +801,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             premiumCurrency={quotation?.premiumCurrency || 'USD'}
             baseCurrency={baseCurrency}
             onUpdate={updateData}
+            allEntities={allEntities}
+            entityAddrs={entityAddrs}
+            qVessels={qVessels}
+            isLight={isLight}
             labelStyle={labelStyle}
             inputStyle={inputStyle}
           />
@@ -715,6 +817,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             flagStates={flagStates}
             isLight={isLight}
             onUpdate={updateData}
+            ownerOptions={ownerOptions}
             labelStyle={labelStyle}
           />
         )}
@@ -1180,42 +1283,89 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         NR = Non-refundable. Each 30 days from inception equals 1 calendar month.
       </p>
       </>)}
+
+      {/* Outstanding premium notice — toggle + editable text (overrides the quotation for this policy) */}
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem', marginBottom: data.outstandingPremiumEnabled ? '8px' : 0 }}>
+          <input type="checkbox" checked={data.outstandingPremiumEnabled} onChange={e => onUpdate({ outstandingPremiumEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+          Show outstanding-premium notice on the policy
+        </label>
+        {data.outstandingPremiumEnabled && (
+          <textarea
+            value={data.outstandingPremiumText}
+            onChange={e => onUpdate({ outstandingPremiumText: e.target.value })}
+            rows={2}
+            placeholder="All outstanding premium to be settled prior inception"
+            style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+        )}
+      </div>
     </div>
   )
 }
 
-function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, labelStyle, inputStyle }: {
+function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, allEntities, entityAddrs, qVessels, isLight, labelStyle, inputStyle }: {
   data: WizardData
   banks: { id: string; name: string; details: string; order: number }[]
   hasBroker: boolean
   premiumCurrency: string
   baseCurrency: string
   onUpdate: (partial: Partial<WizardData>) => void
+  allEntities: { id: string; name: string }[]
+  entityAddrs: Record<string, { id: string; addressLine1: string; label?: string }[]>
+  qVessels: QuotationVessel[]
+  isLight: boolean
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
 }) {
   const sameAsBase = premiumCurrency.toUpperCase() === baseCurrency.toUpperCase()
+  const vesselIds = data.selectedVesselIds
+  const [activeVid, setActiveVid] = useState(vesselIds[0] || '')
+  const vid = vesselIds.includes(activeVid) ? activeVid : (vesselIds[0] || '')
+  const rows = data.insuredByVessel[vid] || []
+  const setRows = (newRows: InsuredRow[]) => onUpdate({ insuredByVessel: { ...data.insuredByVessel, [vid]: newRows } })
+  const updateRow = (idx: number, patch: Partial<InsuredRow>) => setRows(rows.map((r, i) => i === idx ? { ...r, ...patch } : r))
+  const addRow = () => setRows([...rows, { entityId: '', entityName: '', role: '', addressText: '', addressId: '', isNew: false }])
+  const removeRow = (idx: number) => setRows(rows.filter((_, i) => i !== idx))
+  const onEntityChange = (idx: number, entityId: string) => {
+    const name = allEntities.find(e => e.id === entityId)?.name || ''
+    const first = (entityAddrs[entityId] || [])[0]
+    updateRow(idx, { entityId, entityName: name, addressText: first?.addressLine1 || '', addressId: first?.id || '', isNew: false })
+  }
+  const onAddrChange = (idx: number, r: InsuredRow, val: string) => {
+    if (val === '__new__') { updateRow(idx, { addressId: '', isNew: true, addressText: '' }); return }
+    const a = (entityAddrs[r.entityId] || []).find(x => x.id === val)
+    updateRow(idx, { addressId: val, isNew: false, addressText: a?.addressLine1 || '' })
+  }
+  const vesselName = (id: string) => { const v = qVessels.find(q => (q.vesselId || q.id) === id); return v ? (v.name || v.vesselLabel || id) : id }
+  const cellInput: React.CSSProperties = { ...inputStyle, padding: '6px 8px', fontSize: '0.82rem' }
+
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Additional Details</h2>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        Configure commission, bank, and address settings.
+        Configure commission, bank, and the insured on the policy.
       </p>
 
-      {/* Commission */}
+      {/* Commission — toggle to include/skip */}
       <div style={{ marginBottom: '20px' }}>
-        <label style={labelStyle}>Commission %{hasBroker ? '' : ' (optional)'}</label>
-        <input
-          type="number"
-          value={data.commissionPercent}
-          onChange={e => onUpdate({ commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-          min={0}
-          max={100}
-          step={0.01}
-          placeholder={hasBroker ? 'e.g. 15' : '0'}
-          style={{ ...inputStyle, width: '160px' }}
-        />
-        {hasBroker && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Broker commission — will generate Credit Advice</p>}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem', marginBottom: data.commissionEnabled ? '8px' : 0 }}>
+          <input type="checkbox" checked={data.commissionEnabled} onChange={e => onUpdate({ commissionEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+          Include commission{hasBroker ? ' (broker — generates Credit Advice)' : ''}
+        </label>
+        {data.commissionEnabled && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="number"
+              value={data.commissionPercent}
+              onChange={e => onUpdate({ commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+              min={0} max={100} step={0.01}
+              placeholder="e.g. 15"
+              style={{ ...inputStyle, width: '160px' }}
+            />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>%</span>
+          </div>
+        )}
       </div>
 
       {/* Exchange Rate */}
@@ -1246,28 +1396,63 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
         )}
       </div>
 
-      {/* Show Addresses */}
+      {/* Insured & Addresses */}
       <div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem' }}>
-          <input
-            type="checkbox"
-            checked={data.showAddresses}
-            onChange={e => onUpdate({ showAddresses: e.target.checked })}
-            style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
-          />
-          Show Addresses in Policy Document
-        </label>
+        <label style={labelStyle}>Insured & Addresses</label>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+          These appear on the policy. Pick an existing address or add a new one (a new address is saved back to the entity).
+        </p>
+        {vesselIds.length > 1 && (
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            {vesselIds.map(id => (
+              <button key={id} type="button" onClick={() => setActiveVid(id)}
+                style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: id === vid ? 700 : 400, border: id === vid ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: id === vid ? 'rgba(0,170,200,0.08)' : 'transparent', color: id === vid ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                {vesselName(id)}
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {rows.map((r, idx) => {
+            const addrs = entityAddrs[r.entityId] || []
+            return (
+              <div key={idx} style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+                  <select value={r.entityId} onChange={e => onEntityChange(idx, e.target.value)} style={cellInput}>
+                    <option value="">Select entity…</option>
+                    {allEntities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                  <input type="text" value={r.role} onChange={e => updateRow(idx, { role: e.target.value })} placeholder="Role (e.g. Registered Owners)" style={cellInput} />
+                  <button type="button" onClick={() => removeRow(idx)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', fontSize: '0.9rem' }}>✕</button>
+                </div>
+                <div style={{ marginTop: '8px' }}>
+                  <select value={r.isNew ? '__new__' : r.addressId} onChange={e => onAddrChange(idx, r, e.target.value)} style={{ ...cellInput, width: '100%' }} disabled={!r.entityId}>
+                    {addrs.map(a => <option key={a.id} value={a.id}>{a.addressLine1}{a.label ? ` (${a.label})` : ''}</option>)}
+                    {addrs.length === 0 && !r.isNew && <option value="">No saved address — add new</option>}
+                    <option value="__new__">+ New address…</option>
+                  </select>
+                  {(r.isNew || addrs.length === 0) && (
+                    <textarea value={r.addressText} onChange={e => updateRow(idx, { addressText: e.target.value, isNew: true, addressId: '' })} rows={2} placeholder="Full address…" style={{ ...cellInput, width: '100%', marginTop: '6px', resize: 'vertical', fontFamily: 'inherit' }} />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {rows.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No insured on this vessel yet.</p>}
+        </div>
+        <button type="button" onClick={addRow} className="btn-secondary" style={{ marginTop: '10px', padding: '5px 14px', fontSize: '0.8rem' }}>+ Add insured</button>
       </div>
     </div>
   )
 }
 
-function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelStyle }: {
+function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOptions, labelStyle }: {
   data: WizardData
   qVessels: QuotationVessel[]
   flagStates: FlagState[]
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
+  ownerOptions: { id: string; name: string; role: string }[]
   labelStyle: React.CSSProperties
 }) {
   // Find the vessel's flag state for ratification checks
@@ -1313,9 +1498,27 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Blue Cards</h2>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
         Select which blue cards to issue for this P&I policy.
       </p>
+
+      {/* Blue-card period (may be shorter than the policy period) */}
+      {!data.blueCardNone && (
+        <div style={{ marginBottom: '18px' }}>
+          <label style={labelStyle}>Blue-card period</label>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Inception</div>
+              <input type="date" value={data.blueCardInception} onChange={e => onUpdate({ blueCardInception: e.target.value })} style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Expiry</div>
+              <input type="date" value={data.blueCardExpiry} onChange={e => onUpdate({ blueCardExpiry: e.target.value })} style={inputStyle} />
+            </div>
+          </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Defaults to the policy period. Set a shorter period if the cards are issued for less than the policy term.</p>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {/* None option */}
@@ -1371,6 +1574,24 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
           </div>
       </div>
 
+      {/* Named assured per card (defaults to Registered Owner) */}
+      {!data.blueCardNone && data.blueCards.length > 0 && ownerOptions.length > 0 && (
+        <div style={{ marginTop: '18px' }}>
+          <label style={labelStyle}>Named assured on each card</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {data.blueCards.map(card => (
+              <div key={card} style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{card}</span>
+                <select value={data.blueCardOwners[card] || ''} onChange={e => onUpdate({ blueCardOwners: { ...data.blueCardOwners, [card]: e.target.value } })} style={inputStyle}>
+                  {ownerOptions.map(o => <option key={o.id} value={o.id}>{o.name}{o.role ? ` — ${o.role}` : ''}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Defaults to the Registered Owner.</p>
+        </div>
+      )}
+
       {/* BBC ratification warning */}
       {bbcWarning && (
         <div style={{
@@ -1422,7 +1643,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, labelSty
   )
 }
 
-function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, hasBroker, isPI, isLight, onGoToStep }: {
+function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, isLight, onGoToStep }: {
   data: WizardData
   quotation: Quotation
   qVessels: QuotationVessel[]
@@ -1540,9 +1761,9 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, hasBro
           {editLink(3)}
         </div>
         <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {hasBroker && <div>Commission: <strong>{typeof data.commissionPercent === 'number' ? `${data.commissionPercent}%` : 'Not set'}</strong></div>}
+          <div>Commission: <strong>{data.commissionEnabled && typeof data.commissionPercent === 'number' ? `${data.commissionPercent}%` : 'None'}</strong></div>
           <div>Bank: <strong>{selectedBank?.name || 'Not selected'}</strong></div>
-          <div>Show Addresses: <strong>{data.showAddresses ? 'Yes' : 'No'}</strong></div>
+          <div>Outstanding premium: <strong>{data.outstandingPremiumEnabled ? 'Shown' : 'Hidden'}</strong></div>
         </div>
       </div>
 

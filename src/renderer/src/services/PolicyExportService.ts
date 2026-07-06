@@ -2300,12 +2300,18 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     }
   }
 
-  // 2b. Outstanding premium notice
-  if (wq.outstandingPremiumEnabled && wq.outstandingPremiumText) {
+  // 2b. Outstanding premium notice — policy override (set in the conversion wizard) wins over the quotation
+  const outstandingEnabled = (data.policy as any).outstandingPremiumEnabled != null
+    ? (data.policy as any).outstandingPremiumEnabled
+    : wq.outstandingPremiumEnabled
+  const outstandingText = (data.policy as any).outstandingPremiumText != null
+    ? (data.policy as any).outstandingPremiumText
+    : wq.outstandingPremiumText
+  if (outstandingEnabled && outstandingText) {
     content.push(new Paragraph({
       spacing: { after: 80, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({
-        text: wq.outstandingPremiumText,
+        text: outstandingText,
         size: POL_FONT_SIZE, font: 'Arial', color: '000000',
         bold: wq.outstandingPremiumBold !== false,
         underline: wq.outstandingPremiumUnderline !== false ? {} : undefined

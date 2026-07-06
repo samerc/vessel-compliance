@@ -113,7 +113,7 @@ export interface Api {
   deleteEntityUBO: (ubo: EntityUBO) => Promise<void>
 
   // Entity Addresses
-  getEntityAddresses: (entityId: string) => Promise<EntityAddress[]>
+  getEntityAddresses: (entityId?: string) => Promise<EntityAddress[]>
   getAllEntityAddresses: () => Promise<EntityAddress[]>
   addEntityAddress: (addr: Omit<EntityAddress, 'id'>) => Promise<EntityAddress>
   updateEntityAddress: (id: string, updates: Partial<Omit<EntityAddress, 'id' | 'entityId'>>) => Promise<void>
@@ -907,6 +907,12 @@ export interface Api {
     selectedLolOptionId?: string | null
     selectedAgreedValueOptionId?: string | null
     premiumAmount?: number | null
+    insured?: { vesselId: string; entityId: string; role: string; addressText: string; isNewAddress?: boolean }[]
+    outstandingPremiumEnabled?: boolean | null
+    outstandingPremiumText?: string | null
+    blueCardInception?: string | null
+    blueCardExpiry?: string | null
+    blueCardOwners?: Record<string, string>
   }) => Promise<any[]>
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
