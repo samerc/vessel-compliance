@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2, LayoutList } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
+import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -68,6 +69,8 @@ interface WizardData {
   // LOL / Agreed Value Option selection
   selectedLolOptionId: string
   selectedAgreedValueOptionId: string
+  // Per-policy section order override (null = use the policy-settings default for the type)
+  sectionOrder: string[] | null
 }
 
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
@@ -118,7 +121,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     blueCardExpiry: '',
     blueCardOwners: {},
     selectedLolOptionId: '',
-    selectedAgreedValueOptionId: ''
+    selectedAgreedValueOptionId: '',
+    sectionOrder: null
   })
 
   const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
@@ -128,6 +132,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const [entityAddrs, setEntityAddrs] = useState<Record<string, { id: string; addressLine1: string; label?: string }[]>>({})
   // Vessels of this quotation that already have a policy (multi-vessel: convert the rest later)
   const [convertedVesselIds, setConvertedVesselIds] = useState<string[]>([])
+  const [showSectionOrder, setShowSectionOrder] = useState(false)
 
   const isPI = quotation?.quotationTypeCode === 'P'
   const allAlts = useMemo(() => [...piAlts, ...hullAlts], [piAlts, hullAlts])
@@ -615,6 +620,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         selectedLolOptionId: data.selectedLolOptionId || null,
         selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null,
         premiumAmount: data.totalPremium || null,
+        sectionOrder: data.sectionOrder,
         insured,
         outstandingPremiumEnabled: data.outstandingPremiumEnabled,
         outstandingPremiumText: data.outstandingPremiumEnabled ? data.outstandingPremiumText : null,
@@ -851,6 +857,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             isLight={isLight}
             labelStyle={labelStyle}
             inputStyle={inputStyle}
+            onEditSectionOrder={() => setShowSectionOrder(true)}
           />
         )}
 
@@ -917,6 +924,24 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           )}
         </div>
       </div>
+
+      {showSectionOrder && quotation && (
+        <SectionOrderModal
+          quotation={{ id: quotationId, quotationTypeCode: quotation.quotationTypeCode, sectionOrder: data.sectionOrder } as any}
+          docLabel="policy"
+          isLight={isLight}
+          showSuccess={showSuccess}
+          showError={showError}
+          // Load defaults from the policy settings (not the quotation defaults)
+          defaultsLoader={async (tc) => {
+            try { const raw = await window.api.getSetting(`policy_section_order_defaults_${tc}`); return raw ? JSON.parse(raw) : [] } catch { return [] }
+          }}
+          // Don't persist here — just capture the order onto the wizard state
+          persist={async (order) => { updateData({ sectionOrder: order }) }}
+          onClose={() => setShowSectionOrder(false)}
+          onSave={() => setShowSectionOrder(false)}
+        />
+      )}
     </div>
   )
 }
@@ -1357,7 +1382,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
   )
 }
 
-function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, allEntities, entityAddrs, qVessels, isLight, labelStyle, inputStyle }: {
+function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, allEntities, entityAddrs, qVessels, isLight, labelStyle, inputStyle, onEditSectionOrder }: {
   data: WizardData
   banks: { id: string; name: string; details: string; order: number }[]
   hasBroker: boolean
@@ -1370,6 +1395,7 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
   isLight: boolean
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
+  onEditSectionOrder: () => void
 }) {
   const sameAsBase = premiumCurrency.toUpperCase() === baseCurrency.toUpperCase()
   const vesselIds = data.selectedVesselIds
@@ -1509,6 +1535,22 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
           {rows.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No insured on this vessel yet.</p>}
         </div>
         <button type="button" onClick={addRow} className="btn-secondary" style={{ marginTop: '10px', padding: '5px 14px', fontSize: '0.8rem' }}>+ Add insured</button>
+      </div>
+
+      {/* Section order — override the policy-settings default for this policy */}
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+        <label style={labelStyle}>Section Order</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button type="button" onClick={onEditSectionOrder} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.82rem' }}>
+            <LayoutList size={14} /> {data.sectionOrder ? 'Edit Section Order' : 'Reorder Sections'}
+          </button>
+          <span style={{ fontSize: '0.75rem', color: data.sectionOrder ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+            {data.sectionOrder ? 'Custom order for this policy' : 'Using the default order for this type'}
+          </span>
+          {data.sectionOrder && (
+            <button type="button" onClick={() => onUpdate({ sectionOrder: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.75rem', textDecoration: 'underline' }}>Reset to default</button>
+          )}
+        </div>
       </div>
     </div>
   )

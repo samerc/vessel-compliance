@@ -22,12 +22,14 @@ import {
   PenTool,
   QrCode,
   Percent,
-  Edit3
+  Edit3,
+  LayoutList
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import RichTextEditor from './RichTextEditor'
+import { SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import { BC_DEFAULTS } from '../services/PolicyExportService'
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
@@ -60,6 +62,7 @@ type PolicySettingsTab =
   | 'commissions'
   | 'declaration'
   | 'endorsements'
+  | 'sectionOrder'
 
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
@@ -85,6 +88,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
     { id: 'commissions', label: 'Commissions', icon: <Percent size={15} /> },
     { id: 'declaration', label: 'Declaration', icon: <FileText size={15} /> },
     { id: 'endorsements', label: 'Endorsements', icon: <FileCheck size={15} /> },
+    { id: 'sectionOrder', label: 'Section Order', icon: <LayoutList size={15} /> },
   ],
   pi: [
     { id: 'piOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -205,6 +209,7 @@ export default function PolicySettings() {
         {activeTab === 'commissions' && <CommissionsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'declaration' && <DeclarationSettingsTab showSuccess={showSuccess} />}
         {activeTab === 'endorsements' && <EndorsementSettingsTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
+        {activeTab === 'sectionOrder' && <PolicySectionOrderTab showSuccess={showSuccess} showError={showError} isLight={isLight} />}
         {activeTab === 'piOpening' && <RichTextSettingTab settingKey="policy_text_P_openingClause" label="P&I Opening Clause" description="The opening clause text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piClosing' && <RichTextSettingTab settingKey="policy_text_P_closingText" label="P&I Closing Text" description="The closing section text for P&I policy documents." showSuccess={showSuccess} />}
         {activeTab === 'piNotice' && <RichTextSettingTab settingKey="policy_text_P_importantNotice" label="P&I Important Notice" description="The important notice section for P&I policy documents." showSuccess={showSuccess} />}
@@ -1952,6 +1957,95 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
             No templates yet
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Default policy section order per type (P&I / Hull / War). Policies inherit this unless
+// overridden per-policy in the conversion wizard.
+function PolicySectionOrderTab({ showSuccess, showError, isLight }: { showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+  const TYPES: { code: string; label: string; color: string }[] = [
+    { code: 'P', label: 'P&I', color: '#6464ff' },
+    { code: 'H', label: 'Hull', color: '#ff64c8' },
+    { code: 'W', label: 'War', color: '#ffb020' },
+  ]
+  const [typeCode, setTypeCode] = useState('P')
+  const [order, setOrder] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const key = (tc: string) => `policy_section_order_defaults_${tc}`
+
+  const load = async (tc: string) => {
+    setLoading(true)
+    try {
+      const raw = await window.api.getSetting(key(tc))
+      let saved: string[] | null = null
+      if (raw) { try { saved = JSON.parse(raw) } catch { saved = null } }
+      const def = getDefaultSectionOrder(tc)
+      // Start from saved (filtered to valid keys), then append any missing default keys
+      const base = Array.isArray(saved) && saved.length > 0 ? saved.filter(k => def.includes(k)) : [...def]
+      for (const k of def) if (!base.includes(k)) base.push(k)
+      setOrder(base)
+    } catch { setOrder(getDefaultSectionOrder(tc)) }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { load(typeCode) }, [typeCode])
+
+  const move = (i: number, dir: 'up' | 'down') => {
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= order.length) return
+    const next = [...order]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setOrder(next)
+  }
+
+  const save = async () => {
+    try {
+      await window.api.setSetting(key(typeCode), JSON.stringify(order))
+      showSuccess('Section order saved')
+    } catch (err: any) { showError(err.message || 'Failed to save') }
+  }
+
+  const reset = () => setOrder(getDefaultSectionOrder(typeCode))
+
+  return (
+    <div>
+      <h3 style={{ fontSize: '1rem', margin: '0 0 4px' }}>Section Order</h3>
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+        Default order of sections in exported policy documents, per type. Can be overridden per policy in the conversion wizard.
+      </p>
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        {TYPES.map(t => (
+          <button key={t.code} type="button" onClick={() => setTypeCode(t.code)}
+            style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: typeCode === t.code ? 700 : 400, border: typeCode === t.code ? `2px solid ${t.color}` : '1px solid var(--input-border)', background: typeCode === t.code ? `${t.color}18` : 'transparent', color: typeCode === t.code ? t.color : 'var(--text-secondary)' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>Loading...</div>
+      ) : (
+        <div style={{ marginBottom: '16px' }}>
+          {order.map((k, i) => (
+            <div key={k} style={{ padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '4px', display: 'flex', gap: '12px', alignItems: 'center', background: isLight ? '#fafbfc' : 'transparent' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '22px' }}>{i + 1}.</span>
+              <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>{SECTION_LABELS[k] || k}</span>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button onClick={() => move(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                <button onClick={() => move(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+        <button onClick={reset} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Reset to Defaults</button>
+        <button onClick={save} className="btn-primary" style={{ fontSize: '0.82rem' }}><Save size={14} /> Save Order</button>
       </div>
     </div>
   )

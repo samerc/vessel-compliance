@@ -11170,6 +11170,8 @@ export class MySQLAdapter {
         // null = inherit from quotation, for legacy policies)
         nonRefundableType?: 'first_instalment' | 'percentage' | 'none' | null
         nonRefundablePercent?: number | null
+        // Per-policy section order override (null = use the policy-settings default for the type)
+        sectionOrder?: string[] | null
         // Blue-card period (falls back to policy period) + per-card named assured (entity id)
         blueCardInception?: string | null
         blueCardExpiry?: string | null
@@ -11213,7 +11215,7 @@ export class MySQLAdapter {
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
                 premiumAmount, options.selectedAlternativeId || null, options.createdBy, options.exchangeRate || 1,
-                quotation.sectionOrder ? JSON.stringify(quotation.sectionOrder) : null,
+                options.sectionOrder && options.sectionOrder.length > 0 ? JSON.stringify(options.sectionOrder) : null,
                 (options as any).selectedLolOptionId || null,
                 (options as any).selectedAgreedValueOptionId || null,
                 options.outstandingPremiumEnabled == null ? null : (options.outstandingPremiumEnabled ? 1 : 0),

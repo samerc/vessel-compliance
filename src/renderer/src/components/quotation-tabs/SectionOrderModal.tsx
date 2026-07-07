@@ -3,14 +3,20 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 
-export default function SectionOrderModal({ quotation, onClose, onSave, showSuccess, showError, isLight }: {
+export default function SectionOrderModal({ quotation, onClose, onSave, showSuccess, showError, isLight, persist, docLabel, defaultsLoader }: {
     quotation: Quotation
     onClose: () => void
     onSave: (order: string[]) => void
     showSuccess: (m: string) => void
     showError: (m: string) => void
     isLight: boolean
+    // Optional custom persistence (e.g. save onto a policy instead of the quotation)
+    persist?: (order: string[]) => Promise<void>
+    docLabel?: string
+    // Optional custom defaults loader (e.g. policy settings defaults instead of quotation)
+    defaultsLoader?: (typeCode: string) => Promise<string[]>
 }) {
+    const loadTypeDefaults = (tc: string) => defaultsLoader ? defaultsLoader(tc) : window.api.piGetSectionOrderDefaultsByType(tc)
     const [order, setOrder] = useState<string[]>([])
     const [customSections, setCustomSections] = useState<QuotationCustomSection[]>([])
     const [loading, setLoading] = useState(true)
@@ -24,7 +30,7 @@ export default function SectionOrderModal({ quotation, onClose, onSave, showSucc
         setLoading(true)
         const [cs, typeDefaults] = await Promise.all([
             window.api.getQuotationCustomSections(quotation.id),
-            window.api.piGetSectionOrderDefaultsByType(typeCode)
+            loadTypeDefaults(typeCode)
         ])
         const safeSections = Array.isArray(cs) ? cs : []
         setCustomSections(safeSections)
@@ -69,14 +75,15 @@ export default function SectionOrderModal({ quotation, onClose, onSave, showSucc
 
     const handleSave = async () => {
         try {
-            await window.api.updateQuotation(quotation.id, { sectionOrder: order } as any)
+            if (persist) await persist(order)
+            else await window.api.updateQuotation(quotation.id, { sectionOrder: order } as any)
             showSuccess('Section order saved')
             onSave(order)
         } catch (err: any) { showError(err.message || 'Failed to save order') }
     }
 
     const handleReset = async () => {
-        const defaults = await window.api.piGetSectionOrderDefaultsByType(typeCode)
+        const defaults = await loadTypeDefaults(typeCode)
         const baseOrder = Array.isArray(defaults) && defaults.length > 0 ? [...defaults] : [...typeDefaultOrder]
         const customKeys = customSections.map(s => `custom:${s.id}`)
         for (const ck of customKeys) {
@@ -107,7 +114,7 @@ export default function SectionOrderModal({ quotation, onClose, onSave, showSucc
                     <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={18} /></button>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                    Drag sections to reorder how they appear in the exported quotation.
+                    Reorder how sections appear in the exported {docLabel || 'quotation'}.
                 </p>
 
                 {loading ? (

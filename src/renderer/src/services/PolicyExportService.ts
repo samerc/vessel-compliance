@@ -16,7 +16,7 @@ import {
   QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings,
   QuotationAssuredGroup, QuotationAgreedValueOption
 } from '../../../shared/types'
-import { DEFAULT_SECTION_TEXTS } from '../components/quotationSettingsConstants'
+import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
@@ -2155,6 +2155,39 @@ function polGetValueSectionTitle(typeCode: string | undefined): string {
   }
 }
 
+// Section-order key for the generic value/limit section (mirrors quotationSettingsConstants keys)
+function polGetValueSectionKey(typeCode: string | undefined): string {
+  switch (typeCode) {
+    case 'H': return 'agreedValue'
+    case 'W': return 'sumInsured'
+    case 'C': return 'insuredValue'
+    default: return 'liability'
+  }
+}
+
+// Section-order key for the conditions section, per type
+function polGetConditionsKey(typeCode: string | undefined): string {
+  switch (typeCode) {
+    case 'H': return 'hullConditions'
+    case 'W': return 'warConditions'
+    case 'C': return 'cargoConditions'
+    default: return 'conditions'
+  }
+}
+
+// Resolve the section order for a policy: per-policy saved order → policy-settings default
+// (per type) → hardcoded default. Any missing hardcoded keys and custom sections are appended.
+function resolvePolicySectionOrder(data: PolicyExportData, settingsDefault?: string[]): string[] {
+  const typeCode = data.quotation.quotationTypeCode || 'P'
+  const hardcoded = getDefaultSectionOrder(typeCode)
+  const def = (settingsDefault && settingsDefault.length > 0) ? settingsDefault : hardcoded
+  const saved = (data.policy as any).sectionOrder
+  const order = Array.isArray(saved) && saved.length > 0 ? [...saved] : [...def]
+  for (const k of hardcoded) if (!order.includes(k)) order.push(k)
+  for (const cs of data.customSections) { const key = `custom:${cs.id}`; if (!order.includes(key)) order.push(key) }
+  return order
+}
+
 function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
   const wq = data.quotation
@@ -2510,14 +2543,16 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     })
   }
 
-  const rows: TableRow[] = []
+  // Collect each section with its order-key; emitted in the configured section order below.
+  const secList: { key: string; row: TableRow }[] = []
+  const addRow = (key: string, row: TableRow) => secList.push({ key, row })
 
   // INSURED
   const insuredContent = polBuildInsuredSection(data)
-  if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
+  if (insuredContent.length > 0) addRow('insured', makeRow('Insured', insuredContent))
 
   // INSURED VESSEL
-  rows.push(makeRow('Insured Vessel', [polBuildVesselTable(data)]))
+  addRow('vessel', makeRow('Insured Vessel', [polBuildVesselTable(data)]))
 
   // VALUE / LIMIT — Hull with IV gets split into Interest + Agreed Insured Value
   {
@@ -2532,7 +2567,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
         const intContent: (Paragraph | Table)[] = []
         if (hmItems.length > 0) intContent.push(polNp('A) ' + hmItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
         if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
-        rows.push(makeRow('Interest', intContent))
+        addRow('interest', makeRow('Interest', intContent))
       }
       // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
       const avContent: (Paragraph | Table)[] = []
@@ -2548,7 +2583,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
         if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
         avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, ivCurrency)} (${numberToWords(polVesselIv, ivCurrency)})`))
       }
-      rows.push(makeRow('Agreed Insured\nValue', avContent))
+      addRow('agreedValue', makeRow('Agreed Insured\nValue', avContent))
     } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
       const polIsS2Only = Boolean(data.quotation.warSection2Only)
 
@@ -2565,29 +2600,29 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
         intContent.push(polBp('Section 2'))
         intContent.push(polNp(sec2Text))
       }
-      if (intContent.length > 0) rows.push(makeRow('Interest', intContent))
+      if (intContent.length > 0) addRow('interest', makeRow('Interest', intContent))
       const valueContent = polBuildValueSection(data)
-      if (valueContent.length > 0) rows.push(makeRow('Sum Insured / Limits', valueContent))
+      if (valueContent.length > 0) addRow('sumInsured', makeRow('Sum Insured / Limits', valueContent))
     } else {
       const valueContent = polBuildValueSection(data)
-      if (valueContent.length > 0) rows.push(makeRow(polGetValueSectionTitle(typeCode), valueContent))
+      if (valueContent.length > 0) addRow(polGetValueSectionKey(typeCode), makeRow(polGetValueSectionTitle(typeCode), valueContent))
     }
   }
 
   // PERIOD
   const periodContent = polBuildPeriodSection(data)
-  if (periodContent.length > 0) rows.push(makeRow('Period', periodContent))
+  if (periodContent.length > 0) addRow('period', makeRow('Period', periodContent))
 
   // CONDITIONS
   const conditionsContent = polBuildConditionsSection(data)
-  if (conditionsContent.length > 0) rows.push(makeRow('Conditions', conditionsContent))
+  if (conditionsContent.length > 0) addRow(polGetConditionsKey(typeCode), makeRow('Conditions', conditionsContent))
 
   // CLASSIFICATION — shown in vessel table, not as separate section
 
   // TRADING WARRANTY
   if (typeCode !== 'W') {
     const tradingContent = polBuildTradingSection(data)
-    if (tradingContent.length > 0) rows.push(makeRow('Trading Warranty', tradingContent))
+    if (tradingContent.length > 0) addRow('trading', makeRow('Trading Warranty', tradingContent))
   } else {
     // War: use per-vessel intro or quotation-level intro
     const warVesselQvId = data.vessel?.id || null
@@ -2595,22 +2630,22 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(warVesselQvId))
       : null
     const warEffIntro = warPerVIntro ? warPerVIntro.text : data.quotation.tradingWarrantyIntro
-    if (warEffIntro) rows.push(makeRow('Trading Warranty', polMp(warEffIntro)))
+    if (warEffIntro) addRow('warTrading', makeRow('Trading Warranty', polMp(warEffIntro)))
   }
 
   // WARRANTIES
   const warrantiesContent = polBuildWarrantiesSection(data)
-  if (warrantiesContent.length > 0) rows.push(makeRow('Warranties', warrantiesContent))
+  if (warrantiesContent.length > 0) addRow('warranties', makeRow('Warranties', warrantiesContent))
 
   // DEDUCTIBLES (P&I only)
   if (typeCode === 'P') {
     const dedContent = polBuildDeductiblesSection(data)
-    if (dedContent.length > 0) rows.push(makeRow('Deductibles', dedContent))
+    if (dedContent.length > 0) addRow('deductibles', makeRow('Deductibles', dedContent))
   }
 
   // SANCTIONS
   const sanctionsText = polGetSanctionsText(data)
-  if (sanctionsText) rows.push(makeRow('Sanction Limitation and Exclusion Clause', polMp(decodeHtmlEntities(sanctionsText))))
+  if (sanctionsText) addRow('sanctions', makeRow('Sanction Limitation and Exclusion Clause', polMp(decodeHtmlEntities(sanctionsText))))
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
@@ -2628,12 +2663,12 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== firstAltId) continue
     exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
-  if (exclusionsContent.length > 0) rows.push(makeRow('Exclusions', exclusionsContent))
+  if (exclusionsContent.length > 0) addRow('exclusions', makeRow('Exclusions', exclusionsContent))
 
   // CUSTOM SECTIONS
   for (const cs of data.customSections) {
     if (cs.text) {
-      rows.push(makeRow(cs.title || 'Additional', polMp(cs.text)))
+      addRow(`custom:${cs.id}`, makeRow(cs.title || 'Additional', polMp(cs.text)))
     }
   }
 
@@ -2655,7 +2690,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
     for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
-    rows.push(makeRow('Subjectivities', subjContent))
+    addRow('subjectivities', makeRow('Subjectivities', subjContent))
   }
 
   // NCB (No Claims Bonus) — skip if this vessel is excluded from NCB
@@ -2673,7 +2708,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     }
     ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
     ncbContent.push(...ncbText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
-    rows.push(makeRow('No Claims\nBonus (NCB)', ncbContent))
+    addRow('ncb', makeRow('No Claims\nBonus (NCB)', ncbContent))
   }
 
   // UPCC (Upfront Continuity Credit) — skip if this vessel is excluded from UPCC
@@ -2684,12 +2719,33 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     if (data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
     upccText = upccText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
     upccContent.push(...upccText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
-    rows.push(makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
+    addRow('upcc', makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
   }
 
   // PREMIUM PAYMENT
   const premiumContent = await polBuildPremiumPaymentSection(data)
-  if (premiumContent.length > 0) rows.push(makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
+  if (premiumContent.length > 0) addRow('premium', makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
+
+  // Emit sections in the configured order. Any section whose key isn't in the configured
+  // order (e.g. a War policy's sanctions section) is anchored right after its original
+  // preceding section, so it keeps its natural position instead of jumping to the end.
+  let policySecDefault: string[] = []
+  try { const rawSecOrder = await window.api.getSetting(`policy_section_order_defaults_${typeCode}`); if (rawSecOrder) policySecDefault = JSON.parse(rawSecOrder) } catch { /* use hardcoded default */ }
+  const secOrder = resolvePolicySectionOrder(data, policySecDefault)
+  const inOrder = new Set(secOrder)
+  let lastKnownIdx = -1
+  for (const { key } of secList) {
+    if (inOrder.has(key)) { lastKnownIdx = secOrder.indexOf(key); continue }
+    const insertAt = lastKnownIdx + 1
+    secOrder.splice(insertAt, 0, key)
+    inOrder.add(key)
+    lastKnownIdx = insertAt
+  }
+  const secIndex = (k: string) => secOrder.indexOf(k)
+  const rows = secList
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => (secIndex(a.s.key) - secIndex(b.s.key)) || (a.i - b.i))
+    .map(x => x.s.row)
 
   // Build main table
   const mainTable = new Table({

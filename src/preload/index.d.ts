@@ -913,6 +913,7 @@ export interface Api {
     outstandingPremiumText?: string | null
     nonRefundableType?: 'first_instalment' | 'percentage' | 'none' | null
     nonRefundablePercent?: number | null
+    sectionOrder?: string[] | null
     blueCardInception?: string | null
     blueCardExpiry?: string | null
     blueCardOwners?: Record<string, string>
