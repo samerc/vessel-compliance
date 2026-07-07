@@ -911,6 +911,8 @@ export interface Api {
     insured?: { vesselId: string; entityId: string; entityName?: string; role: string; addressText: string; addressLabel?: string; isNewAddress?: boolean }[]
     outstandingPremiumEnabled?: boolean | null
     outstandingPremiumText?: string | null
+    nonRefundableType?: 'first_instalment' | 'percentage' | 'none' | null
+    nonRefundablePercent?: number | null
     blueCardInception?: string | null
     blueCardExpiry?: string | null
     blueCardOwners?: Record<string, string>

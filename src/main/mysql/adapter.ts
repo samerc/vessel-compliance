@@ -3296,6 +3296,15 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Non-refundable override on policy_documents (NULL type = inherit from quotation)
+            try {
+                const [nrtpCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'non_refundable_type'") as any[]
+                if ((nrtpCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN non_refundable_type VARCHAR(20) DEFAULT NULL")
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN non_refundable_percent DECIMAL(5,2) DEFAULT NULL")
+                }
+            } catch {}
+
             // ---- Policy Endorsements tables ----
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
                 id VARCHAR(36) PRIMARY KEY,
@@ -10762,6 +10771,8 @@ export class MySQLAdapter {
             showAddresses: Boolean(r.show_addresses),
             outstandingPremiumEnabled: r.outstanding_premium_enabled == null ? null : Boolean(r.outstanding_premium_enabled),
             outstandingPremiumText: r.outstanding_premium_text ?? null,
+            nonRefundableType: r.non_refundable_type ?? null,
+            nonRefundablePercent: r.non_refundable_percent == null ? null : Number(r.non_refundable_percent),
             proRata: Boolean(r.pro_rata),
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
@@ -11155,6 +11166,10 @@ export class MySQLAdapter {
         // Outstanding-premium override for the policy (null = inherit from quotation)
         outstandingPremiumEnabled?: boolean | null
         outstandingPremiumText?: string | null
+        // Non-refundable override for the policy ('none' = explicitly no non-refundable;
+        // null = inherit from quotation, for legacy policies)
+        nonRefundableType?: 'first_instalment' | 'percentage' | 'none' | null
+        nonRefundablePercent?: number | null
         // Blue-card period (falls back to policy period) + per-card named assured (entity id)
         blueCardInception?: string | null
         blueCardExpiry?: string | null
@@ -11191,8 +11206,9 @@ export class MySQLAdapter {
                     timezone, commission_percent, show_addresses, bank_id, pro_rata,
                     per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
                     section_order, selected_lol_option_id, selected_agreed_value_option_id,
-                    outstanding_premium_enabled, outstanding_premium_text)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    outstanding_premium_enabled, outstanding_premium_text,
+                    non_refundable_type, non_refundable_percent)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
@@ -11201,7 +11217,9 @@ export class MySQLAdapter {
                 (options as any).selectedLolOptionId || null,
                 (options as any).selectedAgreedValueOptionId || null,
                 options.outstandingPremiumEnabled == null ? null : (options.outstandingPremiumEnabled ? 1 : 0),
-                options.outstandingPremiumText ?? null])
+                options.outstandingPremiumText ?? null,
+                options.nonRefundableType ?? null,
+                options.nonRefundablePercent ?? null])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {

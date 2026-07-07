@@ -2320,6 +2320,10 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   const numInst = instalments.length || 1
   const currency = data.quotation.premiumCurrency || 'USD'
   const wq = data.quotation
+  // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
+  const polNr = (data.policy as any).nonRefundableType
+  const nrType = polNr != null ? (polNr === 'none' ? null : polNr) : wq.nonRefundableType
+  const nrPct = (data.policy as any).nonRefundablePercent != null ? (data.policy as any).nonRefundablePercent : wq.nonRefundablePercent
   // Priority: instalment sum (most accurate) → policy premium → quotation premium
   const instalmentSum = instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0)
   const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
@@ -2350,12 +2354,12 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     content.push(polEmptyP())
 
     // Non-refundable text for single instalment
-    if (wq.nonRefundableType === 'first_instalment' || (instalments[0].isNonRefundable)) {
+    if (nrType === 'first_instalment' || (instalments[0].isNonRefundable)) {
       content.push(polNpTight('Non-refundable in case of cancellation, whether before or after inception.'))
       content.push(polEmptyP())
     }
-    if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+    if (nrType === 'percentage' && nrPct) {
+      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
       if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
     }
   } else {
@@ -2372,7 +2376,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
 
     // Instalment lines
     if (instalments.length > 0) {
-      const isFirstInstNr = wq.nonRefundableType === 'first_instalment'
+      const isFirstInstNr = nrType === 'first_instalment'
       instalments.forEach((inst, i) => {
         let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
         if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
@@ -2382,8 +2386,8 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       })
       content.push(polEmptyP())
 
-      if (wq.nonRefundableType === 'percentage' && wq.nonRefundablePercent) {
-        const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(wq.nonRefundablePercent!)))
+      if (nrType === 'percentage' && nrPct) {
+        const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
         if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
       }
     }
@@ -3395,9 +3399,13 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   }
   ppcpContent.push(polEmptyP())
 
+  // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
+  const daPolNr = (data.policy as any).nonRefundableType
+  const daNrType = daPolNr != null ? (daPolNr === 'none' ? null : daPolNr) : data.quotation.nonRefundableType
+  const daNrPct = (data.policy as any).nonRefundablePercent != null ? (data.policy as any).nonRefundablePercent : data.quotation.nonRefundablePercent
   // Instalment table — 2 columns: "Xth Instalment due {date}" | "USD X (non-refundable)"
   if (data.instalments.length > 0) {
-    const isFirstInstNr = data.quotation.nonRefundableType === 'first_instalment'
+    const isFirstInstNr = daNrType === 'first_instalment'
     const instDescW = Math.round(POL_BODY_W * 0.55)
     const instAmtW = POL_BODY_W - instDescW
     const instRows = data.instalments.map(inst => {
@@ -3416,8 +3424,8 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   }
 
   // Non-refundable percentage note (only for percentage type)
-  if (data.quotation.nonRefundableType === 'percentage' && data.quotation.nonRefundablePercent) {
-    ppcpContent.push(polNp(`${polFmtPct(data.quotation.nonRefundablePercent)}% of premium is non-refundable.`))
+  if (daNrType === 'percentage' && daNrPct) {
+    ppcpContent.push(polNp(`${polFmtPct(daNrPct)}% of premium is non-refundable.`))
   }
 
   rows.push(makeRow('Premium\nPayment\nCondition\nPrecedent', ppcpContent))

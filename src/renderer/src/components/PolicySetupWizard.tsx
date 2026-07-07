@@ -47,7 +47,9 @@ interface WizardData {
   // Step 3
   instalmentDates: string[]
   instalmentAmounts: number[]
-  instalmentNonRefundable: boolean[]
+  // Non-refundable: same model as the quotation — 1st instalment OR a percentage (or none)
+  nonRefundableType: 'first_instalment' | 'percentage' | null
+  nonRefundablePercent: number
   outstandingPremiumEnabled: boolean
   outstandingPremiumText: string
   // Step 4
@@ -100,7 +102,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     totalPremium: 0,
     instalmentDates: [],
     instalmentAmounts: [],
-    instalmentNonRefundable: [],
+    nonRefundableType: null,
+    nonRefundablePercent: 0,
     outstandingPremiumEnabled: false,
     outstandingPremiumText: '',
     commissionEnabled: false,
@@ -299,7 +302,6 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       const count = safeInstalments.length
       let initDates: string[] = []
       let initAmounts: number[] = []
-      let initNR: boolean[] = []
       if (count > 0) {
         const perInstalment = Math.round((payable / count) * 100) / 100
         initAmounts = safeInstalments.map((_, i) => {
@@ -307,7 +309,6 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           return perInstalment
         })
         initDates = safeInstalments.map(() => '')
-        initNR = safeInstalments.map((_, i) => i === 0 && !!quot.nonRefundableType)
       }
 
       // Try to pre-fill inception/expiry from vessel's existing policy
@@ -360,7 +361,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         totalPremium: payable,
         instalmentDates: initDates,
         instalmentAmounts: initAmounts,
-        instalmentNonRefundable: initNR,
+        nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
+        nonRefundablePercent: quot.nonRefundablePercent || 0,
         commissionEnabled: resolvedCommission !== '' && Number(resolvedCommission) > 0,
         commissionPercent: resolvedCommission,
         insuredByVessel,
@@ -447,9 +449,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     const amounts = Array.from({ length: count }, (_, i) =>
       i === count - 1 ? Math.round((total - per * (count - 1)) * 100) / 100 : per
     )
-    const nr = Array.from({ length: count }, (_, i) => data.instalmentNonRefundable[i] || false)
     setInstalments(newInstalments)
-    setData(prev => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts, instalmentNonRefundable: nr }))
+    setData(prev => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts }))
   }
 
   const computePayable = (techPremium: number): number => {
@@ -598,8 +599,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           dueDate,
           premiumAmount: data.instalmentAmounts[i] || 0,
           commissionAmount: Math.round((data.instalmentAmounts[i] || 0) * commPct / 100 * 100) / 100,
-          isNonRefundable: data.instalmentNonRefundable[i] || false
+          // Only the 1st instalment can be non-refundable (percentage is a policy-level note)
+          isNonRefundable: data.nonRefundableType === 'first_instalment' && i === 0
         })),
+        // Always store the wizard's explicit choice on the policy ('none' distinguishes it
+        // from legacy NULL = inherit-from-quotation)
+        nonRefundableType: data.nonRefundableType || 'none',
+        nonRefundablePercent: data.nonRefundableType === 'percentage' ? (data.nonRefundablePercent || 0) : null,
         commissionPercent: data.commissionEnabled ? (commPct || null) : null,
         bankId: data.bankId || null,
         showAddresses: true,
@@ -1286,19 +1292,6 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
               style={{ ...inputStyle, width: '130px', flex: 'none', textAlign: 'right' }}
             />
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '36px' }}>{quotation.premiumCurrency || 'USD'}</span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              <input
-                type="checkbox"
-                checked={data.instalmentNonRefundable[i] || false}
-                onChange={e => {
-                  const updated = [...data.instalmentNonRefundable]
-                  updated[i] = e.target.checked
-                  onUpdate({ instalmentNonRefundable: updated })
-                }}
-                style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }}
-              />
-              NR
-            </label>
           </div>
         ))}
       </div>
@@ -1310,9 +1303,38 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         </span>
       </div>
 
-      <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
-        NR = Non-refundable. Each 30 days from inception equals 1 calendar month.
-      </p>
+      {/* Non-refundable — 1st instalment OR a percentage (mirrors the quotation) */}
+      <div style={{ marginTop: '16px' }}>
+        <label style={labelUpper}>Non-Refundable</label>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {([
+            { key: null, label: 'None' },
+            { key: 'first_instalment', label: '1st Instalment' },
+            { key: 'percentage', label: 'Percentage' }
+          ] as { key: WizardData['nonRefundableType']; label: string }[]).map(opt => {
+            const active = data.nonRefundableType === opt.key
+            return (
+              <button key={String(opt.key)} type="button"
+                onClick={() => onUpdate({ nonRefundableType: opt.key })}
+                style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: active ? 700 : 400, border: active ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: active ? 'rgba(0,170,200,0.08)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+        {data.nonRefundableType === 'percentage' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+            <input type="number" min={0} max={100} step={0.01}
+              value={data.nonRefundablePercent || ''}
+              onChange={e => onUpdate({ nonRefundablePercent: parseFloat(e.target.value) || 0 })}
+              placeholder="e.g. 25" style={{ ...inputStyle, width: '160px' }} />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>% of premium is non-refundable</span>
+          </div>
+        )}
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
+          Each 30 days from inception equals 1 calendar month.
+        </p>
+      </div>
       </>)}
 
       {/* Outstanding premium notice — toggle + editable text (overrides the quotation for this policy) */}
@@ -1793,9 +1815,12 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
                 <span style={{ minWidth: '28px', fontWeight: 600, color: 'var(--text-secondary)' }}>#{i + 1}</span>
                 <span style={{ flex: 1 }}>{date}</span>
                 <span style={{ fontWeight: 600 }}>{(data.instalmentAmounts[i] || 0).toLocaleString()} {quotation.premiumCurrency || 'USD'}</span>
-                {data.instalmentNonRefundable[i] && <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,77,77,0.1)', color: 'var(--danger)', fontWeight: 600 }}>NR</span>}
+                {data.nonRefundableType === 'first_instalment' && i === 0 && <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,77,77,0.1)', color: 'var(--danger)', fontWeight: 600 }}>NR</span>}
               </div>
             ))}
+            {data.nonRefundableType === 'percentage' && data.nonRefundablePercent > 0 && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{data.nonRefundablePercent}% of premium is non-refundable</div>
+            )}
           </div>
         )}
       </div>
