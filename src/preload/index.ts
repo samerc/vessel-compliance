@@ -974,8 +974,14 @@ const api = {
   tcGetTemplate: (typeCode: string) => ipcRenderer.invoke('tc:getTemplate', typeCode),
   tcGetTemplateFile: (typeCode: string) => ipcRenderer.invoke('tc:getTemplateFile', typeCode),
   tcGetAllTemplates: () => ipcRenderer.invoke('tc:getAllTemplates'),
-  tcUpload: (data: { typeCode: string; fileName: string; fileData: number[] }) => ipcRenderer.invoke('tc:upload', data),
-  tcDelete: (typeCode: string) => ipcRenderer.invoke('tc:delete', typeCode),
+  tcListByType: (typeCode: string) => ipcRenderer.invoke('tc:listByType', typeCode),
+  tcGetById: (id: string) => ipcRenderer.invoke('tc:getById', id),
+  tcGetFileById: (id: string) => ipcRenderer.invoke('tc:getFileById', id),
+  tcCreate: (data: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null; makeDefault?: boolean }) => ipcRenderer.invoke('tc:create', data),
+  tcUpdate: (id: string, updates: { name?: string; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null }) => ipcRenderer.invoke('tc:update', id, updates),
+  tcSetDefault: (id: string) => ipcRenderer.invoke('tc:setDefault', id),
+  tcDeleteById: (id: string) => ipcRenderer.invoke('tc:deleteById', id),
+  convertDocxBufferToPdf: (data: { docxData: number[]; fileName?: string }) => ipcRenderer.invoke('convert:docxBufferToPdf', data),
 
   // File Manager
   fileManagerGetRoot: () => ipcRenderer.invoke('fileManager:getRoot'),

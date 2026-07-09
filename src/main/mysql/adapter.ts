@@ -2843,6 +2843,29 @@ export class MySQLAdapter {
                 `)
             } catch (e) { console.error('policy_tc_templates migration:', e) }
 
+            // Migration: extend policy_tc_templates for rich-text (html) + multiple named templates per type
+            try {
+                const [tcCols] = await this.pool.query('SHOW COLUMNS FROM policy_tc_templates') as any[]
+                const tcColNames = (tcCols as any[]).map(c => c.Field)
+                if (!tcColNames.includes('name')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN name VARCHAR(255) NULL")
+                if (!tcColNames.includes('kind')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN kind VARCHAR(10) NOT NULL DEFAULT 'docx'")
+                if (!tcColNames.includes('content_html')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN content_html MEDIUMTEXT NULL")
+                if (!tcColNames.includes('is_default')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0")
+                if (!tcColNames.includes('order_index')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN order_index INT NOT NULL DEFAULT 0")
+                if (!tcColNames.includes('updated_at')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP")
+                // file_data must be nullable for html templates
+                try { await this.pool.query("ALTER TABLE policy_tc_templates MODIFY COLUMN file_data LONGBLOB NULL") } catch { /* already nullable */ }
+                // Drop the one-per-type UNIQUE index so multiple named templates per type are allowed
+                try {
+                    const [idx] = await this.pool.query("SHOW INDEX FROM policy_tc_templates WHERE Key_name = 'idx_tc_type'") as any[]
+                    if ((idx as any[]).length > 0) await this.pool.query("ALTER TABLE policy_tc_templates DROP INDEX idx_tc_type")
+                } catch { /* index already gone */ }
+                // Backfill legacy rows: they were DOCX, one per type → mark as default docx templates
+                await this.pool.query("UPDATE policy_tc_templates SET kind = 'docx' WHERE kind IS NULL OR kind = ''")
+                await this.pool.query("UPDATE policy_tc_templates SET is_default = 1 WHERE is_default = 0 AND kind = 'docx'")
+                await this.pool.query("UPDATE policy_tc_templates SET name = file_name WHERE (name IS NULL OR name = '') AND file_name IS NOT NULL")
+            } catch (e) { console.error('policy_tc_templates extend migration:', e) }
+
             // Migration: Seed draft and real quotation sequence counters from existing data
             try {
                 const existingRealSeq = await this.getSetting('real_quotation_seq')
@@ -3456,58 +3479,126 @@ export class MySQLAdapter {
         return { lockedBy: r.lockedBy, lockedByName: r.lockedByName || null, lockedAt: r.lockedAt }
     }
 
-    // --- T&C Templates ---
-    async getTcTemplate(typeCode: string): Promise<import('../../../src/shared/types').PolicyTcTemplate | null> {
-        if (!this.pool) return null
+    // --- T&C Templates (multiple named templates per type; kind = 'html' | 'docx') ---
+    private tcMetaCols = "id, type_code AS typeCode, name, kind, is_default AS isDefault, order_index AS orderIndex, file_name AS fileName, page_count AS pageCount, updated_at AS updatedAt, uploaded_at AS uploadedAt"
+
+    // List templates for a type (metadata only — no html/blob)
+    async getTcTemplatesByType(typeCode: string): Promise<any[]> {
+        if (!this.pool) return []
         const [rows] = await this.pool.query(
-            'SELECT id, type_code AS typeCode, file_name AS fileName, page_count AS pageCount, uploaded_at AS uploadedAt FROM policy_tc_templates WHERE type_code = ?',
+            `SELECT ${this.tcMetaCols} FROM policy_tc_templates WHERE type_code = ? ORDER BY is_default DESC, order_index ASC, name ASC`,
             [typeCode]
         )
-        const arr = rows as any[]
-        return arr.length > 0 ? arr[0] : null
+        return (rows as any[]).map(r => ({ ...r, isDefault: Boolean(r.isDefault) }))
     }
 
-    async getTcTemplateFile(typeCode: string): Promise<Buffer | null> {
+    // Full template by id, including html content (never the file blob)
+    async getTcTemplateById(id: string): Promise<any | null> {
         if (!this.pool) return null
         const [rows] = await this.pool.query(
-            'SELECT file_data FROM policy_tc_templates WHERE type_code = ?',
-            [typeCode]
+            `SELECT ${this.tcMetaCols}, content_html AS contentHtml, (file_data IS NOT NULL) AS hasFile FROM policy_tc_templates WHERE id = ?`,
+            [id]
         )
+        const arr = rows as any[]
+        if (arr.length === 0) return null
+        return { ...arr[0], isDefault: Boolean(arr[0].isDefault), hasFile: Boolean(arr[0].hasFile) }
+    }
+
+    async getTcTemplateFileById(id: string): Promise<Buffer | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query('SELECT file_data FROM policy_tc_templates WHERE id = ?', [id])
         const arr = rows as any[]
         return arr.length > 0 ? arr[0].file_data : null
     }
 
-    async getAllTcTemplates(): Promise<import('../../../src/shared/types').PolicyTcTemplate[]> {
-        if (!this.pool) return []
+    // The default (or only) template for a type — used by the export resolver
+    async getDefaultTcTemplate(typeCode: string): Promise<any | null> {
+        if (!this.pool) return null
         const [rows] = await this.pool.query(
-            'SELECT id, type_code AS typeCode, file_name AS fileName, page_count AS pageCount, uploaded_at AS uploadedAt FROM policy_tc_templates ORDER BY type_code'
+            `SELECT ${this.tcMetaCols}, content_html AS contentHtml, (file_data IS NOT NULL) AS hasFile
+             FROM policy_tc_templates WHERE type_code = ? ORDER BY is_default DESC, order_index ASC LIMIT 1`,
+            [typeCode]
         )
-        return rows as any[]
+        const arr = rows as any[]
+        if (arr.length === 0) return null
+        return { ...arr[0], isDefault: Boolean(arr[0].isDefault), hasFile: Boolean(arr[0].hasFile) }
     }
 
-    async uploadTcTemplate(typeCode: string, fileData: Buffer, fileName: string, pageCount: number = 0): Promise<void> {
+    async createTcTemplate(t: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: Buffer | null; fileName?: string | null; makeDefault?: boolean }): Promise<string> {
         if (!this.pool) throw new Error('Not connected')
         const { v4: uuid } = require('uuid')
         const id = uuid()
+        // First template of a type is automatically the default
+        const existing = await this.getTcTemplatesByType(t.typeCode)
+        const makeDefault = t.makeDefault || existing.length === 0
+        if (makeDefault) await this.pool.query('UPDATE policy_tc_templates SET is_default = 0 WHERE type_code = ?', [t.typeCode])
         await this.pool.query(
-            `INSERT INTO policy_tc_templates (id, type_code, file_data, file_name, page_count)
-             VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE file_data = VALUES(file_data), file_name = VALUES(file_name), page_count = VALUES(page_count), uploaded_at = CURRENT_TIMESTAMP`,
-            [id, typeCode, fileData, fileName, pageCount]
+            `INSERT INTO policy_tc_templates (id, type_code, name, kind, content_html, file_data, file_name, page_count, is_default, order_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+            [id, t.typeCode, t.name || 'T&C', t.kind, t.contentHtml ?? null, t.fileData ?? null, t.fileName ?? null, makeDefault ? 1 : 0, existing.length]
         )
+        return id
+    }
+
+    async updateTcTemplate(id: string, updates: { name?: string; contentHtml?: string | null; fileData?: Buffer | null; fileName?: string | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const vals: any[] = []
+        if (updates.name !== undefined) { fields.push('name = ?'); vals.push(updates.name) }
+        if (updates.contentHtml !== undefined) { fields.push('content_html = ?'); vals.push(updates.contentHtml ?? null) }
+        if (updates.fileData !== undefined) { fields.push('file_data = ?'); vals.push(updates.fileData ?? null) }
+        if (updates.fileName !== undefined) { fields.push('file_name = ?'); vals.push(updates.fileName ?? null) }
+        if (fields.length === 0) return
+        fields.push('updated_at = CURRENT_TIMESTAMP')
+        vals.push(id)
+        await this.pool.query(`UPDATE policy_tc_templates SET ${fields.join(', ')} WHERE id = ?`, vals)
+    }
+
+    async setDefaultTcTemplate(id: string): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query('SELECT type_code FROM policy_tc_templates WHERE id = ?', [id])
+        const tc = (rows as any[])[0]?.type_code
+        if (!tc) return
+        await this.pool.query('UPDATE policy_tc_templates SET is_default = 0 WHERE type_code = ?', [tc])
+        await this.pool.query('UPDATE policy_tc_templates SET is_default = 1 WHERE id = ?', [id])
+    }
+
+    async deleteTcTemplateById(id: string): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query('SELECT type_code, is_default FROM policy_tc_templates WHERE id = ?', [id])
+        const row = (rows as any[])[0]
+        await this.pool.query('DELETE FROM policy_tc_templates WHERE id = ?', [id])
+        // If we removed the default, promote the next template of that type
+        if (row && row.is_default) {
+            const [nextRows] = await this.pool.query('SELECT id FROM policy_tc_templates WHERE type_code = ? ORDER BY order_index ASC LIMIT 1', [row.type_code])
+            const next = (nextRows as any[])[0]
+            if (next) await this.pool.query('UPDATE policy_tc_templates SET is_default = 1 WHERE id = ?', [next.id])
+        }
+    }
+
+    // --- Legacy shims (kept so existing export paths keep working) ---
+    async getTcTemplate(typeCode: string): Promise<any | null> {
+        const t = await this.getDefaultTcTemplate(typeCode)
+        if (!t) return null
+        return { id: t.id, typeCode: t.typeCode, fileName: t.fileName, pageCount: t.pageCount, uploadedAt: t.uploadedAt, kind: t.kind, hasFile: t.hasFile, contentHtml: t.contentHtml, name: t.name }
+    }
+
+    async getTcTemplateFile(typeCode: string): Promise<Buffer | null> {
+        const t = await this.getDefaultTcTemplate(typeCode)
+        if (!t || !t.hasFile) return null
+        return this.getTcTemplateFileById(t.id)
+    }
+
+    async getAllTcTemplates(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`SELECT ${this.tcMetaCols} FROM policy_tc_templates ORDER BY type_code, is_default DESC, order_index ASC`)
+        return (rows as any[]).map(r => ({ ...r, isDefault: Boolean(r.isDefault) }))
     }
 
     async updateTcTemplatePageCount(typeCode: string, pageCount: number): Promise<void> {
         if (!this.pool) return
-        await this.pool.query(
-            'UPDATE policy_tc_templates SET page_count = ? WHERE type_code = ?',
-            [pageCount, typeCode]
-        )
-    }
-
-    async deleteTcTemplate(typeCode: string): Promise<void> {
-        if (!this.pool) return
-        await this.pool.query('DELETE FROM policy_tc_templates WHERE type_code = ?', [typeCode])
+        const t = await this.getDefaultTcTemplate(typeCode)
+        if (t) await this.pool.query('UPDATE policy_tc_templates SET page_count = ? WHERE id = ?', [pageCount, t.id])
     }
 
     // --- Document Types ---

@@ -124,10 +124,11 @@ interface RichTextEditorProps {
   showAlignment?: boolean
   showLineSpacing?: boolean
   showPlaceholders?: boolean
+  showHeadings?: boolean
   placeholderItems?: PlaceholderItem[]
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing, showPlaceholders, placeholderItems }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing, showPlaceholders, showHeadings, placeholderItems }: RichTextEditorProps) {
   const { theme } = useTheme()
   const iconColor = useMemo(() => theme === 'light' ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
   const activeIconColor = '#ffffff'
@@ -144,7 +145,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const extensions = useMemo(() => {
     const exts: any[] = [
       StarterKit.configure({
-        heading: false,
+        heading: showHeadings ? { levels: [1, 2, 3] } : false,
         codeBlock: false,
         code: false,
         blockquote: false,
@@ -162,13 +163,13 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       if (showFontFamily) exts.push(FontFamily)
     }
     if (showAlignment) {
-      exts.push(TextAlign.configure({ types: ['paragraph'] }))
+      exts.push(TextAlign.configure({ types: showHeadings ? ['paragraph', 'heading'] : ['paragraph'] }))
     }
     if (showLineSpacing) {
       exts.push(LineHeight)
     }
     return exts
-  }, [showFontSize, showFontFamily, showAlignment, showLineSpacing])
+  }, [showFontSize, showFontFamily, showAlignment, showLineSpacing, showHeadings])
 
   const editor = useEditor({
     extensions,
@@ -328,6 +329,17 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                 </div>
               )}
             </div>
+            <div className="rte-separator" />
+          </>
+        )}
+        {showHeadings && (
+          <>
+            {[1, 2, 3].map(lvl => (
+              <button key={lvl} type="button" className={btn(editor.isActive('heading', { level: lvl }))} onClick={() => editor.chain().focus().toggleHeading({ level: lvl as any }).run()} title={`Heading ${lvl}`}
+                style={{ fontSize: '0.72rem', fontWeight: 700, color: editor.isActive('heading', { level: lvl }) ? activeIconColor : iconColor }}>
+                H{lvl}
+              </button>
+            ))}
             <div className="rte-separator" />
           </>
         )}

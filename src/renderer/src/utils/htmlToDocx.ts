@@ -192,6 +192,29 @@ export function parseHtmlToParagraphs(
               paragraphs.push(makeParagraphFromSegments(segments, prefix))
             }
           }
+        } else if (/^h[1-6]$/.test(tag)) {
+          // Headings → bold, stepped-down sizes (half-points)
+          const level = parseInt(tag[1], 10)
+          const segments = extractSegments(el)
+          if (segments.some(s => s.text.trim())) {
+            const align = parseAlignment(el.style?.textAlign)
+            const headingSize = Math.max(size, [0, 32, 28, 26, 24, 23, 22][level] || size)
+            const children = segments.map(seg => new TextRun({
+              text: seg.text,
+              size: seg.fontSize || headingSize,
+              font: seg.fontFamily || font,
+              color,
+              bold: true,
+              italics: seg.italic,
+              underline: seg.underline ? {} : undefined
+            } as any))
+            paragraphs.push(new Paragraph({
+              spacing: { before: 120, after: spacingAfter },
+              alignment: align || opts?.alignment,
+              ...(indentOffset ? { indent: { left: indentOffset } } : {}),
+              children
+            } as any))
+          }
         } else if (tag === 'br') {
           paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
         } else {

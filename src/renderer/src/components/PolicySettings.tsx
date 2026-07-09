@@ -23,7 +23,9 @@ import {
   QrCode,
   Percent,
   Edit3,
-  LayoutList
+  LayoutList,
+  Star,
+  Eye
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -1074,202 +1076,177 @@ const TC_TYPE_LABELS: Record<string, string> = {
 }
 
 function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg: string) => void; showError: (msg: string) => void; isLight: boolean }) {
-  const [templates, setTemplates] = useState<Array<{ id: string; typeCode: string; fileName: string; pageCount: number; uploadedAt: string }>>([])
+  const typeCodes = Object.keys(TC_TYPE_LABELS)
+  const [typeCode, setTypeCode] = useState('P')
+  const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  // Rich-text editor modal state
+  const [editing, setEditing] = useState<{ id: string | null; name: string; html: string } | null>(null)
+  const [previewHtml, setPreviewHtml] = useState<{ name: string; html: string } | null>(null)
+  // Footer config (policyExportSettings)
+  const [footer, setFooter] = useState({ tcFooterText: '', tcTitleLine: '{type} Cover {number}', tcShowPageNumbers: true })
 
-  const loadTemplates = async () => {
-    try {
-      const result = await window.api.tcGetAllTemplates()
-      if (Array.isArray(result)) setTemplates(result)
-    } catch { /* ignore */ }
+  const load = async (tc: string) => {
+    setLoading(true)
+    try { const r = await window.api.tcListByType(tc); setTemplates(Array.isArray(r) ? r : []) } catch { setTemplates([]) }
     finally { setLoading(false) }
   }
+  useEffect(() => { load(typeCode) }, [typeCode])
+  useEffect(() => {
+    ;(async () => {
+      try { const raw = await window.api.getSetting('policyExportSettings'); if (raw) { const p = JSON.parse(raw); setFooter(f => ({ tcFooterText: p.tcFooterText ?? f.tcFooterText, tcTitleLine: p.tcTitleLine ?? f.tcTitleLine, tcShowPageNumbers: p.tcShowPageNumbers !== false })) } } catch { /* default */ }
+    })()
+  }, [])
 
-  useEffect(() => { loadTemplates() }, [])
+  const saveFooter = async () => {
+    try {
+      const raw = await window.api.getSetting('policyExportSettings')
+      const p = raw ? JSON.parse(raw) : {}
+      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...p, ...footer }))
+      showSuccess('T&C footer saved')
+    } catch (err: any) { showError(err.message || 'Failed to save footer') }
+  }
 
-  const handleUpload = async (typeCode: string) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.docx'
+  const uploadDocx = async () => {
+    const input = document.createElement('input'); input.type = 'file'; input.accept = '.docx'
     input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-
-      setUploading(typeCode)
+      const file = input.files?.[0]; if (!file) return
+      setBusy(true)
       try {
-        const arrayBuffer = await file.arrayBuffer()
-        const fileData = Array.from(new Uint8Array(arrayBuffer))
-        const result = await window.api.tcUpload({ typeCode, fileName: file.name, fileData })
-        if (result && !(result as any).error) {
-          showSuccess(`T&C template uploaded for ${TC_TYPE_LABELS[typeCode] || typeCode}`)
-          await loadTemplates()
-        } else {
-          showError((result as any)?.message || 'Upload failed')
-        }
-      } catch (err: any) {
-        showError(err.message || 'Upload failed')
-      } finally {
-        setUploading(null)
-      }
+        const fileData = Array.from(new Uint8Array(await file.arrayBuffer()))
+        const r = await window.api.tcCreate({ typeCode, name: file.name.replace(/\.docx$/i, ''), kind: 'docx', fileData, fileName: file.name }) as any
+        if (r?.error) showError(r.message || 'Upload failed'); else { showSuccess('T&C document uploaded'); await load(typeCode) }
+      } catch (err: any) { showError(err.message || 'Upload failed') } finally { setBusy(false) }
     }
     input.click()
   }
 
-  const handleDelete = async (typeCode: string) => {
+  const saveHtml = async () => {
+    if (!editing) return
+    setBusy(true)
     try {
-      await window.api.tcDelete(typeCode)
-      showSuccess(`T&C template removed for ${TC_TYPE_LABELS[typeCode] || typeCode}`)
-      await loadTemplates()
-    } catch (err: any) {
-      showError(err.message || 'Delete failed')
-    }
+      if (editing.id) { await window.api.tcUpdate(editing.id, { name: editing.name, contentHtml: editing.html }) }
+      else { await window.api.tcCreate({ typeCode, name: editing.name || 'T&C', kind: 'html', contentHtml: editing.html }) }
+      showSuccess('T&C template saved'); setEditing(null); await load(typeCode)
+    } catch (err: any) { showError(err.message || 'Save failed') } finally { setBusy(false) }
   }
 
-  const handleDownload = async (typeCode: string, fileName: string) => {
+  const setDefault = async (id: string) => { try { await window.api.tcSetDefault(id); await load(typeCode) } catch (err: any) { showError(err.message || 'Failed') } }
+  const remove = async (id: string) => { try { await window.api.tcDeleteById(id); showSuccess('Template deleted'); await load(typeCode) } catch (err: any) { showError(err.message || 'Delete failed') } }
+
+  const openEdit = async (t: any) => {
+    if (t.kind !== 'html') return
+    try { const full = await window.api.tcGetById(t.id) as any; setEditing({ id: t.id, name: t.name || '', html: full?.contentHtml || '' }) }
+    catch { setEditing({ id: t.id, name: t.name || '', html: '' }) }
+  }
+  const openPreview = async (t: any) => {
+    if (t.kind !== 'html') { showError('Preview is available for rich-text templates. Download the DOCX to preview it.'); return }
+    try { const full = await window.api.tcGetById(t.id) as any; setPreviewHtml({ name: t.name || 'T&C', html: full?.contentHtml || '' }) } catch { /* ignore */ }
+  }
+  const downloadDocx = async (t: any) => {
     try {
-      const fileData = await window.api.tcGetTemplateFile(typeCode)
-      if (!fileData) { showError('Template file not found'); return }
-      const blob = new Blob([new Uint8Array(fileData)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err: any) {
-      showError(err.message || 'Download failed')
-    }
+      const fileData = await window.api.tcGetFileById(t.id); if (!fileData) { showError('File not found'); return }
+      const url = URL.createObjectURL(new Blob([new Uint8Array(fileData)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }))
+      const a = document.createElement('a'); a.href = url; a.download = t.fileName || `${t.name}.docx`; a.click(); URL.revokeObjectURL(url)
+    } catch (err: any) { showError(err.message || 'Download failed') }
   }
 
-  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
-
-  const typeCodes = Object.keys(TC_TYPE_LABELS)
+  const typeColor = (tc: string) => tc === 'P' ? '#6464ff' : tc === 'H' ? '#ff64c8' : tc === 'W' ? '#ffb020' : 'var(--accent-primary)'
 
   return (
     <div>
-      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Terms & Conditions Templates</h4>
-      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-        Upload a Word document (.docx) per policy type. When exporting a policy as PDF + T&C,
-        the template will be appended with correct page numbering.
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '6px' }}>Terms & Conditions</h4>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+        Author T&C as rich text (appended into the exported policy) or upload a Word document. Multiple per type; one is the default.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {typeCodes.map(tc => {
-          const tmpl = templates.find(t => t.typeCode === tc)
-          const isUploading = uploading === tc
-
-          return (
-            <div key={tc} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 16px',
-              borderRadius: '10px',
-              background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
-              border: '1px solid var(--glass-border)'
-            }}>
-              {/* Type label */}
-              <div style={{
-                minWidth: '80px',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                color: tc === 'P' ? '#6464ff' : tc === 'H' ? '#ff64c8' : tc === 'W' ? '#ffb020' : 'var(--text-primary)'
-              }}>
-                {TC_TYPE_LABELS[tc]}
-              </div>
-
-              {tmpl ? (
-                <>
-                  {/* File info */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{tmpl.fileName}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      Uploaded {new Date(tmpl.uploadedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  {/* Download button */}
-                  <button
-                    onClick={() => handleDownload(tc, tmpl.fileName)}
-                    title="Download template"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--accent-primary)',
-                      cursor: 'pointer',
-                      padding: '6px',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <FileText size={16} />
-                  </button>
-
-                  {/* Replace button */}
-                  <button
-                    onClick={() => handleUpload(tc)}
-                    disabled={isUploading}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--glass-border)',
-                      background: 'transparent',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    {isUploading ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Replace
-                  </button>
-
-                  {/* Delete button */}
-                  <button
-                    onClick={() => handleDelete(tc)}
-                    title="Remove template"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--danger)',
-                      cursor: 'pointer',
-                      padding: '6px',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div style={{ flex: 1, fontSize: '0.83rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                    No template uploaded
-                  </div>
-                  <button
-                    onClick={() => handleUpload(tc)}
-                    disabled={isUploading}
-                    className="btn-primary"
-                    style={{
-                      padding: '5px 14px',
-                      fontSize: '0.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}
-                  >
-                    {isUploading ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Upload
-                  </button>
-                </>
-              )}
-            </div>
-          )
-        })}
+      {/* Type toggle */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {typeCodes.map(tc => (
+          <button key={tc} type="button" onClick={() => setTypeCode(tc)}
+            style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.83rem', cursor: 'pointer', fontWeight: typeCode === tc ? 700 : 400, border: typeCode === tc ? `2px solid ${typeColor(tc)}` : '1px solid var(--input-border)', background: typeCode === tc ? `${typeColor(tc)}18` : 'transparent', color: typeCode === tc ? typeColor(tc) : 'var(--text-secondary)' }}>
+            {TC_TYPE_LABELS[tc]}
+          </button>
+        ))}
       </div>
+
+      {loading ? <p style={{ color: 'var(--text-secondary)' }}>Loading...</p> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+          {templates.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No T&C templates for {TC_TYPE_LABELS[typeCode]} yet.</p>}
+          {templates.map(t => (
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)', border: t.isDefault ? `1.5px solid ${typeColor(typeCode)}` : '1px solid var(--glass-border)' }}>
+              <button type="button" onClick={() => setDefault(t.id)} title={t.isDefault ? 'Default template' : 'Set as default'} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: t.isDefault ? '#ffb020' : 'var(--text-secondary)' }}>
+                <Star size={16} fill={t.isDefault ? '#ffb020' : 'none'} />
+              </button>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{t.name}</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{t.kind === 'html' ? 'Rich text' : 'Word document'}{t.isDefault ? ' · Default' : ''}</span>
+              </div>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', padding: '2px 7px', borderRadius: '5px', background: t.kind === 'html' ? 'rgba(0,170,200,0.12)' : 'rgba(180,100,255,0.12)', color: t.kind === 'html' ? 'var(--accent-primary)' : '#b464ff' }}>{t.kind === 'html' ? 'Rich' : 'DOCX'}</span>
+              <button type="button" onClick={() => openPreview(t)} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 5 }}><Eye size={15} /></button>
+              {t.kind === 'html'
+                ? <button type="button" onClick={() => openEdit(t)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 5 }}><Edit3 size={15} /></button>
+                : <button type="button" onClick={() => downloadDocx(t)} title="Download" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 5 }}><FileText size={15} /></button>}
+              <button type="button" onClick={() => remove(t.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 5 }}><Trash2 size={15} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+        <button type="button" onClick={() => setEditing({ id: null, name: '', html: '' })} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Plus size={14} /> Add Rich-Text</button>
+        <button type="button" onClick={uploadDocx} disabled={busy} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{busy ? <Loader2 size={13} className="spin" /> : <Upload size={13} />} Upload DOCX</button>
+      </div>
+
+      {/* T&C footer config */}
+      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '10px' }}>T&C Footer</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '520px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Title line (placeholders: {'{type}'}, {'{number}'})</label>
+            <input type="text" value={footer.tcTitleLine} onChange={e => setFooter({ ...footer, tcTitleLine: e.target.value })} style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Footer text (optional, shown below the title)</label>
+            <input type="text" value={footer.tcFooterText} onChange={e => setFooter({ ...footer, tcFooterText: e.target.value })} style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={footer.tcShowPageNumbers} onChange={e => setFooter({ ...footer, tcShowPageNumbers: e.target.checked })} style={{ width: '15px', height: '15px', accentColor: 'var(--accent-primary)' }} /> Show page numbers on T&C pages
+          </label>
+          <div><button type="button" onClick={saveFooter} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Save size={14} /> Save Footer</button></div>
+        </div>
+      </div>
+
+      {/* Rich-text editor modal */}
+      {editing && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '20px', width: '760px', maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>{editing.id ? 'Edit' : 'New'} T&C — {TC_TYPE_LABELS[typeCode]}</h3>
+              <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+            <input type="text" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Template name (e.g. Standard P&I T&C)" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.88rem', marginBottom: '10px', boxSizing: 'border-box' }} />
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: '260px' }}>
+              <RichTextEditor value={editing.html} onChange={html => setEditing(ed => ed ? { ...ed, html } : ed)} minHeight={340} showHeadings showAlignment showFontSize />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+              <button onClick={() => setEditing(null)} className="btn-secondary" style={{ fontSize: '0.82rem' }}>Cancel</button>
+              <button onClick={saveHtml} disabled={busy} className="btn-primary" style={{ fontSize: '0.82rem' }}>{busy ? 'Saving…' : 'Save Template'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview modal (rich text) */}
+      {previewHtml && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setPreviewHtml(null)}>
+          <div style={{ background: '#ffffff', color: '#000', borderRadius: '10px', padding: '32px 40px', width: '720px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ textAlign: 'center', fontWeight: 700, textDecoration: 'underline', marginBottom: '16px' }}>TERMS AND CONDITIONS</div>
+            <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11pt', lineHeight: 1.5, textAlign: 'justify' }} dangerouslySetInnerHTML={{ __html: previewHtml.html || '<p style="color:#888">(empty)</p>' }} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2473,10 +2473,19 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 
 // ==================== Policy Document Export ====================
 
-export async function exportPolicyDocx(policyId: string, totalPages?: number): Promise<void> {
+export async function exportPolicyDocx(policyId: string, totalPages?: number, includeTC?: boolean): Promise<void> {
   await loadPolicyFontSize()
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
+
+  // Resolve rich-text (html) T&C to append inline as a new section (docx T&C is handled by the merge path)
+  let tcHtml: string | null = null
+  if (includeTC) {
+    try {
+      const tcTpl = await window.api.tcGetTemplate(typeCode) as any
+      if (tcTpl && !tcTpl.error && tcTpl.kind === 'html' && tcTpl.contentHtml) tcHtml = tcTpl.contentHtml
+    } catch { /* no T&C */ }
+  }
 
   const children: (Paragraph | Table)[] = []
 
@@ -2923,6 +2932,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
     W: 'War Risk Certificate'
   }
   let pageCountMap: Record<string, Record<string, number>> = {}
+  let tcFooterText = ''
+  let tcTitleLine = '{type} Cover {number}'
+  let tcShowPageNumbers = true
   try {
     const settings = await window.api.getSetting('policyExportSettings')
     if (settings) {
@@ -2930,6 +2942,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
       if (parsed.footerText) footerText = parsed.footerText
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
       if (parsed.pageCountMap) pageCountMap = parsed.pageCountMap
+      if (parsed.tcFooterText != null) tcFooterText = parsed.tcFooterText
+      if (parsed.tcTitleLine != null && parsed.tcTitleLine !== '') tcTitleLine = parsed.tcTitleLine
+      if (parsed.tcShowPageNumbers != null) tcShowPageNumbers = parsed.tcShowPageNumbers !== false
     }
   } catch { /* ignore */ }
 
@@ -3043,14 +3058,43 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
   }
   const policyFooter = new Footer({ children: footerChildren })
 
+  const docSections: any[] = [{
+    properties: polMakePageProperties(),
+    headers: { default: defaultHeader },
+    footers: { default: policyFooter },
+    children: children as any[]
+  }]
+
+  // Append the rich-text T&C as a new section (starts on a fresh page, own footer,
+  // continuous page numbering — no separate merge needed)
+  if (tcHtml) {
+    const tcChildren: (Paragraph | Table)[] = [
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 160 }, children: [new TextRun({ text: 'TERMS AND CONDITIONS', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })] }),
+      ...parseHtmlToParagraphs(decodeHtmlEntities(tcHtml), { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+    ]
+    // T&C footer: configurable title line + optional page numbers
+    const tcTitleResolved = tcTitleLine.replace(/\{type\}/gi, headerTitle).replace(/\{number\}/gi, data.policy.policyNumber)
+    const tcFooterChildren: Paragraph[] = []
+    const tcFooterLines = tcFooterText ? tcFooterText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').split('\n').filter(l => l.trim()) : []
+    if (tcTitleResolved.trim()) tcFooterChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: tcTitleResolved.trim(), size: 16, font: 'Arial', color: '999999' })] }))
+    for (const l of tcFooterLines) tcFooterChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: l.trim(), size: 16, font: 'Arial', color: '999999' })] }))
+    if (tcShowPageNumbers) tcFooterChildren.push(new Paragraph({
+      alignment: AlignmentType.CENTER, spacing: { before: 40, after: 0 },
+      children: [new TextRun({ text: 'Page ', ...pnStyle }), new TextRun({ children: [PageNumber.CURRENT], ...pnStyle }), new TextRun({ text: ' of ', ...pnStyle }),
+        ...(configTotalPages ? [new TextRun({ text: String(configTotalPages), ...pnStyle })] : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])]
+    }))
+    if (tcFooterChildren.length === 0) tcFooterChildren.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
+    docSections.push({
+      properties: polMakePageProperties(),
+      headers: { default: new Header({ children: [polEmptyP()] }) },
+      footers: { default: new Footer({ children: tcFooterChildren }) },
+      children: tcChildren as any[]
+    })
+  }
+
   const document = new Document({
     numbering: polMakeDocxNumbering(),
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: { default: defaultHeader },
-      footers: { default: policyFooter },
-      children: children as any[]
-    }]
+    sections: docSections
   })
 
   const blob = await Packer.toBlob(document)
@@ -3067,7 +3111,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number): P
  * Uses capture mode to intercept the blob from exportPolicyDocx.
  * @param totalPages - if provided, hardcodes "Page X of N" instead of using auto NUMPAGES
  */
-async function generatePolicyDocxBuffer(policyId: string, totalPages?: number): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
+async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, includeTC?: boolean): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const vName = data.vesselInfo?.name || ''
@@ -3078,7 +3122,7 @@ async function generatePolicyDocxBuffer(policyId: string, totalPages?: number): 
   _polCaptureMode = true
   _polCapturedBlob = null
   try {
-    await exportPolicyDocx(policyId, totalPages)
+    await exportPolicyDocx(policyId, totalPages, includeTC)
     // _polCapturedBlob is set by polDownloadBlob during exportPolicyDocx (TS can't track this)
     const captured = _polCapturedBlob as Blob | null
     if (!captured) throw new Error('Failed to generate policy document')
@@ -3101,11 +3145,22 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   const data = await loadPolicyExportData(policyId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
-  const tcTemplate = await window.api.tcGetTemplate(typeCode)
-  if (!tcTemplate || (tcTemplate as any).error) {
-    throw new Error('No T&C template uploaded for this policy type. Upload one in Policy Settings > T&C Templates.')
+  const tcTemplate = await window.api.tcGetTemplate(typeCode) as any
+  if (!tcTemplate || tcTemplate.error) {
+    throw new Error('No T&C template set for this policy type. Add one in Policy Settings → T&C Templates.')
   }
 
+  // Rich-text (html) T&C: build ONE combined DOCX (policy + T&C section) and convert once.
+  if (tcTemplate.kind === 'html' && tcTemplate.contentHtml) {
+    const { buffer, fileName } = await generatePolicyDocxBuffer(policyId, undefined, true)
+    const res = await window.api.convertDocxBufferToPdf({ docxData: Array.from(new Uint8Array(buffer)), fileName }) as any
+    if (!res || res.error) throw new Error(res?.message || 'PDF conversion failed')
+    polDownloadBlob(new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }), res.fileName)
+    try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
+    return
+  }
+
+  // Legacy DOCX T&C: merge policy PDF + T&C PDF via the two-pass page-number pipeline.
   // Resolve policy type title for T&C footer
   const typeTitleMap: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War Risk', F: 'FDD', L: 'Loss of Hire', C: 'Cargo' }
   const policyTypeTitle = typeTitleMap[typeCode] || data.quotation.quotationTypeName || 'Insurance'

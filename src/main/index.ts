@@ -4482,16 +4482,66 @@ app.whenReady().then(() => {
     return db.getAllTcTemplates()
   })
 
-  safeHandle('tc:upload', async (event, data: { typeCode: string; fileName: string; fileData: number[] }) => {
+  // Multiple named templates per type (html rich-text or uploaded docx)
+  safeHandle('tc:listByType', async (event, typeCode: string) => {
+    requireSession(event)
+    return db.getTcTemplatesByType(typeCode)
+  })
+  safeHandle('tc:getById', async (event, id: string) => {
+    requireSession(event)
+    return db.getTcTemplateById(id)
+  })
+  safeHandle('tc:getFileById', async (event, id: string) => {
+    requireSession(event)
+    const buf = await db.getTcTemplateFileById(id)
+    return buf ? Array.from(buf as Buffer) : null
+  })
+  safeHandle('tc:create', async (event, data: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null; makeDefault?: boolean }) => {
     await requirePermission(event, 'admin:settings')
-    const buf = Buffer.from(data.fileData)
-    await db.uploadTcTemplate(data.typeCode, buf, data.fileName, 0)
-    return db.getTcTemplate(data.typeCode)
+    const id = await db.createTcTemplate({
+      typeCode: data.typeCode, name: data.name, kind: data.kind,
+      contentHtml: data.contentHtml ?? null,
+      fileData: data.fileData ? Buffer.from(data.fileData) : null,
+      fileName: data.fileName ?? null, makeDefault: data.makeDefault
+    })
+    return db.getTcTemplateById(id)
+  })
+  safeHandle('tc:update', async (event, id: string, updates: { name?: string; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null }) => {
+    await requirePermission(event, 'admin:settings')
+    await db.updateTcTemplate(id, {
+      name: updates.name,
+      contentHtml: updates.contentHtml,
+      fileData: updates.fileData === undefined ? undefined : (updates.fileData ? Buffer.from(updates.fileData) : null),
+      fileName: updates.fileName
+    })
+    return db.getTcTemplateById(id)
+  })
+  safeHandle('tc:setDefault', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    await db.setDefaultTcTemplate(id)
+  })
+  safeHandle('tc:deleteById', async (event, id: string) => {
+    await requirePermission(event, 'admin:settings')
+    await db.deleteTcTemplateById(id)
   })
 
-  safeHandle('tc:delete', async (event, typeCode: string) => {
-    await requirePermission(event, 'admin:settings')
-    await db.deleteTcTemplate(typeCode)
+  // Convert a DOCX buffer straight to PDF bytes (used for T&C preview + single-pass PDF+T&C)
+  safeHandle('convert:docxBufferToPdf', async (event, data: { docxData: number[]; fileName?: string }) => {
+    requireSession(event)
+    const { convertDocxToPdf } = await import('./services/DocxToPdfService')
+    const os = require('os'); const fs = require('fs'); const path = require('path')
+    const base = (data.fileName || 'document').replace(/[^a-zA-Z0-9._-]/g, '_')
+    const docxPath = path.join(os.tmpdir(), `${base}_${Date.now()}.docx`)
+    fs.writeFileSync(docxPath, Buffer.from(data.docxData))
+    let pdfPath = ''
+    try {
+      pdfPath = await convertDocxToPdf(docxPath)
+      const pdfData = fs.readFileSync(pdfPath)
+      return { data: Array.from(pdfData as Buffer), fileName: `${base}.pdf` }
+    } finally {
+      try { fs.unlinkSync(docxPath) } catch { /* ignore */ }
+      try { if (pdfPath) fs.unlinkSync(pdfPath) } catch { /* ignore */ }
+    }
   })
 
   // --- DOCX-to-PDF Conversion & Merging ---

@@ -1063,11 +1063,17 @@ export interface Api {
   recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => Promise<void>
 
   // T&C Templates
-  tcGetTemplate: (typeCode: string) => Promise<PolicyTcTemplate | null>
+  tcGetTemplate: (typeCode: string) => Promise<any | null>
   tcGetTemplateFile: (typeCode: string) => Promise<number[] | null>
-  tcGetAllTemplates: () => Promise<PolicyTcTemplate[]>
-  tcUpload: (data: { typeCode: string; fileName: string; fileData: number[] }) => Promise<PolicyTcTemplate>
-  tcDelete: (typeCode: string) => Promise<void>
+  tcGetAllTemplates: () => Promise<any[]>
+  tcListByType: (typeCode: string) => Promise<any[]>
+  tcGetById: (id: string) => Promise<any | null>
+  tcGetFileById: (id: string) => Promise<number[] | null>
+  tcCreate: (data: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null; makeDefault?: boolean }) => Promise<any>
+  tcUpdate: (id: string, updates: { name?: string; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null }) => Promise<any>
+  tcSetDefault: (id: string) => Promise<void>
+  tcDeleteById: (id: string) => Promise<void>
+  convertDocxBufferToPdf: (data: { docxData: number[]; fileName?: string }) => Promise<{ data: number[]; fileName: string } | { error: true; message: string }>
 
   // File Manager
   fileManagerGetRoot: () => Promise<string | null>
