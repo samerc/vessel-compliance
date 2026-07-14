@@ -1418,7 +1418,6 @@ function polBuildAmountBreakdown(
   return [
     new Table({
       width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, amtW],
       rows: [
@@ -1639,7 +1638,6 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   if (tableRows.length > 0) {
     content.push(new Table({
       width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.AUTOFIT,
       rows: tableRows
     }))
@@ -1678,7 +1676,6 @@ function polBuildVesselTable(data: PolicyExportData): Table {
 
   return new Table({
     width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, sepW, valW],
     rows: rows.map(([label, value]) => new TableRow({
@@ -1710,7 +1707,6 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
 
   return [new Table({
     width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeTzW],
     rows: [
@@ -1731,7 +1727,6 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
   })
   return [new Table({
     width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1753,7 +1748,6 @@ function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData
   })
   return [new Table({
     width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1775,7 +1769,6 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
       const clauseDescW = POL_BODY_INNER_W - clauseRefW
       content.push(new Table({
         width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-        indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         columnWidths: [clauseRefW, clauseDescW],
         rows: selectedClauses.map(c => {
@@ -1849,7 +1842,6 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
 
   const makeCondTable = (conds: typeof hc) => new Table({
     width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [condCol1W, condCol2W],
     rows: conds.map(qc => {
@@ -2350,7 +2342,6 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
     }
     content.push(new Table({
       width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
-      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [dedAmtW, dedDescW],
       rows: dedRows
@@ -3560,7 +3551,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
@@ -3788,7 +3779,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
           ]
         })
       })
-      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
+      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
       detailsContent.push(new Paragraph({ spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })] }))
     }
   }
@@ -4380,7 +4371,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
