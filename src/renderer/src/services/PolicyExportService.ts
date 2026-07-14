@@ -1380,6 +1380,18 @@ function polMpTight(text: string): Paragraph[] {
   return out
 }
 
+// Render authored HTML with uniform inter-paragraph spacing: empty <p>/<br> separators
+// are dropped so every clause is spaced by the same `after` gap (used for the trading
+// warranty, whose source mixes blank-line separators with tightly-packed sub-clauses).
+function polMpUniform(text: string): Paragraph[] {
+  if (!text) return []
+  const decoded = decodeHtmlEntities(text)
+  if (polIsHtml(decoded)) {
+    return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED, collapseEmpty: true })
+  }
+  return decoded.split('\n').filter(l => l.trim()).map(p => polNp(p))
+}
+
 // Aligned "Section A / Section B / Total" amount breakdown, shared by the Debit Advice
 // premium split and the Hull Agreed Insured Value section. Amounts left-aligned; the
 // Total row is bold with a top rule, and the total is spelled out in words below.
@@ -2214,7 +2226,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(policyVesselQvId))
     : null
   const effectiveIntro = perVesselIntro ? perVesselIntro.text : wq.tradingWarrantyIntro
-  if (effectiveIntro) content.push(...polMpTight(effectiveIntro))
+  if (effectiveIntro) content.push(...polMpUniform(effectiveIntro))
   if (wq.tradingCustomMode && wq.tradingCustomWording) {
     content.push(polEmptyP())
     content.push(...polMp(wq.tradingCustomWording))
@@ -2654,7 +2666,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(warVesselQvId))
       : null
     const warEffIntro = warPerVIntro ? warPerVIntro.text : data.quotation.tradingWarrantyIntro
-    if (warEffIntro) addRow('warTrading', makeRow('Trading Warranty', polMp(warEffIntro)))
+    if (warEffIntro) addRow('warTrading', makeRow('Trading Warranty', polMpUniform(warEffIntro)))
   }
 
   // WARRANTIES

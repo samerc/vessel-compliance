@@ -46,7 +46,7 @@ function parseLineHeight(css: string | null | undefined, fallbackMultiplier?: nu
 
 export function parseHtmlToParagraphs(
   html: string,
-  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number; indentOffset?: number }
+  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number; indentOffset?: number; collapseEmpty?: boolean }
 ): Paragraph[] {
   if (!html || html.trim() === '') return []
 
@@ -58,18 +58,24 @@ export function parseHtmlToParagraphs(
   // Extra left indent (twips) added to every paragraph/list item — used to nest a
   // condition's sub-list and continuation text under its bullet.
   const indentOffset = opts?.indentOffset ?? 0
+  // When true, drop empty paragraphs / <br> blank lines so every real paragraph is
+  // separated by a uniform `after` gap (used for authored content that mixes blank-line
+  // separators with tightly-packed clauses, e.g. the trading warranty).
+  const collapseEmpty = opts?.collapseEmpty ?? false
 
   // If no HTML tags, treat as plain text with line breaks
   if (!/<[a-z][\s\S]*>/i.test(html)) {
-    return html.split('\n').map(line =>
-      line.trim()
-        ? new Paragraph({
-            spacing: { after: spacingAfter, ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {}) },
-            alignment: opts?.alignment,
-            children: [new TextRun({ text: line, size, font, color })]
-          })
-        : new Paragraph({ spacing: { after: 40 }, children: [] })
-    )
+    return html.split('\n')
+      .filter(line => !collapseEmpty || line.trim())
+      .map(line =>
+        line.trim()
+          ? new Paragraph({
+              spacing: { after: spacingAfter, ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {}) },
+              alignment: opts?.alignment,
+              children: [new TextRun({ text: line, size, font, color })]
+            })
+          : new Paragraph({ spacing: { after: 40 }, children: [] })
+      )
   }
 
   const paragraphs: Paragraph[] = []
@@ -173,7 +179,7 @@ export function parseHtmlToParagraphs(
         if (tag === 'p') {
           const segments = extractSegments(el)
           if (segments.length === 0 || segments.every(s => !s.text.trim())) {
-            paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
+            if (!collapseEmpty) paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
           } else {
             // Parse text-align and line-height from style
             const align = parseAlignment(el.style?.textAlign)
@@ -216,7 +222,7 @@ export function parseHtmlToParagraphs(
             } as any))
           }
         } else if (tag === 'br') {
-          paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
+          if (!collapseEmpty) paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
         } else {
           // Recurse for other wrapper elements
           processNode(el)
