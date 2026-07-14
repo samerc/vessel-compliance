@@ -11290,6 +11290,11 @@ export class MySQLAdapter {
         const polDraftSeqVal = await this.getSetting('draft_policy_seq')
         let polDraftSeq = (parseInt(polDraftSeqVal || '0', 10) || 0)
 
+        // Freeze the opening clause onto the policy at conversion time (from the type's
+        // Policy Settings value) so exporting an old policy keeps its original wording even
+        // if the setting changes later. NULL falls back to the hardcoded default at export.
+        const openingClauseSetting = typeCode ? (await this.getSetting(`policy_text_${typeCode}_openingClause`)) || null : null
+
         const createdPolicies: any[] = []
         const vessels = await this.getQuotationVessels(quotationId)
 
@@ -11312,8 +11317,8 @@ export class MySQLAdapter {
                     per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
                     section_order, selected_lol_option_id, selected_agreed_value_option_id,
                     outstanding_premium_enabled, outstanding_premium_text,
-                    non_refundable_type, non_refundable_percent, qr_enabled)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    non_refundable_type, non_refundable_percent, qr_enabled, opening_clause)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
@@ -11325,7 +11330,8 @@ export class MySQLAdapter {
                 options.outstandingPremiumText ?? null,
                 options.nonRefundableType ?? null,
                 options.nonRefundablePercent ?? null,
-                options.qrEnabled ? 1 : 0])
+                options.qrEnabled ? 1 : 0,
+                openingClauseSetting])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {
