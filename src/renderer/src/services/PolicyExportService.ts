@@ -1849,9 +1849,15 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
       if (!def) return null
       let text = qc.textOverride || def.text
       const amount = resolveAmount(qc)
-      if (def.hasAmount && def.amountPlaceholder && amount != null) {
-        const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
+      if (def.hasAmount && amount != null) {
+        if (def.amountPlaceholder && text.includes(def.amountPlaceholder)) {
+          const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
+        } else if (!text.includes('{amount}')) {
+          // Placeholder not present in the text — append the amount (mirrors the quotation
+          // export) so conditions like "Deductible of" still show their value in the policy.
+          text = text.trimEnd() + ' ' + polFormatCurrency(amount, currency)
+        }
       }
       // Issue 3: resolve generic {currency} and {amount} placeholders
       text = text.replace(new RegExp(`\\{currency\\}\\s*${currency}`, 'gi'), currency).replace(/\{currency\}/g, currency).replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
