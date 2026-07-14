@@ -2437,12 +2437,14 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
     // Instalment lines
     if (instalments.length > 0) {
       const isFirstInstNr = nrType === 'first_instalment'
-      instalments.forEach((inst, i) => {
+      instalments.forEach((inst) => {
         let line = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
         if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
           line += ' (non-refundable in case of cancellation, whether before or after inception)'
         }
-        content.push(i === instalments.length - 1 ? polNpTight(line) : polNp(line))
+        // Instalments are a tight list — no inter-line spacing (polEmptyP below separates
+        // the whole group from the next block).
+        content.push(polNpTight(line))
       })
       content.push(polEmptyP())
 
