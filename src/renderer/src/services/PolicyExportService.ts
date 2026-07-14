@@ -2537,8 +2537,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   // Title now in header — no body title needed
 
-  // Opening Clause
-  const openingClause = data.policy.openingClause || polGetDefaultOpeningClause(typeCode)
+  // Opening Clause: per-policy override → Policy Settings default for the type → hardcoded fallback
+  let settingsOpening = ''
+  try {
+    const oc = await window.api.getSetting(`policy_text_${typeCode}_openingClause`)
+    if (oc && stripHtml(oc).trim()) settingsOpening = oc
+  } catch { /* fall through to hardcoded default */ }
+  const openingClause = data.policy.openingClause || settingsOpening || polGetDefaultOpeningClause(typeCode)
   if (openingClause) {
     children.push(...polMpTight(openingClause))
     children.push(polEmptyP())
