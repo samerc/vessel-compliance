@@ -1460,6 +1460,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
 // ==================== QR Verification Tab ====================
 function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   const [url, setUrl] = useState('')
+  const [defaultEnabled, setDefaultEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -1467,6 +1468,8 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
       try {
         const raw = await window.api.getSetting('qr_verification_url')
         if (raw) setUrl(raw)
+        const de = await window.api.getSetting('qr_default_enabled')
+        setDefaultEnabled(de === 'true')
       } catch { /* default */ }
       finally { setLoading(false) }
     })()
@@ -1474,7 +1477,8 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
 
   const handleSave = async () => {
     await window.api.setSetting('qr_verification_url', url)
-    showSuccess('QR verification URL saved')
+    await window.api.setSetting('qr_default_enabled', defaultEnabled ? 'true' : 'false')
+    showSuccess('QR verification settings saved')
   }
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
@@ -1484,7 +1488,20 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
       <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>QR Code Verification</h4>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
         Configure the base URL for policy verification QR codes. The policy number will be appended to generate the full verification URL.
-        A QR code and verification link will be embedded on the closing page of exported policy documents.
+        When enabled for a policy, a QR code and verification link are embedded on the closing page of the exported P&amp;I policy.
+      </p>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={defaultEnabled}
+          onChange={e => setDefaultEnabled(e.target.checked)}
+          style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+        />
+        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Include QR code in P&amp;I policies by default</span>
+      </label>
+      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '-8px 0 16px' }}>
+        Pre-selects the &ldquo;Include QR verification code&rdquo; toggle in the policy conversion wizard (Blue Cards step). Off by default; can be overridden per policy.
       </p>
 
       <div style={{ marginBottom: '16px' }}>

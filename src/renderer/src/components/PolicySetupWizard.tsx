@@ -71,6 +71,8 @@ interface WizardData {
   selectedAgreedValueOptionId: string
   // Per-policy section order override (null = use the policy-settings default for the type)
   sectionOrder: string[] | null
+  // QR verification code toggle (P&I only; default from settings, off unless enabled)
+  qrEnabled: boolean
 }
 
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
@@ -122,7 +124,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     blueCardOwners: {},
     selectedLolOptionId: '',
     selectedAgreedValueOptionId: '',
-    sectionOrder: null
+    sectionOrder: null,
+    qrEnabled: false
   })
 
   const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
@@ -355,6 +358,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         }
       } catch (err) { console.warn('[PolicyWizard] Commission resolve failed:', err) }
 
+      // QR default (P&I only) — settings toggle pre-fills the per-policy choice
+      let qrDefault = false
+      try {
+        const isPICode = (quot.quotationTypeCode || '') === 'P'
+        if (isPICode) qrDefault = (await window.api.getSetting('qr_default_enabled')) === 'true'
+      } catch { /* default off */ }
+
       setData(prev => ({
         ...prev,
         // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
@@ -375,7 +385,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         outstandingPremiumText: quot.outstandingPremiumText || '',
         blueCardInception: inception,
         blueCardExpiry: expiry,
-        blueCardOwners: defaultBlueCardOwners
+        blueCardOwners: defaultBlueCardOwners,
+        qrEnabled: qrDefault
       }))
     } catch (err: any) {
       showError(err.message || 'Failed to load data')
@@ -621,6 +632,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         selectedAgreedValueOptionId: data.selectedAgreedValueOptionId || null,
         premiumAmount: data.totalPremium || null,
         sectionOrder: data.sectionOrder,
+        qrEnabled: data.qrEnabled,
         insured,
         outstandingPremiumEnabled: data.outstandingPremiumEnabled,
         outstandingPremiumText: data.outstandingPremiumEnabled ? data.outstandingPremiumText : null,
@@ -1749,6 +1761,28 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
           </select>
         </div>
       )}
+
+      {/* QR verification code toggle (P&I policy) */}
+      <div style={{ marginTop: '22px', paddingTop: '16px', borderTop: '1px solid var(--table-border)' }}>
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 14px', borderRadius: '10px',
+          border: data.qrEnabled ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
+          background: data.qrEnabled ? 'rgba(0,170,200,0.06)' : 'transparent',
+          cursor: 'pointer', transition: 'all 0.15s'
+        }}>
+          <input
+            type="checkbox"
+            checked={data.qrEnabled}
+            onChange={e => onUpdate({ qrEnabled: e.target.checked })}
+            style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+          />
+          <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Include QR verification code in the policy</span>
+        </label>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+          Embeds a verification QR code on the closing page of the exported P&amp;I policy. Requires a verification URL configured in Policy Settings &rarr; QR Verification.
+        </p>
+      </div>
     </div>
   )
 }

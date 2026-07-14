@@ -2838,9 +2838,10 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     }
   }
 
-  // QR Verification — P&I only: QR code image + URL with IMO number
+  // QR Verification — P&I only, and only when enabled for this policy (wizard toggle, default off)
   try {
-    const qrBase = data.quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
+    const qrEnabled = (data.policy as any).qrEnabled === true
+    const qrBase = (data.quotation.quotationTypeCode === 'P' && qrEnabled) ? await window.api.getSetting('qr_verification_url') : null
     if (qrBase && data.vesselInfo.imo) {
       const qrFullUrl = `${qrBase}${data.vesselInfo.imo}`
       // Generate QR code as PNG buffer

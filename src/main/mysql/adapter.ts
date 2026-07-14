@@ -3328,6 +3328,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // QR verification code toggle on policy_documents (NULL/0 = off; per-policy choice set in wizard)
+            try {
+                const [qreCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'qr_enabled'") as any[]
+                if ((qreCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN qr_enabled TINYINT(1) DEFAULT NULL")
+                }
+            } catch {}
+
             // ---- Policy Endorsements tables ----
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
                 id VARCHAR(36) PRIMARY KEY,
@@ -10864,6 +10872,7 @@ export class MySQLAdapter {
             outstandingPremiumText: r.outstanding_premium_text ?? null,
             nonRefundableType: r.non_refundable_type ?? null,
             nonRefundablePercent: r.non_refundable_percent == null ? null : Number(r.non_refundable_percent),
+            qrEnabled: r.qr_enabled == null ? null : Boolean(r.qr_enabled),
             proRata: Boolean(r.pro_rata),
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
@@ -11100,6 +11109,7 @@ export class MySQLAdapter {
             selectedLolOptionId: 'selected_lol_option_id',
             selectedAgreedValueOptionId: 'selected_agreed_value_option_id',
             ourShare: 'our_share',
+            qrEnabled: 'qr_enabled',
         }
         const sets: string[] = []
         const vals: any[] = []
@@ -11263,6 +11273,8 @@ export class MySQLAdapter {
         nonRefundablePercent?: number | null
         // Per-policy section order override (null = use the policy-settings default for the type)
         sectionOrder?: string[] | null
+        // QR verification code toggle for this policy (P&I only; false/undefined = off)
+        qrEnabled?: boolean
         // Blue-card period (falls back to policy period) + per-card named assured (entity id)
         blueCardInception?: string | null
         blueCardExpiry?: string | null
@@ -11300,8 +11312,8 @@ export class MySQLAdapter {
                     per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
                     section_order, selected_lol_option_id, selected_agreed_value_option_id,
                     outstanding_premium_enabled, outstanding_premium_text,
-                    non_refundable_type, non_refundable_percent)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    non_refundable_type, non_refundable_percent, qr_enabled)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
@@ -11312,7 +11324,8 @@ export class MySQLAdapter {
                 options.outstandingPremiumEnabled == null ? null : (options.outstandingPremiumEnabled ? 1 : 0),
                 options.outstandingPremiumText ?? null,
                 options.nonRefundableType ?? null,
-                options.nonRefundablePercent ?? null])
+                options.nonRefundablePercent ?? null,
+                options.qrEnabled ? 1 : 0])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {
