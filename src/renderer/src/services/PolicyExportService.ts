@@ -2966,7 +2966,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 0 },
     children: [
-      new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+      new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })
     ]
   }))
   if (vesselName) {
@@ -2974,7 +2974,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       alignment: AlignmentType.CENTER,
       spacing: { before: 0, after: 0 },
       children: [
-        new TextRun({ text: `M/V ${vesselName.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+        new TextRun({ text: `M/V ${vesselName.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })
       ]
     }))
   }
