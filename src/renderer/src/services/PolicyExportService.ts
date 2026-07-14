@@ -671,6 +671,12 @@ const POL_FOOTER_DXA = 450
 const POL_CONTENT_W = POL_PAGE_W_DXA - 2 * POL_MARGIN_LR
 const POL_TITLE_W = Math.round(POL_CONTENT_W * 0.20)
 const POL_BODY_W = POL_CONTENT_W - POL_TITLE_W
+// makeRow body cell has left/right margins of 80 twips. Nested tables ignore the
+// parent cell's left margin and hug the cell border, so they render ~80 twips left
+// of the paragraph-based sections. Indent nested tables by this margin and base
+// their width on the inner content area so they align with paragraph content.
+const POL_BODY_CELL_MARGIN = 80
+const POL_BODY_INNER_W = POL_BODY_W - 2 * POL_BODY_CELL_MARGIN
 
 // ---- Policy data interfaces ----
 
@@ -1383,8 +1389,8 @@ function polBuildAmountBreakdown(
   total: number,
   currency: string
 ): (Paragraph | Table)[] {
-  const labelW = Math.round(POL_BODY_W * 0.45)
-  const amtW = POL_BODY_W - labelW
+  const labelW = Math.round(POL_BODY_INNER_W * 0.45)
+  const amtW = POL_BODY_INNER_W - labelW
   const totalTop = {
     top: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
     bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -1399,7 +1405,8 @@ function polBuildAmountBreakdown(
   })
   return [
     new Table({
-      width: { size: POL_BODY_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, amtW],
       rows: [
@@ -1619,7 +1626,8 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
   if (tableRows.length > 0) {
     content.push(new Table({
-      width: { size: POL_BODY_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.AUTOFIT,
       rows: tableRows
     }))
@@ -1652,12 +1660,13 @@ function polBuildVesselTable(data: PolicyExportData): Table {
   ]
   // Call sign is intentionally omitted from policy documents — it only appears on blue cards.
 
-  const labelW = Math.round(POL_BODY_W * 0.25)
-  const sepW = Math.round(POL_BODY_W * 0.05)
-  const valW = POL_BODY_W - labelW - sepW
+  const labelW = Math.round(POL_BODY_INNER_W * 0.25)
+  const sepW = Math.round(POL_BODY_INNER_W * 0.05)
+  const valW = POL_BODY_INNER_W - labelW - sepW
 
   return new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, sepW, valW],
     rows: rows.map(([label, value]) => new TableRow({
@@ -1672,9 +1681,9 @@ function polBuildVesselTable(data: PolicyExportData): Table {
 
 function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_W * 0.10)
-  const dateW = Math.round(POL_BODY_W * 0.30)
-  const timeTzW = POL_BODY_W - labelW - dateW
+  const labelW = Math.round(POL_BODY_INNER_W * 0.10)
+  const dateW = Math.round(POL_BODY_INNER_W * 0.30)
+  const timeTzW = POL_BODY_INNER_W - labelW - dateW
 
   const makeCell = (text: string, bold = false) => new TableCell({
     width: { size: 0, type: WidthType.AUTO },
@@ -1688,7 +1697,8 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   }
 
   return [new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeTzW],
     rows: [
@@ -1700,15 +1710,16 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_W * 0.12)
-  const dateW = Math.round(POL_BODY_W * 0.33)
-  const timeW = POL_BODY_W - labelW - dateW
+  const labelW = Math.round(POL_BODY_INNER_W * 0.12)
+  const dateW = Math.round(POL_BODY_INNER_W * 0.33)
+  const timeW = POL_BODY_INNER_W - labelW - dateW
   const pCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
     children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
   })
   return [new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1721,15 +1732,16 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
 /** Period for endorsement DA/CA: from endorsement effective date to policy expiry */
 function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData): (Paragraph | Table)[] {
   const { expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_W * 0.12)
-  const dateW = Math.round(POL_BODY_W * 0.33)
-  const timeW = POL_BODY_W - labelW - dateW
+  const labelW = Math.round(POL_BODY_INNER_W * 0.12)
+  const dateW = Math.round(POL_BODY_INNER_W * 0.33)
+  const timeW = POL_BODY_INNER_W - labelW - dateW
   const pCell = (text: string, w: number) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
     children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
   })
   return [new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1747,10 +1759,11 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
     const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
     if (polSt(data, 'conditionsIntro')) content.push(...polMp(polSt(data, 'conditionsIntro')))
     if (selectedClauses.length > 0) {
-      const clauseRefW = Math.round(POL_BODY_W * 0.32)
-      const clauseDescW = POL_BODY_W - clauseRefW
+      const clauseRefW = Math.round(POL_BODY_INNER_W * 0.32)
+      const clauseDescW = POL_BODY_INNER_W - clauseRefW
       content.push(new Table({
-        width: { size: POL_BODY_W, type: WidthType.DXA },
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         columnWidths: [clauseRefW, clauseDescW],
         rows: selectedClauses.map(c => {
@@ -1808,8 +1821,8 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   const currency = data.quotation.premiumCurrency || 'USD'
   if (hc.length === 0 && ha.length === 0) return
 
-  const condCol1W = Math.round(POL_BODY_W * 0.20)
-  const condCol2W = POL_BODY_W - condCol1W
+  const condCol1W = Math.round(POL_BODY_INNER_W * 0.20)
+  const condCol2W = POL_BODY_INNER_W - condCol1W
 
   // Resolve amount: check vesselAmounts for this vessel first, then the condition itself, then any sibling
   const policyVesselId = data.vessel?.id || null
@@ -1823,7 +1836,8 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   }
 
   const makeCondTable = (conds: typeof hc) => new Table({
-    width: { size: POL_BODY_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: [condCol1W, condCol2W],
     rows: conds.map(qc => {
@@ -2294,8 +2308,8 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
 
 function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
-  const dedAmtW = Math.round(POL_BODY_W * 0.20)
-  const dedDescW = POL_BODY_W - dedAmtW
+  const dedAmtW = Math.round(POL_BODY_INNER_W * 0.20)
+  const dedDescW = POL_BODY_INNER_W - dedAmtW
 
   if (data.deductibles.length > 0) {
     const policyVesselId = data.vessel?.id || null
@@ -2323,7 +2337,8 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       }
     }
     content.push(new Table({
-      width: { size: POL_BODY_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [dedAmtW, dedDescW],
       rows: dedRows
@@ -3517,8 +3532,8 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   // Instalment table — 2 columns: "Xth Instalment due {date}" | "USD X (non-refundable)"
   if (data.instalments.length > 0) {
     const isFirstInstNr = daNrType === 'first_instalment'
-    const instDescW = Math.round(POL_BODY_W * 0.55)
-    const instAmtW = POL_BODY_W - instDescW
+    const instDescW = Math.round(POL_BODY_INNER_W * 0.55)
+    const instAmtW = POL_BODY_INNER_W - instDescW
     const instRows = data.instalments.map(inst => {
       const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       const isNR = inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)
@@ -3530,7 +3545,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
@@ -3747,8 +3762,8 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
     }
     if (numInst > 1) {
       detailsContent.push(polEmptyP())
-      const caInstDescW = Math.round(POL_BODY_W * 0.55)
-      const caInstAmtW = POL_BODY_W - caInstDescW
+      const caInstDescW = Math.round(POL_BODY_INNER_W * 0.55)
+      const caInstAmtW = POL_BODY_INNER_W - caInstDescW
       const caInstRows = data.instalments.map(inst => {
         const commAmt = inst.commissionAmount != null ? inst.commissionAmount : Math.round(((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent / 100 * 100) / 100
         return new TableRow({
@@ -3758,7 +3773,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
           ]
         })
       })
-      detailsContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
+      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
       detailsContent.push(new Paragraph({ spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })] }))
     }
   }
@@ -4338,8 +4353,8 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
     ppcpContent.push(polEmptyP())
 
     // Instalment table — same pattern as policy DA
-    const instDescW = Math.round(POL_BODY_W * 0.55)
-    const instAmtW = POL_BODY_W - instDescW
+    const instDescW = Math.round(POL_BODY_INNER_W * 0.55)
+    const instAmtW = POL_BODY_INNER_W - instDescW
     const instRows = instalments.map(inst => {
       const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       const amtText = polFormatCurrency(Number(inst.premiumAmount) || 0, currency)
@@ -4350,7 +4365,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, indent: { size: POL_BODY_CELL_MARGIN, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
