@@ -1750,7 +1750,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   Do not mention broker on documents
                 </label>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', marginLeft: '24px' }}>
-                  Hides the “c/o {'{broker}'}” line on the policy, debit advice and credit advice.
+                  Hides the “c/o {'{broker}'}” line on the policy and debit advice. The credit advice always shows the broker (it is the broker’s document).
                 </div>
               </div>
             </div>

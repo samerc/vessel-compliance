@@ -3838,12 +3838,11 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
   const children: (Paragraph | Table)[] = []
 
   // Broker block — load from quotation customer (broker), show at top left with 0 spacing.
-  // Suppressed when the policy's "do not mention broker" toggle is on.
+  // The hide-broker toggle intentionally does NOT apply here: the CA is the broker's document.
   const brokerEntityId = data.quotation.customerEntityId
   const isBroker = data.quotation.customerType === 'broker'
-  const hideBroker = !!(data.policy as any).hideBroker
   const caZeroP = (text: string) => new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })
-  if (brokerEntityId && isBroker && !hideBroker) {
+  if (brokerEntityId && isBroker) {
     try {
       // Broker entity + address are frozen on the policy snapshot (first export).
       const brokerEntity = data.frozen?.brokerEntity || null
