@@ -837,6 +837,8 @@ interface FrozenExportSettings {
   brokerEntity?: { id: string; name: string; email?: string; phone?: string } | null
   brokerAddress?: { addressLine1?: string; city?: string; country?: string } | null
   logoPath?: string | null
+  declarationSettings?: any            // per-year War declaration config (UMR/Amlin/risk code)
+  endorsementClosingText?: string | null
 }
 
 interface PolVesselInfo {
@@ -870,6 +872,9 @@ async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): 
   } catch { /* null */ }
   const qrBase = quotation.quotationTypeCode === 'P' ? (await window.api.getSetting('qr_verification_url')) : null
   const logoPath = await window.api.piGetQuotationLogoPath()
+  let declarationSettings: any = null
+  try { const rawDec = await window.api.getSetting('declaration_settings'); if (rawDec) declarationSettings = JSON.parse(rawDec) } catch { /* null */ }
+  const endorsementClosingText = (await window.api.getSetting('endorsement_closing_text').catch(() => null)) || null
   let st: any = sectionTextsRaw
   if (!st) { try { st = await window.api.piGetSectionTexts() } catch { st = null } }
   let brokerEntity: FrozenExportSettings['brokerEntity'] = null
@@ -893,7 +898,9 @@ async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): 
     sectionOrderDefault,
     brokerEntity,
     brokerAddress,
-    logoPath
+    logoPath,
+    declarationSettings,
+    endorsementClosingText
   }
 }
 
@@ -3990,9 +3997,8 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   let amlinRef = ''
   let riskCode = '"W" in respect of War Risks Premium\t\t"WB" in respect of War Breach Premium'
   try {
-    const raw = await window.api.getSetting('declaration_settings')
-    if (raw) {
-      const parsed = JSON.parse(raw)
+    const parsed = data.frozen?.declarationSettings
+    if (parsed) {
       const yearSettings = parsed[year] || {}
       umr = yearSettings.umr || ''
       amlinRef = yearSettings.amlinRef || ''
@@ -4067,7 +4073,7 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
 }
 
 export async function exportDeclarationDocx(policyId: string, fields: DeclarationFields): Promise<void> {
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
 
   const FONT = 'Arial'
   const SIZE = 20 // 10pt
@@ -4181,7 +4187,7 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
 // ============================================================================
 
 async function loadEndorsementExportData(policyId: string, endorsementId: string) {
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
   const endorsement = await window.api.endorsementGet(endorsementId)
   if (!endorsement) throw new Error('Endorsement not found')
   const sections = await window.api.endorsementGetSections(endorsementId)
@@ -4333,10 +4339,8 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   // Closing text
   let closingText = 'All other terms and conditions of the above-mentioned policy remain unchanged.'
-  try {
-    const savedClosing = await window.api.getSetting('endorsement_closing_text')
-    if (savedClosing) closingText = savedClosing
-  } catch { /* ignore */ }
+  const savedClosing = data.frozen?.endorsementClosingText
+  if (savedClosing) closingText = savedClosing
 
   children.push(polEmptyP())
   if (polIsHtml(closingText)) {
