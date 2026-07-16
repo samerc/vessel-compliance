@@ -175,6 +175,10 @@ const BC_LABEL_W = 3800
 const BC_SEP_W = 300
 const BC_VALUE_W = 5900
 
+// Zero the default cell inset so table cell text aligns flush-left with the
+// surrounding paragraphs (Word's default ~108twip left cell margin nudges tables right).
+const BC_TABLE_MARGINS = { marginUnitType: WidthType.DXA, top: 0, bottom: 0, left: 0, right: 0 }
+
 /** Borderless key : value row for vessel detail tables — 3 columns */
 function bcDetailRow(label: string, value: string): TableRow {
   return new TableRow({
@@ -294,6 +298,7 @@ function buildBbcWrcPage(
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
+    margins: BC_TABLE_MARGINS,
     columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
     rows: vesselRows,
   }) as unknown as Paragraph)
@@ -343,6 +348,7 @@ function buildBbcWrcPage(
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
+    margins: BC_TABLE_MARGINS,
     columnWidths: [pLabelW, pDateW, pTimeTzW],
     rows: [
       new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(`${polFormatTime(data.inceptionTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] }),
@@ -442,6 +448,7 @@ function buildMlcPage(
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
+    margins: BC_TABLE_MARGINS,
     columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
     rows: vesselRows,
   }) as unknown as Paragraph)
@@ -498,6 +505,7 @@ function buildMlcPage(
     children.push(new Table({
       width: { size: 10000, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
+      margins: BC_TABLE_MARGINS,
       columnWidths: [cLabelW, cValueW],
       rows: contactRows,
     }) as unknown as Paragraph)
