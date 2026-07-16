@@ -3454,6 +3454,25 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: backfill the "addressed to" (flag maritime authority) on existing BBC/WRC
+            // blue cards that were created before conversion auto-filled it. Only fills blank ones,
+            // and only when the flag ratifies the relevant convention (BBC=bunker, WRC=wreck).
+            try {
+                await this.pool.query(`
+                    UPDATE policy_blue_cards bc
+                    JOIN policy_documents pd ON pd.id = bc.policy_doc_id
+                    JOIN vessels v ON v.id = pd.vessel_id
+                    JOIN flag_states fs ON fs.id = v.flag_state_id
+                    SET bc.addressed_to_flag_id = fs.id,
+                        bc.addressed_to_name = fs.authority_name,
+                        bc.addressed_to_address = fs.authority_address
+                    WHERE (bc.addressed_to_name IS NULL OR bc.addressed_to_name = '')
+                      AND fs.authority_name IS NOT NULL AND fs.authority_name <> ''
+                      AND ((bc.card_type = 'BBC' AND fs.ratified_bunker = 1)
+                        OR (bc.card_type = 'WRC' AND fs.ratified_wreck = 1))
+                `)
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -11494,8 +11513,14 @@ export class MySQLAdapter {
 
             // Create blue cards (P&I only)
             if (options.blueCards.length > 0) {
-                // Resolve the port of registry from the vessel's flag state (single port, or the default one)
+                // Resolve the port of registry + flag maritime authority (for BBC/WRC "addressed to")
+                // from the vessel's flag state.
                 let defaultPort: string | null = null
+                let flagAuthorityId: string | null = null
+                let flagAuthorityName: string | null = null
+                let flagAuthorityAddress: string | null = null
+                let ratifiedBunker = false
+                let ratifiedWreck = false
                 try {
                     const [vFlagRows] = await this.pool.query('SELECT flag_state_id FROM vessels WHERE id = ?', [actualVesselId])
                     const flagStateId = (vFlagRows as any[])[0]?.flag_state_id
@@ -11506,8 +11531,21 @@ export class MySQLAdapter {
                         )
                         const ports = portRows as any[]
                         defaultPort = ports.length === 1 ? ports[0].name : (ports.find(p => p.is_default)?.name || null)
+
+                        const [fsRows] = await this.pool.query(
+                            'SELECT authority_name, authority_address, ratified_bunker, ratified_wreck FROM flag_states WHERE id = ?',
+                            [flagStateId]
+                        )
+                        const fs = (fsRows as any[])[0]
+                        if (fs) {
+                            flagAuthorityId = flagStateId
+                            flagAuthorityName = fs.authority_name || null
+                            flagAuthorityAddress = fs.authority_address || null
+                            ratifiedBunker = !!fs.ratified_bunker
+                            ratifiedWreck = !!fs.ratified_wreck
+                        }
                     }
-                } catch { /* non-critical — port can be set later in the blue card editor */ }
+                } catch { /* non-critical — port/addressee can be set later in the blue card editor */ }
 
                 // Resolve the registered owner (name + address) for the blue cards — the assured
                 // with a "Registered Owner" role, else the first assured on the vessel.
@@ -11571,14 +11609,24 @@ export class MySQLAdapter {
                 for (const cardType of options.blueCards) {
                     const cardNumber = policyNumber + '/' + cardType
                     const ov = await resolveOwnerFor(options.blueCardOwners?.[cardType] || null)
+                    // BBC/WRC certificates are addressed to the flag-state maritime authority when
+                    // the flag ratifies the relevant convention (BBC=bunker, WRC=wreck). MLC cards
+                    // are addressed to the provider, so they get no flag addressee.
+                    const addressToFlag =
+                        (cardType === 'BBC' && ratifiedBunker) || (cardType === 'WRC' && ratifiedWreck)
+                    const atFlagId = addressToFlag ? flagAuthorityId : null
+                    const atName = addressToFlag ? flagAuthorityName : null
+                    const atAddress = addressToFlag ? flagAuthorityAddress : null
                     await this.pool.execute(`
                         INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
                             inception_date, expiry_date, revision_number, issued_date, port_of_registry,
-                            owner_entity_id, owner_name, owner_address)
-                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?, ?, ?, ?)
+                            owner_entity_id, owner_name, owner_address,
+                            addressed_to_flag_id, addressed_to_name, addressed_to_address)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, CURRENT_DATE, ?, ?, ?, ?, ?, ?, ?)
                     `, [uuidv4(), policyId, cardType, cardNumber,
                         bcInception, bcExpiry, defaultPort,
-                        ov.id, ov.name, ov.address])
+                        ov.id, ov.name, ov.address,
+                        atFlagId, atName, atAddress])
                 }
             }
 
