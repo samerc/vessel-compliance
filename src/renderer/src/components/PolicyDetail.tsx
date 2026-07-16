@@ -437,7 +437,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         premiumAmount: editPremium,
         commissionPercent: editCommission || null,
         bankId: editBankId || null,
-        cancelReplaceText: editCancelReplace ? editCancelReplaceText : null
+        cancelReplaceText: editCancelReplace ? editCancelReplaceText : null,
+        // Editing invalidates the frozen export snapshot so the next export re-freezes
+        // with the change (exports are otherwise identical on re-export).
+        exportSnapshot: null
       })
       await window.api.policySetInstalments(policyId, editInstalments)
       await window.api.policySetAddresses(policyId, editAddresses.map(a => ({
@@ -934,6 +937,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           bcModalMode === 'reissue' ? 'Blue card reissued' : 'Blue card issued'
         )
       }
+      // Blue card changes invalidate the frozen snapshot so exports re-freeze with them
+      try { await window.api.policyUpdate(policyId, { exportSnapshot: null }) } catch { /* non-critical */ }
       setBcModalOpen(false)
       // Reload blue cards
       const bc = await window.api.policyGetBlueCards(policyId)
@@ -970,7 +975,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           companyName: reportSettings.companyName || 'Insurance Company',
           cancelReplaceText: card.cancelReplaceText || ''
         },
-        card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2'
+        card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2',
+        policyId
       )
       showSuccess(`${card.cardType} blue card exported`)
     } catch (err: any) {

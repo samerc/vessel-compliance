@@ -575,44 +575,59 @@ async function buildBlueCardPage(
  */
 export async function exportBlueCardDocx(
   data: BlueCardData,
-  cardType: BlueCardType
+  cardType: BlueCardType,
+  policyId?: string
 ): Promise<void> {
   await loadPolicyFontSize()
-  const settings = await loadBcSettings()
+  // When a policyId is given, freeze the policy on first export and pull the blue-card
+  // texts / letterhead / footer from its frozen snapshot so re-exports never change.
+  let settings: BcSettingsMap
+  let headerHtml = ''
+  let headerSpacing: number | undefined
+  let footerSettings: any = null
+  if (policyId) {
+    const exp = await loadFrozenExportData(policyId)
+    const f = exp.frozen
+    settings = { ...BC_DEFAULTS, ...(f?.bcSettings || {}) } as unknown as BcSettingsMap
+    headerHtml = f?.docHeader || ''
+    headerSpacing = f?.docHeaderSpacing
+    footerSettings = f?.exportSettings || null
+    applyFrozenFontSize(exp)
+  } else {
+    settings = await loadBcSettings()
+    try {
+      const st = await window.api.piGetSectionTexts()
+      headerHtml = st?.docHeader || ''
+      headerSpacing = (st as any)?.docHeaderSpacing || undefined
+    } catch { /* no header */ }
+    try {
+      const raw = await window.api.getSetting('policyExportSettings')
+      footerSettings = raw ? JSON.parse(raw) : null
+    } catch { /* no footer */ }
+  }
   const children = await buildBlueCardPage(data, cardType, true, settings)
 
   // Build header + footer matching policy style
   const headerParas: Paragraph[] = []
-  try {
-    const sectionTexts = await window.api.piGetSectionTexts()
-    const headerHtml = sectionTexts?.docHeader
-    if (headerHtml) {
-      const hSpacing = (sectionTexts as any).docHeaderSpacing || undefined
-      headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hSpacing, spacingAfter: 0 }))
-    }
-  } catch { /* no header */ }
+  if (headerHtml) {
+    headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing, spacingAfter: 0 }))
+  }
   // No policy/vessel line in header — shown in body REF line instead
 
-  // Footer text from settings (no page number for blue cards)
+  // Footer text (no page number for blue cards)
   const footerParas: Paragraph[] = []
-  try {
-    const raw = await window.api.getSetting('policyExportSettings')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.footerText) {
-        const plainFt = parsed.footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
-        for (const line of plainFt.split('\n')) {
-          if (line.trim()) {
-            footerParas.push(new Paragraph({
-              alignment: AlignmentType.LEFT,
-              spacing: { before: 0, after: 0 },
-              children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999' })],
-            }))
-          }
-        }
+  if (footerSettings?.footerText) {
+    const plainFt = footerSettings.footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    for (const line of plainFt.split('\n')) {
+      if (line.trim()) {
+        footerParas.push(new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999' })],
+        }))
       }
     }
-  } catch { /* no footer */ }
+  }
 
   const document = new Document({
     sections: [{
@@ -647,14 +662,15 @@ export async function exportBlueCardDocx(
  */
 export async function exportBlueCardsDocx(
   data: BlueCardData,
-  cardTypes: BlueCardType[]
+  cardTypes: BlueCardType[],
+  policyId?: string
 ): Promise<void> {
   if (cardTypes.length === 0) return
   await loadPolicyFontSize()
 
   // Export each card as a separate file
   for (const cardType of cardTypes) {
-    await exportBlueCardDocx(data, cardType)
+    await exportBlueCardDocx(data, cardType, policyId)
   }
 }
 
@@ -803,6 +819,24 @@ interface PolicyExportData {
   agreedValueOptions: QuotationAgreedValueOption[]
   fleets: { id: string; name: string }[]
   vesselClassificationNames: Record<string, string>
+  // Frozen render settings — everything the builders would otherwise read live from
+  // getSetting/settings. Captured on first export so re-exports (policy/DA/CA/BC) never
+  // pick up later setting changes. A new revision produces a new row with no snapshot,
+  // which re-freezes on its first export.
+  frozen?: FrozenExportSettings
+}
+
+interface FrozenExportSettings {
+  exportSettings: any                 // parsed policyExportSettings (footer, header titles, intros…)
+  bcSettings: Record<string, string>  // blue-card title/certify/cancel + MLC contact block
+  docHeader: string                   // company letterhead HTML
+  docHeaderSpacing?: number
+  fontSize?: number | null
+  qrBase?: string | null
+  sectionOrderDefault?: string[] | null
+  brokerEntity?: { id: string; name: string; email?: string; phone?: string } | null
+  brokerAddress?: { addressLine1?: string; city?: string; country?: string } | null
+  logoPath?: string | null
 }
 
 interface PolVesselInfo {
@@ -819,6 +853,50 @@ interface PolVesselInfo {
 
 // ---- Data loading ----
 
+/** Load every live render setting the builders would otherwise read via getSetting, so it
+ * can be frozen into the snapshot. Reused for fresh loads and to backfill legacy snapshots. */
+async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): Promise<FrozenExportSettings> {
+  let exportSettings: any = {}
+  try {
+    const raw = await window.api.getSetting('policyExportSettings')
+    if (raw) exportSettings = JSON.parse(raw)
+  } catch { /* keep {} */ }
+  const bcSettings = await loadBcSettings()
+  const fontRaw = await window.api.getSetting('policy_font_size')
+  let sectionOrderDefault: string[] | null = null
+  try {
+    const rawSec = await window.api.getSetting(`policy_section_order_defaults_${quotation.quotationTypeCode}`)
+    if (rawSec) sectionOrderDefault = JSON.parse(rawSec)
+  } catch { /* null */ }
+  const qrBase = quotation.quotationTypeCode === 'P' ? (await window.api.getSetting('qr_verification_url')) : null
+  const logoPath = await window.api.piGetQuotationLogoPath()
+  let st: any = sectionTextsRaw
+  if (!st) { try { st = await window.api.piGetSectionTexts() } catch { st = null } }
+  let brokerEntity: FrozenExportSettings['brokerEntity'] = null
+  let brokerAddress: FrozenExportSettings['brokerAddress'] = null
+  if (quotation.customerEntityId && quotation.customerType === 'broker') {
+    try {
+      const ents = await window.api.getEntities()
+      const be = (Array.isArray(ents) ? ents : []).find((e: any) => e.id === quotation.customerEntityId)
+      if (be) brokerEntity = { id: be.id, name: be.name, email: be.email, phone: be.phone }
+      const addrs = await window.api.getEntityAddresses(quotation.customerEntityId)
+      if (Array.isArray(addrs) && addrs.length > 0) brokerAddress = { addressLine1: addrs[0].addressLine1, city: addrs[0].city, country: addrs[0].country }
+    } catch { /* no broker */ }
+  }
+  return {
+    exportSettings,
+    bcSettings,
+    docHeader: (st as any)?.docHeader || '',
+    docHeaderSpacing: (st as any)?.docHeaderSpacing,
+    fontSize: fontRaw ? parseInt(fontRaw, 10) : null,
+    qrBase,
+    sectionOrderDefault,
+    brokerEntity,
+    brokerAddress,
+    logoPath
+  }
+}
+
 async function loadPolicyExportData(policyId: string): Promise<PolicyExportData> {
   const policy: PolicyDocRecord = await window.api.policyGetById(policyId)
 
@@ -829,6 +907,11 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       // Restore the policy record from snapshot but keep current signedBy/signedAt
       if (snapshot.policy) {
         snapshot.policy.exportSnapshot = policy.exportSnapshot
+      }
+      // Legacy snapshots (captured before the freeze-everything change) have no `frozen`
+      // bundle — backfill it from current settings so footer/titles/etc. aren't blank.
+      if (!snapshot.frozen && snapshot.quotation) {
+        try { snapshot.frozen = await loadFrozenSettings(snapshot.quotation) } catch { /* leave undefined */ }
       }
       return snapshot
     } catch {
@@ -1018,9 +1101,13 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   const reportSettings = await getReportSettings()
 
+  // Freeze all live render settings so the snapshot fully determines the output.
+  const frozen = await loadFrozenSettings(quotation, sectionTexts)
+
   return {
     policy,
     quotation,
+    frozen,
     instalments: Array.isArray(instalments) ? instalments : [],
     addresses: Array.isArray(addresses) ? addresses : [],
     blueCards: Array.isArray(blueCards) ? blueCards : [],
@@ -1111,17 +1198,18 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 // ---- Export Snapshot ----
 
 /**
- * Capture all export data for a signed policy and freeze it as a JSON snapshot.
- * Future exports will use this snapshot so documents never change after signing.
+ * Freeze the given already-loaded export data as a JSON snapshot on the policy.
+ * All future exports (policy/DA/CA/BC) read from this so documents never change on
+ * re-export. Called on the FIRST export of a policy and again at signing (to add the
+ * signature). A new revision is a new policy row with no snapshot and re-freezes.
  */
-export async function capturePolicyExportSnapshot(policyId: string): Promise<void> {
-  const data = await loadPolicyExportData(policyId)
+async function capturePolicyExportSnapshotFromData(policyId: string, data: PolicyExportData): Promise<void> {
   // Strip the exportSnapshot field from the nested policy to avoid storing a snapshot-of-a-snapshot
   const snapshotPolicy = { ...data.policy }
   delete snapshotPolicy.exportSnapshot
 
   // Capture the signature image so it's frozen with the policy
-  let signatureSnapshot: { imageData: number[]; signerName: string } | null = null
+  let signatureSnapshot: { imageData: number[]; signerName: string } | null = (data as any).signatureSnapshot || null
   try {
     const sigData = await window.api.policyGetSignature(policyId)
     if (sigData && sigData.imageData) {
@@ -1139,6 +1227,28 @@ export async function capturePolicyExportSnapshot(policyId: string): Promise<voi
     snapshotAt: new Date().toISOString()
   }
   await window.api.policyUpdate(policyId, { exportSnapshot: JSON.stringify(snapshot) })
+}
+
+/** Public capture (used at signing) — loads current data, then freezes it. */
+export async function capturePolicyExportSnapshot(policyId: string): Promise<void> {
+  const data = await loadPolicyExportData(policyId)
+  await capturePolicyExportSnapshotFromData(policyId, data)
+}
+
+/**
+ * Load export data and, if the policy has no snapshot yet, freeze one now (first export).
+ * Every export entry point uses this so the very first document produced locks the content.
+ */
+async function loadFrozenExportData(policyId: string): Promise<PolicyExportData> {
+  const data = await loadPolicyExportData(policyId)
+  if (!data.policy.exportSnapshot) {
+    try {
+      await capturePolicyExportSnapshotFromData(policyId, data)
+    } catch (e) {
+      console.warn('[PolicyExport] freeze-on-first-export failed; exporting live', e)
+    }
+  }
+  return data
 }
 
 // ---- Number to Words ----
@@ -1301,6 +1411,15 @@ async function loadPolicyFontSize(): Promise<void> {
       }
     }
   } catch { /* use default */ }
+}
+
+/** Override the live font size with the policy's frozen value (from the snapshot). */
+function applyFrozenFontSize(data: PolicyExportData): void {
+  const fs = data.frozen?.fontSize
+  if (fs && fs >= 8 && fs <= 16) {
+    POL_FONT_SIZE = fs * 2
+    BC_SIZE = fs * 2
+  }
 }
 
 function polNp(text: string) {
@@ -2390,7 +2509,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   let premIntroTemplate = ''
   let premIntroSingleTemplate = ''
   try {
-    const s = await window.api.getSetting('policyExportSettings')
+    const s = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (s) {
       const p = JSON.parse(s)
       if (p.premiumIntroText) premIntroTemplate = p.premiumIntroText
@@ -2501,7 +2620,8 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 
 export async function exportPolicyDocx(policyId: string, totalPages?: number, includeTC?: boolean): Promise<void> {
   await loadPolicyFontSize()
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
   // Resolve rich-text (html) T&C to append inline as a new section (docx T&C is handled by the merge path)
@@ -2515,8 +2635,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   const children: (Paragraph | Table)[] = []
 
-  // Logo
-  const logoPath = await window.api.piGetQuotationLogoPath()
+  // Logo — frozen path from the snapshot (falls back to live if an older snapshot lacks it)
+  const logoPath = data.frozen?.logoPath !== undefined ? data.frozen.logoPath : await window.api.piGetQuotationLogoPath()
   if (logoPath) {
     const logoData = await polLoadLogoAsBuffer(logoPath)
     if (logoData) {
@@ -2766,8 +2886,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Emit sections in the configured order. Any section whose key isn't in the configured
   // order (e.g. a War policy's sanctions section) is anchored right after its original
   // preceding section, so it keeps its natural position instead of jumping to the end.
-  let policySecDefault: string[] = []
-  try { const rawSecOrder = await window.api.getSetting(`policy_section_order_defaults_${typeCode}`); if (rawSecOrder) policySecDefault = JSON.parse(rawSecOrder) } catch { /* use hardcoded default */ }
+  const policySecDefault: string[] = data.frozen?.sectionOrderDefault || []
   const secOrder = resolvePolicySectionOrder(data, policySecDefault)
   const inOrder = new Set(secOrder)
   let lastKnownIdx = -1
@@ -2840,7 +2959,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // QR Verification — P&I only, and only when enabled for this policy (wizard toggle, default off)
   try {
     const qrEnabled = (data.policy as any).qrEnabled === true
-    const qrBase = (data.quotation.quotationTypeCode === 'P' && qrEnabled) ? await window.api.getSetting('qr_verification_url') : null
+    const qrBase = (data.quotation.quotationTypeCode === 'P' && qrEnabled) ? (data.frozen?.qrBase || null) : null
     if (qrBase && data.vesselInfo.imo) {
       const qrFullUrl = `${qrBase}${data.vesselInfo.imo}`
       // Generate QR code as PNG buffer
@@ -2965,7 +3084,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   let tcTitleLine = '{type} Cover {number}'
   let tcShowPageNumbers = true
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.footerText) footerText = parsed.footerText
@@ -3141,7 +3260,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
  * @param totalPages - if provided, hardcodes "Page X of N" instead of using auto NUMPAGES
  */
 async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, includeTC?: boolean): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
@@ -3171,7 +3291,8 @@ async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, i
  */
 export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   // Check if T&C template exists for this policy type
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
   const tcTemplate = await window.api.tcGetTemplate(typeCode) as any
@@ -3235,17 +3356,16 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
 // ==================== Shared DA/CA Helpers ====================
 
 /** Build the same header paragraphs used by the policy export (company details + title line) */
-/** Build footer for DA/CA — footer text only, NO page number */
+/** Build footer for DA/CA — footer text only, NO page number. Footer text comes from the
+ * policy's frozen export settings (passed in) so it never changes on re-export. */
 async function polBuildAdviceFooter(
-  sigBuf: Uint8Array | null
+  sigBuf: Uint8Array | null,
+  frozenSettings?: any
 ): Promise<Footer> {
   let footerText = ''
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
-    if (settings) {
-      const parsed = JSON.parse(settings)
-      if (parsed.footerText) footerText = parsed.footerText
-    }
+    const parsed = frozenSettings || {}
+    if (parsed.footerText) footerText = parsed.footerText
   } catch { /* ignore */ }
 
   // Parse footer text lines
@@ -3394,7 +3514,8 @@ async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ 
 
 export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   await loadPolicyFontSize()
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const currency = data.quotation.premiumCurrency || 'USD'
 
@@ -3405,7 +3526,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
     W: 'War Risk Certificate'
   }
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
@@ -3423,7 +3544,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   if (daHeaderHtml) {
     daHeaderParas.push(...parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(null)
+  const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
@@ -3511,7 +3632,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   let daIntroTemplate = ''
   let daIntroSingleTemplate = ''
   try {
-    const s = await window.api.getSetting('policyExportSettings')
+    const s = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (s) {
       const p = JSON.parse(s)
       if (p.debitAdviceIntroText) daIntroTemplate = p.debitAdviceIntroText
@@ -3617,7 +3738,8 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
 
 export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   await loadPolicyFontSize()
-  const data = await loadPolicyExportData(policyId)
+  const data = await loadFrozenExportData(policyId)
+  applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const currency = data.quotation.premiumCurrency || 'USD'
 
@@ -3628,7 +3750,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
     W: 'War Risk Certificate'
   }
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
@@ -3646,13 +3768,13 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   if (caHeaderHtml) {
     caHeaderParas.push(...parseHtmlToParagraphs(caHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: caHeaderSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(null)
+  const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   // Load credit advice commission wording from settings
   let caCommissionMultiText = 'Commission payable in {instalments} instalments:'
   let caCommissionSingleText = 'Commission payable on {date}.'
   try {
-    const caSettingsRaw = await window.api.getSetting('policyExportSettings')
+    const caSettingsRaw = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (caSettingsRaw) {
       const caParsed = JSON.parse(caSettingsRaw)
       if (caParsed.creditAdviceCommissionText) caCommissionMultiText = caParsed.creditAdviceCommissionText
@@ -3668,20 +3790,20 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const caZeroP = (text: string) => new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })
   if (brokerEntityId && isBroker) {
     try {
-      const allEntities = await window.api.getEntities()
-      const brokerEntity = (Array.isArray(allEntities) ? allEntities : []).find((e: any) => e.id === brokerEntityId)
+      // Broker entity + address are frozen on the policy snapshot (first export).
+      const brokerEntity = data.frozen?.brokerEntity || null
       if (brokerEntity) {
         children.push(caZeroP(brokerEntity.name))
-        const brokerAddrs = await window.api.getEntityAddresses(brokerEntityId)
-        if (Array.isArray(brokerAddrs) && brokerAddrs.length > 0) {
-          const addrText = brokerAddrs[0].addressLine1 || ''
+        const brokerAddr = data.frozen?.brokerAddress || null
+        if (brokerAddr) {
+          const addrText = brokerAddr.addressLine1 || ''
           if (addrText) {
             for (const line of addrText.split('\n')) {
               if (line.trim()) children.push(caZeroP(line.trim()))
             }
           }
-          if (brokerAddrs[0].city || brokerAddrs[0].country) {
-            const cityCountry = [brokerAddrs[0].city, brokerAddrs[0].country].filter(Boolean).join(', ')
+          if (brokerAddr.city || brokerAddr.country) {
+            const cityCountry = [brokerAddr.city, brokerAddr.country].filter(Boolean).join(', ')
             children.push(caZeroP(cityCountry))
           }
         }
@@ -4078,7 +4200,7 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
     W: 'War Risk Certificate'
   }
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
@@ -4259,7 +4381,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
     W: 'War Risk Certificate'
   }
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
@@ -4275,7 +4397,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   if (hdrHtml) {
     hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(null)
+  const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
@@ -4441,7 +4563,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
     W: 'War Risk Certificate'
   }
   try {
-    const settings = await window.api.getSetting('policyExportSettings')
+    const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
     if (settings) {
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
@@ -4457,7 +4579,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   if (hdrHtml) {
     hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
   }
-  const adviceFooter = await polBuildAdviceFooter(null)
+  const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
