@@ -3837,11 +3837,13 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
 
   const children: (Paragraph | Table)[] = []
 
-  // Broker block — load from quotation customer (broker), show at top left with 0 spacing
+  // Broker block — load from quotation customer (broker), show at top left with 0 spacing.
+  // Suppressed when the policy's "do not mention broker" toggle is on.
   const brokerEntityId = data.quotation.customerEntityId
   const isBroker = data.quotation.customerType === 'broker'
+  const hideBroker = !!(data.policy as any).hideBroker
   const caZeroP = (text: string) => new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })
-  if (brokerEntityId && isBroker) {
+  if (brokerEntityId && isBroker && !hideBroker) {
     try {
       // Broker entity + address are frozen on the policy snapshot (first export).
       const brokerEntity = data.frozen?.brokerEntity || null
@@ -3950,7 +3952,8 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
       detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
     }
     if (numInst > 1) {
-      detailsContent.push(polEmptyP())
+      // 3pt gap between the commission intro line and the instalment list (matches DA)
+      detailsContent.push(polSpacerPts(3))
       const caInstDescW = Math.round(POL_BODY_INNER_W * 0.55)
       const caInstAmtW = POL_BODY_INNER_W - caInstDescW
       const caInstRows = data.instalments.map(inst => {
