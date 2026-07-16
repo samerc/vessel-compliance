@@ -2574,16 +2574,16 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, timezone)
     content.push(polNpTight(singleIntro))
-    content.push(polEmptyP())
+    content.push(polSpacerPts(3))
 
     // Non-refundable text for single instalment
     if (nrType === 'first_instalment' || (instalments[0].isNonRefundable)) {
       content.push(polNpTight('Non-refundable in case of cancellation, whether before or after inception.'))
-      content.push(polEmptyP())
+      content.push(polSpacerPts(6))
     }
     if (nrType === 'percentage' && nrPct) {
       const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
-      if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
+      if (nrText) { content.push(polNpTight(nrText)); content.push(polSpacerPts(6)) }
     }
   } else {
     // Multiple instalments
@@ -2595,7 +2595,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, timezone)
     content.push(polNpTight(premIntro))
-    content.push(polEmptyP())
+    content.push(polSpacerPts(3))
 
     // Instalment lines
     if (instalments.length > 0) {
@@ -2605,15 +2605,15 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
         if (inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)) {
           line += ' (non-refundable in case of cancellation, whether before or after inception)'
         }
-        // Instalments are a tight list — no inter-line spacing (polEmptyP below separates
+        // Instalments are a tight list — no inter-line spacing (the small gap below separates
         // the whole group from the next block).
         content.push(polNpTight(line))
       })
-      content.push(polEmptyP())
+      content.push(polSpacerPts(6))
 
       if (nrType === 'percentage' && nrPct) {
         const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
-        if (nrText) { content.push(polNpTight(nrText)); content.push(polEmptyP()) }
+        if (nrText) { content.push(polNpTight(nrText)); content.push(polSpacerPts(6)) }
       }
     }
   }
@@ -2635,17 +2635,17 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
         underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
       })]
     }))
-    content.push(polEmptyP())
+    content.push(polSpacerPts(6))
   }
 
   // 2c. Full premium in case of loss
   if (wq.fullPremiumLossEnabled && wq.fullPremiumLossText) {
     content.push(polNpTight(wq.fullPremiumLossText))
-    content.push(polEmptyP())
+    content.push(polSpacerPts(6))
   }
 
   // 3. Additional premium text
-  if (wq.premiumAdditionalText) { content.push(...polMpTight(wq.premiumAdditionalText)); content.push(polEmptyP()) }
+  if (wq.premiumAdditionalText) { content.push(...polMpTight(wq.premiumAdditionalText)); content.push(polSpacerPts(6)) }
 
   // 4. Condition precedent text
   if (polSt(data, 'premiumCondition')) { content.push(...polMpTight(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
