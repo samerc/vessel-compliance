@@ -259,6 +259,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [editAddresses, setEditAddresses] = useState<{ entityId: string; entityName: string; role: string; addressText: string }[]>([])
   const [editCancelReplace, setEditCancelReplace] = useState(false)
   const [editCancelReplaceText, setEditCancelReplaceText] = useState('')
+  const [editHideBroker, setEditHideBroker] = useState(false)
 
   // Supplementary data for editing
   const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
@@ -426,6 +427,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     })))
     setEditCancelReplace(!!policy.cancelReplaceText)
     setEditCancelReplaceText(policy.cancelReplaceText || '')
+    setEditHideBroker(!!(policy as any).hideBroker)
     setActiveTab('overview')
     setIsEditing(true)
   }, [policy, instalments, addresses])
@@ -445,6 +447,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         commissionPercent: editCommission || null,
         bankId: editBankId || null,
         cancelReplaceText: editCancelReplace ? editCancelReplaceText : null,
+        hideBroker: editHideBroker,
         // Editing invalidates the frozen export snapshot so the next export re-freezes
         // with the change (exports are otherwise identical on re-export).
         exportSnapshot: null
@@ -1738,6 +1741,17 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', marginTop: '8px' }}
                   />
                 )}
+              </div>
+
+              {/* Broker mention */}
+              <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid transparent' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
+                  <input type="checkbox" checked={editHideBroker} onChange={e => setEditHideBroker(e.target.checked)} />
+                  Do not mention broker on documents
+                </label>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', marginLeft: '24px' }}>
+                  Hides the “c/o {'{broker}'}” line on the policy, debit advice and credit advice.
+                </div>
               </div>
             </div>
           )}

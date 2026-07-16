@@ -1503,6 +1503,12 @@ function polEmptyP() {
   return new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
 }
 
+// A precise, tiny vertical gap (exact line height in points) — used where a full blank line
+// is too much, e.g. a 3pt gap between a paragraph and a following block.
+function polSpacerPts(pts: number) {
+  return new Paragraph({ spacing: { before: 0, after: 0, line: Math.round(pts * 20), lineRule: 'exact' as any }, children: [] })
+}
+
 function polMp(text: string): Paragraph[] {
   if (!text) return []
   const decoded = decodeHtmlEntities(text)
@@ -1797,15 +1803,16 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     }))
   }
 
+  // "For their respective rights…" follows the insured block directly (no blank line).
   if (polSt(data, 'insuredFooter')) {
-    content.push(polEmptyP())
     content.push(...polMpTight(polSt(data, 'insuredFooter')))
   }
 
+  // Broker (c/o …) comes just after the footer with a tiny 3pt gap — unless suppressed.
   const brokerName = data.quotation.coName || data.assureds.find(a => a.role?.toLowerCase().includes('broker'))?.name
-  if (brokerName) {
-    content.push(polEmptyP())
-    content.push(polNp(`c/o ${brokerName}`))
+  if (brokerName && !(data.policy as any).hideBroker) {
+    content.push(polSpacerPts(3))
+    content.push(polNpTight(`c/o ${brokerName}`))
   }
 
   return content
@@ -1872,7 +1879,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_INNER_W * 0.12)
+  const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
   const pCell = (text: string, w: number) => new TableCell({
@@ -1893,7 +1900,7 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
 /** Period for endorsement DA/CA: from endorsement effective date to policy expiry */
 function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData): (Paragraph | Table)[] {
   const { expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_INNER_W * 0.12)
+  const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
   const pCell = (text: string, w: number) => new TableCell({
@@ -3598,7 +3605,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 
@@ -3683,7 +3690,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
   const daTimezone = data.policy.timezone || ''
   if (numInst === 1 && data.instalments.length === 1) {
     const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
-    ppcpContent.push(polNp(singleTpl
+    ppcpContent.push(polNpTight(singleTpl
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
       .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate))
@@ -3691,14 +3698,15 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
       .replace(/\{timezone\}/g, daTimezone)))
   } else {
     const multiTpl = daIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
-    ppcpContent.push(polNp(multiTpl
+    ppcpContent.push(polNpTight(multiTpl
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
       .replace(/\{instalments\}/g, String(numInst))
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, daTimezone)))
   }
-  ppcpContent.push(polEmptyP())
+  // 3pt gap between the intro line and the instalment list
+  ppcpContent.push(polSpacerPts(3))
 
   // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
   const daPolNr = (data.policy as any).nonRefundableType
@@ -3869,7 +3877,7 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 
@@ -4490,7 +4498,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 
@@ -4679,7 +4687,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
 

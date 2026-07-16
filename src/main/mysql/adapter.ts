@@ -3336,6 +3336,14 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Hide-broker toggle on policy_documents — suppress the "c/o broker" line on policy + DA/CA
+            try {
+                const [hbCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'hide_broker'") as any[]
+                if ((hbCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN hide_broker TINYINT(1) DEFAULT 0")
+                }
+            } catch {}
+
             // ---- Policy Endorsements tables ----
             await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
                 id VARCHAR(36) PRIMARY KEY,
@@ -10926,6 +10934,7 @@ export class MySQLAdapter {
             nonRefundableType: r.non_refundable_type ?? null,
             nonRefundablePercent: r.non_refundable_percent == null ? null : Number(r.non_refundable_percent),
             qrEnabled: r.qr_enabled == null ? null : Boolean(r.qr_enabled),
+            hideBroker: Boolean(r.hide_broker),
             proRata: Boolean(r.pro_rata),
             commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
@@ -11163,6 +11172,7 @@ export class MySQLAdapter {
             selectedAgreedValueOptionId: 'selected_agreed_value_option_id',
             ourShare: 'our_share',
             qrEnabled: 'qr_enabled',
+            hideBroker: 'hide_broker',
         }
         const sets: string[] = []
         const vals: any[] = []
