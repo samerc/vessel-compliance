@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, ChevronDown, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
-import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus } from '../../../shared/types'
+import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus, ConditionSurvey, Surveyor } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
@@ -55,6 +55,13 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const [reminderWarrantyId, setReminderWarrantyId] = useState<string | null>(null)
   const [waiveWarrantyId, setWaiveWarrantyId] = useState<string | null>(null)
   const [completeWarrantyId, setCompleteWarrantyId] = useState<string | null>(null)
+
+  // Link-to-survey modal
+  const [linkWarranty, setLinkWarranty] = useState<SurveyWarranty | null>(null)
+  const [availableSurveys, setAvailableSurveys] = useState<ConditionSurvey[]>([])
+  const [surveyorMap, setSurveyorMap] = useState<Record<string, string>>({})
+  const [linkSearch, setLinkSearch] = useState('')
+  const [linkLoading, setLinkLoading] = useState(false)
 
   // Add/edit form
   const [formDescription, setFormDescription] = useState('')
@@ -232,6 +239,42 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       loadWarranties()
     } catch (err: any) {
       showError(err.message || 'Failed to convert to survey')
+    }
+  }
+
+  // ── Link to existing Survey ─────────────────────────────────────
+  const openLinkModal = async (w: SurveyWarranty) => {
+    setLinkWarranty(w)
+    setLinkSearch('')
+    setLinkLoading(true)
+    try {
+      const [surveys, surveyors] = await Promise.all([
+        window.api.getConditionSurveys(w.vesselId),
+        window.api.getSurveyors()
+      ])
+      setAvailableSurveys(Array.isArray(surveys) ? surveys : [])
+      const map: Record<string, string> = {}
+      for (const s of (Array.isArray(surveyors) ? surveyors : []) as Surveyor[]) map[s.id] = s.companyName
+      setSurveyorMap(map)
+    } catch (err: any) {
+      showError(err.message || 'Failed to load surveys')
+    } finally {
+      setLinkLoading(false)
+    }
+  }
+
+  const handleLinkSurvey = async (surveyId: string) => {
+    if (!linkWarranty) return
+    try {
+      await window.api.surveyWarrantyUpdate(linkWarranty.id, {
+        conditionSurveyId: surveyId,
+        status: 'survey_done'
+      })
+      showSuccess('Survey linked to warranty')
+      setLinkWarranty(null)
+      loadWarranties()
+    } catch (err: any) {
+      showError(err.message || 'Failed to link survey')
     }
   }
 
@@ -571,6 +614,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   <ClipboardCheck size={13} /> Convert to Survey
                 </button>
               )}
+              {canManage && w.status === 'pending' && !w.conditionSurveyId && (
+                <button
+                  onClick={() => openLinkModal(w)}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a7dff', borderColor: 'rgba(138,125,255,0.35)' }}
+                >
+                  <Link2 size={13} /> Link to Survey
+                </button>
+              )}
               {canManage && w.status === 'pending' && (
                 <button
                   onClick={() => handleMarkSurveyDone(w)}
@@ -854,6 +906,82 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               >
                 Mark Complete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Link to Survey Modal ──────────────────────────────── */}
+      {linkWarranty && (
+        <div style={modalBg} onClick={() => setLinkWarranty(null)}>
+          <div style={{ ...modalCard, width: '560px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>Link to Survey</h3>
+              <button onClick={() => setLinkWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Pick an existing survey on file for this vessel to link to: <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>
+            </p>
+            <input
+              type="text"
+              value={linkSearch}
+              onChange={e => setLinkSearch(e.target.value)}
+              placeholder="Search by type, reference, surveyor…"
+              style={{ ...inputStyle, marginBottom: '12px' }}
+            />
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              {linkLoading ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading surveys…</div>
+              ) : (() => {
+                const q = linkSearch.trim().toLowerCase()
+                const filtered = availableSurveys.filter(s => {
+                  if (!q) return true
+                  const surveyor = (surveyorMap[s.surveyorId] || '').toLowerCase()
+                  return (
+                    (s.surveyType || '').toLowerCase().includes(q) ||
+                    (s.reference || '').toLowerCase().includes(q) ||
+                    surveyor.includes(q) ||
+                    (s.surveyDate || '').includes(q)
+                  )
+                })
+                if (availableSurveys.length === 0) {
+                  return (
+                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      No condition surveys recorded for this vessel.<br />Use “Convert to Survey” to create one.
+                    </div>
+                  )
+                }
+                if (filtered.length === 0) {
+                  return <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No surveys match your search.</div>
+                }
+                return filtered.map(s => (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                      padding: '10px 12px', marginBottom: '8px', borderRadius: '8px',
+                      border: '1px solid var(--glass-border)',
+                      background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {formatDateShort(s.surveyDate)} · {s.surveyType || 'Survey'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {surveyorMap[s.surveyorId] || 'Unknown surveyor'}{s.reference ? ` — ${s.reference}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleLinkSurvey(s.id)}
+                      className="btn-secondary"
+                      style={{ fontSize: '0.78rem', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a7dff', borderColor: 'rgba(138,125,255,0.35)', flexShrink: 0 }}
+                    >
+                      <Link2 size={13} /> Link
+                    </button>
+                  </div>
+                ))
+              })()}
             </div>
           </div>
         </div>
