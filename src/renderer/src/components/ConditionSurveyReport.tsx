@@ -8,7 +8,11 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx-js-style'
 
-type StatusFilter = 'all' | 'pending' | 'done' | 'waived'
+// Display status derived from the survey's closure state (open defects), not the raw
+// warranty status: a survey with open defects reads "Carried Out"; all defects closed
+// reads "Survey Done".
+type DisplayStatus = 'pending' | 'carried_out' | 'survey_done' | 'waived'
+type StatusFilter = 'all' | DisplayStatus
 
 const NO_DATE_KEY = '9999-99'
 const NO_DATE_LABEL = 'No Due Date'
@@ -23,17 +27,25 @@ interface ReportRow {
   surveyDate: string | null
   surveyType: string
   surveyor: string
-  status: SurveyWarranty['status']
+  status: DisplayStatus
   monthKey: string
   monthLabel: string
 }
 
-const STATUS_META: Record<SurveyWarranty['status'], { label: string; color: string }> = {
+const STATUS_META: Record<DisplayStatus, { label: string; color: string }> = {
   pending: { label: 'Pending', color: '#e0912f' },
-  survey_done: { label: 'Survey Done', color: '#3b9bd6' },
-  completed: { label: 'Completed', color: '#2fa66a' },
+  carried_out: { label: 'Carried Out', color: '#3b9bd6' },
+  survey_done: { label: 'Survey Done', color: '#2fa66a' },
   waived: { label: 'Waived', color: '#8a8f9a' }
 }
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'carried_out', label: 'Carried Out' },
+  { key: 'survey_done', label: 'Survey Done' },
+  { key: 'waived', label: 'Waived' }
+]
 
 function calcDueDate(w: SurveyWarranty): Date | null {
   if (w.deadlineType === 'days' && w.deadlineDays != null && w.inceptionDate) {
@@ -85,11 +97,18 @@ export default function ConditionSurveyReport() {
         ? due.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
         : NO_DATE_LABEL
       // A recorded survey (linked, or the vessel's latest via adapter fallback) means the
-      // vessel carried out the survey and complied — treat a still-pending warranty as Survey Done.
+      // vessel carried out the survey and complied. Whether it reads "Carried Out" or
+      // "Survey Done" depends on the survey's open defects: >0 open = still carried out,
+      // 0 open = all defects closed = survey done.
       const carriedOut =
         w.surveyDate || (w.status === 'completed' || w.status === 'survey_done' ? w.completedAt || null : null)
-      const status: SurveyWarranty['status'] =
-        w.status === 'pending' && w.surveyDate ? 'survey_done' : w.status
+      const hasSurvey = !!w.surveyDate
+      const surveyClosed = (w.surveyOpenDefects ?? 0) === 0
+      let status: DisplayStatus
+      if (w.status === 'waived') status = 'waived'
+      else if (w.status === 'completed') status = 'survey_done'
+      else if (hasSurvey) status = surveyClosed ? 'survey_done' : 'carried_out'
+      else status = 'pending'
       return {
         vesselName: w.vesselName || '',
         imo: w.imoNumber || '',
@@ -110,11 +129,7 @@ export default function ConditionSurveyReport() {
   const displayRows = useMemo(() => {
     let r = rows
     if (statusFilter !== 'all') {
-      r = r.filter((row) =>
-        statusFilter === 'done'
-          ? row.status === 'completed' || row.status === 'survey_done'
-          : row.status === statusFilter
-      )
+      r = r.filter((row) => row.status === statusFilter)
     }
     if (search) {
       const q = search.toLowerCase()
@@ -148,9 +163,10 @@ export default function ConditionSurveyReport() {
   }, [displayRows])
 
   const stats = useMemo(() => {
-    const done = displayRows.filter((r) => r.status === 'completed' || r.status === 'survey_done').length
+    const surveyDone = displayRows.filter((r) => r.status === 'survey_done').length
+    const carriedOut = displayRows.filter((r) => r.status === 'carried_out').length
     const pending = displayRows.filter((r) => r.status === 'pending').length
-    return { total: displayRows.length, done, pending }
+    return { total: displayRows.length, surveyDone, carriedOut, pending }
   }, [displayRows])
 
   const dueCell = (row: ReportRow) => (row.dueDate ? fmtDate(row.dueDate) : row.deadlineText || 'No due date')
@@ -232,7 +248,11 @@ export default function ConditionSurveyReport() {
 
       doc.setFontSize(8)
       doc.setTextColor(100)
-      doc.text(`${stats.total} survey warranties  —  ${stats.done} done  —  ${stats.pending} pending`, margin, y)
+      doc.text(
+        `${stats.total} survey warranties  —  ${stats.surveyDone} survey done  —  ${stats.carriedOut} carried out  —  ${stats.pending} pending`,
+        margin,
+        y
+      )
       y += 6
 
       for (const g of groups) {
@@ -340,23 +360,23 @@ export default function ConditionSurveyReport() {
         }}
       >
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {(['all', 'pending', 'done', 'waived'] as const).map((f) => (
+          {STATUS_FILTERS.map((f) => (
             <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
               style={{
                 padding: '7px 14px',
                 borderRadius: '8px',
                 fontSize: '0.82rem',
                 cursor: 'pointer',
-                textTransform: 'capitalize',
-                border: statusFilter === f ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
-                background: statusFilter === f ? 'rgba(0,210,255,0.08)' : 'transparent',
-                color: statusFilter === f ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontWeight: statusFilter === f ? 600 : 400
+                border:
+                  statusFilter === f.key ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                background: statusFilter === f.key ? 'rgba(0,210,255,0.08)' : 'transparent',
+                color: statusFilter === f.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                fontWeight: statusFilter === f.key ? 600 : 400
               }}
             >
-              {f}
+              {f.label}
             </button>
           ))}
         </div>
@@ -404,7 +424,10 @@ export default function ConditionSurveyReport() {
           <strong style={{ color: 'var(--text-primary)' }}>{stats.total}</strong> survey warranties
         </span>
         <span>
-          <strong style={{ color: '#2fa66a' }}>{stats.done}</strong> done
+          <strong style={{ color: '#2fa66a' }}>{stats.surveyDone}</strong> survey done
+        </span>
+        <span>
+          <strong style={{ color: '#3b9bd6' }}>{stats.carriedOut}</strong> carried out
         </span>
         <span>
           <strong style={{ color: '#e0912f' }}>{stats.pending}</strong> pending

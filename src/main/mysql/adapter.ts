@@ -6077,6 +6077,7 @@ export class MySQLAdapter {
                 COALESCE(cs.survey_type, vcs.survey_type) as conditionSurveyType,
                 COALESCE(s.company_name, vs.company_name) as surveyorName,
                 (cs.id IS NULL AND vcs.id IS NOT NULL) as surveyMatchedByVessel,
+                (SELECT COUNT(*) FROM survey_defects sd WHERE sd.survey_id = COALESCE(cs.id, vcs.id) AND sd.status = 'OPEN') as surveyOpenDefects,
                 (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
                 (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
                 (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
