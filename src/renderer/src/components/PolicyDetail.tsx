@@ -282,6 +282,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [bcModalMode, setBcModalMode] = useState<'issue' | 'reissue' | 'edit'>('issue')
   const [bcPreselectedType, setBcPreselectedType] = useState<CardType | null>(null)
   const [bcReissueSource, setBcReissueSource] = useState<BlueCard | null>(null)
+  // Inline "add flag state" from the blue card addressed-to selector
+  const [bcAddingFlag, setBcAddingFlag] = useState(false)
+  const [newFlagForm, setNewFlagForm] = useState({ name: '', iso3: '', ratBunker: false, ratWreck: false, authName: '', authAddr: '' })
   const [bcSaving, setBcSaving] = useState(false)
   const [bcForm, setBcForm] = useState<BlueCardFormData>({
     cardType: 'BBC',
@@ -726,6 +729,68 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   // Determine if a card type needs addressed-to (BBC/WRC only)
   const needsAddressedTo = (ct: string): boolean => ct === 'BBC' || ct === 'WRC'
 
+  // Cancel & replace applies only when the new blue card's period OVERLAPS the source card's
+  // period. Consecutive periods (new inception == old expiry) do NOT overlap → no cancel/replace.
+  const computeReissueCancelReplace = (
+    source: BlueCard,
+    newInception: string,
+    newExpiry: string
+  ): { on: boolean; text: string } => {
+    const overlaps =
+      !!source.expiryDate && !!newInception &&
+      new Date(newInception) < new Date(source.expiryDate) &&
+      (!newExpiry || !source.inceptionDate || new Date(source.inceptionDate) < new Date(newExpiry))
+    return {
+      on: overlaps,
+      text: overlaps
+        ? `This certificate cancels and replaces certificate ${source.cardNumber} issued on ${source.issuedDate || 'N/A'}.`
+        : ''
+    }
+  }
+
+  // Update a blue-card date; in reissue mode, re-derive cancel & replace from the new period.
+  const updateBcDate = (field: 'inceptionDate' | 'expiryDate', value: string): void => {
+    setBcForm((f) => {
+      const next = { ...f, [field]: value }
+      if (bcModalMode === 'reissue' && bcReissueSource) {
+        const cr = computeReissueCancelReplace(bcReissueSource, next.inceptionDate, next.expiryDate)
+        next.cancelReplace = cr.on
+        next.cancelReplaceText = cr.text
+      }
+      return next
+    })
+  }
+
+  // Add a flag state inline (from the addressed-to selector) and select it as the addressee.
+  const handleAddFlagInline = async (): Promise<void> => {
+    if (!newFlagForm.name.trim() || !newFlagForm.iso3.trim()) {
+      showError('Flag name and ISO3 code are required')
+      return
+    }
+    try {
+      const created = await window.api.addFlagState({
+        name: newFlagForm.name.trim(),
+        iso3Code: newFlagForm.iso3.trim().toUpperCase(),
+        ratifiedBunker: newFlagForm.ratBunker,
+        ratifiedWreck: newFlagForm.ratWreck,
+        authorityName: newFlagForm.authName.trim() || null,
+        authorityAddress: newFlagForm.authAddr.trim() || null
+      } as any)
+      setFlagStates((prev) => [...prev, created])
+      setBcForm((f) => ({
+        ...f,
+        addressedToFlagId: created.id,
+        addressedToName: created.authorityName || '',
+        addressedToAddress: created.authorityAddress || ''
+      }))
+      setBcAddingFlag(false)
+      setNewFlagForm({ name: '', iso3: '', ratBunker: false, ratWreck: false, authName: '', authAddr: '' })
+      showSuccess('Flag state added')
+    } catch (err: any) {
+      showError(err.message || 'Failed to add flag state')
+    }
+  }
+
   // Open issue modal
   const openIssueModal = (preselectedType?: CardType): void => {
     const ct = preselectedType || 'BBC'
@@ -755,43 +820,39 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     setBcPreselectedType(preselectedType || null)
     setBcEditId(null)
     setBcReissueSource(null)
+    setBcAddingFlag(false)
     setBcModalOpen(true)
   }
 
   // Open reissue modal from existing card
   const openReissueModal = (card: BlueCard): void => {
-    const fs = vesselFlagState
-    const ct = card.cardType
-    const isRatified =
-      ct === 'BBC' ? fs?.ratifiedBunker : ct === 'WRC' ? fs?.ratifiedWreck : false
-
-    // Check if periods overlap (old card still active during new period)
-    const hasOverlap = card.status === 'active'
+    const ct = card.cardType as CardType
+    // New card is issued today; expiry carries over from the source card. Cancel & replace is
+    // driven by whether the new period overlaps the source period (not just "old card active").
+    const newInception = todayISO
+    const newExpiry = card.expiryDate || policy?.expiryDate || ''
+    const cr = computeReissueCancelReplace(card, newInception, newExpiry)
 
     setBcForm({
-      cardType: ct as CardType,
-      inceptionDate: policy?.inceptionDate || card.expiryDate || '',
-      expiryDate: policy?.expiryDate || '',
+      cardType: ct,
+      inceptionDate: newInception,
+      expiryDate: newExpiry,
       ownerEntityId: card.ownerEntityId || '',
       ownerName: card.ownerName || '',
       ownerAddress: card.ownerAddress || '',
       portOfRegistry: card.portOfRegistry || '',
-      addressedToFlagId:
-        card.addressedToFlagId || (isRatified && fs ? fs.id : ''),
-      addressedToName:
-        card.addressedToName || (isRatified && fs ? fs.authorityName || '' : ''),
-      addressedToAddress:
-        card.addressedToAddress ||
-        (isRatified && fs ? fs.authorityAddress || '' : ''),
-      cancelReplace: hasOverlap,
-      cancelReplaceText: hasOverlap
-        ? `This certificate cancels and replaces certificate ${card.cardNumber} issued on ${card.issuedDate || 'N/A'}.`
-        : ''
+      // Carry the source addressee; the user can switch to another flag state for the reissue.
+      addressedToFlagId: card.addressedToFlagId || '',
+      addressedToName: card.addressedToName || '',
+      addressedToAddress: card.addressedToAddress || '',
+      cancelReplace: cr.on,
+      cancelReplaceText: cr.text
     })
     setBcModalMode('reissue')
-    setBcPreselectedType(ct as CardType)
+    setBcPreselectedType(ct)
     setBcEditId(null)
     setBcReissueSource(card)
+    setBcAddingFlag(false)
     setBcModalOpen(true)
   }
 
@@ -815,6 +876,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     setBcPreselectedType(card.cardType as CardType)
     setBcEditId(card.id)
     setBcReissueSource(null)
+    setBcAddingFlag(false)
     setBcModalOpen(true)
   }
 
@@ -865,6 +927,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const handleSaveBlueCard = async (): Promise<void> => {
     if (!bcForm.inceptionDate || !bcForm.expiryDate) {
       showError('Inception and expiry dates are required')
+      return
+    }
+    // BBC/WRC must be addressed to a ratified flag state authority — block otherwise.
+    if (needsAddressedTo(bcForm.cardType) && !bcForm.addressedToFlagId) {
+      showError('Select the flag state authority this certificate is addressed to (add one if it is not listed)')
       return
     }
     setBcSaving(true)
@@ -2996,9 +3063,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <input
                   type="date"
                   value={bcForm.inceptionDate}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, inceptionDate: e.target.value }))
-                  }
+                  onChange={(e) => updateBcDate('inceptionDate', e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -3015,9 +3080,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <input
                   type="date"
                   value={bcForm.expiryDate}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, expiryDate: e.target.value }))
-                  }
+                  onChange={(e) => updateBcDate('expiryDate', e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -3211,6 +3274,78 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       </option>
                     ))}
                 </select>
+
+                {/* Inline "add flag state" — when the ratified flag needed isn't listed */}
+                {!bcAddingFlag ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBcAddingFlag(true)
+                      setNewFlagForm({
+                        name: '', iso3: '',
+                        ratBunker: bcForm.cardType === 'BBC',
+                        ratWreck: bcForm.cardType === 'WRC',
+                        authName: '', authAddr: ''
+                      })
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px',
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      color: 'var(--accent-primary)', fontSize: '0.78rem', fontWeight: 600
+                    }}
+                  >
+                    <Plus size={13} /> Flag state not listed? Add it
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      marginBottom: '10px', padding: '10px', borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#20233a'
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <input
+                        type="text" placeholder="Flag state name"
+                        value={newFlagForm.name}
+                        onChange={(e) => setNewFlagForm((f) => ({ ...f, name: e.target.value }))}
+                        style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                      />
+                      <input
+                        type="text" placeholder="ISO3 (e.g. PAN)" maxLength={3}
+                        value={newFlagForm.iso3}
+                        onChange={(e) => setNewFlagForm((f) => ({ ...f, iso3: e.target.value.toUpperCase() }))}
+                        style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textTransform: 'uppercase' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '8px', fontSize: '0.8rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newFlagForm.ratBunker} onChange={(e) => setNewFlagForm((f) => ({ ...f, ratBunker: e.target.checked }))} />
+                        Ratified Bunker
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newFlagForm.ratWreck} onChange={(e) => setNewFlagForm((f) => ({ ...f, ratWreck: e.target.checked }))} />
+                        Ratified Wreck
+                      </label>
+                    </div>
+                    <input
+                      type="text" placeholder="Authority name"
+                      value={newFlagForm.authName}
+                      onChange={(e) => setNewFlagForm((f) => ({ ...f, authName: e.target.value }))}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', marginBottom: '8px', boxSizing: 'border-box' }}
+                    />
+                    <textarea
+                      placeholder="Authority address" rows={2}
+                      value={newFlagForm.authAddr}
+                      onChange={(e) => setNewFlagForm((f) => ({ ...f, authAddr: e.target.value }))}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', marginBottom: '8px', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                      <button type="button" className="btn-secondary" onClick={() => setBcAddingFlag(false)} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Cancel</button>
+                      <button type="button" className="btn-primary" onClick={handleAddFlagInline} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Add &amp; Select</button>
+                    </div>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Authority name"
