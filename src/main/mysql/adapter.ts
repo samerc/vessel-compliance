@@ -6073,9 +6073,10 @@ export class MySQLAdapter {
                 COALESCE(ce.name, e.name) as customerName,
                 f.name as fleetName,
                 pt.name as policyTypeName,
-                cs.survey_date as surveyDate,
-                cs.survey_type as conditionSurveyType,
-                s.company_name as surveyorName,
+                COALESCE(cs.survey_date, vcs.survey_date) as surveyDate,
+                COALESCE(cs.survey_type, vcs.survey_type) as conditionSurveyType,
+                COALESCE(s.company_name, vs.company_name) as surveyorName,
+                (cs.id IS NULL AND vcs.id IS NOT NULL) as surveyMatchedByVessel,
                 (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
                 (SELECT swr2.sent_at FROM survey_warranty_reminders swr2 WHERE swr2.warranty_id = sw.id ORDER BY swr2.sent_at DESC LIMIT 1) as lastReminderDate,
                 (SELECT swr3.next_reminder_date FROM survey_warranty_reminders swr3 WHERE swr3.warranty_id = sw.id ORDER BY swr3.created_at DESC LIMIT 1) as nextReminderDate
@@ -6088,6 +6089,9 @@ export class MySQLAdapter {
             LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
             LEFT JOIN condition_surveys cs ON cs.id = sw.condition_survey_id
             LEFT JOIN surveyors s ON s.id = cs.surveyor_id
+            LEFT JOIN condition_surveys vcs ON vcs.vessel_id = sw.vessel_id
+                AND vcs.id = (SELECT x.id FROM condition_surveys x WHERE x.vessel_id = sw.vessel_id ORDER BY x.survey_date DESC, x.created_at DESC LIMIT 1)
+            LEFT JOIN surveyors vs ON vs.id = vcs.surveyor_id
             ORDER BY sw.inception_date ASC
         `)
         return rows as any[]

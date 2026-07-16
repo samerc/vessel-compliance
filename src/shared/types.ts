@@ -391,6 +391,7 @@ export interface SurveyWarranty {
   surveyDate?: string | null
   conditionSurveyType?: string | null
   surveyorName?: string | null
+  surveyMatchedByVessel?: number | boolean | null
   lastReminderDate?: string | null
   nextReminderDate?: string | null
   reminderCount?: number

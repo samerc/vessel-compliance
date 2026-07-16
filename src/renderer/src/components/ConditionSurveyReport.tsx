@@ -84,6 +84,12 @@ export default function ConditionSurveyReport() {
       const monthLabel = due
         ? due.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
         : NO_DATE_LABEL
+      // A recorded survey (linked, or the vessel's latest via adapter fallback) means the
+      // vessel carried out the survey and complied — treat a still-pending warranty as Survey Done.
+      const carriedOut =
+        w.surveyDate || (w.status === 'completed' || w.status === 'survey_done' ? w.completedAt || null : null)
+      const status: SurveyWarranty['status'] =
+        w.status === 'pending' && w.surveyDate ? 'survey_done' : w.status
       return {
         vesselName: w.vesselName || '',
         imo: w.imoNumber || '',
@@ -91,10 +97,10 @@ export default function ConditionSurveyReport() {
         description: w.description || '',
         dueDate: dueISO,
         deadlineText: w.deadlineType === 'event' ? w.deadlineEvent || '' : '',
-        surveyDate: w.surveyDate || (w.status === 'completed' || w.status === 'survey_done' ? w.completedAt || null : null),
+        surveyDate: carriedOut,
         surveyType: w.conditionSurveyType || '',
         surveyor: w.surveyorName || '',
-        status: w.status,
+        status,
         monthKey,
         monthLabel
       }
