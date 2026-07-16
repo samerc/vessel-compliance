@@ -1775,7 +1775,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
         const addrParas: Paragraph[] = []
         const addrLines = addrText.split('\n').filter((l: string) => l.trim())
         for (let li = 0; li < addrLines.length; li++) {
-          addrParas.push(new Paragraph({ spacing: { after: li === addrLines.length - 1 ? 120 : 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: addrLines[li].trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+          addrParas.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: addrLines[li].trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
         }
         tableRows.push(new TableRow({
           children: [
