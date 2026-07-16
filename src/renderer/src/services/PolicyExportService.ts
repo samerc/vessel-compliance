@@ -3985,7 +3985,9 @@ export async function exportPolicyBundleZip(
   const zip = new JSZip()
 
   const pol = await generatePolicyDocxBuffer(policyId)
-  zip.file(pol.fileName, pol.buffer)
+  // generatePolicyDocxBuffer returns fileName WITHOUT extension (the PDF path re-derives it)
+  const polFileName = /\.docx$/i.test(pol.fileName) ? pol.fileName : `${pol.fileName}.docx`
+  zip.file(polFileName, pol.buffer)
 
   const da = await buildDebitAdviceBlob(policyId)
   zip.file(da.fileName, da.blob)
