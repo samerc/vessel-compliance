@@ -706,6 +706,10 @@ const POL_BODY_W = POL_CONTENT_W - POL_TITLE_W
 // their width on the inner content area so they align with paragraph content.
 const POL_BODY_CELL_MARGIN = 80
 const POL_BODY_INNER_W = POL_BODY_W - 2 * POL_BODY_CELL_MARGIN
+// Zero the nested-table cell inset (Word/LibreOffice default ~108twip) so nested-table
+// cell text aligns flush-left with the paragraph sections in the same body cell.
+// Verified via docx→LibreOffice render (inner-width alone left a ~108twip residual).
+const POL_TABLE_MARGINS = { marginUnitType: WidthType.DXA, top: 0, bottom: 0, left: 0, right: 0 }
 
 // ---- Policy data interfaces ----
 
@@ -1556,7 +1560,7 @@ function polBuildAmountBreakdown(
   })
   return [
     new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, amtW],
       rows: [
@@ -1776,7 +1780,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
   if (tableRows.length > 0) {
     content.push(new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
       layout: TableLayoutType.AUTOFIT,
       rows: tableRows
     }))
@@ -1814,7 +1818,7 @@ function polBuildVesselTable(data: PolicyExportData): Table {
   const valW = POL_BODY_INNER_W - labelW - sepW
 
   return new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, sepW, valW],
     rows: rows.map(([label, value]) => new TableRow({
@@ -1845,7 +1849,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   }
 
   return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeTzW],
     rows: [
@@ -1865,7 +1869,7 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
     children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
   })
   return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1886,7 +1890,7 @@ function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData
     children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
   })
   return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, dateW, timeW],
     rows: [
@@ -1907,7 +1911,7 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
       const clauseRefW = Math.round(POL_BODY_INNER_W * 0.32)
       const clauseDescW = POL_BODY_INNER_W - clauseRefW
       content.push(new Table({
-        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
         layout: TableLayoutType.FIXED,
         columnWidths: [clauseRefW, clauseDescW],
         rows: selectedClauses.map(c => {
@@ -1980,7 +1984,7 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   }
 
   const makeCondTable = (conds: typeof hc) => new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [condCol1W, condCol2W],
     rows: conds.map(qc => {
@@ -2486,7 +2490,7 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       }
     }
     content.push(new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
       layout: TableLayoutType.FIXED,
       columnWidths: [dedAmtW, dedDescW],
       rows: dedRows
@@ -3705,7 +3709,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
@@ -3939,7 +3943,7 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
           ]
         })
       })
-      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
+      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
       detailsContent.push(new Paragraph({ spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })] }))
     }
   }
@@ -4564,7 +4568,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
     ppcpContent.push(polEmptyP())
   }
 
