@@ -2725,6 +2725,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -3620,6 +3623,9 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -3635,7 +3641,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          margins: { top: 60, bottom: 200, left: 80, right: 80 },
+          margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: content.length > 0 ? content : [polEmptyP()]
         })
       ]
@@ -3893,6 +3899,9 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -4352,6 +4361,9 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -4520,6 +4532,9 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -4703,6 +4718,9 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
+      // Keep the whole section (title + content) on one page — moves to the next page if it
+      // doesn't fit, rather than splitting the title/content mid-row across pages.
+      cantSplit: true,
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
