@@ -1,18 +1,20 @@
 import { useState, lazy, Suspense } from 'react'
-import { FileBarChart2, Database, Users } from 'lucide-react'
+import { FileBarChart2, Database, Users, ClipboardCheck } from 'lucide-react'
 import LossRecordReport from './LossRecordReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
 import AssuredReport from './AssuredReport'
+import ConditionSurveyReport from './ConditionSurveyReport'
 
 const ReportBuilder = lazy(() => import('./ReportBuilder'))
 
-type ReportTab = 'report-builder' | 'loss-record' | 'customer-compliance' | 'assured-report'
+type ReportTab = 'report-builder' | 'loss-record' | 'customer-compliance' | 'assured-report' | 'condition-survey'
 
 const TABS: { id: ReportTab; label: string; icon: any }[] = [
   { id: 'report-builder', label: 'Report Builder', icon: Database },
   { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
   { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 },
-  { id: 'assured-report', label: 'Assured Report', icon: Users }
+  { id: 'assured-report', label: 'Assured Report', icon: Users },
+  { id: 'condition-survey', label: 'Condition Surveys', icon: ClipboardCheck }
 ]
 
 export default function Reports() {
@@ -79,6 +81,7 @@ export default function Reports() {
       {activeTab === 'loss-record' && <LossRecordReport />}
       {activeTab === 'customer-compliance' && <CustomerComplianceReport />}
       {activeTab === 'assured-report' && <AssuredReport />}
+      {activeTab === 'condition-survey' && <ConditionSurveyReport />}
     </div>
   )
 }

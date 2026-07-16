@@ -388,6 +388,9 @@ export interface SurveyWarranty {
   customerName?: string
   fleetName?: string
   policyTypeName?: string
+  surveyDate?: string | null
+  conditionSurveyType?: string | null
+  surveyorName?: string | null
   lastReminderDate?: string | null
   nextReminderDate?: string | null
   reminderCount?: number
