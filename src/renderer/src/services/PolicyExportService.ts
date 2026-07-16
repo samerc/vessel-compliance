@@ -474,7 +474,18 @@ function buildMlcPage(
     'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY',
     { bold: false, spacingAfter: 80 }
   ))
-  const providerLines = [data.companyName, ...(mlcCompanyAddress || '').split('\n'), mlcWebsite].filter(Boolean)
+  // The MLC company-address setting usually already leads with the provider name (which may
+  // differ from data.companyName only by punctuation/hyphenation), so avoid printing it twice.
+  const providerAddrLines = (mlcCompanyAddress || '').split('\n').map(l => l.trim()).filter(Boolean)
+  const normProvider = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const includeCompanyName =
+    !!data.companyName &&
+    (providerAddrLines.length === 0 || normProvider(providerAddrLines[0]) !== normProvider(data.companyName))
+  const providerLines = [
+    ...(includeCompanyName ? [data.companyName] : []),
+    ...providerAddrLines,
+    mlcWebsite
+  ].filter(Boolean)
   for (let i = 0; i < providerLines.length; i++) {
     children.push(new Paragraph({
       spacing: { after: i === providerLines.length - 1 ? 240 : 0 },
@@ -492,8 +503,8 @@ function buildMlcPage(
   const cValueW = 9200
   const cRow = (label: string, value: string) => new TableRow({
     children: [
-      new TableCell({ width: { size: cLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(label)] })] }),
-      new TableCell({ width: { size: cValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(value, { bold: true })] })] })
+      new TableCell({ width: { size: cLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(label)] })] }),
+      new TableCell({ width: { size: cValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(value, { bold: true })] })] })
     ]
   })
   if (mlcEmail) contactRows.push(cRow('Email', mlcEmail))
