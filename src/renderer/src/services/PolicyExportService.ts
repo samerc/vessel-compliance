@@ -2395,29 +2395,34 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
       const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
       const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
-      content.push(polEmptyP())
+      content.push(polSpacerPts(3))
       if (ddqIntro.includes('{ddq_countries}')) {
         content.push(new Paragraph({
           numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
           children: [new TextRun({ text: ddqIntro.replace(/\{ddq_countries\}/g, ddqList), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
         }))
       } else {
         content.push(new Paragraph({
           numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
           children: [new TextRun({ text: ddqIntro, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
         }))
-        content.push(polNp(ddqList))
+        // Country list indented to align under the numbered item's text (240 = numbering indent)
+        content.push(new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          indent: { left: 240 },
+          children: [new TextRun({ text: ddqList, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        }))
       }
     }
     if (wq.tradingShowDdqWarranties) {
       const intro = polSt(data, 'tradingConditionA')
       if (intro) {
-        content.push(polEmptyP())
+        content.push(polSpacerPts(3))
         content.push(new Paragraph({
           numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
           children: [new TextRun({ text: stripHtml(intro), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
         }))
       }
@@ -2434,10 +2439,10 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
     if (wq.tradingShowIsrael && polSt(data, 'tradingIsrael')) {
-      content.push(polEmptyP())
+      content.push(polSpacerPts(3))
       content.push(new Paragraph({
         numbering: { reference: 'trading-numbered', level: 0 },
-        spacing: { before: 120, after: 80, line: 240, lineRule: 'auto' as any },
+        spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
         children: [new TextRun({ text: stripHtml(polSt(data, 'tradingIsrael')), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       }))
     }
