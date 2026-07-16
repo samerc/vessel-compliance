@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Copy,
   FileSpreadsheet,
+  FileArchive,
   MoreHorizontal,
   PenTool
 } from 'lucide-react'
@@ -37,10 +38,12 @@ import {
   exportCreditAdviceDocx,
   exportBlueCardDocx,
   exportPolicyPdfWithTC,
+  exportPolicyBundleZip,
   capturePolicyExportSnapshot,
   loadDeclarationFields,
   exportDeclarationDocx,
-  DeclarationFields
+  DeclarationFields,
+  BlueCardData
 } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
@@ -224,6 +227,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [, setExportingBC] = useState(false)
   const [exportingQB, setExportingQB] = useState(false)
   const [exportingPdfTC, setExportingPdfTC] = useState(false)
+  const [exportingBundle, setExportingBundle] = useState(false)
   const [showDeclarationModal, setShowDeclarationModal] = useState(false)
   const [declarationFields, setDeclarationFields] = useState<DeclarationFields | null>(null)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
@@ -951,36 +955,60 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   }
 
   // Export single blue card
+  const buildBlueCardData = (card: BlueCard, companyName: string): BlueCardData => ({
+    policyNumber: policy?.policyNumber || '',
+    vesselName: policy?.vesselName || '',
+    imoNumber: policy?.imoNumber || '',
+    flagState: policy?.flagStateName || '',
+    grossTonnage: policy?.grossTonnage || 0,
+    inceptionDate: card.inceptionDate || policy?.inceptionDate || '',
+    inceptionTime: policy?.inceptionTime || '',
+    expiryDate: card.expiryDate || policy?.expiryDate || '',
+    expiryTime: policy?.expiryTime || '',
+    timezone: policy?.timezone || 'GMT',
+    callSign: policy?.callSign || '',
+    portOfRegistry: card.portOfRegistry || '',
+    ownerName: card.ownerName || '',
+    ownerAddress: card.ownerAddress || '',
+    flagAuthorityName: card.addressedToName || '',
+    flagAuthorityAddress: card.addressedToAddress || '',
+    companyName: companyName || 'Insurance Company',
+    cancelReplaceText: card.cancelReplaceText || ''
+  })
+
   const handleExportSingleBC = async (card: BlueCard): Promise<void> => {
     try {
       const reportSettings = await getReportSettings()
       await exportBlueCardDocx(
-        {
-          policyNumber: policy?.policyNumber || '',
-          vesselName: policy?.vesselName || '',
-          imoNumber: policy?.imoNumber || '',
-          flagState: policy?.flagStateName || '',
-          grossTonnage: policy?.grossTonnage || 0,
-          inceptionDate: card.inceptionDate || policy?.inceptionDate || '',
-          inceptionTime: policy?.inceptionTime || '',
-          expiryDate: card.expiryDate || policy?.expiryDate || '',
-          expiryTime: policy?.expiryTime || '',
-          timezone: policy?.timezone || 'GMT',
-          callSign: policy?.callSign || '',
-          portOfRegistry: card.portOfRegistry || '',
-          ownerName: card.ownerName || '',
-          ownerAddress: card.ownerAddress || '',
-          flagAuthorityName: card.addressedToName || '',
-          flagAuthorityAddress: card.addressedToAddress || '',
-          companyName: reportSettings.companyName || 'Insurance Company',
-          cancelReplaceText: card.cancelReplaceText || ''
-        },
+        buildBlueCardData(card, reportSettings.companyName || 'Insurance Company'),
         card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2',
         policyId
       )
       showSuccess(`${card.cardType} blue card exported`)
     } catch (err: any) {
       showError(err.message || 'Failed to export blue card')
+    }
+  }
+
+  const handleExportBundle = async (): Promise<void> => {
+    setShowActionsMenu(false)
+    setExportingBundle(true)
+    try {
+      const reportSettings = await getReportSettings()
+      const activeBCs = isPIType ? blueCards.filter((bc) => bc.status === 'active') : []
+      const bundleBlueCards = activeBCs.map((card) => ({
+        data: buildBlueCardData(card, reportSettings.companyName || 'Insurance Company'),
+        cardType: card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2'
+      }))
+      await exportPolicyBundleZip(policyId, {
+        includeCA: commissionAmount != null && commissionAmount > 0,
+        blueCards: bundleBlueCards
+      })
+      showSuccess('All documents exported as ZIP')
+    } catch (err: any) {
+      showError(err.message || 'Failed to export documents')
+    } finally {
+      setExportingBundle(false)
     }
   }
 
@@ -1411,6 +1439,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
 
                       {/* Exports */}
+                      <button onClick={handleExportBundle} disabled={exportingBundle} style={{ ...actionItemStyle, fontWeight: 600, color: isLight ? '#007a91' : '#00d2ff' }} className="hover-effect">
+                        <FileArchive size={15} /> {exportingBundle ? 'Zipping...' : 'Export All Documents (ZIP)'}
+                      </button>
                       <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
                         <Download size={15} /> Export Policy (DOCX)
                       </button>

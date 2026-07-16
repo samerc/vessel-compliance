@@ -16,6 +16,7 @@ import {
   QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings,
   QuotationAssuredGroup, QuotationAgreedValueOption
 } from '../../../shared/types'
+import JSZip from 'jszip'
 import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
@@ -578,6 +579,15 @@ export async function exportBlueCardDocx(
   cardType: BlueCardType,
   policyId?: string
 ): Promise<void> {
+  const { blob, fileName } = await buildBlueCardBlob(data, cardType, policyId)
+  polDownloadBlob(blob, fileName)
+}
+
+async function buildBlueCardBlob(
+  data: BlueCardData,
+  cardType: BlueCardType,
+  policyId?: string
+): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   // When a policyId is given, freeze the policy on first export and pull the blue-card
   // texts / letterhead / footer from its frozen snapshot so re-exports never change.
@@ -648,13 +658,8 @@ export async function exportBlueCardDocx(
   })
 
   const blob = await Packer.toBlob(document)
-  const url = URL.createObjectURL(blob)
-  const a = window.document.createElement('a')
-  a.href = url
   const bcVName = data.vesselName ? ` - ${data.vesselName}` : ''
-  a.download = `${data.policyNumber}${bcVName} - ${cardType}.docx`
-  a.click()
-  URL.revokeObjectURL(url)
+  return { blob, fileName: `${data.policyNumber}${bcVName} - ${cardType}.docx` }
 }
 
 /**
@@ -3520,6 +3525,11 @@ async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ 
 // ==================== Debit Advice Export ====================
 
 export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
+  const { blob, fileName } = await buildDebitAdviceBlob(policyId)
+  polDownloadBlob(blob, fileName)
+}
+
+async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3738,12 +3748,17 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   const blob = await Packer.toBlob(document)
   const daVName = data.vesselInfo?.name || ''
   const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${daVName} - Debit Advice${daRevSuffix}.docx`)
+  return { blob, fileName: `${data.policy.policyNumber} - ${daVName} - Debit Advice${daRevSuffix}.docx` }
 }
 
 // ==================== Credit Advice Export ====================
 
 export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
+  const { blob, fileName } = await buildCreditAdviceBlob(policyId)
+  polDownloadBlob(blob, fileName)
+}
+
+async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3953,7 +3968,41 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   const blob = await Packer.toBlob(document)
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx`)
+  return { blob, fileName: `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx` }
+}
+
+// ==================== Policy Bundle (ZIP) Export ====================
+
+/**
+ * Export all policy documents as a single ZIP: policy DOCX, Debit Advice,
+ * optional Credit Advice (when there is commission), and each supplied blue card.
+ * All content comes from the frozen export snapshot, exactly like the individual exports.
+ */
+export async function exportPolicyBundleZip(
+  policyId: string,
+  opts: { includeCA?: boolean; blueCards?: { data: BlueCardData; cardType: BlueCardType }[] } = {}
+): Promise<void> {
+  const zip = new JSZip()
+
+  const pol = await generatePolicyDocxBuffer(policyId)
+  zip.file(pol.fileName, pol.buffer)
+
+  const da = await buildDebitAdviceBlob(policyId)
+  zip.file(da.fileName, da.blob)
+
+  if (opts.includeCA) {
+    const ca = await buildCreditAdviceBlob(policyId)
+    zip.file(ca.fileName, ca.blob)
+  }
+
+  for (const bc of opts.blueCards || []) {
+    const built = await buildBlueCardBlob(bc.data, bc.cardType, policyId)
+    zip.file(built.fileName, built.blob)
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' })
+  const base = pol.fileName.replace(/\.docx$/i, '')
+  polDownloadBlob(zipBlob, `${base} (All Documents).zip`)
 }
 
 // ==================== War Declaration Export ====================
