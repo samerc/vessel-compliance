@@ -3430,6 +3430,30 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: heal quotations stuck on the "Converted" workflow step with no policy
+            // documents (their policy was deleted before delete reverted the step). Without this
+            // they show as Converted and the "Convert to Policy" action stays hidden.
+            try {
+                const [convStepRows] = await this.pool.query("SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1")
+                const convStep = (convStepRows as any[])[0]
+                if (convStep) {
+                    const [stepRows] = await this.pool.query('SELECT id, name, is_initial, order_index FROM quotation_workflow_steps')
+                    const steps = stepRows as any[]
+                    const target =
+                        steps.find(s => String(s.name).toLowerCase() === 'approved') ||
+                        steps.filter(s => s.id !== convStep.id).sort((a, b) => (b.order_index || 0) - (a.order_index || 0))[0] ||
+                        steps.find(s => s.is_initial)
+                    if (target && target.id !== convStep.id) {
+                        await this.pool.query(
+                            `UPDATE quotations SET workflow_step_id = ?
+                             WHERE workflow_step_id = ?
+                               AND NOT EXISTS (SELECT 1 FROM policy_documents pd WHERE pd.quotation_id = quotations.id)`,
+                            [target.id, convStep.id]
+                        )
+                    }
+                }
+            } catch {}
+
         } catch (error) {
             console.error('Schema initialization failed:', error)
             throw error
@@ -11250,11 +11274,58 @@ export class MySQLAdapter {
 
     async deletePolicyDocument(id: string): Promise<void> {
         if (!this.pool) return
+        // Capture the source quotation before deleting so we can revert its workflow step.
+        const [polRows] = await this.pool.query('SELECT quotation_id FROM policy_documents WHERE id = ?', [id])
+        const quotationId = (polRows as any[])[0]?.quotation_id || null
+
         // Delete related records first (no FK cascade since no FK constraints)
         await this.pool.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [id])
         await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [id])
         await this.pool.execute('DELETE FROM policy_blue_cards WHERE policy_doc_id = ?', [id])
         await this.pool.execute('DELETE FROM policy_documents WHERE id = ?', [id])
+
+        // If the source quotation sits on the "Converted" workflow step but no longer has a
+        // policy for every vessel, revert it so it can be re-converted (the "Convert to Policy"
+        // action is hidden while the step is "Converted").
+        if (quotationId) {
+            try {
+                await this.revertQuotationConversionIfOrphaned(quotationId)
+            } catch { /* non-critical: the policy is deleted regardless */ }
+        }
+    }
+
+    // Move a quotation off the "Converted" workflow step when it no longer has a policy for
+    // every vessel (e.g. after its policy was deleted). Prefers the "Approved" step, then the
+    // highest-order non-converted step, then the initial step.
+    private async revertQuotationConversionIfOrphaned(quotationId: string): Promise<void> {
+        if (!this.pool) return
+        const [qRows] = await this.pool.query(
+            `SELECT ws.name AS step_name FROM quotations q
+             LEFT JOIN quotation_workflow_steps ws ON ws.id = q.workflow_step_id
+             WHERE q.id = ?`, [quotationId]
+        )
+        const stepName = String((qRows as any[])[0]?.step_name || '').toLowerCase()
+        if (stepName !== 'converted') return
+
+        const vessels = await this.getQuotationVessels(quotationId)
+        const [covRows] = await this.pool.query(
+            'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?', [quotationId]
+        )
+        const covered = new Set((covRows as any[]).map(r => r.vessel_id))
+        const allCovered = vessels.length > 0 && vessels.every((v: any) => covered.has(v.vesselId || v.id))
+        if (allCovered) return
+
+        const [stepRows] = await this.pool.query(
+            'SELECT id, name, is_initial, order_index FROM quotation_workflow_steps'
+        )
+        const steps = stepRows as any[]
+        const target =
+            steps.find(s => String(s.name).toLowerCase() === 'approved') ||
+            steps.filter(s => String(s.name).toLowerCase() !== 'converted').sort((a, b) => (b.order_index || 0) - (a.order_index || 0))[0] ||
+            steps.find(s => s.is_initial)
+        if (target) {
+            await this.pool.execute('UPDATE quotations SET workflow_step_id = ? WHERE id = ?', [target.id, quotationId])
+        }
     }
 
     async convertQuotationToPolicy(quotationId: string, options: {
