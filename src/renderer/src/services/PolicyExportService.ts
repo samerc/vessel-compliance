@@ -239,7 +239,7 @@ function buildBbcWrcPage(
   const gt = !isNaN(gtNum) ? gtNum.toLocaleString('en-US', { maximumFractionDigits: gtNum % 1 === 0 ? 0 : 2 }) : String(data.grossTonnage || '')
   const portOfRegistry = data.portOfRegistry || ''
   const today = bcFormatDate(new Date().toISOString())
-  const city = data.closingCity || ''
+  const city = data.closingCity || 'Beirut'
 
   const titleKey = cardType === 'BBC' ? 'bc_text_BBC_title' : 'bc_text_WRC_title'
   const certifyKey = cardType === 'BBC' ? 'bc_text_BBC_certify' : 'bc_text_WRC_certify'
@@ -412,7 +412,7 @@ function buildMlcPage(
   const expiryFmt = bcFormatDate(data.expiryDate)
   const portOfRegistry = data.portOfRegistry || ''
   const today = bcFormatDate(new Date().toISOString())
-  const city = data.closingCity || ''
+  const city = data.closingCity || 'Beirut'
 
   const titleKey = is42 ? 'bc_text_MLC42_title' : 'bc_text_MLC252_title'
   const certifyKey = is42 ? 'bc_text_MLC42_certify' : 'bc_text_MLC252_certify'
@@ -867,6 +867,7 @@ interface FrozenExportSettings {
   logoPath?: string | null
   declarationSettings?: any            // per-year War declaration config (UMR/Amlin/risk code)
   endorsementClosingText?: string | null
+  policyClosingText?: string | null    // per-type policy closing section text (policy_text_{code}_closingText)
 }
 
 interface PolVesselInfo {
@@ -903,6 +904,7 @@ async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): 
   let declarationSettings: any = null
   try { const rawDec = await window.api.getSetting('declaration_settings'); if (rawDec) declarationSettings = JSON.parse(rawDec) } catch { /* null */ }
   const endorsementClosingText = (await window.api.getSetting('endorsement_closing_text').catch(() => null)) || null
+  const policyClosingText = (await window.api.getSetting(`policy_text_${quotation.quotationTypeCode}_closingText`).catch(() => null)) || null
   let st: any = sectionTextsRaw
   if (!st) { try { st = await window.api.piGetSectionTexts() } catch { st = null } }
   let brokerEntity: FrozenExportSettings['brokerEntity'] = null
@@ -928,7 +930,8 @@ async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): 
     brokerAddress,
     logoPath,
     declarationSettings,
-    endorsementClosingText
+    endorsementClosingText,
+    policyClosingText
   }
 }
 
@@ -2237,17 +2240,21 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
 
+    // Amount rendered with its wording in parentheses, e.g. "50,000,000 (US Dollars Fifty Million Only)"
+    const lolAmountWithWords = resolvedLolAmount != null
+      ? `${polFormatAmountOnly(resolvedLolAmount)} (${numberToWords(resolvedLolAmount, resolvedLolCurrency)})`
+      : '___'
     let lolText = ''
     if (data.quotation.limitOfLiabilityText) {
       lolText = data.quotation.limitOfLiabilityText
-        .replace(/\{amount\}/g, resolvedLolAmount != null ? polFormatAmountOnly(resolvedLolAmount) : '___')
+        .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
     } else if (polSt(data, 'limitOfLiabilityDefaultText') && resolvedLolAmount != null) {
       lolText = htmlToPlainText(polSt(data, 'limitOfLiabilityDefaultText'))
-        .replace(/\{amount\}/g, polFormatAmountOnly(resolvedLolAmount))
+        .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
     } else if (resolvedLolAmount != null) {
-      lolText = `${polFormatCurrency(resolvedLolAmount, resolvedLolCurrency)} all claims in the aggregate.`
+      lolText = `${polFormatCurrency(resolvedLolAmount, resolvedLolCurrency)} (${numberToWords(resolvedLolAmount, resolvedLolCurrency)}) all claims in the aggregate.`
     }
     // Handle sub-limits
     const subLimitLines = data.subLimits.map(sl =>
@@ -2969,9 +2976,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   })
   children.push(mainTable)
 
-  // Terms reference
+  // Terms reference / closing text — from per-type Policy Settings (frozen), hardcoded fallback
   children.push(polEmptyP())
-  children.push(polNpTight('The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'))
+  const policyClosingText = data.frozen?.policyClosingText || 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'
+  if (polIsHtml(policyClosingText)) {
+    children.push(...parseHtmlToParagraphs(policyClosingText, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED }))
+  } else {
+    children.push(polNpTight(policyClosingText))
+  }
   children.push(polEmptyP())
 
   // Important Notice — make type-aware by replacing P&I references for other types
@@ -3590,7 +3602,8 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
   } catch { /* ignore */ }
-  const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
+  // Title Case (not upper) for the Debit Advice heading + attachment sentence
+  const headerTitle = headerTitles[typeCode] || 'Certificate'
 
   // Load signature (for closing section — not in footer for DA)
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -3619,6 +3632,10 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
     spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
     children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
   }))
+
+  // Attachment sentence — this DA forms an integral part of the policy
+  children.push(polNp(`This Debit Advice shall be deemed to be attached to and forming an integral part of ${headerTitle} ${data.policy.policyNumber}`))
+  children.push(polEmptyP())
 
   // Build main two-column table (same pattern as policy)
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
