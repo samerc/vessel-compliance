@@ -157,6 +157,7 @@ Cross-vessel warranty and endorsement tracking system:
 - **Endorsements Due**: Computed from surveys with open defects past their due date; displayed in a dedicated tab
 - **IPC Handlers**: `survey_warranty:getByVessel`, `survey_warranty:getAll`, `survey_warranty:create`, `survey_warranty:update`, `survey_warranty:delete`, `survey_warranty:getReminders`, `survey_warranty:addReminder`, `survey_warranty:getEndorsementsDue`
 - **SQL alias rule**: All `sw.*` / `swr.*` wildcard selects must use explicit `column AS camelCaseName` aliases — MySQL returns raw snake_case, but TypeScript interfaces expect camelCase
+- **Convert to Survey vs Link to Survey** (WarrantyManager, on a `pending` warranty): "Convert to Survey" creates a NEW condition survey and links it (status → `survey_done`); "Link to Survey" opens a searchable picker of the vessel's EXISTING condition surveys (date/type/surveyor/reference) and links the chosen one (sets `condition_survey_id` + status `survey_done`). Both reuse `getConditionSurveys`/`getSurveyors`/`surveyWarrantyUpdate`.
 
 ### Customer Assignment (Policy-Level)
 
@@ -446,6 +447,7 @@ Tab-based reports page (`src/renderer/src/components/Reports.tsx`) with sub-navi
 
 - **LossRecordReport** (`src/renderer/src/components/LossRecordReport.tsx`): Imports Book1.xlsx (UWY in col 6), outputs a PDF grouped by Underwriting Year → vessel → claim
 - **AssuredReport** (`src/renderer/src/components/AssuredReport.tsx`): Assured listing by vessel/fleet. Filter: all active vessels, by fleet (searchable), or select vessels (search + chips). Table with vessel name, IMO, fleet, assured name, role, type, email, phone. Grouped by vessel with rowSpan. Sorted by role order from settings. Export: Excel + PDF (per-vessel sections with navy header bars).
+- **ConditionSurveyReport** (`src/renderer/src/components/ConditionSurveyReport.tsx`): "Condition Surveys" tab. Driven by **survey warranties** (vessels with none are omitted). Per row: warranty due date (inception + deadline days), the carried-out survey date, surveyor, and status. **Sorted/grouped by month** of the due date; event-based (no calculable date) warranties grouped under "No Due Date" at the end. Status is derived from the survey's **open-defect count**, not the raw warranty status: a recorded survey with open defects reads **Carried Out**, all-defects-closed reads **Survey Done** (also Pending / Waived). `getAllSurveyWarranties` was extended to LEFT JOIN `condition_surveys`/`surveyors` and, when a warranty has no explicit `condition_survey_id`, falls back (COALESCE) to the vessel's **latest** condition survey + its open-defect count. On-screen table + PDF (landscape, month header bars) + Excel.
 
 ### Customer Compliance Report
 
@@ -786,9 +788,13 @@ Insurance policy document management:
 - **Policy Detail** (`PolicyDetail.tsx`): Overview, Financial, Addresses, Blue Cards, Revision History, editing mode with 4 tabs
 - **Policy List** (`PolicyList.tsx`): Stats, search, filters, sortable table with conversion/export dates
 - **Policy Settings** (`PolicySettings.tsx`): Two-tier navigation (General/P&I/Hull/War) for opening clause, closing text, important notice, premium intro, font size, timezones, page numbering, footer, header titles, banks, cancel & replace, blue card texts, signatures, QR verification, T&C templates
-- **Exports**: Policy DOCX, Debit Advice, Credit Advice, Blue Cards (individual), PDF+T&C combined
+- **Exports**: Policy DOCX, Debit Advice, Credit Advice, Blue Cards (individual), PDF+T&C combined, and **Export All Documents (ZIP)** — bundles policy DOCX + DA + CA (when commission > 0) + every active blue card into one `.zip` via JSZip (`exportPolicyBundleZip`; shared blob-builders `buildDebitAdviceBlob`/`buildCreditAdviceBlob`/`buildBlueCardBlob`)
+- **Freeze on first export**: all exports (policy/DA/CA/BC/declaration/endorsement) freeze their content in `policy_documents.export_snapshot` on the FIRST export — re-exporting never changes content. A `FrozenExportSettings` bundle captures every setting/entity the builders read. Editing a policy or blue card, or creating a revision, clears the snapshot → next export re-freezes. See memory `project_export_freeze`.
+- **Hide broker toggle** (`policy_documents.hide_broker`, edited in PolicyDetail): suppresses the "c/o {broker}" line on the **policy and DA** only. The CA always shows the broker (it is the broker's document).
+- **Delete policy reverts the quotation**: deleting a policy that was its quotation's only converted vessel moves the quotation's `workflow_step_id` off "Converted" so it can be re-converted (the "converted" state is the workflow step, not `quotations.status`). A startup migration heals already-orphaned quotations (Converted step with zero policies).
 - **Instalment Dates**: Each 30 days = 1 calendar month from inception
 - **Premium**: Uses payable amount (after NCB/UPCC discounts)
+- **Export layout invariants** (PolicyExportService, see lessons-learned): nested tables use `POL_TABLE_MARGINS` (zero cell inset) to align with paragraphs; section titles use `keepLines` so a multi-line title never splits across pages (content still flows — NOT `cantSplit`); small gaps via `polSpacerPts(n)` not blank `polEmptyP()`. Policy/DA/CA share the insured (`polBuildInsuredSection`) and period (`polBuildPeriodParagraphs`) builders — a change to one applies to all.
 
 ### Policy Revisions
 
@@ -813,12 +819,13 @@ P&I insurance certificates:
 - **Issue/Reissue**: Per-type with auto-incremented numbers (P26200001/BBC, P26200001-2/BBC)
 - **Owner Override**: Per-card owner entity selection
 - **Port of Registry**: From flag state ports, auto-selected if single
-- **Auto-populate on conversion**: `convertQuotationToPolicy` sets each card's `port_of_registry` (flag's single/default port) AND owner (`owner_entity_id`/`owner_name`/`owner_address` from the Registered-Owner assured + entity_addresses). Previously conversion set only type/dates, leaving port/owner blank. (addressed-to for BBC/WRC still not auto-filled on conversion.)
+- **Auto-populate on conversion**: `convertQuotationToPolicy` sets each card's `port_of_registry` (flag's single/default port), owner (`owner_entity_id`/`owner_name`/`owner_address` from the Registered-Owner assured + entity_addresses), AND — for BBC/WRC — `addressed_to_*` from the vessel's flag-state authority when the flag ratifies the convention (BBC=`ratified_bunker`, WRC=`ratified_wreck`; MLC cards get none). A backfill migration fills the addressee on existing blank BBC/WRC cards for ratifying flags with an authority on file.
 - **Export port format**: `PORT / COUNTRY` (both uppercased); when no port is set it prints just the country — never `COUNTRY / COUNTRY`.
-- **Addressed To**: BBC/WRC addressed to flag authority; warns if flag not ratified, offers alternative
-- **Cancel & Replace**: Auto-checked if periods overlap, configurable text with placeholders
+- **Addressed To (ratification enforcement)**: BBC/WRC addressed to a flag-state maritime authority. The issue/reissue modal's addressee dropdown lists ONLY flags that ratify the relevant convention; a not-ratified warning shows when the vessel's own flag doesn't ratify. **Saving a BBC/WRC is blocked unless a ratified flag is selected** (`addressedToFlagId` required). An inline **"Add flag state"** form (name/ISO3/ratified bunker+wreck/authority) creates + selects a missing flag via `addFlagState` without leaving the modal.
+- **Reissue for another flag state**: from an existing card, reissue defaults new inception = today, expiry carried over, number increments (`-2`). The addressee flag can be switched (updates the "To:"). **Cancel & Replace is driven by period OVERLAP** — `new inception < old expiry` — recomputed live as the dates change (consecutive/touching periods omit it); when on, the source card is superseded.
+- **Cancel & Replace**: Configurable text with placeholders; auto-set from period overlap on reissue
 - **Status**: Active / Superseded (one active per type)
-- **Export**: Individual DOCX per card matching real certificate templates
+- **Export**: Individual DOCX per card matching real certificate templates. MLC provider block de-dupes the company name (report-settings `companyName` vs the `bc_mlc_company_address` first line, compared normalized so hyphenation differences match); Email/Tel contact rows have zero inter-row spacing. All blue-card tables use `BC_TABLE_MARGINS` (zero cell inset) to align with the surrounding paragraphs.
 
 ### Digital Signatures
 

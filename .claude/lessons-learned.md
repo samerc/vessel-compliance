@@ -171,6 +171,37 @@ Using the paginated `entities` state for parent-company lookups causes "undefine
 
 ---
 
+## DOCX Export Layout (`docx` library — PolicyExportService)
+
+### Nested-table cell text is inset ~108twip vs paragraphs — zero the cell margins
+A borderless nested table (inside a section's body cell) renders its cell text ~108 twips (Word's default `tblCellMar`) to the RIGHT of the paragraph text in the same cell — so vessel/insured/period/deductible tables looked misaligned with the section paragraphs. Reducing the table WIDTH (the earlier `POL_BODY_INNER_W` attempt) does NOT fix the left position. **Fix**: set `margins: { marginUnitType: WidthType.DXA, top:0, bottom:0, left:0, right:0 }` on the table (`POL_TABLE_MARGINS` for policy, `BC_TABLE_MARGINS` for blue cards) so cell text sits flush-left with the paragraphs.
+
+### Keep a multi-line section title whole with `keepLines`, NOT the row with `cantSplit`
+When a section (title cell + content cell) spans a page boundary, the multi-line title (e.g. "PREMIUM PAYMENT CONDITION PRECEDENT") can split 2-and-2 across pages. `cantSplit: true` on the `TableRow` fixes the split but forces the WHOLE section onto the next page → big blank gaps at page bottoms (users dislike this). **Fix**: leave the row splittable (content flows across pages) and put `keepLines: true` on the title paragraph — it holds all the title's lines together on one page while content flows. Applied to all 6 `makeRow` builders (policy/DA/CA/endorsement).
+
+### Precise small gaps: `polSpacerPts(n)` not `polEmptyP()`
+`polEmptyP()` is a full blank line (~14pt: line 240 + after 40). For a small gap (3pt/6pt between clauses) use an exact-height empty paragraph: `spacing: { before:0, after:0, line: n*20, lineRule: 'exact' }` (`polSpacerPts(n)`). Used for premium-payment clause gaps, trading-warranty section gaps, broker c/o gap.
+
+### Indent a continuation line under a numbered list item
+A plain paragraph following a `numbering`-ref list item renders at the left margin, not under the item's text. To align it under the numbered text, give it `indent: { left: 240 }` (matching the numbering's text indent — trading-numbered level 0 uses `left:240, hanging:240`, so the wrapped text sits at 240). Used for the excluded-country list under trading section 1.
+
+### Verify docx layout empirically with a LibreOffice render, don't reason about it
+Nested-table alignment and page-break behavior are renderer-dependent and counter-intuitive. Build a minimal `.docx` with the `docx` lib (`NODE_PATH=./node_modules`), convert with `soffice --headless --convert-to pdf` (paths under `C:\tmp`), and Read the PDF to see the real layout. This caught the inner-width-vs-zero-margin and the cantSplit-vs-keepLines decisions where reasoning alone was wrong.
+
+### `generatePolicyDocxBuffer` returns a fileName WITHOUT extension
+The buffer helper returns `fileName` with no `.docx` (the PDF+T&C path re-derives it). When zipping the policy into a bundle, append `.docx` yourself or the file lands extensionless.
+
+### Blue-card addressed-to and ratification live on `flag_states`
+`flag_states.authority_name`/`authority_address` (set in Flag State settings; ~14/39 flags have them) + `ratified_bunker`/`ratified_wreck`. BBC is addressed to the flag authority only when `ratified_bunker`; WRC when `ratified_wreck`; MLC cards are addressed to the provider (never the flag). Conversion auto-fills addressed-to for ratifying flags; a backfill migration heals existing blank BBC/WRC cards.
+
+---
+
+## Local Dev DB Charset Corruption (2026-07-14 reload)
+
+The local dev DB was reimported from a prod `mysqldump` that ran over a non-utf8 connection, so all non-ASCII became literal `?` (2-byte char→`??`, 3-byte→`???`; e.g. "Türkiye"→"T??rkiye", en-dash→"???"). This is LOCAL ONLY — **prod is clean** and deploys never push local rows to prod. Don't chase `?`/`??`/`???` in entity/address text as a code bug; it's the corrupted import. Clean re-export uses `mysqldump --default-character-set=utf8mb4 --result-file=out.sql` (NOT `> file`, which re-encodes in PowerShell). See memory `project_local_db_import`.
+
+---
+
 ## Patterns to Avoid
 
 - **Never call `loadDynamicPolicies()` only on tab switch** if the data is needed on other tabs (e.g. Documents tab needs P&I date from dynamicPolicies)
