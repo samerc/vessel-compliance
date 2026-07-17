@@ -186,17 +186,17 @@ function bcDetailRow(label: string, value: string): TableRow {
       new TableCell({
         width: { size: BC_LABEL_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(label, { caps: true })] })],
+        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(label, { caps: true })] })],
       }),
       new TableCell({
         width: { size: BC_SEP_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(':')] })],
+        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(':')] })],
       }),
       new TableCell({
         width: { size: BC_VALUE_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [bcText(value, { bold: true })] })],
+        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(value, { bold: true })] })],
       }),
     ],
   })
