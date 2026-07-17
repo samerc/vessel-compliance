@@ -2269,7 +2269,9 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     }
   } else if (typeCode === 'H') {
-    const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
+    const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
+    const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
+    const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
     const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
     const ivItems = data.quotation.ivEnabled ? data.hullAgreedValueItems.filter(it => it.section === 'iv') : []
     // Use per-vessel agreed value if available, falling back to quotation-level
@@ -2285,7 +2287,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
       content.push(polEmptyP())
-      content.push(polBp(`Section B: ${polFormatCurrency(vesselIvValue, data.quotation.ivCurrency || hmCurrency)} (${numberToWords(vesselIvValue, data.quotation.ivCurrency || hmCurrency)})`))
+      content.push(polBp(`Section B: ${polFormatCurrency(vesselIvValue, ivCurrency)} (${numberToWords(vesselIvValue, ivCurrency)})`))
       if (ivItems.length > 0) {
         for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
@@ -2778,8 +2780,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       }
       // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
       const avContent: (Paragraph | Table)[] = []
-      const hmCurrency = data.quotation.agreedValueCurrency || 'USD'
-      const ivCurrency = data.quotation.ivCurrency || hmCurrency
+      const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
+      const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
+      const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
       if (ivCurrency === hmCurrency) {
         const avSections: { label: string; amount: number }[] = []
         if (polVesselAv != null) avSections.push({ label: 'Section A', amount: polVesselAv })
@@ -4084,7 +4087,7 @@ export interface DeclarationFields {
 export async function loadDeclarationFields(policyId: string): Promise<DeclarationFields> {
   const data = await loadPolicyExportData(policyId)
   const q = data.quotation
-  const currency = q.agreedValueCurrency || q.premiumCurrency || 'USD'
+  const currency = (data.vessel as any)?.agreedValueCurrency || q.agreedValueCurrency || q.premiumCurrency || 'USD'
   const curSymbol = currency === 'USD' ? 'US$' : currency
 
   // Year from inception

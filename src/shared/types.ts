@@ -1152,6 +1152,7 @@ export interface QuotationVessel {
   premiumAmount?: number
   agreedValue?: number | null
   ivValue?: number | null
+  agreedValueCurrency?: string | null
   warExcessAmount?: number | null
   warSection1Premium?: number | null
   warSection2Premium?: number | null

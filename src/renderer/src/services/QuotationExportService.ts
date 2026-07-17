@@ -1431,14 +1431,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         avContent.push(new Table({ rows: avAltRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW2, avColonW2, avAmtW2], layout: TableLayoutType.FIXED }))
       } else if (dHasPerVesselValues) {
         const avVessels2 = data.quotationVessels.filter(v => v.agreedValue != null)
-        const allSameAv2 = avVessels2.length > 1 && avVessels2.every(v => v.agreedValue === avVessels2[0].agreedValue)
+        const allSameAv2 = avVessels2.length > 1 && avVessels2.every(v => v.agreedValue === avVessels2[0].agreedValue && (v.agreedValueCurrency || dHmCurr) === (avVessels2[0].agreedValueCurrency || dHmCurr))
         if (allSameAv2) {
-          avContent.push(np(`Section A: ${formatCurrency(avVessels2[0].agreedValue ?? undefined, dHmCurr)} each vessel`))
+          avContent.push(np(`Section A: ${formatCurrency(avVessels2[0].agreedValue ?? undefined, avVessels2[0].agreedValueCurrency || dHmCurr)} each vessel`))
         } else {
           avContent.push(np('Section A:'))
           const avRows2: TableRow[] = []
           for (const qv of avVessels2) {
-            avRows2.push(avRow2(qv.name || 'Unnamed', formatCurrency(qv.agreedValue ?? undefined, dHmCurr)))
+            avRows2.push(avRow2(qv.name || 'Unnamed', formatCurrency(qv.agreedValue ?? undefined, qv.agreedValueCurrency || dHmCurr)))
           }
           avContent.push(new Table({ rows: avRows2, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW2, avColonW2, avAmtW2], layout: TableLayoutType.FIXED }))
         }
@@ -1450,14 +1450,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dHasPerVesselIv = dIsMultiVessel && data.quotationVessels.some(v => v.ivValue != null)
       if (dHasPerVesselIv) {
         const ivVessels2 = data.quotationVessels.filter(v => v.ivValue != null)
-        const allSameIv2 = ivVessels2.length > 1 && ivVessels2.every(v => v.ivValue === ivVessels2[0].ivValue)
+        const allSameIv2 = ivVessels2.length > 1 && ivVessels2.every(v => v.ivValue === ivVessels2[0].ivValue && (v.agreedValueCurrency || dIvCurr) === (ivVessels2[0].agreedValueCurrency || dIvCurr))
         if (allSameIv2) {
-          avContent.push(np(`Section B: ${formatCurrency(ivVessels2[0].ivValue ?? undefined, dIvCurr)} each vessel`))
+          avContent.push(np(`Section B: ${formatCurrency(ivVessels2[0].ivValue ?? undefined, ivVessels2[0].agreedValueCurrency || dIvCurr)} each vessel`))
         } else {
           avContent.push(np('Section B:'))
           const ivRows2: TableRow[] = []
           for (const qv of ivVessels2) {
-            ivRows2.push(avRow2(qv.name || 'Unnamed', formatCurrency(qv.ivValue ?? undefined, dIvCurr)))
+            ivRows2.push(avRow2(qv.name || 'Unnamed', formatCurrency(qv.ivValue ?? undefined, qv.agreedValueCurrency || dIvCurr)))
           }
           avContent.push(new Table({ rows: ivRows2, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW2, avColonW2, avAmtW2], layout: TableLayoutType.FIXED }))
         }
@@ -1505,13 +1505,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         avContent.push(emptyP())
       } else if (dHasPerVesselValues) {
         const avVesselsStd = data.quotationVessels.filter(v => v.agreedValue != null)
-        const allSameAvStd = avVesselsStd.length > 1 && avVesselsStd.every(v => v.agreedValue === avVesselsStd[0].agreedValue)
+        const allSameAvStd = avVesselsStd.length > 1 && avVesselsStd.every(v => v.agreedValue === avVesselsStd[0].agreedValue && (v.agreedValueCurrency || dHmCurr) === (avVesselsStd[0].agreedValueCurrency || dHmCurr))
         if (allSameAvStd) {
-          avContent.push(np(`${formatCurrency(avVesselsStd[0].agreedValue ?? undefined, dHmCurr)} each vessel`))
+          avContent.push(np(`${formatCurrency(avVesselsStd[0].agreedValue ?? undefined, avVesselsStd[0].agreedValueCurrency || dHmCurr)} each vessel`))
         } else {
           const avStdRows: TableRow[] = []
           for (const qv of avVesselsStd) {
-            avStdRows.push(avRow3(qv.name || 'Unnamed', formatCurrency(qv.agreedValue ?? undefined, dHmCurr)))
+            avStdRows.push(avRow3(qv.name || 'Unnamed', formatCurrency(qv.agreedValue ?? undefined, qv.agreedValueCurrency || dHmCurr)))
           }
           avContent.push(new Table({ rows: avStdRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: [avNameW3, avColonW3, avAmtW3], layout: TableLayoutType.FIXED }))
         }
