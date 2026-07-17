@@ -2725,9 +2725,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the multi-line title must never split
+      // across a page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -2735,6 +2734,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
+            keepLines: true,
             spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
@@ -3623,9 +3623,8 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the multi-line title must never split
+      // across a page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -3633,6 +3632,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
+            keepLines: true,
             spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
@@ -3899,9 +3899,8 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the multi-line title must never split
+      // across a page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -3909,6 +3908,7 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
+            keepLines: true,
             spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
@@ -4361,15 +4361,14 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the title must never split across a
+      // page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: [polBp(title)]
+          children: [new Paragraph({ keepLines: true, alignment: AlignmentType.JUSTIFIED, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: title, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -4532,9 +4531,8 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the multi-line title must never split
+      // across a page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
@@ -4542,6 +4540,7 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({
+            keepLines: true,
             spacing: { before: 0, after: 0 },
             children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
           })]
@@ -4718,15 +4717,14 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
-      // Keep the whole section (title + content) on one page — moves to the next page if it
-      // doesn't fit, rather than splitting the title/content mid-row across pages.
-      cantSplit: true,
+      // The section content may flow across pages, but the title must never split across a
+      // page boundary — keepLines holds all its lines together on one page.
       children: [
         new TableCell({
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: [polBp(title)]
+          children: [new Paragraph({ keepLines: true, alignment: AlignmentType.JUSTIFIED, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: title, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
