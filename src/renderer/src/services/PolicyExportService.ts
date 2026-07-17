@@ -471,7 +471,7 @@ function buildMlcPage(
 
   // 6. Provider block — label NOT bold, entity from settings
   children.push(bcParagraph(
-    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY',
+    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY:',
     { bold: false, spacingAfter: 80 }
   ))
   // The MLC company-address setting usually already leads with the provider name (which may
