@@ -79,7 +79,11 @@ export default function ConditionSurveyReport() {
       setLoading(true)
       try {
         const w = await window.api.surveyWarrantyGetAll()
-        setWarranties(Array.isArray(w) ? w : [])
+        // Only active vessels — inactive vessels' warranties are excluded from the report
+        const active = (Array.isArray(w) ? w : []).filter(
+          (x: any) => x.vesselIsActive !== 0 && x.vesselIsActive !== false
+        )
+        setWarranties(active)
       } catch (err: any) {
         showError(err?.message || 'Failed to load survey warranties')
       } finally {

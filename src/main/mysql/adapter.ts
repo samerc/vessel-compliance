@@ -6124,7 +6124,7 @@ export class MySQLAdapter {
                 sw.completion_notes as completionNotes,
                 sw.condition_survey_id as conditionSurveyId,
                 sw.created_at as createdAt,
-                v.name as vesselName, v.imo_number as imoNumber,
+                v.name as vesselName, v.imo_number as imoNumber, v.is_active as vesselIsActive,
                 COALESCE(ce.name, e.name) as customerName,
                 f.name as fleetName,
                 pt.name as policyTypeName,

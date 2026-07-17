@@ -388,6 +388,7 @@ export interface SurveyWarranty {
   customerName?: string
   fleetName?: string
   policyTypeName?: string
+  vesselIsActive?: number | boolean | null
   surveyDate?: string | null
   conditionSurveyType?: string | null
   surveyorName?: string | null
