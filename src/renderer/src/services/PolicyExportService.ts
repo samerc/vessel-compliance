@@ -1590,7 +1590,7 @@ function polBuildAmountBreakdown(
     }),
     new Paragraph({
       spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: `(${numberToWords(total, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+      children: [new TextRun({ text: `(${numberToWords(total, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
     })
   ]
 }
@@ -3696,7 +3696,7 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: polFormatCurrency(totalPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: ` (${numberToWords(totalPremium, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({ text: ` (${numberToWords(totalPremium, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     }))
   }
@@ -3962,7 +3962,7 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
       spacing: { after: 120, line: 240, lineRule: 'auto' as any },
       children: [
         new TextRun({ text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)} Only)`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({ text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
     })
   ]

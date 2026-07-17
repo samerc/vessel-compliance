@@ -75,7 +75,7 @@ export const DEFAULT_SECTION_TEXTS: PISectionTexts = {
     docFooter: '<p style="text-align: center">Al Bahriah Insurance &amp; Reinsurance SAL — Confidential</p>',
     docFooterSpacing: 1,
     insuredFooter: 'For their respective rights and interests and/or respectively for accounts of whom it may concern.',
-    limitOfLiabilityDefaultText: 'The limit of liability of the Insurer under this Policy shall not exceed {amount} {currency} any one vessel any one accident or occurrence and in the aggregate during the policy period, except where otherwise specifically provided.',
+    limitOfLiabilityDefaultText: 'The limit of liability of the Insurer under this Policy shall not exceed {currency} {amount} any one vessel any one accident or occurrence and in the aggregate during the policy period, except where otherwise specifically provided.',
     conditionsIntro: 'Al-Bahriah Protection & Indemnity Wording 01.01.2025 covering the following Risks Insured:',
     tradingIntro: 'Subject to Paragraph 2 below, any trade of whatsoever nature with the following countries is excluded.',
     tradingConditionA: 'Trade with the countries set out in paragraph 1 above is however permitted subject to and provided always that the following express conditions are fully complied with in every respect.',
