@@ -489,7 +489,7 @@ function buildMlcPage(
   for (let i = 0; i < providerLines.length; i++) {
     children.push(new Paragraph({
       spacing: { after: i === providerLines.length - 1 ? 240 : 0 },
-      children: [bcText(providerLines[i].toUpperCase(), { bold: true })]
+      children: [bcText(providerLines[i], { bold: true })]
     }))
   }
 
