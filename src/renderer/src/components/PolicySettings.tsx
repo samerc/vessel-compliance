@@ -10,7 +10,6 @@ import {
   BookOpen,
   Type,
   Globe,
-  Hash,
   Landmark,
   AlertTriangle,
   DollarSign,
@@ -39,7 +38,7 @@ type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 type PolicySettingsTab =
   | 'fontSize'
   | 'timezones'
-  | 'pageNumbering'
+  | 'baseCurrency'
   | 'footerText'
   | 'headerTitles'
   | 'banks'
@@ -77,7 +76,7 @@ const CATEGORY_TABS: Record<PolicySettingsCategory, { id: PolicySettingsTab; lab
   general: [
     { id: 'fontSize', label: 'Font Size', icon: <Type size={15} /> },
     { id: 'timezones', label: 'Timezones', icon: <Globe size={15} /> },
-    { id: 'pageNumbering', label: 'Page Numbering', icon: <Hash size={15} /> },
+    { id: 'baseCurrency', label: 'Base Currency', icon: <DollarSign size={15} /> },
     { id: 'footerText', label: 'Footer Text', icon: <FileText size={15} /> },
     { id: 'headerTitles', label: 'Header Titles', icon: <BookOpen size={15} /> },
     { id: 'banks', label: 'Banks', icon: <Landmark size={15} /> },
@@ -198,7 +197,7 @@ export default function PolicySettings() {
       <fieldset disabled={!canSettings} style={{ border: 'none', padding: 0, margin: 0 }}>
         {activeTab === 'fontSize' && <FontSizeTab showSuccess={showSuccess} />}
         {activeTab === 'timezones' && <TimezonesTab showSuccess={showSuccess} />}
-        {activeTab === 'pageNumbering' && <PageNumberingTab showSuccess={showSuccess} />}
+        {activeTab === 'baseCurrency' && <BaseCurrencyTab showSuccess={showSuccess} />}
         {activeTab === 'footerText' && <FooterTextTab showSuccess={showSuccess} />}
         {activeTab === 'headerTitles' && <HeaderTitlesTab showSuccess={showSuccess} />}
         {activeTab === 'banks' && <BanksTab showSuccess={showSuccess} showError={showError} />}
@@ -366,94 +365,44 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   )
 }
 
-// ==================== Page Numbering Tab ====================
-function PageNumberingTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
-  const defaultPageMap: Record<string, Record<string, number>> = { P: { '3': 30, '4': 31, '5': 32, '6': 33 }, H: { '3': 28, '4': 29, '5': 30 }, W: { '3': 25, '4': 26 } }
-  const typeLabels: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War' }
-
-  const [pageCountMap, setPageCountMap] = useState(defaultPageMap)
-  const [newPageType, setNewPageType] = useState('P')
-  const [newPageCount, setNewPageCount] = useState('')
-  const [newTotalPages, setNewTotalPages] = useState('')
+// ==================== Base Currency Tab ====================
+function BaseCurrencyTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+  const [currency, setCurrency] = useState('USD')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     ;(async () => {
       try {
-        const raw = await window.api.getSetting('policyExportSettings')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (parsed.pageCountMap) setPageCountMap({ ...defaultPageMap, ...parsed.pageCountMap })
-        }
+        const raw = await window.api.getSetting('base_currency')
+        if (raw) setCurrency(raw)
       } catch { /* default */ }
       finally { setLoading(false) }
     })()
   }, [])
 
-  const save = async (updated: Record<string, Record<string, number>>) => {
-    setPageCountMap(updated)
-    // Load existing settings and merge
-    try {
-      const raw = await window.api.getSetting('policyExportSettings')
-      const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, pageCountMap: updated }))
-      showSuccess('Page numbering saved')
-    } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ pageCountMap: updated }))
-      showSuccess('Page numbering saved')
-    }
-  }
-
-  const addPageCountRow = () => {
-    if (!newPageCount || !newTotalPages) return
-    const updated = { ...pageCountMap }
-    if (!updated[newPageType]) updated[newPageType] = {}
-    updated[newPageType][newPageCount] = parseInt(newTotalPages, 10)
-    save(updated)
-    setNewPageCount('')
-    setNewTotalPages('')
-  }
-
-  const removePageCountRow = (type: string, pages: string) => {
-    const updated = { ...pageCountMap }
-    if (updated[type]) {
-      delete updated[type][pages]
-      if (Object.keys(updated[type]).length === 0) delete updated[type]
-    }
-    save(updated)
+  const handleSave = async () => {
+    const val = currency.toUpperCase().trim()
+    await window.api.setSetting('base_currency', val)
+    showSuccess(`Base currency set to ${val}`)
   }
 
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
 
   return (
     <div>
-      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Page Count Mapping</h4>
+      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>Base Currency</h4>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-        Map policy page count to total pages (including attached terms &amp; conditions). Used in footer &quot;Page X of Y&quot;.
+        The default accounting currency. Used for exchange rate calculations on policies.
       </p>
-      <div style={{ marginBottom: '12px' }}>
-        {Object.entries(pageCountMap).sort().map(([type, mapping]) => (
-          <div key={type} style={{ marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{typeLabels[type] || type}</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-              {Object.entries(mapping).sort(([a], [b]) => Number(a) - Number(b)).map(([pages, total]) => (
-                <span key={pages} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--input-border)', background: 'rgba(0,170,200,0.05)' }}>
-                  {pages} pg → {total}
-                  <button onClick={() => removePageCountRow(type, pages)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.75rem', padding: '0 2px' }}>x</button>
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <select value={newPageType} onChange={e => setNewPageType(e.target.value)} style={{ width: '80px' }}>
-          {Object.entries(typeLabels).map(([c, l]) => <option key={c} value={c}>{l}</option>)}
-        </select>
-        <input type="number" value={newPageCount} onChange={e => setNewPageCount(e.target.value)} placeholder="Pages" style={{ width: '70px' }} min={1} />
-        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>&rarr;</span>
-        <input type="number" value={newTotalPages} onChange={e => setNewTotalPages(e.target.value)} placeholder="Total" style={{ width: '70px' }} min={1} />
-        <button onClick={addPageCountRow} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Add</button>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={currency}
+          onChange={e => setCurrency(e.target.value)}
+          maxLength={5}
+          style={{ width: '100px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.88rem', textTransform: 'uppercase' }}
+        />
+        <button onClick={handleSave} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.84rem' }}>Save</button>
       </div>
     </div>
   )

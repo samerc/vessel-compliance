@@ -3144,7 +3144,6 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     H: 'Hull Cover',
     W: 'War Risk Certificate'
   }
-  let pageCountMap: Record<string, Record<string, number>> = {}
   let tcFooterText = ''
   let tcTitleLine = '{type} Cover {number}'
   let tcShowPageNumbers = true
@@ -3154,23 +3153,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       const parsed = JSON.parse(settings)
       if (parsed.footerText) footerText = parsed.footerText
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
-      if (parsed.pageCountMap) pageCountMap = parsed.pageCountMap
       if (parsed.tcFooterText != null) tcFooterText = parsed.tcFooterText
       if (parsed.tcTitleLine != null && parsed.tcTitleLine !== '') tcTitleLine = parsed.tcTitleLine
       if (parsed.tcShowPageNumbers != null) tcShowPageNumbers = parsed.tcShowPageNumbers !== false
     }
   } catch { /* ignore */ }
 
-  // Resolve total pages from page count map if not passed
-  if (!configTotalPages) {
-    const typeCode = data.quotation.quotationTypeCode || 'P'
-    const typeMap = pageCountMap[typeCode]
-    if (typeMap) {
-      // We don't know exact page count yet, use first mapping as default
-      const firstKey = Object.keys(typeMap).sort()[0]
-      if (firstKey) configTotalPages = typeMap[firstKey]
-    }
-  }
+  // Total pages: use the passed-in value (computed by the two-pass T&C pipeline) when present,
+  // otherwise fall back to Word's live NUMPAGES field (PageNumber.TOTAL_PAGES) at render time.
 
   // Add policy title (configurable per type)
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
