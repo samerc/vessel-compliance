@@ -9257,25 +9257,6 @@ export class MySQLAdapter {
         for (const qv of allQVessels) {
             if (qv.vesselId) vesselIdToQvId.set(qv.vesselId, qv.id)
         }
-        const vesselIdToLabel = new Map<string, string>()
-        for (const qv of allQVessels) {
-            if (qv.vesselId) vesselIdToLabel.set(qv.vesselId, qv.vesselLabel)
-        }
-
-        // Assign vessel labels to primary vessel's assureds (cloned from single-vessel quotation with NULL labels)
-        if (allQVessels.length > 1) {
-            const primaryLabel = vesselIdToLabel.get(primaryVesselId) || 'V1'
-            await this.pool.execute(
-                'UPDATE quotation_assureds SET vessel_label = ? WHERE quotation_id = ? AND (vessel_label IS NULL OR vessel_label = ?)',
-                [primaryLabel, newQuotationId, primaryLabel]
-            )
-        }
-
-        // Get existing quotation assureds — track per-vessel using entityId:vesselLabel keys
-        const existingAssureds = await this.getQuotationAssureds(newQuotationId)
-        const existingEntityKeys = new Set(
-            existingAssureds.map((a: any) => a.entityId ? `${a.entityId}:${a.vesselLabel || ''}` : null).filter(Boolean)
-        )
 
         // Role order from settings — used to add assureds in Registered Owners → Managers → … order
         const fleetAssuredRoles = await this.getAssuredRoles()
@@ -9286,64 +9267,14 @@ export class MySQLAdapter {
             (a: any, b: any) => (fleetRoleOrder.get(a.role?.toLowerCase()) ?? 999) - (fleetRoleOrder.get(b.role?.toLowerCase()) ?? 999)
         )
 
-        // Ensure the PRIMARY vessel has assureds. Its quotation is cloned from the source policy's
-        // quotation; if that source carried none, the primary vessel would be empty in the export
-        // while non-primary vessels (handled below) get theirs. Fall back to the vessel registry.
-        {
-            const primaryLabel = vesselIdToLabel.get(primaryVesselId) || 'V1'
-            const primaryHasAssureds = allQVessels.length > 1
-                ? existingAssureds.some((a: any) => (a.vesselLabel || '') === primaryLabel)
-                : existingAssureds.length > 0
-            if (!primaryHasAssureds) {
-                const pvAssureds = await this.getVesselAssureds(primaryVesselId)
-                const entities = await this.getEntities()
-                let assuredOrder = existingAssureds.length
-                for (const va of sortByRole(Array.isArray(pvAssureds) ? pvAssureds : [])) {
-                    if (existingEntityKeys.has(`${va.entityId}:${primaryLabel}`)) continue
-                    const entity = entities.find((e: any) => e.id === va.entityId)
-                    if (!entity) continue
-                    if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') continue
-                    await this.addQuotationAssured({
-                        quotationId: newQuotationId,
-                        entityId: va.entityId,
-                        name: entity.name,
-                        role: va.role || undefined,
-                        vesselLabel: allQVessels.length > 1 ? primaryLabel : undefined,
-                        order: assuredOrder++
-                    })
-                    existingEntityKeys.add(`${va.entityId}:${primaryLabel}`)
-                }
-            }
-        }
-
-        // For each non-primary vessel that has a policy, merge their data
+        // For each non-primary vessel that has a source policy, merge its premium/value/warranties.
+        // Assureds are NOT merged here — copying them from source quotations cross-contaminates
+        // (a multi-vessel source carries every vessel's assureds) and misses registry changes.
+        // They are rebuilt authoritatively from each vessel's registry after this loop.
         for (const vid of vesselIds) {
             if (vid === primaryVesselId) continue
             const sourceQId = quotationMap.get(vid)
-            if (!sourceQId) {
-                // No policy — just add assureds from vessel's assured list
-                const vassureds = await this.getVesselAssureds(vid)
-                const entities = await this.getEntities()
-                const vLabel = vesselIdToLabel.get(vid) || ''
-                let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
-                for (const va of sortByRole(Array.isArray(vassureds) ? vassureds : [])) {
-                    if (existingEntityKeys.has(`${va.entityId}:${vLabel}`)) continue
-                    const entity = entities.find((e: any) => e.id === va.entityId)
-                    if (!entity) continue
-                    // c/o role → skip (handled as broker)
-                    if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') continue
-                    await this.addQuotationAssured({
-                        quotationId: newQuotationId,
-                        entityId: va.entityId,
-                        name: entity.name,
-                        role: va.role || undefined,
-                        vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
-                        order: assuredOrder++
-                    })
-                    existingEntityKeys.add(`${va.entityId}:${vLabel}`)
-                }
-                continue
-            }
+            if (!sourceQId) continue // no source policy → nothing to merge
 
             // Merge from source quotation
             const sourceQ = await this.getQuotation(sourceQId)
@@ -9403,23 +9334,49 @@ export class MySQLAdapter {
             } finally {
                 await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             }
+        }
 
-            // Merge assureds (dedup per vessel using entityId:vesselLabel keys)
-            const sourceAssureds = await this.getQuotationAssureds(sourceQId)
-            const vLabel = vesselIdToLabel.get(vid) || ''
-            let assuredOrder = (await this.getQuotationAssureds(newQuotationId)).length
-            for (const sa of sourceAssureds) {
-                if (sa.entityId && existingEntityKeys.has(`${sa.entityId}:${vLabel}`)) continue
+        // ── Assureds: rebuild authoritatively from each vessel's current registry ──
+        // The clone (primary) and any source-quotation copies can cross-contaminate — a
+        // multi-vessel source quotation carries every vessel's assureds — or miss owners
+        // added to the registry since the last quotation. Rebuild deterministically so each
+        // vessel gets exactly its own registry assureds, labeled to that vessel, deduped
+        // per vessel. Mirrors how VesselTab populates assureds when a vessel is added.
+        await this.pool.execute('DELETE FROM quotation_assureds WHERE quotation_id = ?', [newQuotationId])
+        await this.pool.execute('DELETE FROM quotation_assured_groups WHERE quotation_id = ?', [newQuotationId])
+        const fleetEntities = await this.getEntities()
+        const fleetEntityById = new Map((Array.isArray(fleetEntities) ? fleetEntities : []).map((e: any) => [e.id, e]))
+        const isMultiVessel = allQVessels.length > 1
+        let fleetAssuredOrder = 0
+        let brokerCoName: string | null = null
+        for (const qv of allQVessels) {
+            if (!qv.vesselId) continue
+            const vLabel = qv.vesselLabel
+            const seenForVessel = new Set<string>()
+            const vassureds = await this.getVesselAssureds(qv.vesselId)
+            for (const va of sortByRole(Array.isArray(vassureds) ? vassureds : [])) {
+                // c/o role → quotation-level broker (coName), not an assured
+                if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
+                    if (!brokerCoName) { const ce = fleetEntityById.get(va.entityId); if (ce) brokerCoName = (ce as any).name }
+                    continue
+                }
+                if (va.entityId && seenForVessel.has(va.entityId)) continue
+                const entity = fleetEntityById.get(va.entityId)
+                if (!entity) continue
                 await this.addQuotationAssured({
                     quotationId: newQuotationId,
-                    entityId: sa.entityId || undefined,
-                    name: sa.name,
-                    role: sa.role || undefined,
-                    vesselLabel: allQVessels.length > 1 ? vLabel : undefined,
-                    order: assuredOrder++
+                    entityId: va.entityId,
+                    name: (entity as any).name,
+                    role: va.role || undefined,
+                    vesselLabel: isMultiVessel ? vLabel : undefined,
+                    order: fleetAssuredOrder++
                 })
-                if (sa.entityId) existingEntityKeys.add(`${sa.entityId}:${vLabel}`)
+                if (va.entityId) seenForVessel.add(va.entityId)
             }
+        }
+        if (brokerCoName) {
+            const curQ = await this.getQuotation(newQuotationId)
+            if (curQ && !curQ.coName) await this.updateQuotation(newQuotationId, { coName: brokerCoName } as any)
         }
 
         return newQuotationId
