@@ -9360,7 +9360,10 @@ export class MySQLAdapter {
                     if (!brokerCoName) { const ce = fleetEntityById.get(va.entityId); if (ce) brokerCoName = (ce as any).name }
                     continue
                 }
-                if (va.entityId && seenForVessel.has(va.entityId)) continue
+                // Dedup by entity + role: the same entity can be assured on the same vessel
+                // under multiple roles (e.g. Commercial Managers AND Financial Managers).
+                const dedupKey = `${va.entityId || ''}:${(va.role || '').toLowerCase()}`
+                if (va.entityId && seenForVessel.has(dedupKey)) continue
                 const entity = fleetEntityById.get(va.entityId)
                 if (!entity) continue
                 await this.addQuotationAssured({
@@ -9371,7 +9374,7 @@ export class MySQLAdapter {
                     vesselLabel: isMultiVessel ? vLabel : undefined,
                     order: fleetAssuredOrder++
                 })
-                if (va.entityId) seenForVessel.add(va.entityId)
+                if (va.entityId) seenForVessel.add(dedupKey)
             }
         }
         if (brokerCoName) {
