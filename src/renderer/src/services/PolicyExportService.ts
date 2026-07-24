@@ -3764,8 +3764,8 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
       const amtText = polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency) + (isNR ? ' (non-refundable)' : '')
       return new TableRow({
         children: [
-          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       })
     })
@@ -4003,8 +4003,8 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
         const commAmt = inst.commissionAmount != null ? inst.commissionAmount : Math.round(((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent / 100 * 100) / 100
         return new TableRow({
           children: [
-            new TableCell({ width: { size: caInstDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: caInstAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+            new TableCell({ width: { size: caInstDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: caInstAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
           ]
         })
       })
@@ -4633,8 +4633,8 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
       const amtText = polFormatCurrency(Number(inst.premiumAmount) || 0, currency)
       return new TableRow({
         children: [
-          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       })
     })
