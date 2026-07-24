@@ -3903,7 +3903,6 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
           }
         }
         if (brokerEntity.phone) children.push(caZeroP(`Phone: ${brokerEntity.phone}`))
-        if (brokerEntity.email) children.push(caZeroP(brokerEntity.email))
         children.push(polEmptyP())
       }
     } catch { /* ignore broker load errors */ }
