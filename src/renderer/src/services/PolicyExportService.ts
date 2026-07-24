@@ -4173,24 +4173,33 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   const periodFrom = `${polFormatDateUS(data.policy.inceptionDate)}\t\t${polFormatTime(data.policy.inceptionTime)} ${data.policy.timezone || ''}`
   const periodTo = `${polFormatDateUS(data.policy.expiryDate)}\t\t${polFormatTime(data.policy.expiryTime)} ${data.policy.timezone || ''}`
 
+  // Resolve war placeholders ({jwla_code}, {jwla_date}, {tc_text}) from war settings
+  const resolveWarPh = (text: string): string => {
+    if (!data.warSettings) return text
+    return text
+      .replace(/\{jwla_code\}/g, data.warSettings.jwlaCode)
+      .replace(/\{jwla_date\}/g, data.warSettings.jwlaDate)
+      .replace(/\{tc_text\}/g, data.warSettings.tcText)
+  }
+
   // Wording from war conditions
   const wordingLines: string[] = []
   for (const wc of data.warConditions) {
     const def = data.allWarConditions.find(c => c.id === wc.warConditionId)
-    if (def) wordingLines.push(wc.textOverride || def.text)
+    if (def) wordingLines.push(resolveWarPh(wc.textOverride || def.text))
   }
 
   // Warranties
   const warrantyLines: string[] = []
   for (const wid of data.selectedWarrantyIds) {
     const w = data.allWarranties.find(aw => aw.id === wid)
-    if (w) warrantyLines.push(w.text || (w as any).name)
+    if (w) warrantyLines.push(resolveWarPh(w.text || (w as any).name))
   }
-  for (const cw of data.customWarranties) warrantyLines.push(cw.text)
+  for (const cw of data.customWarranties) warrantyLines.push(resolveWarPh(cw.text))
 
   // Trading
   let tradingText = ''
-  if (q.tradingWarrantyIntro) tradingText = stripHtml(q.tradingWarrantyIntro)
+  if (q.tradingWarrantyIntro) tradingText = resolveWarPh(stripHtml(q.tradingWarrantyIntro))
 
   return {
     yearOfAccount: year,
@@ -4229,10 +4238,14 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   const LABEL_W = 1800
   const VALUE_W = 8200
 
+  // Extra top/bottom cell padding to space the sections apart a little more
+  const SECTION_MARGINS = { top: 90, bottom: 90, left: 0, right: 0 }
+
   const labelCell = (text: string) => new TableCell({
     width: { size: LABEL_W, type: WidthType.DXA },
     borders: polNoBorders(),
     verticalAlign: VerticalAlign.TOP,
+    margins: SECTION_MARGINS,
     children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: SIZE, font: FONT, bold: true })] })]
   })
 
@@ -4240,6 +4253,7 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
     width: { size: VALUE_W, type: WidthType.DXA },
     borders: polNoBorders(),
     verticalAlign: VerticalAlign.TOP,
+    margins: SECTION_MARGINS,
     children: lines.length > 0 ? lines.map(l => new Paragraph({
       spacing: { after: 60, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({ text: l, size: SIZE, font: FONT })]
@@ -4252,18 +4266,22 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
 
   const children: (Paragraph | Table)[] = []
 
-  // Title
+  // Title \u2014 two centered bold caps lines (name/declaration + year of account)
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 40 },
+    children: [new TextRun({ text: `${data.companyName.toUpperCase()} WAR COVER \u2013 DECLARATION`, size: SIZE, font: FONT, bold: true })]
+  }))
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 200 },
-    children: [new TextRun({ text: `${data.companyName.toUpperCase()} WAR COVER \u2013 DECLARATION`, size: SIZE, font: FONT, bold: true })]
+    children: [new TextRun({ text: `YEAR OF ACCOUNT ${fields.yearOfAccount}`, size: SIZE, font: FONT, bold: true })]
   }))
   children.push(emptyP())
 
-  // Main table
+  // Main table \u2014 UMR is the first section (year of account moved into the title)
   const rows: TableRow[] = []
 
-  rows.push(makeRow('YEAR OF\nACCOUNT:', [fields.yearOfAccount]))
   rows.push(makeRow('UMR:', [fields.umr]))
   rows.push(makeRow('REINSURED:', [fields.reinsured]))
   rows.push(makeRow('ASSURED:', fields.assuredText.split('\n')))
@@ -4284,8 +4302,8 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   vesselLines.push(`CLASS: ${fields.vesselClass}`)
   rows.push(makeRow('VESSEL(S):', vesselLines))
 
-  // Period
-  rows.push(makeRow('PERIOD:', [`From ${fields.periodFrom}`, '', `To     ${fields.periodTo}`]))
+  // Period — no blank line between the dates (tighter spacing)
+  rows.push(makeRow('PERIOD:', [`From ${fields.periodFrom}`, `To     ${fields.periodTo}`]))
 
   // Wording
   rows.push(makeRow('WORDING', fields.wording.split('\n').filter(l => l.trim())))
