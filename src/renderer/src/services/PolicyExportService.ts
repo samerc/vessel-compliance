@@ -2477,8 +2477,8 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
   if (data.quotation.quotationTypeCode !== 'W') {
     for (const sw of data.surveyWarranties) content.push(polBulletP(decodeHtmlEntities(sw.text)))
   }
-  if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'warrantiesAdditionalText'))) }
-  if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'warrantiesBreach'))) }
+  if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpUniform(polSt(data, 'warrantiesAdditionalText'))) }
+  if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMpUniform(polSt(data, 'warrantiesBreach'))) }
 
   // H&M warranty NOTE — from warrantiesNote section text or hardcoded default
   if (data.quotation.quotationTypeCode === 'H') {
