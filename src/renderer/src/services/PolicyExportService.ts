@@ -3009,9 +3009,17 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   })
   children.push(mainTable)
 
-  // Terms reference / closing text — from per-type Policy Settings (frozen), hardcoded fallback
+  // Terms reference / closing text — from per-type Policy Settings (frozen), hardcoded fallback.
+  // War closing text may reference the T&C version / JWLA via {tc_text}, {jwla_code}, {jwla_date}
+  // placeholders, resolved from War Settings (same as war conditions / declaration).
   children.push(polEmptyP())
-  const policyClosingText = data.frozen?.policyClosingText || 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'
+  let policyClosingText = data.frozen?.policyClosingText || 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'
+  if (data.warSettings) {
+    policyClosingText = policyClosingText
+      .replace(/\{tc_text\}/g, data.warSettings.tcText)
+      .replace(/\{jwla_code\}/g, data.warSettings.jwlaCode)
+      .replace(/\{jwla_date\}/g, data.warSettings.jwlaDate)
+  }
   if (polIsHtml(policyClosingText)) {
     children.push(...parseHtmlToParagraphs(policyClosingText, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED }))
   } else {
