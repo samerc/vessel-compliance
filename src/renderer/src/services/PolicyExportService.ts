@@ -1489,6 +1489,29 @@ function polBp(text: string) {
   })
 }
 
+// Premium-payment time-of-day text used in the premium payment condition precedent
+// (policy, DA, endorsement DA). This is a FIXED, settings-driven value (default
+// "Noon Lebanon LST") — intentionally NOT the policy's own inception time/timezone,
+// which is only shown in the PERIOD section.
+function polPremiumPaymentTime(data: PolicyExportData): string {
+  try {
+    const es: any = data.frozen?.exportSettings
+    if (es && typeof es.premiumPaymentTime === 'string' && es.premiumPaymentTime.trim()) {
+      return es.premiumPaymentTime.trim()
+    }
+  } catch { /* default */ }
+  return 'Noon Lebanon LST'
+}
+
+// Substitute {time} {timezone} (or a lone {time}) in a premium-payment intro with the
+// fixed premium-payment time; drop any leftover {timezone}.
+function polApplyPremiumTime(tpl: string, ppTime: string): string {
+  return tpl
+    .replace(/\{time\}\s*\{timezone\}/g, ppTime)
+    .replace(/\{time\}/g, ppTime)
+    .replace(/\{timezone\}/g, '')
+}
+
 // Bold amount followed by a non-bold parenthetical (the amount-in-words), e.g.
 // **USD 6,000,000** (US Dollars Six Million Only)
 function polAmountWordsP(amountText: string, wordsText: string) {
@@ -2589,7 +2612,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   // Priority: instalment sum (most accurate) → policy premium → quotation premium
   const instalmentSum = instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0)
   const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
-  const timezone = data.policy.timezone || ''
+  const ppTime = polPremiumPaymentTime(data)
 
   // Load policy export settings
   let premIntroTemplate = ''
@@ -2606,12 +2629,10 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   if (numInst === 1 && instalments.length === 1) {
     // Single instalment: "Premium of {currency} {amount} shall be payable on {date}..."
     const singleTemplate = premIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
-    const singleIntro = singleTemplate
+    const singleIntro = polApplyPremiumTime(singleTemplate
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate))
-      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
-      .replace(/\{timezone\}/g, timezone)
+      .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate)), ppTime)
     content.push(polNpTight(singleIntro))
     content.push(polSpacerPts(3))
 
@@ -2627,12 +2648,10 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   } else {
     // Multiple instalments
     const multiTemplate = premIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
-    const premIntro = multiTemplate
+    const premIntro = polApplyPremiumTime(multiTemplate
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{instalments\}/g, String(numInst))
-      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
-      .replace(/\{timezone\}/g, timezone)
+      .replace(/\{instalments\}/g, String(numInst)), ppTime)
     content.push(polNpTight(premIntro))
     content.push(polSpacerPts(3))
 
@@ -3753,25 +3772,21 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
     }
   } catch {}
 
-  const daTimezone = data.policy.timezone || ''
+  const ppTime = polPremiumPaymentTime(data)
   if (numInst === 1 && data.instalments.length === 1) {
     const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
-    ppcpContent.push(polNpTight(singleTpl
+    ppcpContent.push(polNpTight(polApplyPremiumTime(singleTpl
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate))
-      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
-      .replace(/\{timezone\}/g, daTimezone)))
+      .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate)), ppTime)))
   } else {
     // DA multi-instalment intro: drop the total premium amount (per-instalment amounts stay in the list below)
     const multiTpl = daIntroTemplate || 'Premium shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
-    ppcpContent.push(polNpTight(multiTpl
+    ppcpContent.push(polNpTight(polApplyPremiumTime(multiTpl
       .replace(/\{currency\}\s*\{amount\}\s*/g, '')
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{instalments\}/g, String(numInst))
-      .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
-      .replace(/\{timezone\}/g, daTimezone)))
+      .replace(/\{instalments\}/g, String(numInst)), ppTime)))
   }
   // 3pt gap between the intro line and the instalment list
   ppcpContent.push(polSpacerPts(3))
@@ -4657,15 +4672,15 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   // ADDITIONAL PREMIUM PAYMENT CONDITION PRECEDENT
   const ppcpContent: (Paragraph | Table)[] = []
-  const daTimezone = data.policy.timezone || ''
+  const ppTime = polPremiumPaymentTime(data)
 
   if (instalments.length === 1) {
     ppcpContent.push(polNp(
-      `Additional Premium shall be payable on ${polFormatDateUS(instalments[0].dueDate)} at ${polFormatTime(data.policy.inceptionTime)} ${daTimezone}, time being of the essence.`
+      `Additional Premium shall be payable on ${polFormatDateUS(instalments[0].dueDate)} at ${ppTime}, time being of the essence.`
     ))
   } else if (instalments.length > 1) {
     ppcpContent.push(polNp(
-      `Additional Premium ${polFormatCurrency(absPremium, currency)} shall be payable in ${instalments.length} Instalments on the following dates, at ${polFormatTime(data.policy.inceptionTime)} ${daTimezone}, time being of the essence:`
+      `Additional Premium ${polFormatCurrency(absPremium, currency)} shall be payable in ${instalments.length} Instalments on the following dates, at ${ppTime}, time being of the essence:`
     ))
     ppcpContent.push(polEmptyP())
 
