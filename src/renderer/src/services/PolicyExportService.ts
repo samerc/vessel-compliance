@@ -2250,7 +2250,11 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
     } else if (polSt(data, 'limitOfLiabilityDefaultText') && resolvedLolAmount != null) {
-      lolText = htmlToPlainText(polSt(data, 'limitOfLiabilityDefaultText'))
+      // Preserve paragraph breaks (e.g. the "Under no circumstances…" sentence sits in its own
+      // <p>) — htmlToPlainText uses textContent which would otherwise concatenate them.
+      lolText = htmlToPlainText(
+        polSt(data, 'limitOfLiabilityDefaultText').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n')
+      )
         .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
     } else if (resolvedLolAmount != null) {
@@ -2342,10 +2346,10 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polGetValueSectionTitle(typeCode: string | undefined): string {
   switch (typeCode) {
-    case 'P': return 'Limits of Liability'
+    case 'P': return 'Limit of Liability'
     case 'H': return 'Agreed Insured Value'
     case 'W': return 'Sum Insured'
-    default: return 'Limits of Liability'
+    default: return 'Limit of Liability'
   }
 }
 
