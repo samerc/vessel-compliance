@@ -1489,6 +1489,19 @@ function polBp(text: string) {
   })
 }
 
+// Bold amount followed by a non-bold parenthetical (the amount-in-words), e.g.
+// **USD 6,000,000** (US Dollars Six Million Only)
+function polAmountWordsP(amountText: string, wordsText: string) {
+  return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    children: [
+      new TextRun({ text: amountText, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+      new TextRun({ text: ` (${wordsText})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+    ]
+  })
+}
+
 // Tight variants (no trailing `after`) — for a heading/line immediately followed by a
 // polEmptyP() spacer, so the gap is exactly one blank line (matching the insured section).
 function polBupTight(text: string) {
@@ -2349,7 +2362,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     } else {
       const warAV = data.vessel?.agreedValue ?? data.quotation.agreedValue
       if (warAV != null) {
-        content.push(polBp(`${polFormatCurrency(warAV, wCurrency)} (${numberToWords(warAV, wCurrency)})`))
+        content.push(polAmountWordsP(polFormatCurrency(warAV, wCurrency), numberToWords(warAV, wCurrency)))
       }
     }
   }
