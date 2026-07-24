@@ -3511,12 +3511,16 @@ async function polBuildAdviceFooter(
 /** Build the closing block for DA/CA — subject line, city/date, company name + signature (right-aligned) */
 function polBuildAdviceClosing(
   data: PolicyExportData,
-  signatureImageRun: ImageRun | null
+  signatureImageRun: ImageRun | null,
+  omitSubjectLine = false
 ): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
 
-  content.push(polEmptyP())
-  content.push(polNp('Subject to the terms, clauses, conditions, and warranties of cover afforded.'))
+  // The "Subject to the terms..." line is shown on the DA but suppressed on the CA.
+  if (!omitSubjectLine) {
+    content.push(polEmptyP())
+    content.push(polNp('Subject to the terms, clauses, conditions, and warranties of cover afforded.'))
+  }
   content.push(polEmptyP())
 
   const closingCity = data.policy.closingCity || 'Beirut'
@@ -4028,8 +4032,8 @@ async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fi
     rows
   }))
 
-  // Closing block
-  children.push(...polBuildAdviceClosing(data, signatureImageRun))
+  // Closing block — CA omits the "Subject to the terms..." line
+  children.push(...polBuildAdviceClosing(data, signatureImageRun, true))
 
   const document = new Document({
     numbering: polMakeDocxNumbering(),
@@ -4796,8 +4800,8 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
     rows
   }))
 
-  // Closing
-  const closingParas = polBuildAdviceClosing(data, signatureImageRun)
+  // Closing — endorsement CA omits the "Subject to the terms..." line
+  const closingParas = polBuildAdviceClosing(data, signatureImageRun, true)
   children.push(...closingParas)
 
   const document = new Document({
