@@ -1762,7 +1762,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
       // Right: role only ("As <role>") — the address goes on its own full-width row below
       const rightChildren: Paragraph[] = []
-      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `As ${addr.role}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `"as ${addr.role}"`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
       if (rightChildren.length === 0) rightChildren.push(polEmptyP())
 
       tableRows.push(new TableRow({
@@ -1792,7 +1792,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       tableRows.push(new TableRow({
         children: [
           new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `As ${a.role}` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `"as ${a.role}"` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
         ]
       }))
     }
