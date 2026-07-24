@@ -1,13 +1,44 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
-  Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, X,
-  Trash2, AlertTriangle, CheckCircle2, Hash, Plus, Merge, Link2,
-  ScanSearch, CheckSquare, Square, Download, FolderOpen
+  Search,
+  User,
+  Ship,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Shield,
+  Building2,
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw,
+  Loader2,
+  X,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  Hash,
+  Plus,
+  Merge,
+  Link2,
+  ScanSearch,
+  CheckSquare,
+  Square,
+  Download,
+  FolderOpen
 } from 'lucide-react'
 import RemapFilePathsModal from './RemapFilePathsModal'
 import EntityEditPanel from './EntityEditPanel'
-import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityDocumentType, EntityDocument } from '../../../shared/types'
+import {
+  Entity,
+  EntityQueryParams,
+  Vessel,
+  VesselAssured,
+  EntityUBO,
+  SanctionsMatch,
+  EntityDocumentType,
+  EntityDocument
+} from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -33,7 +64,8 @@ function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
   s2 = s2.toLowerCase().trim()
   if (s1 === s2) return 1
-  const len1 = s1.length, len2 = s2.length
+  const len1 = s1.length,
+    len2 = s2.length
   if (len1 === 0 || len2 === 0) return 0
   const matchDist = Math.max(Math.floor(Math.max(len1, len2) / 2) - 1, 0)
   const s1m = new Array(len1).fill(false)
@@ -50,7 +82,8 @@ function jaroWinkler(s1: string, s2: string): number {
     }
   }
   if (matches === 0) return 0
-  let t = 0, k = 0
+  let t = 0,
+    k = 0
   for (let i = 0; i < len1; i++) {
     if (!s1m[i]) continue
     while (!s2m[k]) k++
@@ -66,7 +99,13 @@ function jaroWinkler(s1: string, s2: string): number {
   return jaro + prefix * 0.1 * (1 - jaro)
 }
 
-export default function EntityDirectory({ initialEntityId, onInitialEntityConsumed }: { initialEntityId?: string | null; onInitialEntityConsumed?: () => void }) {
+export default function EntityDirectory({
+  initialEntityId,
+  onInitialEntityConsumed
+}: {
+  initialEntityId?: string | null
+  onInitialEntityConsumed?: () => void
+}) {
   const [entities, setEntities] = useState<Entity[]>([])
   const [allEntities, setAllEntities] = useState<Entity[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -103,7 +142,10 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     { id: 'documents', label: 'Documents', defaultVisible: true },
     { id: 'vessels', label: 'Vessels', defaultVisible: true }
   ]
-  const { visibleColumns: entVisibleCols, setVisibleColumns: setEntVisibleCols } = useColumnPrefs('entities', ENTITY_COLUMNS)
+  const { visibleColumns: entVisibleCols, setVisibleColumns: setEntVisibleCols } = useColumnPrefs(
+    'entities',
+    ENTITY_COLUMNS
+  )
   const entVisSet = new Set(entVisibleCols)
 
   const [checkingId, setCheckingId] = useState<string | null>(null)
@@ -116,7 +158,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     vesselId?: string
   }>({ show: false, searchedName: '', matches: [] })
 
-
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     show: boolean
     entity: Entity | null
@@ -124,7 +165,13 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   }>({ show: false, entity: null, message: '' })
 
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', type: 'company' as 'company' | 'person', identifier: '', email: '', phone: '' })
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    type: 'company' as 'company' | 'person',
+    identifier: '',
+    email: '',
+    phone: ''
+  })
   const [isCreating, setIsCreating] = useState(false)
   const [similarEntities, setSimilarEntities] = useState<{ name: string; score: number }[]>([])
   const similarCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -153,14 +200,14 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     setMergeSearch('')
     setMergeKeepName('target')
     const all = await window.api.getEntities()
-    setAllEntitiesForMerge(all.filter(e => e.id !== entity.id))
+    setAllEntitiesForMerge(all.filter((e) => e.id !== entity.id))
     setShowMergeModal(true)
   }
 
   const mergeSearchResults = useMemo(() => {
     if (!mergeSearch.trim()) return []
     return allEntitiesForMerge
-      .filter(e => e.name.toLowerCase().includes(mergeSearch.toLowerCase()))
+      .filter((e) => e.name.toLowerCase().includes(mergeSearch.toLowerCase()))
       .slice(0, 20)
   }, [mergeSearch, allEntitiesForMerge])
 
@@ -183,7 +230,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     try {
       const keepName = mergeKeepName === 'source' ? mergeSource.name : mergeTarget.name
       const result = await window.api.mergeEntities(mergeSource.id, mergeTarget.id, keepName)
-      showSuccess(`Merged successfully. Reassigned ${result.mergedAssuredLinks} assured links, ${result.mergedUBOLinks} UBO links, ${result.mergedCustomerLinks} customer links.`)
+      showSuccess(
+        `Merged successfully. Reassigned ${result.mergedAssuredLinks} assured links, ${result.mergedUBOLinks} UBO links, ${result.mergedCustomerLinks} customer links.`
+      )
       setShowMergeModal(false)
       setMergeSource(null)
       setMergeTarget(null)
@@ -196,12 +245,12 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     }
   }
 
-
   const handleDeleteEntity = async (entity: Entity) => {
     const assocVessels = getAssociatedVessels(entity.id)
-    const message = assocVessels.length > 0
-      ? `This entity is linked to ${assocVessels.length} vessel(s). Deleting it will remove all assured links. Continue?`
-      : `Delete entity "${entity.name}"? This cannot be undone.`
+    const message =
+      assocVessels.length > 0
+        ? `This entity is linked to ${assocVessels.length} vessel(s). Deleting it will remove all assured links. Continue?`
+        : `Delete entity "${entity.name}"? This cannot be undone.`
     setDeleteConfirmation({ show: true, entity, message })
   }
 
@@ -221,7 +270,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   // Bulk operations
   const toggleSelectEntity = (entityId: string) => {
-    setSelectedEntityIds(prev => {
+    setSelectedEntityIds((prev) => {
       const next = new Set(prev)
       if (next.has(entityId)) next.delete(entityId)
       else next.add(entityId)
@@ -233,15 +282,15 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     if (selectedEntityIds.size === entities.length) {
       setSelectedEntityIds(new Set())
     } else {
-      setSelectedEntityIds(new Set(entities.map(e => e.id)))
+      setSelectedEntityIds(new Set(entities.map((e) => e.id)))
     }
   }
 
   const handleBulkExportEntities = () => {
-    const selected = allEntities.filter(e => selectedEntityIds.has(e.id))
+    const selected = allEntities.filter((e) => selectedEntityIds.has(e.id))
     if (selected.length === 0) return
     const headers = ['Name', 'Type', 'Identifier', 'Email', 'Phone', 'Sanctions Status']
-    const rows = selected.map(e => [
+    const rows = selected.map((e) => [
       e.name,
       e.type,
       e.identifier || '',
@@ -249,7 +298,10 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       e.phone || '',
       e.ofacStatus || 'NOT CHECKED'
     ])
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(','))].join('\n')
+    const csv = [
+      headers.join(','),
+      ...rows.map((r) => r.map((c) => `"${(c || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -301,7 +353,12 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           })
           loadData()
           if (result.matchFound && result.matches.length > 0) {
-            setSanctionsModal({ show: true, searchedName: entityName, matches: result.matches, entityId })
+            setSanctionsModal({
+              show: true,
+              searchedName: entityName,
+              matches: result.matches,
+              entityId
+            })
           }
           setCheckingId(null)
         }
@@ -341,15 +398,21 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       setVesselAssureds(Array.isArray(va) ? va : [])
       setEntityUBOs(Array.isArray(eu) ? eu : [])
       setAllEntities(Array.isArray(allEnts) ? allEnts : [])
-      setEntityDocTypes(Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : [])
+      setEntityDocTypes(
+        Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : []
+      )
       setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => { loadData() }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
-  useEffect(() => { setPage(1) }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
+  useEffect(() => {
+    loadData()
+  }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
 
   // Debounced duplicate detection when typing in create modal
   useEffect(() => {
@@ -368,20 +431,33 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       matches.sort((a, b) => b.score - a.score)
       setSimilarEntities(matches.slice(0, 5))
     }, 500)
-    return () => { if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current) }
+    return () => {
+      if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current)
+    }
   }, [createForm.name, showCreateModal, allEntities])
 
   // Escape key — close topmost open modal first (priority order: sanctions > merge > create)
   const handleGlobalEscape = useCallback(() => {
-    if (sanctionsModal.show) { setSanctionsModal(prev => ({ ...prev, show: false })); return }
-    if (showMergeModal) { setShowMergeModal(false); return }
-    if (showCreateModal) { setShowCreateModal(false); return }
+    if (sanctionsModal.show) {
+      setSanctionsModal((prev) => ({ ...prev, show: false }))
+      return
+    }
+    if (showMergeModal) {
+      setShowMergeModal(false)
+      return
+    }
+    if (showCreateModal) {
+      setShowCreateModal(false)
+      return
+    }
   }, [sanctionsModal.show, showMergeModal, showCreateModal])
 
   useEffect(() => {
     const anyOpen = sanctionsModal.show || showMergeModal || showCreateModal
     if (!anyOpen) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleGlobalEscape() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleGlobalEscape()
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [sanctionsModal.show, showMergeModal, showCreateModal, handleGlobalEscape])
@@ -389,7 +465,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   // Auto-select entity from global search or recent items
   useEffect(() => {
     if (initialEntityId && allEntities.length > 0) {
-      const entity = allEntities.find(e => e.id === initialEntityId)
+      const entity = allEntities.find((e) => e.id === initialEntityId)
       if (entity) setSelectedEntity(entity)
       onInitialEntityConsumed?.()
     }
@@ -430,7 +506,7 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const vesselCountByEntity = useMemo(() => {
     const m = new Map<string, number>()
     for (const [entityId, directLinks] of assuredsByEntity) {
-      const directIds = new Set(directLinks.map(l => l.vesselId))
+      const directIds = new Set(directLinks.map((l) => l.vesselId))
       const parentIds = uboParentIds.get(entityId) || []
       for (const parentId of parentIds) {
         for (const va of assuredsByEntity.get(parentId) || []) {
@@ -447,38 +523,55 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const getAssociatedVessels = (entityId: string) => {
     const directLinks = assuredsByEntity.get(entityId) || []
     const parentIds = uboParentIds.get(entityId) || []
-    const indirectLinks = parentIds.flatMap(pid => assuredsByEntity.get(pid) || [])
-    const vesselIds = new Set([...directLinks.map(l => l.vesselId), ...indirectLinks.map(l => l.vesselId)])
-    return vessels.filter(v => vesselIds.has(v.id)).map(v => {
-      const roles = [...new Set(directLinks.filter(l => l.vesselId === v.id).map(l => l.role))]
-      const viaAssureds = indirectLinks.filter(l => l.vesselId === v.id).map(l => {
-        const assured = allEntities.find(e => e.id === l.entityId)
-        return `${assured?.name ?? '?'} (${l.role})`
+    const indirectLinks = parentIds.flatMap((pid) => assuredsByEntity.get(pid) || [])
+    const vesselIds = new Set([
+      ...directLinks.map((l) => l.vesselId),
+      ...indirectLinks.map((l) => l.vesselId)
+    ])
+    return vessels
+      .filter((v) => vesselIds.has(v.id))
+      .map((v) => {
+        const roles = [
+          ...new Set(directLinks.filter((l) => l.vesselId === v.id).map((l) => l.role))
+        ]
+        const viaAssureds = indirectLinks
+          .filter((l) => l.vesselId === v.id)
+          .map((l) => {
+            const assured = allEntities.find((e) => e.id === l.entityId)
+            return `${assured?.name ?? '?'} (${l.role})`
+          })
+        return { ...v, roles, viaAssureds }
       })
-      return { ...v, roles, viaAssureds }
-    })
   }
 
   const getVesselCount = (entityId: string) => vesselCountByEntity.get(entityId) ?? 0
 
   const getParentCompanies = (entityId: string): Entity[] => {
     return (uboParentIds.get(entityId) || [])
-      .map(pid => allEntities.find(e => e.id === pid))
+      .map((pid) => allEntities.find((e) => e.id === pid))
       .filter((e): e is Entity => !!e)
   }
 
   const getDocScore = (entity: Entity) => {
-    const applicableTypes = entityDocTypes.filter(t =>
-      t.isRequired && (t.entityScope === 'both' || t.entityScope === entity.type)
+    const applicableTypes = entityDocTypes.filter(
+      (t) => t.isRequired && (t.entityScope === 'both' || t.entityScope === entity.type)
     )
-    const docsForEntity = entityDocs.filter(d => d.entityId === entity.id)
-    const have = applicableTypes.filter(t => docsForEntity.some(d => d.documentTypeId === t.id && d.filePath)).length
+    const docsForEntity = entityDocs.filter((d) => d.entityId === entity.id)
+    const have = applicableTypes.filter((t) =>
+      docsForEntity.some((d) => d.documentTypeId === t.id && d.filePath)
+    ).length
     return { have, total: applicableTypes.length }
   }
 
   // ── Stats ───────────────────────────────────────────────────────────────────
-  const companyCount = useMemo(() => allEntities.filter(e => e.type === 'company').length, [allEntities])
-  const personCount = useMemo(() => allEntities.filter(e => e.type === 'person').length, [allEntities])
+  const companyCount = useMemo(
+    () => allEntities.filter((e) => e.type === 'company').length,
+    [allEntities]
+  )
+  const personCount = useMemo(
+    () => allEntities.filter((e) => e.type === 'person').length,
+    [allEntities]
+  )
 
   // ── OFAC handlers ───────────────────────────────────────────────────────────
   const handleOfacRecheck = async (entity: Entity) => {
@@ -497,7 +590,12 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         showSuccess('Sanctions check complete: no matches found above threshold')
       }
       if (result.matchFound && result.matches.length > 0) {
-        setSanctionsModal({ show: true, searchedName: entity.name, matches: result.matches, entityId: entity.id })
+        setSanctionsModal({
+          show: true,
+          searchedName: entity.name,
+          matches: result.matches,
+          entityId: entity.id
+        })
       }
     } catch (error: any) {
       showError(error.message || 'Sanctions check failed. Please try again.')
@@ -522,7 +620,12 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         showSuccess('Sanctions check complete: no matches found above threshold')
       }
       if (result.matchFound && result.matches.length > 0) {
-        setSanctionsModal({ show: true, searchedName: vessel.name, matches: result.matches, vesselId: vessel.id })
+        setSanctionsModal({
+          show: true,
+          searchedName: vessel.name,
+          matches: result.matches,
+          vesselId: vessel.id
+        })
       }
     } catch (error: any) {
       showError(error.message || 'Sanctions check failed. Please try again.')
@@ -533,9 +636,15 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   const handleMarkClean = async () => {
     if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'CLEARED', ofacMatchFound: false })
+      await window.api.updateEntity(sanctionsModal.entityId, {
+        ofacStatus: 'CLEARED',
+        ofacMatchFound: false
+      })
     } else if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, { ofacStatus: 'CLEARED', ofacMatchFound: false })
+      await window.api.updateVessel(sanctionsModal.vesselId, {
+        ofacStatus: 'CLEARED',
+        ofacMatchFound: false
+      })
     }
     setSanctionsModal({ show: false, searchedName: '', matches: [] })
     loadData()
@@ -543,9 +652,15 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   const handleConfirmMatch = async () => {
     if (sanctionsModal.entityId) {
-      await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'MATCH', ofacMatchFound: true })
+      await window.api.updateEntity(sanctionsModal.entityId, {
+        ofacStatus: 'MATCH',
+        ofacMatchFound: true
+      })
     } else if (sanctionsModal.vesselId) {
-      await window.api.updateVessel(sanctionsModal.vesselId, { ofacStatus: 'MATCH', ofacMatchFound: true })
+      await window.api.updateVessel(sanctionsModal.vesselId, {
+        ofacStatus: 'MATCH',
+        ofacMatchFound: true
+      })
     }
     setSanctionsModal({ show: false, searchedName: '', matches: [] })
     loadData()
@@ -558,7 +673,13 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     try {
       const result = await OfacService.checkSanctions(name)
       if (result.matches.length > 0) {
-        setSanctionsModal({ show: true, searchedName: name, matches: result.matches, entityId: entity?.id, vesselId: vessel?.id })
+        setSanctionsModal({
+          show: true,
+          searchedName: name,
+          matches: result.matches,
+          entityId: entity?.id,
+          vesselId: vessel?.id
+        })
       }
     } catch (error: any) {
       showError(error.message || 'Failed to load sanctions data. Please try again.')
@@ -569,7 +690,15 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
   // ── Sub-components ──────────────────────────────────────────────────────────
 
-  const OfacBadge = ({ entity, vessel, onRecheck }: { entity?: Entity; vessel?: Vessel; onRecheck: () => void }) => {
+  const OfacBadge = ({
+    entity,
+    vessel,
+    onRecheck
+  }: {
+    entity?: Entity
+    vessel?: Vessel
+    onRecheck: () => void
+  }) => {
     const target = entity || vessel
     const isChecking = checkingId === target?.id
     const isMatch = target?.ofacStatus === 'MATCH' || target?.ofacStatus === 'SANCTIONED'
@@ -579,7 +708,19 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
     if (isChecking) {
       return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(0,210,255,0.1)', border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(0,210,255,0.3)', color: isLight ? '#0077a3' : '#00d2ff' }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '0.68rem',
+            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(0,210,255,0.1)',
+            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(0,210,255,0.3)',
+            color: isLight ? '#0077a3' : '#00d2ff'
+          }}
+        >
           <Loader2 size={11} className="spinner" /> CHECKING...
         </div>
       )
@@ -587,47 +728,119 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
     let config: { bg: string; border: string; color: string; text: string; icon: React.ReactNode }
     if (isPending) {
-      config = { bg: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', text: 'NOT CHECKED', icon: <Shield size={11} opacity={0.5} /> }
+      config = {
+        bg: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+        border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+        color: 'var(--text-secondary)',
+        text: 'NOT CHECKED',
+        icon: <Shield size={11} opacity={0.5} />
+      }
     } else if (isError) {
-      config = { bg: isLight ? 'rgba(200,120,0,0.15)' : 'rgba(255,153,0,0.1)', border: isLight ? '1px solid rgba(200,120,0,0.4)' : '1px solid rgba(255,153,0,0.3)', color: isLight ? '#b36b00' : '#ff9900', text: 'CHECK FAILED', icon: <Shield size={11} /> }
+      config = {
+        bg: isLight ? 'rgba(200,120,0,0.15)' : 'rgba(255,153,0,0.1)',
+        border: isLight ? '1px solid rgba(200,120,0,0.4)' : '1px solid rgba(255,153,0,0.3)',
+        color: isLight ? '#b36b00' : '#ff9900',
+        text: 'CHECK FAILED',
+        icon: <Shield size={11} />
+      }
     } else if (isMatch) {
-      config = { bg: isLight ? 'rgba(200,0,0,0.12)' : 'rgba(255,77,77,0.1)', border: isLight ? '1px solid rgba(200,0,0,0.35)' : '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', text: 'SANCTIONED', icon: <ShieldAlert size={11} /> }
+      config = {
+        bg: isLight ? 'rgba(200,0,0,0.12)' : 'rgba(255,77,77,0.1)',
+        border: isLight ? '1px solid rgba(200,0,0,0.35)' : '1px solid rgba(255,77,77,0.3)',
+        color: 'var(--danger)',
+        text: 'SANCTIONED',
+        icon: <ShieldAlert size={11} />
+      }
     } else if (isPotentialMatch) {
-      config = { bg: isLight ? 'rgba(180,140,0,0.15)' : 'rgba(255,193,7,0.1)', border: isLight ? '1px solid rgba(180,140,0,0.4)' : '1px solid rgba(255,193,7,0.3)', color: isLight ? '#997a00' : '#ffc107', text: 'POSSIBLE MATCH', icon: <ShieldAlert size={11} /> }
+      config = {
+        bg: isLight ? 'rgba(180,140,0,0.15)' : 'rgba(255,193,7,0.1)',
+        border: isLight ? '1px solid rgba(180,140,0,0.4)' : '1px solid rgba(255,193,7,0.3)',
+        color: isLight ? '#997a00' : '#ffc107',
+        text: 'POSSIBLE MATCH',
+        icon: <ShieldAlert size={11} />
+      }
     } else {
-      config = { bg: isLight ? 'rgba(0,140,70,0.12)' : 'rgba(0,255,136,0.1)', border: isLight ? '1px solid rgba(0,140,70,0.35)' : '1px solid rgba(0,255,136,0.3)', color: isLight ? '#008c46' : '#00ff88', text: 'CLEARED', icon: <ShieldCheck size={11} /> }
+      config = {
+        bg: isLight ? 'rgba(0,140,70,0.12)' : 'rgba(0,255,136,0.1)',
+        border: isLight ? '1px solid rgba(0,140,70,0.35)' : '1px solid rgba(0,255,136,0.3)',
+        color: isLight ? '#008c46' : '#00ff88',
+        text: 'CLEARED',
+        icon: <ShieldCheck size={11} />
+      }
     }
 
     return (
       <div
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '4px', fontSize: '0.68rem', background: config.bg, border: config.border, color: config.color, cursor: (isPotentialMatch || isMatch) ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
-        title={isError ? 'API request failed. Click refresh to retry.' : (isPotentialMatch || isMatch) ? 'Click to review matches' : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`}
-        onClick={e => { e.stopPropagation(); if (isPotentialMatch || isMatch) handleViewPotentialMatch(entity, vessel) }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '2px 7px',
+          borderRadius: '4px',
+          fontSize: '0.68rem',
+          background: config.bg,
+          border: config.border,
+          color: config.color,
+          cursor: isPotentialMatch || isMatch ? 'pointer' : 'default',
+          whiteSpace: 'nowrap'
+        }}
+        title={
+          isError
+            ? 'API request failed. Click refresh to retry.'
+            : isPotentialMatch || isMatch
+              ? 'Click to review matches'
+              : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`
+        }
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isPotentialMatch || isMatch) handleViewPotentialMatch(entity, vessel)
+        }}
       >
         {config.icon}
         {config.text}
-        <RefreshCw size={9} style={{ marginLeft: '3px', cursor: 'pointer', opacity: 0.55 }} className="hover-spin" onClick={e => { e.stopPropagation(); onRecheck() }} />
+        <RefreshCw
+          size={9}
+          style={{ marginLeft: '3px', cursor: 'pointer', opacity: 0.55 }}
+          className="hover-spin"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRecheck()
+          }}
+        />
       </div>
     )
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   const associatedVessels = selectedEntity ? getAssociatedVessels(selectedEntity.id) : []
-  const parentCompanies = selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
+  const parentCompanies =
+    selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
 
   // Track recent item view when an entity is selected (addresses/commissions/docs are
   // now handled by the shared EntityEditPanel).
   useEffect(() => {
     if (selectedEntity) {
-      window.api.recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type).then(() => {
-        window.dispatchEvent(new Event('recent-item-added'))
-      }).catch(() => {})
+      window.api
+        .recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type)
+        .then(() => {
+          window.dispatchEvent(new Event('recent-item-added'))
+        })
+        .catch(() => {})
     }
   }, [selectedEntity?.id])
 
   // ── VesselDetail drill-down ──────────────────────────────────────────────────
   if (viewingVessel) {
-    return <VesselDetail vessel={viewingVessel} backLabel="Back to Entity" onBack={() => { setViewingVessel(null); loadData() }} />
+    return (
+      <VesselDetail
+        vessel={viewingVessel}
+        backLabel="Back to Entity"
+        onBack={() => {
+          setViewingVessel(null)
+          loadData()
+        }}
+      />
+    )
   }
 
   const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
@@ -637,19 +850,47 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in">
-
       {/* Header */}
-      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <header
+        style={{
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}
+      >
         <div>
           <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Entity Directory</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Assureds, UBOs, and beneficial owners across your fleet.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Assureds, UBOs, and beneficial owners across your fleet.
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <button className="btn-secondary" onClick={() => setShowDuplicatesModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.9rem' }}>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowDuplicatesModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 16px',
+              fontSize: '0.9rem'
+            }}
+          >
             <ScanSearch size={16} /> Find Duplicates
           </button>
           {hasPermission('entities:create') && (
-            <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem' }}>
+            <button
+              className="btn-primary"
+              onClick={() => setShowCreateModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 18px',
+                fontSize: '0.9rem'
+              }}
+            >
               <Plus size={16} /> Create Entity
             </button>
           )}
@@ -657,42 +898,126 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       </header>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px',
+          marginBottom: '24px'
+        }}
+      >
+        <div
+          className="glass-card"
+          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
+        >
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <Shield size={20} color="white" />
           </div>
           <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{allEntities.length}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total Entities</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
+              {allEntities.length}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Total Entities
+            </div>
           </div>
         </div>
-        <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          className="glass-card"
+          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
+        >
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: accentBg,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <Building2 size={20} color={companyColor} />
           </div>
           <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{companyCount}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
+              {companyCount}
+            </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Companies</div>
           </div>
         </div>
-        <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          className="glass-card"
+          style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
+        >
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <User size={20} color={personColor} />
           </div>
           <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>{personCount}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: 1.1 }}>
+              {personCount}
+            </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Persons</div>
           </div>
         </div>
       </div>
 
       {/* Filter bar */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '16px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}
+      >
         {/* View mode */}
-        <div style={{ display: 'flex', gap: '3px', background: 'var(--table-header-bg)', padding: '3px', borderRadius: '8px' }}>
-          {(['all', 'customers'] as const).map(mode => (
-            <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: viewMode === mode ? 'var(--bg-card)' : 'transparent', color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: viewMode === mode ? '600' : '400', fontSize: '0.83rem', transition: 'var(--transition)' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '3px',
+            background: 'var(--table-header-bg)',
+            padding: '3px',
+            borderRadius: '8px'
+          }}
+        >
+          {(['all', 'customers'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                background: viewMode === mode ? 'var(--bg-card)' : 'transparent',
+                color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: viewMode === mode ? '600' : '400',
+                fontSize: '0.83rem',
+                transition: 'var(--transition)'
+              }}
+            >
               {mode === 'all' ? 'All Entities' : 'Customers'}
             </button>
           ))}
@@ -701,14 +1026,24 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
         <div style={{ flex: 1 }} />
 
         {/* Type filter */}
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '120px' }} aria-label="Filter by type">
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as any)}
+          style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '120px' }}
+          aria-label="Filter by type"
+        >
           <option value="all">All Types</option>
           <option value="company">Companies</option>
           <option value="person">Persons</option>
         </select>
 
         {/* OFAC filter */}
-        <select value={ofacStatusFilter} onChange={e => setOfacStatusFilter(e.target.value)} style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '140px' }} aria-label="Filter by sanctions status">
+        <select
+          value={ofacStatusFilter}
+          onChange={(e) => setOfacStatusFilter(e.target.value)}
+          style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '140px' }}
+          aria-label="Filter by sanctions status"
+        >
           <option value="all">All Statuses</option>
           <option value="CLEARED">Cleared</option>
           <option value="POTENTIAL_MATCH">Potential Match</option>
@@ -718,24 +1053,44 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
         {/* Search */}
         <div style={{ position: 'relative' }}>
-          <Search style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={15} />
+          <Search
+            style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-secondary)'
+            }}
+            size={15}
+          />
           <input
             type="text"
             placeholder="Search entities..."
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{ paddingLeft: '34px', paddingRight: '10px', width: '220px', fontSize: '0.88rem' }}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              paddingLeft: '34px',
+              paddingRight: '10px',
+              width: '220px',
+              fontSize: '0.88rem'
+            }}
           />
         </div>
         <button
           onClick={() => {
-            setSelectMode(prev => {
+            setSelectMode((prev) => {
               if (prev) setSelectedEntityIds(new Set())
               return !prev
             })
           }}
           className={selectMode ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '7px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+          style={{
+            padding: '7px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.82rem'
+          }}
           title={selectMode ? 'Exit select mode' : 'Enter select mode'}
         >
           <CheckSquare size={15} />
@@ -745,18 +1100,21 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
       {/* Bulk Action Toolbar */}
       {selectMode && selectedEntityIds.size > 0 && (
-        <div className="glass-card fade-in" style={{
-          padding: '10px 20px',
-          marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
-          border: '1px solid var(--accent-primary)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10
-        }}>
+        <div
+          className="glass-card fade-in"
+          style={{
+            padding: '10px 20px',
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
+            border: '1px solid var(--accent-primary)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}
+        >
           <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent-primary)' }}>
             {selectedEntityIds.size} selected
           </span>
@@ -764,7 +1122,13 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           <button
             className="btn-secondary"
             onClick={handleBulkExportEntities}
-            style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.82rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
           >
             <Download size={13} /> Export Selected
           </button>
@@ -772,7 +1136,14 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
             <button
               className="btn-secondary"
               onClick={() => setShowBulkDeleteConfirm(true)}
-              style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: 'var(--danger)'
+              }}
             >
               <Trash2 size={13} /> Delete Selected
             </button>
@@ -780,7 +1151,17 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
           <div style={{ flex: 1 }} />
           <button
             onClick={() => setSelectedEntityIds(new Set())}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.82rem', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.82rem',
+              padding: '6px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
           >
             <X size={13} /> Clear
           </button>
@@ -789,10 +1170,19 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
       {/* Main: table + slide-in panel */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-
         {/* Table */}
-        <div className="glass-card" style={{ flex: 1, minWidth: 0, overflow: 'hidden', padding: 0 }}>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)', position: 'relative' }}>
+        <div
+          className="glass-card"
+          style={{ flex: 1, minWidth: 0, overflow: 'hidden', padding: 0 }}
+        >
+          <div
+            style={{
+              overflowX: 'auto',
+              overflowY: 'auto',
+              maxHeight: 'calc(100vh - 380px)',
+              position: 'relative'
+            }}
+          >
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <colgroup>
                 {selectMode && <col style={{ width: '40px' }} />}
@@ -803,20 +1193,41 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 <col style={{ width: '80px' }} />
               </colgroup>
               <thead>
-                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
+                <tr
+                  style={{
+                    textAlign: 'left',
+                    background: 'var(--table-header-bg)',
+                    borderBottom: '1px solid var(--table-border)'
+                  }}
+                >
                   {selectMode && (
-                  <th style={{ padding: '10px 8px 10px 16px', width: '40px', background: 'var(--table-header-bg)', borderBottom: '2px solid var(--table-border)' }}>
-                    <div
-                      onClick={toggleSelectAllEntities}
-                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--accent-primary)' }}
-                      title={selectedEntityIds.size === entities.length ? 'Deselect all' : 'Select all'}
+                    <th
+                      style={{
+                        padding: '10px 8px 10px 16px',
+                        width: '40px',
+                        background: 'var(--table-header-bg)',
+                        borderBottom: '2px solid var(--table-border)'
+                      }}
                     >
-                      {selectedEntityIds.size === entities.length && entities.length > 0
-                        ? <CheckSquare size={15} />
-                        : <Square size={15} style={{ opacity: 0.4 }} />
-                      }
-                    </div>
-                  </th>
+                      <div
+                        onClick={toggleSelectAllEntities}
+                        style={{
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: 'var(--accent-primary)'
+                        }}
+                        title={
+                          selectedEntityIds.size === entities.length ? 'Deselect all' : 'Select all'
+                        }
+                      >
+                        {selectedEntityIds.size === entities.length && entities.length > 0 ? (
+                          <CheckSquare size={15} />
+                        ) : (
+                          <Square size={15} style={{ opacity: 0.4 }} />
+                        )}
+                      </div>
+                    </th>
                   )}
                   {[
                     { id: 'name', label: 'Name' },
@@ -824,10 +1235,35 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                     { id: 'sanctions', label: 'Sanctions' },
                     { id: 'documents', label: 'Documents' },
                     { id: 'vessels', label: 'Vessels' }
-                  ].filter(col => entVisSet.has(col.id)).map(col => (
-                    <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap', background: 'var(--table-header-bg)', borderBottom: '2px solid var(--table-border)' }}>{col.label}</th>
-                  ))}
-                  <th style={{ padding: '10px 8px', width: '36px', background: 'var(--table-header-bg)', borderBottom: '2px solid var(--table-border)' }}>
+                  ]
+                    .filter((col) => entVisSet.has(col.id))
+                    .map((col) => (
+                      <th
+                        key={col.id}
+                        style={{
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          fontSize: '0.69rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          color: 'var(--text-secondary)',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          background: 'var(--table-header-bg)',
+                          borderBottom: '2px solid var(--table-border)'
+                        }}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                  <th
+                    style={{
+                      padding: '10px 8px',
+                      width: '36px',
+                      background: 'var(--table-header-bg)',
+                      borderBottom: '2px solid var(--table-border)'
+                    }}
+                  >
                     <ColumnSelector
                       pageKey="entities"
                       allColumns={ENTITY_COLUMNS}
@@ -839,119 +1275,301 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
               </thead>
               <tbody>
                 {isLoading && entities.length === 0 ? (
-                  <tr><td colSpan={selectMode ? 6 : 5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <Loader2 size={22} className="spinner" style={{ marginBottom: '10px', display: 'block', margin: '0 auto 10px' }} />
-                    Loading entities...
-                  </td></tr>
-                ) : entities.length === 0 ? (
-                  <tr><td colSpan={selectMode ? 6 : 5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <Shield size={30} style={{ marginBottom: '10px', opacity: 0.25, display: 'block', margin: '0 auto 10px' }} />
-                    No entities found
-                  </td></tr>
-                ) : entities.map(entity => {
-                  const isSelected = selectedEntity?.id === entity.id
-                  const isBulkChecked = selectedEntityIds.has(entity.id)
-                  const score = getDocScore(entity)
-                  const vcount = getVesselCount(entity.id)
-                  const docColor = score.have === score.total
-                    ? (isLight ? '#008c46' : '#00c264')
-                    : score.have === 0
-                      ? (isLight ? '#c00000' : '#ff4d4d')
-                      : (isLight ? '#b45309' : '#f59e0b')
-
-                  return (
-                    <tr
-                      key={entity.id}
-                      onClick={() => setSelectedEntity(isSelected ? null : entity)}
-                      className="hover-effect"
+                  <tr>
+                    <td
+                      colSpan={selectMode ? 6 : 5}
                       style={{
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--table-border)',
-                        background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.04)') : isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(0,210,255,0.07)') : 'transparent',
-                        borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                        transition: 'background 0.12s, border-color 0.12s'
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)'
                       }}
                     >
-                      {/* Checkbox */}
-                      {selectMode && (
-                      <td style={{ padding: '11px 8px 11px 16px', width: '40px' }} onClick={e => e.stopPropagation()}>
-                        <div
-                          onClick={() => toggleSelectEntity(entity.id)}
-                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: isBulkChecked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
-                        >
-                          {isBulkChecked ? <CheckSquare size={15} /> : <Square size={15} style={{ opacity: 0.4 }} />}
-                        </div>
-                      </td>
-                      )}
-                      {/* Name */}
-                      {entVisSet.has('name') && (
-                      <td style={{ padding: '11px 16px', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: entity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {entity.type === 'company' ? <Building2 size={16} color={companyColor} /> : <User size={16} color={personColor} />}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entity.name}</div>
-                            {entity.identifier && (
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entity.identifier}</div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      )}
-                      {/* Type */}
-                      {entVisSet.has('type') && (
-                      <td style={{ padding: '11px 16px' }}>
-                        <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', background: entity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), color: entity.type === 'company' ? companyColor : personColor }}>
-                          {entity.type}
-                        </span>
-                      </td>
-                      )}
-                      {/* Sanctions */}
-                      {entVisSet.has('sanctions') && (
-                      <td style={{ padding: '11px 16px' }}>
-                        <OfacBadge entity={entity} onRecheck={() => handleOfacRecheck(entity)} />
-                      </td>
-                      )}
-                      {/* Documents */}
-                      {entVisSet.has('documents') && (
-                      <td style={{ padding: '11px 16px' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>{score.have}/{score.total}</span>
-                      </td>
-                      )}
-                      {/* Vessels */}
-                      {entVisSet.has('vessels') && (
-                      <td style={{ padding: '11px 16px' }}>
-                        {vcount > 0 ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)', background: accentBg, padding: '2px 8px', borderRadius: '10px' }}>
-                            <Ship size={11} />{vcount}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>—</span>
+                      <Loader2
+                        size={22}
+                        className="spinner"
+                        style={{ marginBottom: '10px', display: 'block', margin: '0 auto 10px' }}
+                      />
+                      Loading entities...
+                    </td>
+                  </tr>
+                ) : entities.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={selectMode ? 6 : 5}
+                      style={{
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      <Shield
+                        size={30}
+                        style={{
+                          marginBottom: '10px',
+                          opacity: 0.25,
+                          display: 'block',
+                          margin: '0 auto 10px'
+                        }}
+                      />
+                      No entities found
+                    </td>
+                  </tr>
+                ) : (
+                  entities.map((entity) => {
+                    const isSelected = selectedEntity?.id === entity.id
+                    const isBulkChecked = selectedEntityIds.has(entity.id)
+                    const score = getDocScore(entity)
+                    const vcount = getVesselCount(entity.id)
+                    const docColor =
+                      score.have === score.total
+                        ? isLight
+                          ? '#008c46'
+                          : '#00c264'
+                        : score.have === 0
+                          ? isLight
+                            ? '#c00000'
+                            : '#ff4d4d'
+                          : isLight
+                            ? '#b45309'
+                            : '#f59e0b'
+
+                    return (
+                      <tr
+                        key={entity.id}
+                        onClick={() => setSelectedEntity(isSelected ? null : entity)}
+                        className="hover-effect"
+                        style={{
+                          cursor: 'pointer',
+                          borderBottom: '1px solid var(--table-border)',
+                          background: isBulkChecked
+                            ? isLight
+                              ? 'rgba(0,150,200,0.06)'
+                              : 'rgba(0,210,255,0.04)'
+                            : isSelected
+                              ? isLight
+                                ? 'rgba(26,115,232,0.07)'
+                                : 'rgba(0,210,255,0.07)'
+                              : 'transparent',
+                          borderLeft: isSelected
+                            ? '3px solid var(--accent-primary)'
+                            : '3px solid transparent',
+                          transition: 'background 0.12s, border-color 0.12s'
+                        }}
+                      >
+                        {/* Checkbox */}
+                        {selectMode && (
+                          <td
+                            style={{ padding: '11px 8px 11px 16px', width: '40px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div
+                              onClick={() => toggleSelectEntity(entity.id)}
+                              style={{
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: isBulkChecked
+                                  ? 'var(--accent-primary)'
+                                  : 'var(--text-secondary)'
+                              }}
+                            >
+                              {isBulkChecked ? (
+                                <CheckSquare size={15} />
+                              ) : (
+                                <Square size={15} style={{ opacity: 0.4 }} />
+                              )}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      )}
-                      <td style={{ width: '36px' }} />
-                    </tr>
-                  )
-                })}
+                        {/* Name */}
+                        {entVisSet.has('name') && (
+                          <td style={{ padding: '11px 16px', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '34px',
+                                  height: '34px',
+                                  borderRadius: '8px',
+                                  background:
+                                    entity.type === 'company'
+                                      ? accentBg
+                                      : isLight
+                                        ? 'rgba(156,39,176,0.1)'
+                                        : 'rgba(186,104,200,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {entity.type === 'company' ? (
+                                  <Building2 size={16} color={companyColor} />
+                                ) : (
+                                  <User size={16} color={personColor} />
+                                )}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontWeight: 600,
+                                    fontSize: '0.88rem',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}
+                                >
+                                  {entity.name}
+                                </div>
+                                {entity.identifier && (
+                                  <div
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      color: 'var(--text-secondary)',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                  >
+                                    {entity.identifier}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        )}
+                        {/* Type */}
+                        {entVisSet.has('type') && (
+                          <td style={{ padding: '11px 16px' }}>
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.4px',
+                                background:
+                                  entity.type === 'company'
+                                    ? accentBg
+                                    : isLight
+                                      ? 'rgba(156,39,176,0.1)'
+                                      : 'rgba(186,104,200,0.1)',
+                                color: entity.type === 'company' ? companyColor : personColor
+                              }}
+                            >
+                              {entity.type}
+                            </span>
+                          </td>
+                        )}
+                        {/* Sanctions */}
+                        {entVisSet.has('sanctions') && (
+                          <td style={{ padding: '11px 16px' }}>
+                            <OfacBadge
+                              entity={entity}
+                              onRecheck={() => handleOfacRecheck(entity)}
+                            />
+                          </td>
+                        )}
+                        {/* Documents */}
+                        {entVisSet.has('documents') && (
+                          <td style={{ padding: '11px 16px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>
+                              {score.have}/{score.total}
+                            </span>
+                          </td>
+                        )}
+                        {/* Vessels */}
+                        {entVisSet.has('vessels') && (
+                          <td style={{ padding: '11px 16px' }}>
+                            {vcount > 0 ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  color: 'var(--accent-primary)',
+                                  background: accentBg,
+                                  padding: '2px 8px',
+                                  borderRadius: '10px'
+                                }}
+                              >
+                                <Ship size={11} />
+                                {vcount}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                —
+                              </span>
+                            )}
+                          </td>
+                        )}
+                        <td style={{ width: '36px' }} />
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Pagination */}
           {!isLoading && totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid var(--table-border)', fontSize: '0.82rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 16px',
+                borderTop: '1px solid var(--table-border)',
+                fontSize: '0.82rem'
+              }}
+            >
               <div style={{ color: 'var(--text-secondary)' }}>
-                {((page - 1) * limit) + 1}–{Math.min(page * limit, total)} of {total}
+                {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
               </div>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '4px 6px' }}><ChevronsLeft size={13} /></button>
-                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '4px 6px' }}><ChevronLeft size={13} /></button>
-                <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>{page}/{totalPages}</span>
-                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '4px 6px' }}><ChevronRight size={13} /></button>
-                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '4px 6px' }}><ChevronsRight size={13} /></button>
-                <select value={limit} onChange={e => setLimit(Number(e.target.value))} style={{ marginLeft: '8px', padding: '3px 6px', fontSize: '0.82rem' }}>
+                <button
+                  className="btn-secondary"
+                  disabled={page === 1}
+                  onClick={() => setPage(1)}
+                  style={{ padding: '4px 6px' }}
+                >
+                  <ChevronsLeft size={13} />
+                </button>
+                <button
+                  className="btn-secondary"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  style={{ padding: '4px 6px' }}
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>
+                  {page}/{totalPages}
+                </span>
+                <button
+                  className="btn-secondary"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  style={{ padding: '4px 6px' }}
+                >
+                  <ChevronRight size={13} />
+                </button>
+                <button
+                  className="btn-secondary"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(totalPages)}
+                  style={{ padding: '4px 6px' }}
+                >
+                  <ChevronsRight size={13} />
+                </button>
+                <select
+                  value={limit}
+                  onChange={(e) => setLimit(Number(e.target.value))}
+                  style={{ marginLeft: '8px', padding: '3px 6px', fontSize: '0.82rem' }}
+                >
                   <option value="10">10</option>
                   <option value="25">25</option>
                   <option value="50">50</option>
@@ -964,35 +1582,114 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
         {/* Slide-in detail panel */}
         {selectedEntity && (
-          <div className="glass-card fade-in" style={{ width: '400px', flexShrink: 0, padding: 0, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-
+          <div
+            className="glass-card fade-in"
+            style={{
+              width: '400px',
+              flexShrink: 0,
+              padding: 0,
+              maxHeight: 'calc(100vh - 280px)',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
             {/* Panel header */}
-            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--table-border)' }}>
+            <div
+              style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--table-border)' }}
+            >
               {/* Top: avatar + close */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {selectedEntity.type === 'company' ? <Building2 size={24} color="white" /> : <User size={24} color="white" />}
+                <div
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    borderRadius: '14px',
+                    background:
+                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {selectedEntity.type === 'company' ? (
+                    <Building2 size={24} color="white" />
+                  ) : (
+                    <User size={24} color="white" />
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2, marginBottom: '4px', wordBreak: 'break-word' }}>{selectedEntity.name}</div>
-                  <span style={{ fontSize: '0.7rem', padding: '1px 7px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', background: selectedEntity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), color: selectedEntity.type === 'company' ? companyColor : personColor }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '1.05rem',
+                      lineHeight: 1.2,
+                      marginBottom: '4px',
+                      wordBreak: 'break-word'
+                    }}
+                  >
+                    {selectedEntity.name}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      padding: '1px 7px',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                      background:
+                        selectedEntity.type === 'company'
+                          ? accentBg
+                          : isLight
+                            ? 'rgba(156,39,176,0.1)'
+                            : 'rgba(186,104,200,0.1)',
+                      color: selectedEntity.type === 'company' ? companyColor : personColor
+                    }}
+                  >
                     {selectedEntity.type}
                   </span>
                 </div>
-                <button onClick={() => setSelectedEntity(null)} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                <button
+                  onClick={() => setSelectedEntity(null)}
+                  style={{
+                    padding: '4px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    flexShrink: 0
+                  }}
+                >
                   <X size={16} />
                 </button>
               </div>
 
               {/* UBO of (persons only) */}
               {parentCompanies.length > 0 && (
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'flex-start', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  <Link2 size={13} color="var(--accent-primary)" style={{ marginTop: '1px', flexShrink: 0 }} />
+                <div
+                  style={{
+                    marginTop: '10px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '5px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <Link2
+                    size={13}
+                    color="var(--accent-primary)"
+                    style={{ marginTop: '1px', flexShrink: 0 }}
+                  />
                   <div>
                     <span style={{ marginRight: '4px' }}>UBO of:</span>
                     {parentCompanies.map((c, i) => (
                       <span key={c.id} style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {c.name}{i < parentCompanies.length - 1 ? ', ' : ''}
+                        {c.name}
+                        {i < parentCompanies.length - 1 ? ', ' : ''}
                       </span>
                     ))}
                   </div>
@@ -1001,83 +1698,257 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
               {/* Directory-level actions (merge / delete / remap) */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
-                <button onClick={() => openMergeModal(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button
+                  onClick={() => openMergeModal(selectedEntity)}
+                  className="btn-secondary"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
                   <Merge size={13} /> Merge
                 </button>
                 {hasPermission('entities:delete') && (
-                  <button onClick={() => handleDeleteEntity(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
+                  <button
+                    onClick={() => handleDeleteEntity(selectedEntity)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: 'var(--danger)'
+                    }}
+                  >
                     <Trash2 size={13} />
                   </button>
                 )}
-                <button onClick={() => setShowEntityRemapModal(true)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }} title="Remap entity file paths">
+                <button
+                  onClick={() => setShowEntityRemapModal(true)}
+                  className="btn-secondary"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Remap entity file paths"
+                >
                   <FolderOpen size={13} /> Remap
                 </button>
               </div>
             </div>
 
             {/* Entity-level editing - shared with the vessel Assured tab */}
-            <EntityEditPanel entityId={selectedEntity.id} canManage={hasPermission('entities:edit')} onChanged={loadData} />
+            <EntityEditPanel
+              entityId={selectedEntity.id}
+              canManage={hasPermission('entities:edit')}
+              onChanged={loadData}
+            />
 
             {/* Vessels section */}
             <div style={{ padding: '16px 20px', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '0.68rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.7px',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600
+                  }}
+                >
                   Vessels
                   {associatedVessels.length > 0 && (
-                    <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '8px', background: accentBg, color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.65rem' }}>{associatedVessels.length}</span>
+                    <span
+                      style={{
+                        marginLeft: '6px',
+                        padding: '1px 6px',
+                        borderRadius: '8px',
+                        background: accentBg,
+                        color: 'var(--accent-primary)',
+                        fontWeight: 700,
+                        fontSize: '0.65rem'
+                      }}
+                    >
+                      {associatedVessels.length}
+                    </span>
                   )}
                 </div>
-                {vessels.some(v => v.customerId === selectedEntity.id) && (
+                {vessels.some((v) => v.customerId === selectedEntity.id) && (
                   <button
                     onClick={async () => {
                       setExportingCompliance(true)
                       try {
-                        const cv = vessels.find(v => v.customerId === selectedEntity.id)
-                        await exportCustomerCompliancePDF(selectedEntity.id, selectedEntity.name, cv?.customerType || null)
-                      } finally { setExportingCompliance(false) }
+                        const cv = vessels.find((v) => v.customerId === selectedEntity.id)
+                        await exportCustomerCompliancePDF(
+                          selectedEntity.id,
+                          selectedEntity.name,
+                          cv?.customerType || null
+                        )
+                      } finally {
+                        setExportingCompliance(false)
+                      }
                     }}
                     disabled={exportingCompliance}
                     className="btn-secondary"
-                    style={{ padding: '3px 10px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.74rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="12" y1="18" x2="12" y2="12" />
+                      <line x1="9" y1="15" x2="15" y2="15" />
+                    </svg>
                     {exportingCompliance ? 'Exporting...' : 'PDF'}
                   </button>
                 )}
               </div>
 
               {associatedVessels.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                  <Ship size={28} style={{ opacity: 0.2, display: 'block', margin: '0 auto 8px' }} />
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '24px 0',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <Ship
+                    size={28}
+                    style={{ opacity: 0.2, display: 'block', margin: '0 auto 8px' }}
+                  />
                   No vessels linked
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {associatedVessels.map((vessel, i) => (
-                    <div key={vessel.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 0', borderBottom: i < associatedVessels.length - 1 ? '1px solid var(--table-border)' : 'none' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                    <div
+                      key={vessel.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        padding: '10px 0',
+                        borderBottom:
+                          i < associatedVessels.length - 1
+                            ? '1px solid var(--table-border)'
+                            : 'none'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '7px',
+                          background: accentBg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          marginTop: '1px'
+                        }}
+                      >
                         <Ship size={13} color={companyColor} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
-                          style={{ fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', color: 'var(--accent-primary)', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                          style={{
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            color: 'var(--accent-primary)',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
                           onClick={() => setViewingVessel(vessel)}
                         >
                           {vessel.name}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <Hash size={10} />{vessel.imoNumber}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginTop: '3px',
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--text-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }}
+                          >
+                            <Hash size={10} />
+                            {vessel.imoNumber}
                           </span>
                           {vessel.roles.map((r, ri) => (
-                            <span key={ri} style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: accentBg, color: companyColor, fontWeight: 500 }}>{r}</span>
+                            <span
+                              key={ri}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: accentBg,
+                                color: companyColor,
+                                fontWeight: 500
+                              }}
+                            >
+                              {r}
+                            </span>
                           ))}
                           {vessel.viaAssureds.map((r, ri) => (
-                            <span key={ri} style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', border: '1px solid var(--table-border)' }}>via {r}</span>
+                            <span
+                              key={ri}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                                color: 'var(--text-secondary)',
+                                border: '1px solid var(--table-border)'
+                              }}
+                            >
+                              via {r}
+                            </span>
                           ))}
                         </div>
                       </div>
-                      <OfacBadge vessel={vessel} onRecheck={() => handleVesselOfacRecheck(vessel)} />
+                      <OfacBadge
+                        vessel={vessel}
+                        onRecheck={() => handleVesselOfacRecheck(vessel)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1091,30 +1962,95 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
       {/* Create Entity Modal */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowCreateModal(false)}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '480px', maxWidth: '90vw', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '480px',
+              maxWidth: '90vw',
+              border: '1px solid var(--glass-border)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}
+            >
               <h3 style={{ fontSize: '1.3rem' }}>Create Entity</h3>
-              <button onClick={() => setShowCreateModal(false)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="btn-secondary"
+                style={{ padding: '6px' }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Name *
+                </label>
                 <div style={{ position: 'relative' }}>
-                  <input type="text" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', paddingRight: '44px' }} placeholder="Entity name" autoFocus />
-                  <CaseToggleBtn value={createForm.name} onChange={v => setCreateForm(f => ({ ...f, name: v }))} />
+                  <input
+                    type="text"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                    style={{ width: '100%', paddingRight: '44px' }}
+                    placeholder="Entity name"
+                    autoFocus
+                  />
+                  <CaseToggleBtn
+                    value={createForm.name}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, name: v }))}
+                  />
                 </div>
                 {similarEntities.length > 0 && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
-                    border: isLight ? '1px solid rgba(200,120,0,0.2)' : '1px solid rgba(255,193,7,0.15)',
-                    fontSize: '0.8rem',
-                    color: isLight ? '#8a6d00' : '#ffc107',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: 600 }}>
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+                      border: isLight
+                        ? '1px solid rgba(200,120,0,0.2)'
+                        : '1px solid rgba(255,193,7,0.15)',
+                      fontSize: '0.8rem',
+                      color: isLight ? '#8a6d00' : '#ffc107'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '6px',
+                        fontWeight: 600
+                      }}
+                    >
                       <AlertTriangle size={14} /> Similar entities found:
                     </div>
                     {similarEntities.map((s, i) => (
@@ -1126,28 +2062,101 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 )}
               </div>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
-                <select value={createForm.type} onChange={e => setCreateForm(f => ({ ...f, type: e.target.value as any }))} style={{ width: '100%', padding: '10px 12px' }}>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Type
+                </label>
+                <select
+                  value={createForm.type}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value as any }))}
+                  style={{ width: '100%', padding: '10px 12px' }}
+                >
                   <option value="company">Company</option>
                   <option value="person">Person</option>
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Identifier</label>
-                <input type="text" value={createForm.identifier} onChange={e => setCreateForm(f => ({ ...f, identifier: e.target.value }))} style={{ width: '100%' }} placeholder="Optional note to distinguish same-named entities" />
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Identifier
+                </label>
+                <input
+                  type="text"
+                  value={createForm.identifier}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, identifier: e.target.value }))}
+                  style={{ width: '100%' }}
+                  placeholder="Optional note to distinguish same-named entities"
+                />
               </div>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email(s)</label>
-                <input type="text" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))} style={{ width: '100%' }} placeholder="Separate multiple emails with commas" />
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Email(s)
+                </label>
+                <input
+                  type="text"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                  style={{ width: '100%' }}
+                  placeholder="Separate multiple emails with commas"
+                />
               </div>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Phone</label>
-                <input type="text" value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))} style={{ width: '100%' }} placeholder="Phone number" />
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
+                  style={{ width: '100%' }}
+                  placeholder="Phone number"
+                />
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">Cancel</button>
-                <button onClick={handleCreateEntity} className="btn-primary" disabled={!createForm.name.trim() || isCreating} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {isCreating ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />} Create Entity
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                  marginTop: '8px'
+                }}
+              >
+                <button onClick={() => setShowCreateModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateEntity}
+                  className="btn-primary"
+                  disabled={!createForm.name.trim() || isCreating}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isCreating ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />}{' '}
+                  Create Entity
                 </button>
               </div>
             </div>
@@ -1180,48 +2189,213 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
       {/* Merge Modal */}
       {showMergeModal && mergeSource && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowMergeModal(false)}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '560px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Merge size={20} /> Merge Entities</h3>
-              <button onClick={() => setShowMergeModal(false)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowMergeModal(false)}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '560px',
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              border: '1px solid var(--glass-border)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}
+            >
+              <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Merge size={20} /> Merge Entities
+              </h3>
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="btn-secondary"
+                style={{ padding: '6px' }}
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div style={{ marginBottom: '20px', padding: '14px', borderRadius: '10px', background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)', border: isLight ? '1px solid rgba(200,120,0,0.2)' : '1px solid rgba(255,193,7,0.15)', fontSize: '0.82rem', color: isLight ? '#8a6d00' : '#ffc107' }}>
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '14px',
+                borderRadius: '10px',
+                background: isLight ? 'rgba(200,120,0,0.08)' : 'rgba(255,193,7,0.08)',
+                border: isLight
+                  ? '1px solid rgba(200,120,0,0.2)'
+                  : '1px solid rgba(255,193,7,0.15)',
+                fontSize: '0.82rem',
+                color: isLight ? '#8a6d00' : '#ffc107'
+              }}
+            >
               <AlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-              This will merge the source entity INTO the target. All vessel links, UBOs, and customer assignments will be transferred. The source entity will be deleted.
+              This will merge the source entity INTO the target. All vessel links, UBOs, and
+              customer assignments will be transferred. The source entity will be deleted.
             </div>
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Source (will be deleted)</label>
-              <div style={{ padding: '12px', borderRadius: '8px', background: isLight ? 'rgba(200,0,0,0.05)' : 'rgba(255,77,77,0.05)', border: isLight ? '1px solid rgba(200,0,0,0.15)' : '1px solid rgba(255,77,77,0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {mergeSource.type === 'company' ? <Building2 size={18} color={companyColor} /> : <User size={18} color={personColor} />}
+              <label
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontWeight: 600
+                }}
+              >
+                Source (will be deleted)
+              </label>
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: isLight ? 'rgba(200,0,0,0.05)' : 'rgba(255,77,77,0.05)',
+                  border: isLight
+                    ? '1px solid rgba(200,0,0,0.15)'
+                    : '1px solid rgba(255,77,77,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                {mergeSource.type === 'company' ? (
+                  <Building2 size={18} color={companyColor} />
+                ) : (
+                  <User size={18} color={personColor} />
+                )}
                 <div>
                   <div style={{ fontWeight: '600' }}>{mergeSource.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{mergeSource.type}{mergeSource.identifier ? ` - ${mergeSource.identifier}` : ''}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {mergeSource.type}
+                    {mergeSource.identifier ? ` - ${mergeSource.identifier}` : ''}
+                  </div>
                 </div>
               </div>
             </div>
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Target (will be kept)</label>
+              <label
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontWeight: 600
+                }}
+              >
+                Target (will be kept)
+              </label>
               {mergeTarget ? (
-                <div style={{ padding: '12px', borderRadius: '8px', background: isLight ? 'rgba(0,140,70,0.05)' : 'rgba(0,255,136,0.05)', border: isLight ? '1px solid rgba(0,140,70,0.15)' : '1px solid rgba(0,255,136,0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {mergeTarget.type === 'company' ? <Building2 size={18} color={companyColor} /> : <User size={18} color={personColor} />}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: isLight ? 'rgba(0,140,70,0.05)' : 'rgba(0,255,136,0.05)',
+                    border: isLight
+                      ? '1px solid rgba(0,140,70,0.15)'
+                      : '1px solid rgba(0,255,136,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  {mergeTarget.type === 'company' ? (
+                    <Building2 size={18} color={companyColor} />
+                  ) : (
+                    <User size={18} color={personColor} />
+                  )}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '600' }}>{mergeTarget.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{mergeTarget.type}{mergeTarget.identifier ? ` - ${mergeTarget.identifier}` : ''}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {mergeTarget.type}
+                      {mergeTarget.identifier ? ` - ${mergeTarget.identifier}` : ''}
+                    </div>
                   </div>
-                  <button onClick={() => { setMergeTarget(null); setMergeSearch('') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Change</button>
+                  <button
+                    onClick={() => {
+                      setMergeTarget(null)
+                      setMergeSearch('')
+                    }}
+                    className="btn-secondary"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                  >
+                    Change
+                  </button>
                 </div>
               ) : (
                 <div style={{ position: 'relative' }}>
-                  <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={14} />
-                  <input type="text" value={mergeSearch} onChange={e => setMergeSearch(e.target.value)} placeholder="Search for target entity..." style={{ width: '100%', paddingLeft: '34px' }} autoFocus />
+                  <Search
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-secondary)'
+                    }}
+                    size={14}
+                  />
+                  <input
+                    type="text"
+                    value={mergeSearch}
+                    onChange={(e) => setMergeSearch(e.target.value)}
+                    placeholder="Search for target entity..."
+                    style={{ width: '100%', paddingLeft: '34px' }}
+                    autoFocus
+                  />
                   {mergeSearchResults.length > 0 && (
-                    <div style={{ marginTop: '4px', maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: '8px', background: isLight ? '#fff' : '#1e222a' }}>
-                      {mergeSearchResults.map(e => (
-                        <div key={e.id} onClick={() => { setMergeTarget(e); setMergeSearch('') }} style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
-                          {e.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
+                    <div
+                      style={{
+                        marginTop: '4px',
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        border: '1px solid var(--glass-border)',
+                        borderRadius: '8px',
+                        background: isLight ? '#fff' : '#1e222a'
+                      }}
+                    >
+                      {mergeSearchResults.map((e) => (
+                        <div
+                          key={e.id}
+                          onClick={() => {
+                            setMergeTarget(e)
+                            setMergeSearch('')
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            borderBottom: '1px solid var(--table-border)'
+                          }}
+                          className="hover-effect"
+                        >
+                          {e.type === 'company' ? (
+                            <Building2 size={14} opacity={0.5} />
+                          ) : (
+                            <User size={14} opacity={0.5} />
+                          )}
                           <span style={{ flex: 1 }}>{e.name}</span>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{e.type}{e.identifier ? ` - ${e.identifier}` : ''}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            {e.type}
+                            {e.identifier ? ` - ${e.identifier}` : ''}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -1231,16 +2405,51 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
             </div>
             {mergeTarget && (
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>Keep which name?</label>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    display: 'block',
+                    marginBottom: '6px',
+                    fontWeight: 600
+                  }}
+                >
+                  Keep which name?
+                </label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setMergeKeepName('target')} className={mergeKeepName === 'target' ? 'btn-primary' : 'btn-secondary'} style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}>{mergeTarget.name}</button>
-                  <button onClick={() => setMergeKeepName('source')} className={mergeKeepName === 'source' ? 'btn-primary' : 'btn-secondary'} style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}>{mergeSource.name}</button>
+                  <button
+                    onClick={() => setMergeKeepName('target')}
+                    className={mergeKeepName === 'target' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}
+                  >
+                    {mergeTarget.name}
+                  </button>
+                  <button
+                    onClick={() => setMergeKeepName('source')}
+                    className={mergeKeepName === 'source' ? 'btn-primary' : 'btn-secondary'}
+                    style={{ flex: 1, padding: '10px', fontSize: '0.82rem' }}
+                  >
+                    {mergeSource.name}
+                  </button>
                 </div>
               </div>
             )}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowMergeModal(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleMerge} className="btn-primary" disabled={!mergeTarget || isMerging} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--danger)', borderColor: 'var(--danger)' }}>
+              <button onClick={() => setShowMergeModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleMerge}
+                className="btn-primary"
+                disabled={!mergeTarget || isMerging}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'var(--danger)',
+                  borderColor: 'var(--danger)'
+                }}
+              >
                 {isMerging ? <Loader2 size={14} className="spinner" /> : <Merge size={14} />}
                 {isMerging ? 'Merging...' : 'Merge Entities'}
               </button>
@@ -1272,89 +2481,282 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
 
       {/* Duplicate Finder Modal */}
       {showDuplicatesModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '780px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '28px',
+              width: '100%',
+              maxWidth: '780px',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.4)'
+            }}
+          >
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}
+            >
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  background:
+                    'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
                 <ScanSearch size={20} color="white" />
               </div>
               <div style={{ flex: 1 }}>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>Duplicate Finder</h2>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Entities with similar names based on Jaro-Winkler similarity</p>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>
+                  Duplicate Finder
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Entities with similar names based on Jaro-Winkler similarity
+                </p>
               </div>
-              <button onClick={() => setShowDuplicatesModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+              <button
+                onClick={() => setShowDuplicatesModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '4px'
+                }}
+              >
                 <X size={20} />
               </button>
             </div>
 
             {/* Threshold control */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', borderRadius: '10px', background: 'var(--table-header-bg)', marginBottom: '18px' }}>
-              <label style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Similarity threshold:</label>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: 'var(--table-header-bg)',
+                marginBottom: '18px'
+              }}
+            >
+              <label
+                style={{
+                  fontSize: '0.83rem',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Similarity threshold:
+              </label>
               <input
                 type="range"
                 min={70}
                 max={99}
                 value={dupThreshold}
-                onChange={e => setDupThreshold(Number(e.target.value))}
+                onChange={(e) => setDupThreshold(Number(e.target.value))}
                 style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
               />
-              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--accent-primary)', minWidth: '38px', textAlign: 'right' }}>{dupThreshold}%</span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>— {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found</span>
+              <span
+                style={{
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  color: 'var(--accent-primary)',
+                  minWidth: '38px',
+                  textAlign: 'right'
+                }}
+              >
+                {dupThreshold}%
+              </span>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                — {duplicatePairs.length} pair{duplicatePairs.length !== 1 ? 's' : ''} found
+              </span>
             </div>
 
             {/* Results */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {duplicatePairs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-secondary)' }}>
-                  <CheckCircle2 size={40} style={{ marginBottom: '12px', color: 'var(--success, #00c853)', opacity: 0.7 }} />
-                  <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '4px' }}>No duplicates found</div>
-                  <div style={{ fontSize: '0.82rem' }}>No entities share {dupThreshold}%+ name similarity.</div>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '48px 20px',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <CheckCircle2
+                    size={40}
+                    style={{ marginBottom: '12px', color: 'var(--success, #00c853)', opacity: 0.7 }}
+                  />
+                  <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '4px' }}>
+                    No duplicates found
+                  </div>
+                  <div style={{ fontSize: '0.82rem' }}>
+                    No entities share {dupThreshold}%+ name similarity.
+                  </div>
                 </div>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--table-header-bg)' }}>
-                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)' }}>Entity A</th>
-                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)' }}>Entity B</th>
-                      <th style={{ padding: '9px 14px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--table-border)', width: '80px' }}>Score</th>
-                      <th style={{ padding: '9px 14px', borderBottom: '1px solid var(--table-border)', width: '80px' }}></th>
+                      <th
+                        style={{
+                          padding: '9px 14px',
+                          textAlign: 'left',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          borderBottom: '1px solid var(--table-border)'
+                        }}
+                      >
+                        Entity A
+                      </th>
+                      <th
+                        style={{
+                          padding: '9px 14px',
+                          textAlign: 'left',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          borderBottom: '1px solid var(--table-border)'
+                        }}
+                      >
+                        Entity B
+                      </th>
+                      <th
+                        style={{
+                          padding: '9px 14px',
+                          textAlign: 'center',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          borderBottom: '1px solid var(--table-border)',
+                          width: '80px'
+                        }}
+                      >
+                        Score
+                      </th>
+                      <th
+                        style={{
+                          padding: '9px 14px',
+                          borderBottom: '1px solid var(--table-border)',
+                          width: '80px'
+                        }}
+                      ></th>
                     </tr>
                   </thead>
                   <tbody>
                     {duplicatePairs.map((pair, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: '1px solid var(--table-border)',
+                          background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'
+                        }}
+                      >
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {pair.a.type === 'company' ? <Building2 size={14} color={companyColor} /> : <User size={14} color={personColor} />}
+                            {pair.a.type === 'company' ? (
+                              <Building2 size={14} color={companyColor} />
+                            ) : (
+                              <User size={14} color={personColor} />
+                            )}
                             <div>
                               <div style={{ fontWeight: '600' }}>{pair.a.name}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{pair.a.type}{pair.a.identifier ? ` · ${pair.a.identifier}` : ''}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                {pair.a.type}
+                                {pair.a.identifier ? ` · ${pair.a.identifier}` : ''}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {pair.b.type === 'company' ? <Building2 size={14} color={companyColor} /> : <User size={14} color={personColor} />}
+                            {pair.b.type === 'company' ? (
+                              <Building2 size={14} color={companyColor} />
+                            ) : (
+                              <User size={14} color={personColor} />
+                            )}
                             <div>
                               <div style={{ fontWeight: '600' }}>{pair.b.name}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{pair.b.type}{pair.b.identifier ? ` · ${pair.b.identifier}` : ''}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                {pair.b.type}
+                                {pair.b.identifier ? ` · ${pair.b.identifier}` : ''}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '700',
-                            background: pair.score >= 0.97 ? 'rgba(255,77,77,0.12)' : pair.score >= 0.92 ? 'rgba(255,193,7,0.12)' : 'rgba(0,200,100,0.1)',
-                            color: pair.score >= 0.97 ? 'var(--danger)' : pair.score >= 0.92 ? (isLight ? '#a06000' : '#ffc107') : (isLight ? '#007a3d' : '#00c853')
-                          }}>
+                          <span
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.78rem',
+                              fontWeight: '700',
+                              background:
+                                pair.score >= 0.97
+                                  ? 'rgba(255,77,77,0.12)'
+                                  : pair.score >= 0.92
+                                    ? 'rgba(255,193,7,0.12)'
+                                    : 'rgba(0,200,100,0.1)',
+                              color:
+                                pair.score >= 0.97
+                                  ? 'var(--danger)'
+                                  : pair.score >= 0.92
+                                    ? isLight
+                                      ? '#a06000'
+                                      : '#ffc107'
+                                    : isLight
+                                      ? '#007a3d'
+                                      : '#00c853'
+                            }}
+                          >
                             {Math.round(pair.score * 100)}%
                           </span>
                         </td>
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                           <button
                             className="btn-secondary"
-                            style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            onClick={() => { setShowDuplicatesModal(false); openMergeModal(pair.a) }}
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            onClick={() => {
+                              setShowDuplicatesModal(false)
+                              openMergeModal(pair.a)
+                            }}
                             title="Open merge dialog for this pair"
                           >
                             <Merge size={13} /> Merge
@@ -1368,7 +2770,9 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
-              <button onClick={() => setShowDuplicatesModal(false)} className="btn-secondary">Close</button>
+              <button onClick={() => setShowDuplicatesModal(false)} className="btn-secondary">
+                Close
+              </button>
             </div>
           </div>
         </div>
