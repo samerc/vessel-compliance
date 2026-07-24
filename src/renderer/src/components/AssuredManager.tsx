@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Users, UserPlus, UserCheck, Check, Building2, User, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X, Save, Upload, FolderOpen, Plus, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
+import { Trash2, Users, UserPlus, Check, Building2, User, Loader2, Pencil, X, Save, Plus } from 'lucide-react'
+import { Vessel, Entity, AssuredRole, VesselAssured, EntityUBO, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import SanctionsModal from './SanctionsModal'
 import ConfirmationModal from './ConfirmationModal'
-import { formatDateTime } from '../utils/dateUtils'
+import EntityEditPanel from './EntityEditPanel'
 
 interface AssuredManagerProps {
     vessel: Vessel
@@ -25,7 +24,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const isLight = theme === 'light' || theme === 'aurora'
     const { hasPermission } = useAuth()
     const canManageAssureds = hasPermission('assureds:manage')
-    const canUploadDocs = hasPermission('documents:upload')
 
     const [showAddForm, setShowAddForm] = useState(false)
     const [newName, setNewName] = useState('')
@@ -33,18 +31,12 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [newRole, setNewRole] = useState('')
     const [newIdentifier, setNewIdentifier] = useState('')
     const [selectedAssuredId, setSelectedAssuredId] = useState<string | null>(null)
-    const [newUBOName, setNewUBOName] = useState('')
-    const [newUBOType, setNewUBOType] = useState<'company' | 'person'>('person')
-    const [newUBOIdentifier, setNewUBOIdentifier] = useState('')
     const [newEmail, setNewEmail] = useState('')
     const [newPhone, setNewPhone] = useState('')
-    const [newUBOEmail, setNewUBOEmail] = useState('')
-    const [newUBOPhone, setNewUBOPhone] = useState('')
 
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-    const [selectedUBOId, setSelectedUBOId] = useState<string | null>(null)
 
-    // Address state
+    // Address state (vessel-specific: assigning an entity address to the vessel_assured link)
     const [allAddresses, setAllAddresses] = useState<EntityAddress[]>([])
     const [showAddAddressFor, setShowAddAddressFor] = useState<string | null>(null) // vesselAssured id
     const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
@@ -53,21 +45,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     const [editingVesselAssuredId, setEditingVesselAssuredId] = useState<string | null>(null)
     const [editRoleValue, setEditRoleValue] = useState('')
     const [isUpdatingRole, setIsUpdatingRole] = useState(false)
-    const [editingEntityId, setEditingEntityId] = useState<string | null>(null)
-    const [editEntityName, setEditEntityName] = useState('')
 
     // Loading states
     const [isAddingAssured, setIsAddingAssured] = useState(false)
-    const [isAddingUBO, setIsAddingUBO] = useState(false)
-    const [checkingId, setCheckingId] = useState<string | null>(null)
-
-    // Sanctions modal state
-    const [sanctionsModal, setSanctionsModal] = useState<{
-        show: boolean
-        searchedName: string
-        matches: SanctionsMatch[]
-        entityId?: string
-    }>({ show: false, searchedName: '', matches: [] })
 
     // Confirmation modal state
     const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -110,9 +90,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         newName && ent.name.toLowerCase().includes(newName.toLowerCase())
     )
 
-    const matchingUBOs = entities.filter(ent =>
-        newUBOName && ent.name.toLowerCase().includes(newUBOName.toLowerCase())
-    )
 
     const handleAddAssured = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -168,65 +145,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         }
     }
 
-    const handleAddUBO = async (assuredEntityId: string) => {
-        if (!newUBOName.trim()) return
-
-        setIsAddingUBO(true)
-        try {
-            let entityId = selectedUBOId
-
-            if (!entityId) {
-                // Check OFAC list
-                const scanResult = await OfacService.checkSanctions(newUBOName)
-
-                const entity = await window.api.addEntity({
-                    name: newUBOName,
-                    type: newUBOType,
-                    identifier: newUBOIdentifier,
-                    email: newUBOEmail,
-                    phone: newUBOPhone,
-                    ofacCheckedAt: scanResult.timestamp,
-                    ofacMatchFound: scanResult.matchFound,
-                    ofacStatus: scanResult.status
-                })
-                entityId = entity.id
-            }
-
-            await window.api.addEntityUBO({
-                assuredEntityId,
-                uboEntityId: entityId
-            })
-
-            setNewUBOName('')
-            setNewUBOType('person')
-            setNewUBOIdentifier('')
-            setNewUBOEmail('')
-            setNewUBOPhone('')
-            setSelectedUBOId(null)
-            showSuccess('UBO added successfully')
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to add UBO. Please try again.')
-        } finally {
-            setIsAddingUBO(false)
-        }
-    }
-
-    const handleLinkExistingUBO = async (assuredEntityId: string, uboEntityId: string) => {
-        setIsAddingUBO(true)
-        try {
-            await window.api.addEntityUBO({ assuredEntityId, uboEntityId })
-            setNewUBOName('')
-            setSelectedUBOId(null)
-            showSuccess('UBO linked successfully')
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to link UBO.')
-        } finally {
-            setIsAddingUBO(false)
-        }
-    }
-
     const handleUpdateRole = async (id: string) => {
         if (!editRoleValue.trim()) return
         setIsUpdatingRole(true)
@@ -248,17 +166,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         }
     }
 
-    const handleRenameEntity = async (entityId: string) => {
-        if (!editEntityName.trim()) return
-        try {
-            await window.api.updateEntity(entityId, { name: editEntityName.trim() })
-            showSuccess('Name updated')
-            setEditingEntityId(null)
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to rename')
-        }
-    }
 
     const handleChangeAddress = async (vesselAssuredId: string, addressId: string | null) => {
         try {
@@ -300,17 +207,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         })
     }
 
-    const handleDeleteUBO = async (assuredEntityId: string, uboEntityId: string) => {
-        setDeleteConfirmation({
-            show: true,
-            id: uboEntityId,
-            uboParentId: assuredEntityId,
-            title: 'Remove UBO?',
-            message: 'Are you sure you want to remove this UBO?',
-            type: 'ubo'
-        })
-    }
-
     const handleConfirmDelete = async () => {
         if (!deleteConfirmation.id) return
 
@@ -319,242 +215,13 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                 await window.api.deleteVesselAssured(deleteConfirmation.id)
                 showSuccess('Assured removed successfully')
                 setIsAddingAssured(false)
-                setIsAddingUBO(false)
                 if (selectedAssuredId === deleteConfirmation.id) setSelectedAssuredId(null)
                 loadData()
             } catch (error: any) {
                 showError(error.message || 'Failed to remove assured. You may need admin privileges.')
             }
-        } else if (deleteConfirmation.type === 'ubo' && deleteConfirmation.uboParentId) {
-            try {
-                await window.api.deleteEntityUBO({ assuredEntityId: deleteConfirmation.uboParentId, uboEntityId: deleteConfirmation.id })
-                showSuccess('UBO removed successfully')
-                setIsAddingUBO(false)
-                loadData()
-            } catch (error: any) {
-                showError(error.message || 'Failed to remove UBO.')
-            }
         }
         setDeleteConfirmation(prev => ({ ...prev, show: false }))
-    }
-
-    const handleDropEntityDoc = async (e: React.DragEvent, entityId: string, documentTypeId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const files = e.dataTransfer.files
-        if (files.length === 0) return
-        const file = files[0]
-        const filePath = window.api.getFilePath(file)
-        if (!filePath) { showError('Could not retrieve file path'); return }
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
-        await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
-        showSuccess('Document uploaded successfully')
-        loadData()
-    }
-
-    const handleClickUploadDoc = async (entityId: string, documentTypeId: string, label: string) => {
-        try {
-            const filePath = await window.api.dialogOpenFileAny()
-            if (!filePath) return
-            const validation = await window.api.fileTypesValidateFile(filePath)
-            if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
-            await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
-            showSuccess(`${label} uploaded successfully`)
-            loadData()
-        } catch (error: any) {
-            showError(error.message || `Failed to upload ${label}`)
-        }
-    }
-
-    const handleDeleteDoc = async (entityId: string, documentTypeId: string) => {
-        try {
-            await window.api.deleteEntityDocument(entityId, documentTypeId)
-            showSuccess('Document removed')
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to remove document')
-        }
-    }
-
-    const handleOfacRecheck = async (entity: Entity) => {
-        setCheckingId(entity.id)
-        try {
-            const result = await OfacService.checkSanctions(entity.name)
-            const autoMark = result.autoMarkCleanOnCheck ?? true
-            if (result.status !== 'CLEARED' || autoMark) {
-                await window.api.updateEntity(entity.id, {
-                    ofacCheckedAt: result.timestamp,
-                    ofacMatchFound: result.matchFound,
-                    ofacStatus: result.status
-                })
-                loadData()
-            } else {
-                showSuccess('Sanctions check complete: no matches found above threshold')
-            }
-
-            if (result.matchFound && result.matches.length > 0) {
-                setSanctionsModal({
-                    show: true,
-                    searchedName: entity.name,
-                    matches: result.matches,
-                    entityId: entity.id
-                })
-            }
-        } catch (error: any) {
-            showError(error.message || 'Sanctions check failed. Please try again.')
-        } finally {
-            setCheckingId(null)
-        }
-    }
-
-    const handleMarkClean = async () => {
-        if (sanctionsModal.entityId) {
-            await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'CLEARED', ofacMatchFound: false })
-        }
-        setSanctionsModal({ show: false, searchedName: '', matches: [] })
-        loadData()
-    }
-
-    const handleConfirmMatch = async () => {
-        if (sanctionsModal.entityId) {
-            await window.api.updateEntity(sanctionsModal.entityId, { ofacStatus: 'MATCH', ofacMatchFound: true })
-        }
-        setSanctionsModal({ show: false, searchedName: '', matches: [] })
-        loadData()
-    }
-
-    const handleViewPotentialMatch = async (entity: Entity) => {
-        setCheckingId(entity.id)
-        try {
-            const result = await OfacService.checkSanctions(entity.name)
-            if (result.matches.length > 0) {
-                setSanctionsModal({
-                    show: true,
-                    searchedName: entity.name,
-                    matches: result.matches,
-                    entityId: entity.id
-                })
-            }
-        } catch (error: any) {
-            showError(error.message || 'Failed to load sanctions data. Please try again.')
-        } finally {
-            setCheckingId(null)
-        }
-    }
-
-    const OfacBadge = ({ entity }: { entity: Entity }) => {
-        const isChecking = checkingId === entity.id
-        const isMatch = entity.ofacStatus === 'MATCH' || entity.ofacStatus === 'SANCTIONED'
-        const isPotentialMatch = entity.ofacStatus === 'POTENTIAL_MATCH'
-        const isError = entity.ofacStatus === 'ERROR'
-        const isPending = !entity.ofacStatus || entity.ofacStatus === 'PENDING'
-
-        // Show checking state
-        if (isChecking) {
-            return (
-                <div
-                    style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '2px 10px',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(0, 210, 255, 0.1)',
-                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(0, 210, 255, 0.3)',
-                        color: isLight ? '#0077a3' : '#00d2ff'
-                    }}
-                >
-                    <Loader2 size={12} className="spinner" />
-                    CHECKING...
-                </div>
-            )
-        }
-
-        let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
-
-        if (isPending) {
-            config = {
-                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
-                border: isLight ? '1px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'var(--text-secondary)',
-                text: 'NOT CHECKED',
-                icon: <Shield size={12} opacity={0.5} />
-            }
-        } else if (isError) {
-            config = {
-                background: isLight ? 'rgba(200, 120, 0, 0.15)' : 'rgba(255, 153, 0, 0.1)',
-                border: isLight ? '1px solid rgba(200, 120, 0, 0.4)' : '1px solid rgba(255, 153, 0, 0.3)',
-                color: isLight ? '#b36b00' : '#ff9900',
-                text: 'CHECK FAILED',
-                icon: <Shield size={12} />
-            }
-        } else if (isMatch) {
-            config = {
-                background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
-                border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                color: 'var(--danger)',
-                text: 'SANCTIONED',
-                icon: <ShieldAlert size={12} />
-            }
-        } else if (isPotentialMatch) {
-            config = {
-                background: isLight ? 'rgba(180, 140, 0, 0.15)' : 'rgba(255, 193, 7, 0.1)',
-                border: isLight ? '1px solid rgba(180, 140, 0, 0.4)' : '1px solid rgba(255, 193, 7, 0.3)',
-                color: isLight ? '#997a00' : '#ffc107',
-                text: 'POSSIBLE MATCH',
-                icon: <ShieldAlert size={12} />
-            }
-        } else {
-            config = {
-                background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
-                border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
-                color: isLight ? '#008c46' : '#00ff88',
-                text: 'CLEARED',
-                icon: <ShieldCheck size={12} />
-            }
-        }
-
-        const isClickable = isPotentialMatch || isMatch
-        const handleBadgeClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            if (isClickable) {
-                handleViewPotentialMatch(entity)
-            }
-        }
-
-        return (
-            <div
-                style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.7rem',
-                    background: config.background,
-                    border: config.border,
-                    color: config.color,
-                    cursor: isClickable ? 'pointer' : 'default'
-                }}
-                title={
-                    isError ? 'API request failed. Click refresh to try again.' :
-                        isPotentialMatch ? 'Click to review potential matches' :
-                            `Last checked: ${entity.ofacCheckedAt ? formatDateTime(entity.ofacCheckedAt) : 'Never'}`
-                }
-                onClick={handleBadgeClick}
-            >
-                {config.icon}
-                <span style={{ whiteSpace: 'nowrap' }}>{config.text}</span>
-                <RefreshCw
-                    size={10}
-                    style={{ marginLeft: '4px', cursor: 'pointer', opacity: 0.6 }}
-                    className="hover-spin"
-                    onClick={(e) => { e.stopPropagation(); handleOfacRecheck(entity); }}
-                />
-            </div>
-        )
     }
 
     const sortedAssureds = [...vesselAssureds].sort((a, b) => {
@@ -565,48 +232,12 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
 
     const selectedVA = sortedAssureds.find(va => va.id === selectedAssuredId)
     const selectedEntity = selectedVA ? entities.find(e => e.id === selectedVA.entityId) : null
-    const selectedUbos = selectedVA ? entityUBOs.filter(u => u.assuredEntityId === selectedVA.entityId).map(u => entities.find(e => e.id === u.uboEntityId)).filter(Boolean) : []
 
     const getDocScore = (entityId: string, entityType: string) => {
         const applicable = entityDocTypes.filter(t => t.isRequired && (t.entityScope === 'both' || t.entityScope === entityType))
         const docs = entityDocs.filter(d => d.entityId === entityId)
         const have = applicable.filter(t => docs.some(d => d.documentTypeId === t.id && d.filePath)).length
         return { have, total: applicable.length }
-    }
-
-    const DocRow = ({ ent }: { ent: Entity }) => {
-        const applicable = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === ent.type)
-        const docsForEnt = entityDocs.filter(d => d.entityId === ent.id)
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {applicable.map(dt => {
-                    const doc = docsForEnt.find(d => d.documentTypeId === dt.id)
-                    const hasFile = !!doc?.filePath
-                    return (
-                        <div key={dt.id}
-                            onDragOver={ev => ev.preventDefault()}
-                            onDrop={ev => handleDropEntityDoc(ev, ent.id, dt.id)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', background: hasFile ? (isLight ? 'rgba(0,140,70,0.06)' : 'rgba(0,255,136,0.04)') : (isLight ? 'rgba(200,0,0,0.04)' : 'rgba(255,77,77,0.04)'), border: hasFile ? (isLight ? '1px solid rgba(0,140,70,0.15)' : '1px solid rgba(0,255,136,0.12)') : (isLight ? '1px solid rgba(200,0,0,0.12)' : '1px solid rgba(255,77,77,0.1)'), display: 'flex', alignItems: 'center', gap: '8px' }}
-                        >
-                            {hasFile
-                                ? <CheckCircle2 size={14} color={isLight ? '#008c46' : '#00ff88'} />
-                                : <AlertTriangle size={14} color={isLight ? '#c00000' : '#ff4d4d'} />
-                            }
-                            <span style={{ flex: 1, fontSize: '0.82rem', color: hasFile ? (isLight ? '#008c46' : 'rgba(0,255,136,0.85)') : (isLight ? '#c00000' : 'rgba(255,77,77,0.85)'), cursor: hasFile ? 'pointer' : 'default' }} onClick={hasFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}>{dt.name}</span>
-                            {hasFile ? (
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                    <button onClick={e => { e.stopPropagation(); window.api.shellShowItemInFolder(doc!.filePath!) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem' }} title="Open location"><FolderOpen size={10} /></button>
-                                    <button onClick={e => { e.stopPropagation(); handleClickUploadDoc(ent.id, dt.id, dt.name) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem' }} title="Replace"><Upload size={10} /></button>
-                                    {canUploadDocs && <button onClick={e => { e.stopPropagation(); handleDeleteDoc(ent.id, dt.id) }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.68rem', color: 'var(--danger)' }} title="Remove"><Trash2 size={10} /></button>}
-                                </div>
-                            ) : (
-                                <button onClick={() => handleClickUploadDoc(ent.id, dt.id, dt.name)} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px' }}><Upload size={10} /> Upload</button>
-                            )}
-                        </div>
-                    )
-                })}
-            </div>
-        )
     }
 
     return (
@@ -732,19 +363,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(0,170,200,0.15), rgba(0,170,200,0.05))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {selectedEntity.type === 'company' ? <Building2 size={20} color="var(--accent-primary)" /> : <User size={20} color="var(--accent-primary)" />}
                             </div>
-                            <div style={{ flex: 1 }}>
-                                {editingEntityId === selectedEntity.id ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <input type="text" value={editEntityName} onChange={e => setEditEntityName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleRenameEntity(selectedEntity.id); if (e.key === 'Escape') setEditingEntityId(null) }} autoFocus style={{ fontWeight: 700, fontSize: '0.95rem', padding: '2px 6px', width: '100%' }} />
-                                        <button onClick={() => handleRenameEntity(selectedEntity.id)} style={{ background: 'transparent', color: 'var(--success)', border: 'none', cursor: 'pointer', padding: '2px' }} title="Save"><Save size={14} /></button>
-                                        <button onClick={() => setEditingEntityId(null)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', padding: '2px' }} title="Cancel"><X size={14} /></button>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{selectedEntity.name}</span>
-                                        {canManageAssureds && <button onClick={() => { setEditingEntityId(selectedEntity.id); setEditEntityName(selectedEntity.name) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px', opacity: 0.5 }} title="Rename"><Pencil size={12} /></button>}
-                                    </div>
-                                )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedEntity.name}</div>
                                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
                                 </div>
@@ -752,20 +372,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                             <button onClick={() => setSelectedAssuredId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={18} /></button>
                         </div>
 
-                        {/* Sanctions */}
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
-                            <OfacBadge entity={selectedEntity} />
-                        </div>
-
-                        {/* Contact info */}
-                        {(selectedEntity.email || selectedEntity.phone) && (
-                            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)', fontSize: '0.82rem' }}>
-                                {selectedEntity.email && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><span style={{ color: 'var(--text-secondary)', minWidth: '50px' }}>Email</span><span style={{ color: 'var(--accent-primary)' }}>{selectedEntity.email}</span></div>}
-                                {selectedEntity.phone && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: 'var(--text-secondary)', minWidth: '50px' }}>Phone</span><span>{selectedEntity.phone}</span></div>}
-                            </div>
-                        )}
-
-                        {/* Role editing */}
+                        {/* Role editing (vessel-specific) */}
                         {editingVesselAssuredId === selectedVA.id && (
                             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
                                 <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>Edit Role</div>
@@ -807,85 +414,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                             })()}
                         </div>
 
-                        {/* Documents */}
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
-                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>Documents</div>
-                            <DocRow ent={selectedEntity} />
-                        </div>
-
-                        {/* UBOs */}
-                        <div style={{ padding: '12px 20px' }}>
-                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <UserCheck size={12} /> Ultimate Beneficial Owners ({selectedUbos.length})
-                            </div>
-
-                            {selectedUbos.map(ubo => {
-                                const uboScore = getDocScore(ubo!.id, ubo!.type)
-                                return (
-                                    <div key={ubo!.id} style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                            {ubo!.type === 'company' ? <Building2 size={14} opacity={0.5} /> : <User size={14} opacity={0.5} />}
-                                            <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: 1 }}>{ubo!.name}</span>
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: uboScore.have === uboScore.total ? (isLight ? '#008c46' : '#00c264') : (isLight ? '#c00000' : '#ff4d4d') }}>{uboScore.have}/{uboScore.total}</span>
-                                            {canManageAssureds && <button onClick={() => handleDeleteUBO(selectedVA.entityId, ubo!.id)} style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '2px' }} className="hover-danger" title="Remove UBO"><Trash2 size={12} /></button>}
-                                        </div>
-                                        <OfacBadge entity={ubo!} />
-                                        <div style={{ marginTop: '8px' }}><DocRow ent={ubo!} /></div>
-                                    </div>
-                                )
-                            })}
-
-                            {selectedUbos.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontStyle: 'italic', marginBottom: '12px' }}>No UBOs listed.</div>}
-
-                            {/* Add UBO form */}
-                            {canManageAssureds && (
-                                <div style={{ marginTop: '8px', padding: '10px', borderRadius: '8px', border: '1px dashed var(--table-border)' }}>
-                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                                        <div style={{ flex: 1, position: 'relative' }}>
-                                            <input type="text" value={newUBOName} onChange={e => { setNewUBOName(e.target.value); setSelectedUBOId(null) }} placeholder="UBO Name..." style={{ width: '100%', padding: '6px 10px', fontSize: '0.8rem' }} />
-                                            {newUBOName && !selectedUBOId && matchingUBOs.length > 0 && (
-                                                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, marginTop: '4px', padding: '6px', maxHeight: '150px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--accent-primary)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-                                                    {matchingUBOs.map(ent => (
-                                                        <div key={ent.id} onClick={() => handleLinkExistingUBO(selectedVA.entityId, ent.id)} style={{ padding: '5px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }} className="hover-effect">
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>{ent.type === 'company' ? <Building2 size={11} opacity={0.5} /> : <User size={11} opacity={0.5} />}<span>{ent.name}</span></div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        {!selectedUBOId && <select value={newUBOType} onChange={e => setNewUBOType(e.target.value as any)} style={{ width: '90px', padding: '6px', fontSize: '0.78rem', color: 'var(--text-primary)' }}><option value="person">Person</option><option value="company">Company</option></select>}
-                                    </div>
-                                    {!selectedUBOId && (
-                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                                            <input type="text" value={newUBOIdentifier} onChange={e => setNewUBOIdentifier(e.target.value)} placeholder="Identifier..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
-                                        </div>
-                                    )}
-                                    {!selectedUBOId && (
-                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                                            <input type="email" value={newUBOEmail} onChange={e => setNewUBOEmail(e.target.value)} placeholder="Email..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
-                                            <input type="text" value={newUBOPhone} onChange={e => setNewUBOPhone(e.target.value)} placeholder="Phone..." style={{ flex: 1, padding: '6px 10px', fontSize: '0.78rem' }} />
-                                        </div>
-                                    )}
-                                    <button onClick={() => handleAddUBO(selectedVA.entityId)} className="btn-primary" disabled={isAddingUBO || !newUBOName.trim()} style={{ width: '100%', padding: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                        {isAddingUBO ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />}
-                                        {isAddingUBO ? 'Adding...' : selectedUBOId ? 'Link UBO' : 'Add UBO'}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                        {/* Entity-level editing — shared with the Entity Directory */}
+                        <EntityEditPanel entityId={selectedVA.entityId} canManage={canManageAssureds} onChanged={loadData} />
                     </div>
                 )}
             </div>
-
-            {sanctionsModal.show && (
-                <SanctionsModal
-                    searchedName={sanctionsModal.searchedName}
-                    matches={sanctionsModal.matches}
-                    onClose={() => setSanctionsModal({ show: false, searchedName: '', matches: [] })}
-                    onMarkClean={handleMarkClean}
-                    onConfirmMatch={handleConfirmMatch}
-                />
-            )}
 
             {deleteConfirmation.show && (
                 <ConfirmationModal
