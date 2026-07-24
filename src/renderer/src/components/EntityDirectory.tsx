@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Search, User, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, Pencil, X,
-  Save, Trash2, Mail, Phone, AlertTriangle, CheckCircle2, Hash, Plus, Upload, Merge, Link2,
-  ScanSearch, MapPin, CheckSquare, Square, Download, FolderOpen
+  Shield, Building2, ShieldCheck, ShieldAlert, RefreshCw, Loader2, X,
+  Trash2, AlertTriangle, CheckCircle2, Hash, Plus, Merge, Link2,
+  ScanSearch, CheckSquare, Square, Download, FolderOpen
 } from 'lucide-react'
 import RemapFilePathsModal from './RemapFilePathsModal'
-import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityAddress, EntityDocumentType, EntityDocument } from '../../../shared/types'
+import EntityEditPanel from './EntityEditPanel'
+import { Entity, EntityQueryParams, Vessel, VesselAssured, EntityUBO, SanctionsMatch, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
 
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -74,13 +75,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [viewingVessel, setViewingVessel] = useState<Vessel | null>(null)
-  const [entityAddresses, setEntityAddresses] = useState<EntityAddress[]>([])
-  const [entityCommissions, setEntityCommissions] = useState<{ policyTypeId: string; commissionPercent: number }[]>([])
-  const [policyTypesForComm, setPolicyTypesForComm] = useState<{ id: string; name: string; code: string }[]>([])
-  const [commDefaults, setCommDefaults] = useState<Record<string, number>>({})
-  const [showAddAddress, setShowAddAddress] = useState(false)
-  const [editingAddress, setEditingAddress] = useState<EntityAddress | null>(null)
-  const [addrForm, setAddrForm] = useState({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
@@ -122,9 +116,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     vesselId?: string
   }>({ show: false, searchedName: '', matches: [] })
 
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null)
-  const [editForm, setEditForm] = useState<{ name: string; type: 'company' | 'person'; identifier: string; email: string; phone: string }>({ name: '', type: 'company', identifier: '', email: '', phone: '' })
-  const [isSaving, setIsSaving] = useState(false)
 
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     show: boolean
@@ -205,37 +196,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     }
   }
 
-  const startEditing = (entity: Entity) => {
-    setEditingEntity(entity)
-    setEditForm({
-      name: entity.name,
-      type: entity.type,
-      identifier: entity.identifier || '',
-      email: entity.email || '',
-      phone: entity.phone || ''
-    })
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingEntity || !editForm.name.trim()) return
-    setIsSaving(true)
-    try {
-      await window.api.updateEntity(editingEntity.id, {
-        name: editForm.name.trim(),
-        type: editForm.type,
-        identifier: editForm.identifier.trim() || undefined,
-        email: editForm.email.trim() || undefined,
-        phone: editForm.phone.trim() || undefined
-      })
-      setEditingEntity(null)
-      setSelectedEntity(prev => prev?.id === editingEntity.id ? { ...prev, ...editForm, name: editForm.name.trim(), identifier: editForm.identifier.trim() || undefined, email: editForm.email.trim() || undefined, phone: editForm.phone.trim() || undefined } : prev)
-      loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to update entity')
-    } finally {
-      setIsSaving(false)
-    }
-  }
 
   const handleDeleteEntity = async (entity: Entity) => {
     const assocVessels = getAssociatedVessels(entity.id)
@@ -355,28 +315,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     }
   }
 
-  const handleUploadEntityDoc = async (entityId: string, documentTypeId: string) => {
-    try {
-      const filePath = await window.api.dialogOpenFileAny()
-      if (!filePath) return
-      await window.api.upsertEntityDocument({ entityId, documentTypeId, filePath })
-      showSuccess('Document uploaded')
-      loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to upload document')
-    }
-  }
-
-  const handleDeleteEntityDoc = async (entityId: string, documentTypeId: string) => {
-    try {
-      await window.api.deleteEntityDocument(entityId, documentTypeId)
-      showSuccess('Document removed')
-      loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to remove document')
-    }
-  }
-
   const loadData = async () => {
     setIsLoading(true)
     try {
@@ -433,21 +371,20 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     return () => { if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current) }
   }, [createForm.name, showCreateModal, allEntities])
 
-  // Escape key — close topmost open modal first (priority order: sanctions > merge > create > edit)
+  // Escape key — close topmost open modal first (priority order: sanctions > merge > create)
   const handleGlobalEscape = useCallback(() => {
     if (sanctionsModal.show) { setSanctionsModal(prev => ({ ...prev, show: false })); return }
     if (showMergeModal) { setShowMergeModal(false); return }
     if (showCreateModal) { setShowCreateModal(false); return }
-    if (editingEntity) { setEditingEntity(null); return }
-  }, [sanctionsModal.show, showMergeModal, showCreateModal, editingEntity])
+  }, [sanctionsModal.show, showMergeModal, showCreateModal])
 
   useEffect(() => {
-    const anyOpen = sanctionsModal.show || showMergeModal || showCreateModal || !!editingEntity
+    const anyOpen = sanctionsModal.show || showMergeModal || showCreateModal
     if (!anyOpen) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleGlobalEscape() }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [sanctionsModal.show, showMergeModal, showCreateModal, editingEntity, handleGlobalEscape])
+  }, [sanctionsModal.show, showMergeModal, showCreateModal, handleGlobalEscape])
 
   // Auto-select entity from global search or recent items
   useEffect(() => {
@@ -674,126 +611,23 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
     )
   }
 
-  const DocBadge = ({ label, hasFile, onClick, onUpload, onDelete, onReplace }: { label: string; hasFile: boolean; onClick?: () => void; onUpload?: () => void; onDelete?: () => void; onReplace?: () => void }) => (
-    <div
-      style={{ padding: '8px 14px', borderRadius: '10px', background: hasFile ? (isLight ? 'rgba(0,140,70,0.08)' : 'rgba(0,255,136,0.06)') : (isLight ? 'rgba(200,0,0,0.06)' : 'rgba(255,77,77,0.06)'), border: hasFile ? (isLight ? '1px solid rgba(0,140,70,0.2)' : '1px solid rgba(0,255,136,0.15)') : (isLight ? '1px solid rgba(200,0,0,0.2)' : '1px solid rgba(255,77,77,0.15)'), display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', cursor: hasFile ? 'pointer' : 'default', transition: 'var(--transition)' }}
-      onClick={onClick}
-    >
-      {hasFile
-        ? <CheckCircle2 size={15} color={isLight ? '#008c46' : '#00ff88'} />
-        : <AlertTriangle size={15} color={isLight ? '#c00000' : '#ff4d4d'} />
-      }
-      <span style={{ color: hasFile ? (isLight ? '#008c46' : 'rgba(0,255,136,0.85)') : (isLight ? '#c00000' : 'rgba(255,77,77,0.85)') }}>{label}</span>
-      {hasFile && (
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <button onClick={e => { e.stopPropagation(); onReplace?.() }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px' }} title={`Replace ${label}`}><Upload size={11} /></button>
-          <button onClick={e => { e.stopPropagation(); onDelete?.() }} className="btn-secondary" style={{ padding: '3px 6px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--danger)' }} title={`Remove ${label}`}><Trash2 size={11} /></button>
-        </div>
-      )}
-      {!hasFile && onUpload && (
-        <button onClick={e => { e.stopPropagation(); onUpload() }} className="btn-secondary" style={{ marginLeft: 'auto', padding: '3px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }} title={`Upload ${label}`}><Upload size={11} /> Upload</button>
-      )}
-    </div>
-  )
-
   // ── Derived ─────────────────────────────────────────────────────────────────
   const associatedVessels = selectedEntity ? getAssociatedVessels(selectedEntity.id) : []
   const parentCompanies = selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
 
-  // Load addresses and commissions when entity is selected
+  // Track recent item view when an entity is selected (addresses/commissions/docs are
+  // now handled by the shared EntityEditPanel).
   useEffect(() => {
     if (selectedEntity) {
-      window.api.getEntityAddresses(selectedEntity.id).then(addrs => {
-        setEntityAddresses(Array.isArray(addrs) ? addrs : [])
-      })
-      // Load commission overrides for this entity
-      Promise.all([
-        window.api.commissionGetOverrides(selectedEntity.id),
-        window.api.getQuotationTypes(),
-        window.api.commissionGetDefaults()
-      ]).then(([co, pt, cd]) => {
-        setEntityCommissions(Array.isArray(co) ? co.map((o: any) => ({ policyTypeId: o.policyTypeId, commissionPercent: o.commissionPercent })) : [])
-        if (Array.isArray(pt)) setPolicyTypesForComm(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
-        if (Array.isArray(cd)) {
-          const map: Record<string, number> = {}
-          for (const d of cd as any[]) map[d.policyTypeId] = d.commissionPercent
-          setCommDefaults(map)
-        }
-      }).catch(() => {})
-      setShowAddAddress(false)
-      setEditingAddress(null)
-      // Track recent item view
       window.api.recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type).then(() => {
         window.dispatchEvent(new Event('recent-item-added'))
       }).catch(() => {})
-    } else {
-      setEntityAddresses([])
-      setEntityCommissions([])
     }
   }, [selectedEntity?.id])
 
   // ── VesselDetail drill-down ──────────────────────────────────────────────────
   if (viewingVessel) {
     return <VesselDetail vessel={viewingVessel} backLabel="Back to Entity" onBack={() => { setViewingVessel(null); loadData() }} />
-  }
-
-  // ── Color helpers ────────────────────────────────────────────────────────────
-
-  const resetAddrForm = () => setAddrForm({ label: '', addressLine1: '', addressLine2: '', city: '', country: '', postalCode: '' })
-
-  const handleSaveAddress = async () => {
-    if (!selectedEntity || !addrForm.label.trim() || !addrForm.addressLine1.trim()) return
-    try {
-      if (editingAddress) {
-        await window.api.updateEntityAddress(editingAddress.id, {
-          label: addrForm.label.trim(),
-          addressLine1: addrForm.addressLine1.trim(),
-          addressLine2: addrForm.addressLine2.trim() || undefined,
-          city: addrForm.city.trim() || undefined,
-          country: addrForm.country.trim() || undefined,
-          postalCode: addrForm.postalCode.trim() || undefined
-        })
-        showSuccess('Address updated')
-      } else {
-        const res = await window.api.addEntityAddress({
-          entityId: selectedEntity.id,
-          label: addrForm.label.trim(),
-          addressLine1: addrForm.addressLine1.trim(),
-          addressLine2: addrForm.addressLine2.trim() || undefined,
-          city: addrForm.city.trim() || undefined,
-          country: addrForm.country.trim() || undefined,
-          postalCode: addrForm.postalCode.trim() || undefined
-        })
-        if (res && (res as any).error) { showError((res as any).message || 'Failed to add'); return }
-        showSuccess('Address added')
-      }
-      const addrs = await window.api.getEntityAddresses(selectedEntity.id)
-      setEntityAddresses(Array.isArray(addrs) ? addrs : [])
-      setShowAddAddress(false)
-      setEditingAddress(null)
-      resetAddrForm()
-    } catch (e: any) { showError(e.message || 'Failed to save address') }
-  }
-
-  const handleDeleteAddress = async (addrId: string) => {
-    try {
-      await window.api.deleteEntityAddress(addrId)
-      setEntityAddresses(prev => prev.filter(a => a.id !== addrId))
-      showSuccess('Address deleted')
-    } catch (e: any) { showError(e.message || 'Failed to delete address') }
-  }
-
-  const startEditAddress = (addr: EntityAddress) => {
-    setEditingAddress(addr)
-    setAddrForm({
-      label: addr.label,
-      addressLine1: addr.addressLine1,
-      addressLine2: addr.addressLine2 || '',
-      city: addr.city || '',
-      country: addr.country || '',
-      postalCode: addr.postalCode || ''
-    })
-    setShowAddAddress(true)
   }
 
   const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
@@ -1141,24 +975,14 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2, marginBottom: '4px', wordBreak: 'break-word' }}>{selectedEntity.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', padding: '1px 7px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', background: selectedEntity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), color: selectedEntity.type === 'company' ? companyColor : personColor }}>
-                      {selectedEntity.type}
-                    </span>
-                    <OfacBadge entity={selectedEntity} onRecheck={() => handleOfacRecheck(selectedEntity)} />
-                  </div>
+                  <span style={{ fontSize: '0.7rem', padding: '1px 7px', borderRadius: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', background: selectedEntity.type === 'company' ? accentBg : (isLight ? 'rgba(156,39,176,0.1)' : 'rgba(186,104,200,0.1)'), color: selectedEntity.type === 'company' ? companyColor : personColor }}>
+                    {selectedEntity.type}
+                  </span>
                 </div>
                 <button onClick={() => setSelectedEntity(null)} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
                   <X size={16} />
                 </button>
               </div>
-
-              {/* Identifier */}
-              {selectedEntity.identifier && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  <Hash size={13} color="var(--accent-primary)" />{selectedEntity.identifier}
-                </div>
-              )}
 
               {/* UBO of (persons only) */}
               {parentCompanies.length > 0 && (
@@ -1175,29 +999,8 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                 </div>
               )}
 
-              {/* Contacts */}
-              {(selectedEntity.email || selectedEntity.phone) && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
-                  {selectedEntity.email && selectedEntity.email.split(',').map((em, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      <Mail size={12} color="var(--accent-primary)" />{em.trim()}
-                    </div>
-                  ))}
-                  {selectedEntity.phone && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      <Phone size={12} color="var(--accent-primary)" />{selectedEntity.phone}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
+              {/* Directory-level actions (merge / delete / remap) */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
-                {hasPermission('entities:edit') && (
-                  <button onClick={() => startEditing(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Pencil size={13} /> Edit
-                  </button>
-                )}
                 <button onClick={() => openMergeModal(selectedEntity)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Merge size={13} /> Merge
                 </button>
@@ -1206,141 +1009,14 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
                     <Trash2 size={13} />
                   </button>
                 )}
-              </div>
-            </div>
-
-            {/* Documents section */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600 }}>Documents</div>
-                <button
-                  onClick={() => setShowEntityRemapModal(true)}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px' }}
-                  className="hover-effect"
-                  title="Remap entity file paths"
-                >
-                  <FolderOpen size={12} /> Remap
+                <button onClick={() => setShowEntityRemapModal(true)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }} title="Remap entity file paths">
+                  <FolderOpen size={13} /> Remap
                 </button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {entityDocTypes
-                  .filter(t => t.entityScope === 'both' || t.entityScope === selectedEntity.type)
-                  .map(t => {
-                    const doc = entityDocs.find(d => d.entityId === selectedEntity.id && d.documentTypeId === t.id)
-                    const hasFile = !!doc?.filePath
-                    return (
-                      <DocBadge key={t.id} label={t.name} hasFile={hasFile}
-                        onClick={hasFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}
-                        onUpload={!hasFile ? () => handleUploadEntityDoc(selectedEntity.id, t.id) : undefined}
-                        onDelete={() => handleDeleteEntityDoc(selectedEntity.id, t.id)}
-                        onReplace={() => handleUploadEntityDoc(selectedEntity.id, t.id)}
-                      />
-                    )
-                  })}
-              </div>
             </div>
 
-            {/* Commission overrides section */}
-            {policyTypesForComm.length > 0 && (
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-              <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '10px' }}>Commission Rates</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {policyTypesForComm.map(pt => {
-                  const override = entityCommissions.find(c => c.policyTypeId === pt.id)
-                  const defaultVal = commDefaults[pt.id]
-                  return (
-                    <div key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '80px' }}>{pt.code || pt.name}</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={override?.commissionPercent ?? ''}
-                        placeholder={defaultVal != null ? `${defaultVal}%` : '—'}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value)
-                          if (!isNaN(val)) {
-                            setEntityCommissions(prev => {
-                              const existing = prev.find(c => c.policyTypeId === pt.id)
-                              if (existing) return prev.map(c => c.policyTypeId === pt.id ? { ...c, commissionPercent: val } : c)
-                              return [...prev, { policyTypeId: pt.id, commissionPercent: val }]
-                            })
-                          }
-                        }}
-                        onBlur={e => {
-                          const val = parseFloat(e.target.value)
-                          if (!isNaN(val) && selectedEntity) {
-                            window.api.commissionSetOverride(selectedEntity.id, pt.id, val).catch(() => {})
-                          } else if (e.target.value === '' && selectedEntity && override) {
-                            window.api.commissionDeleteOverride(selectedEntity.id, pt.id).then(() => {
-                              setEntityCommissions(prev => prev.filter(c => c.policyTypeId !== pt.id))
-                            }).catch(() => {})
-                          }
-                        }}
-                        style={{ width: '70px', padding: '4px 6px', textAlign: 'right', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
-                      />
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>%</span>
-                      {override && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>override</span>}
-                    </div>
-                  )
-                })}
-              </div>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>Clear a field to use the default rate. Set a value to override for this customer.</p>
-            </div>
-            )}
-
-            {/* Addresses section */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Addresses
-                  {entityAddresses.length > 0 && (
-                    <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '8px', background: accentBg, color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.65rem' }}>{entityAddresses.length}</span>
-                  )}
-                </div>
-                <button onClick={() => { resetAddrForm(); setEditingAddress(null); setShowAddAddress(!showAddAddress) }} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Plus size={12} /> Add
-                </button>
-              </div>
-
-              {(showAddAddress) && (
-                <div style={{ background: isLight ? '#f0f4f8' : 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '12px', marginBottom: '10px', border: '1px solid var(--table-border)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <input placeholder="Label (e.g. Registered Office) *" value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem' }} />
-                    <textarea placeholder="Paste or type full address *" value={addrForm.addressLine1} onChange={e => setAddrForm(p => ({ ...p, addressLine1: e.target.value }))} rows={3} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem', resize: 'vertical', fontFamily: 'inherit' }} />
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                      <button onClick={handleSaveAddress} disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()} className="btn-primary" style={{ padding: '5px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Save size={12} /> {editingAddress ? 'Update' : 'Save'}
-                      </button>
-                      <button onClick={() => { setShowAddAddress(false); setEditingAddress(null); resetAddrForm() }} className="btn-secondary" style={{ padding: '5px 14px', fontSize: '0.78rem' }}>Cancel</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {entityAddresses.length === 0 && !showAddAddress ? (
-                <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)', fontSize: '0.8rem', opacity: 0.6 }}>
-                  <MapPin size={20} style={{ opacity: 0.3, display: 'block', margin: '0 auto 4px' }} />
-                  No addresses
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {entityAddresses.map(addr => (
-                    <div key={addr.id} style={{ padding: '8px 10px', borderRadius: '8px', background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)', border: '1px solid var(--table-border)', fontSize: '0.8rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--accent-primary)', fontSize: '0.75rem' }}>{addr.label}</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => startEditAddress(addr)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
-                          <button onClick={() => handleDeleteAddress(addr.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
-                        </div>
-                      </div>
-                      <div style={{ color: 'var(--text-primary)', lineHeight: 1.4, whiteSpace: 'pre-line' }}>
-                        {addr.addressLine1}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Entity-level editing - shared with the vessel Assured tab */}
+            <EntityEditPanel entityId={selectedEntity.id} canManage={hasPermission('entities:edit')} onChanged={loadData} />
 
             {/* Vessels section */}
             <div style={{ padding: '16px 20px', flex: 1 }}>
@@ -1412,52 +1088,6 @@ export default function EntityDirectory({ initialEntityId, onInitialEntityConsum
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────────── */}
-
-      {/* Edit Modal */}
-      {editingEntity && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setEditingEntity(null)}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '480px', maxWidth: '90vw', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1.3rem' }}>Edit Entity</h3>
-              <button onClick={() => setEditingEntity(null)} className="btn-secondary" style={{ padding: '6px' }}><X size={18} /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Name *</label>
-                <div style={{ position: 'relative' }}>
-                  <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', paddingRight: '44px' }} placeholder="Entity name" />
-                  <CaseToggleBtn value={editForm.name} onChange={v => setEditForm(f => ({ ...f, name: v }))} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Type</label>
-                <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as any }))} style={{ width: '100%', padding: '10px 12px' }}>
-                  <option value="company">Company</option>
-                  <option value="person">Person</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Identifier</label>
-                <input type="text" value={editForm.identifier} onChange={e => setEditForm(f => ({ ...f, identifier: e.target.value }))} style={{ width: '100%' }} placeholder="Optional note to distinguish same-named entities" />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Email(s)</label>
-                <input type="text" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} style={{ width: '100%' }} placeholder="Separate multiple emails with commas" />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Phone</label>
-                <input type="text" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} style={{ width: '100%' }} placeholder="Phone number" />
-              </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button onClick={() => setEditingEntity(null)} className="btn-secondary">Cancel</button>
-                <button onClick={handleSaveEdit} className="btn-primary" disabled={!editForm.name.trim() || isSaving} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {isSaving ? <Loader2 size={14} className="spinner" /> : <Save size={14} />} Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Create Entity Modal */}
       {showCreateModal && (
