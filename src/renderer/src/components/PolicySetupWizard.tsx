@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2, LayoutList } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2, LayoutList, ListChecks } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption } from '../../../shared/types'
@@ -21,8 +21,9 @@ const DEFAULT_TIMEZONE_OPTIONS = [
   'PST'
 ]
 
-const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review']
-const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck]
+// Step id 6 (Subjectivities) is inserted between Details and Cards when the quotation has any.
+const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review', 'Subjectivities']
+const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, ListChecks]
 
 interface InsuredRow {
   entityId: string
@@ -73,6 +74,8 @@ interface WizardData {
   sectionOrder: string[] | null
   // QR verification code toggle (P&I only; default from settings, off unless enabled)
   qrEnabled: boolean
+  // Subjectivities kept for the resulting policy (quotation_subjectivity IDs). Empty = "NIL".
+  selectedSubjectivityIds: string[]
 }
 
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
@@ -125,8 +128,12 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     selectedLolOptionId: '',
     selectedAgreedValueOptionId: '',
     sectionOrder: null,
-    qrEnabled: false
+    qrEnabled: false,
+    selectedSubjectivityIds: []
   })
+
+  // Quotation subjectivities available to keep/uncheck in the wizard
+  const [subjectivityItems, setSubjectivityItems] = useState<{ id: string; text: string }[]>([])
 
   const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
   const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
@@ -146,11 +153,12 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   // Determine which steps to show
   const steps = useMemo(() => {
     const s = [0, 1, 2, 3] // Vessel, Period, Instalments, Details
+    if (subjectivityItems.length > 0) s.push(6) // Subjectivities (any type) when the quotation has any
     // Step 4 (Blue Cards) only for P&I
     if (isPI) s.push(4)
     s.push(5) // Review is always last
     return s
-  }, [isPI])
+  }, [isPI, subjectivityItems.length])
 
   const currentStepIndex = steps.indexOf(currentStep)
   const isLastStep = currentStepIndex === steps.length - 1
@@ -159,7 +167,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes, convRes] = await Promise.all([
+      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes, convRes, subjRes] = await Promise.all([
         window.api.getQuotation(quotationId),
         window.api.getQuotationVessels(quotationId),
         window.api.bankGetAll(),
@@ -173,10 +181,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         // Guard: preload may lag renderer on a hot-update (main/preload need a full rebuild)
         typeof window.api.policyGetConvertedVesselIds === 'function'
           ? window.api.policyGetConvertedVesselIds(quotationId)
-          : Promise.resolve([])
+          : Promise.resolve([]),
+        window.api.getQuotationSubjectivities(quotationId)
       ])
       const alreadyConverted = Array.isArray(convRes) ? convRes : []
       setConvertedVesselIds(alreadyConverted)
+
+      // Subjectivities: show the quotation's list, all kept by default
+      const safeSubj = (Array.isArray(subjRes) ? subjRes : []).map((s: any) => ({ id: s.id, text: s.text }))
+      setSubjectivityItems(safeSubj)
+      setData(d => ({ ...d, selectedSubjectivityIds: safeSubj.map(s => s.id) }))
 
       if (!q || (q as any).error) {
         showError('Failed to load quotation')
@@ -638,7 +652,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         outstandingPremiumText: data.outstandingPremiumEnabled ? data.outstandingPremiumText : null,
         blueCardInception: data.blueCardInception || null,
         blueCardExpiry: data.blueCardExpiry || null,
-        blueCardOwners: data.blueCardOwners
+        blueCardOwners: data.blueCardOwners,
+        // Only send a selection when the quotation had subjectivities (step was shown);
+        // otherwise null keeps legacy behavior (no subjectivities section).
+        selectedSubjectivityIds: subjectivityItems.length > 0 ? data.selectedSubjectivityIds : null
       })
       if ((result as any)?.error) {
         showError((result as any).message || 'Conversion failed')
@@ -882,6 +899,15 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             onUpdate={updateData}
             ownerOptions={ownerOptions}
             labelStyle={labelStyle}
+          />
+        )}
+
+        {currentStep === 6 && (
+          <StepSubjectivities
+            items={subjectivityItems}
+            selectedIds={data.selectedSubjectivityIds}
+            isLight={isLight}
+            onUpdate={updateData}
           />
         )}
 
@@ -1782,6 +1808,67 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
         <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
           Embeds a verification QR code on the closing page of the exported P&amp;I policy. Requires a verification URL configured in Policy Settings &rarr; QR Verification.
         </p>
+      </div>
+    </div>
+  )
+}
+
+function StepSubjectivities({ items, selectedIds, isLight, onUpdate }: {
+  items: { id: string; text: string }[]
+  selectedIds: string[]
+  isLight: boolean
+  onUpdate: (partial: Partial<WizardData>) => void
+}) {
+  const stripHtml = (s: string) => (s || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
+  const setSelected = (ids: string[]) => onUpdate({ selectedSubjectivityIds: items.filter(i => ids.includes(i.id)).map(i => i.id) })
+  const toggle = (id: string) => {
+    const set = new Set(selectedIds)
+    set.has(id) ? set.delete(id) : set.add(id)
+    setSelected([...set])
+  }
+  const allChecked = items.length > 0 && selectedIds.length === items.length
+
+  return (
+    <div>
+      <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem' }}>Subjectivities</h3>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+        Uncheck any subjectivity you don&apos;t want on this policy. Kept items render exactly as in the quotation.
+        If none are kept, the policy shows <strong>NIL</strong> in this section.
+      </p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <button
+          type="button"
+          onClick={() => setSelected(allChecked ? [] : items.map(i => i.id))}
+          style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-secondary)' }}
+        >
+          {allChecked ? 'Clear all' : 'Select all'}
+        </button>
+        <span style={{ fontSize: '0.78rem', color: selectedIds.length === 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
+          {selectedIds.length} of {items.length} kept{selectedIds.length === 0 ? ' — will show NIL' : ''}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {items.map(it => {
+          const checked = selectedIds.includes(it.id)
+          return (
+            <label
+              key={it.id}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px',
+                cursor: 'pointer',
+                border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--input-border)'}`,
+                background: checked ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,170,200,0.10)') : 'transparent'
+              }}
+            >
+              <input type="checkbox" checked={checked} onChange={() => toggle(it.id)} style={{ marginTop: '2px' }} />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', textDecoration: checked ? 'none' : 'line-through', opacity: checked ? 1 : 0.55 }}>
+                {stripHtml(it.text)}
+              </span>
+            </label>
+          )
+        })}
       </div>
     </div>
   )

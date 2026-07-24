@@ -3338,6 +3338,12 @@ export class MySQLAdapter {
                 if ((qreCol as any[]).length === 0) {
                     await this.pool.query("ALTER TABLE policy_documents ADD COLUMN qr_enabled TINYINT(1) DEFAULT NULL")
                 }
+                // Per-policy subjectivity selection (JSON array of quotation_subjectivity IDs).
+                // NULL = legacy/all; [] = explicitly none (renders "NIL"); [ids] = only those.
+                const [ssiCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'selected_subjectivity_ids'") as any[]
+                if ((ssiCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE policy_documents ADD COLUMN selected_subjectivity_ids TEXT DEFAULT NULL")
+                }
             } catch {}
 
             // Hide-broker toggle on policy_documents — suppress the "c/o broker" line on policy + DA/CA
@@ -10918,6 +10924,7 @@ export class MySQLAdapter {
             previousPolicyNumber: r.previous_policy_number || null,
             previousPolicyDate: r.previous_policy_date || null,
             openingClause: r.opening_clause || null,
+            selectedSubjectivityIds: r.selected_subjectivity_ids ? (() => { try { return JSON.parse(r.selected_subjectivity_ids) } catch { return null } })() : null,
             importantNotice: r.important_notice || null,
             closingCity: r.closing_city || null,
             createdBy: r.created_by || null,
@@ -11137,6 +11144,7 @@ export class MySQLAdapter {
             ourShare: 'our_share',
             qrEnabled: 'qr_enabled',
             hideBroker: 'hide_broker',
+            selectedSubjectivityIds: 'selected_subjectivity_ids',
         }
         const sets: string[] = []
         const vals: any[] = []
@@ -11144,6 +11152,7 @@ export class MySQLAdapter {
             if (key in fields) {
                 let val = fields[key] ?? null
                 if (key === 'sectionOrder') val = val ? JSON.stringify(val) : null
+                if (key === 'selectedSubjectivityIds') val = val != null ? JSON.stringify(val) : null
                 sets.push(`${col} = ?`)
                 vals.push(val)
             }
@@ -11353,6 +11362,9 @@ export class MySQLAdapter {
         blueCardInception?: string | null
         blueCardExpiry?: string | null
         blueCardOwners?: Record<string, string>
+        // Per-policy subjectivity selection (quotation_subjectivity IDs to keep).
+        // undefined/null = keep all (legacy); [] = none → renders "NIL"; [ids] = only those.
+        selectedSubjectivityIds?: string[] | null
     }): Promise<any[]> {
         if (!this.pool) throw new Error('DB not connected')
 
@@ -11391,8 +11403,9 @@ export class MySQLAdapter {
                     per_annum_premium, premium_amount, selected_alternative_id, created_by, exchange_rate,
                     section_order, selected_lol_option_id, selected_agreed_value_option_id,
                     outstanding_premium_enabled, outstanding_premium_text,
-                    non_refundable_type, non_refundable_percent, qr_enabled, opening_clause)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    non_refundable_type, non_refundable_percent, qr_enabled, opening_clause,
+                    selected_subjectivity_ids)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [policyId, quotationId, actualVesselId, policyNumber,
                 options.inceptionDate, options.inceptionTime, options.expiryDate, options.expiryTime,
                 options.timezone, options.commissionPercent, options.showAddresses, options.bankId,
@@ -11405,7 +11418,8 @@ export class MySQLAdapter {
                 options.nonRefundableType ?? null,
                 options.nonRefundablePercent ?? null,
                 options.qrEnabled ? 1 : 0,
-                openingClauseSetting])
+                openingClauseSetting,
+                options.selectedSubjectivityIds != null ? JSON.stringify(options.selectedSubjectivityIds) : null])
 
             // Create instalments
             for (let i = 0; i < options.instalments.length; i++) {

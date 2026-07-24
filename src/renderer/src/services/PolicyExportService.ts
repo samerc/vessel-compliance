@@ -739,6 +739,7 @@ interface PolicyDocRecord {
   bankId?: string
   showAddresses: boolean
   openingClause?: string
+  selectedSubjectivityIds?: string[] | null
   importantNotice?: string
   premiumAmount?: number
   selectedAlternativeId?: string | null
@@ -823,6 +824,7 @@ interface PolicyExportData {
   excludedCountries: QuotationExcludedCountry[]
   subjectivities: QuotationSubjectivity[]
   subjectivityDays: number
+  subjectivitiesNil: boolean   // true when the converter explicitly kept none → render "NIL"
   sectionTexts: PISectionTexts
   sanctionsVersions: PISanctionsVersion[]
   clauseOverrides: Record<string, string>
@@ -1142,6 +1144,18 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   // Freeze all live render settings so the snapshot fully determines the output.
   const frozen = await loadFrozenSettings(quotation, sectionTexts)
 
+  // Per-policy subjectivity selection (set in the converter). Filter by vessel scope first,
+  // then by the kept-ID list when the converter recorded one. An explicit selection that
+  // resolves to nothing renders "NIL"; a legacy policy (null selection) keeps all.
+  const selSubjIds = policy.selectedSubjectivityIds ?? null
+  const scopedSubjectivities = (Array.isArray(subjectivities) ? subjectivities : []).filter(
+    (s: QuotationSubjectivity) => !s.vesselScope || !vessel || s.vesselScope.includes(vessel.id)
+  )
+  const finalSubjectivities = selSubjIds != null
+    ? scopedSubjectivities.filter((s: any) => selSubjIds.includes(s.id))
+    : scopedSubjectivities
+  const subjectivitiesNil = selSubjIds != null && finalSubjectivities.length === 0
+
   return {
     policy,
     quotation,
@@ -1183,9 +1197,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     allExclusions: Array.isArray(allExclusions) ? allExclusions : [],
     customExclusions: filterByAlt(Array.isArray(customExclusions) ? customExclusions : []),
     excludedCountries: Array.isArray(excludedCountries) ? excludedCountries : [],
-    subjectivities: (Array.isArray(subjectivities) ? subjectivities : []).filter(
-      (s: QuotationSubjectivity) => !s.vesselScope || !vessel || s.vesselScope.includes(vessel.id)
-    ),
+    subjectivities: finalSubjectivities,
+    subjectivitiesNil,
     subjectivityDays: policy.subjectivityDays ?? 7,
     sectionTexts: mergedTexts,
     sanctionsVersions: Array.isArray(sanctionsVersions) ? sanctionsVersions : [],
@@ -2912,6 +2925,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
     if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
     addRow('subjectivities', makeRow('Subjectivities', subjContent))
+  } else if (data.subjectivitiesNil) {
+    // Converter kept no subjectivities for this policy → explicit NIL
+    addRow('subjectivities', makeRow('Subjectivities', [polNp('NIL')]))
   }
 
   // NCB (No Claims Bonus) — skip if this vessel is excluded from NCB
