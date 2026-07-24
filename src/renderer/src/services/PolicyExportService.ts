@@ -3742,8 +3742,10 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
       .replace(/\{time\}/g, polFormatTime(data.policy.inceptionTime))
       .replace(/\{timezone\}/g, daTimezone)))
   } else {
-    const multiTpl = daIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+    // DA multi-instalment intro: drop the total premium amount (per-instalment amounts stay in the list below)
+    const multiTpl = daIntroTemplate || 'Premium shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
     ppcpContent.push(polNpTight(multiTpl
+      .replace(/\{currency\}\s*\{amount\}\s*/g, '')
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
       .replace(/\{instalments\}/g, String(numInst))
