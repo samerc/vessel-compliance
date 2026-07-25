@@ -19,7 +19,9 @@ import {
   UserCheck,
   Mail,
   Phone,
-  Hash
+  Hash,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react'
 import {
   Entity,
@@ -47,6 +49,13 @@ interface EntityEditPanelProps {
   onChanged: () => void
   /** Show the per-policy-type commission override editor (default true). */
   showCommissions?: boolean
+  /**
+   * Controlled edit mode for the core fields. When provided, the parent owns the state and
+   * supplies the Edit trigger (e.g. a button in its own header). When omitted, the panel
+   * manages it internally.
+   */
+  editing?: boolean
+  onEditingChange?: (v: boolean) => void
 }
 
 /**
@@ -62,7 +71,9 @@ export default function EntityEditPanel({
   entityId,
   canManage,
   onChanged,
-  showCommissions = true
+  showCommissions = true,
+  editing,
+  onEditingChange
 }: EntityEditPanelProps) {
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
@@ -84,8 +95,14 @@ export default function EntityEditPanel({
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string; code: string }[]>([])
   const [commDefaults, setCommDefaults] = useState<Record<string, number>>({})
 
-  // ── Core fields edit ───────────────────────────────────────────────────────────
-  const [editingCore, setEditingCore] = useState(false)
+  // ── Core fields edit (controlled by parent when `editing` prop is supplied) ──────
+  const [editingInternal, setEditingInternal] = useState(false)
+  const editingCore = editing !== undefined ? editing : editingInternal
+  const setEditingCore = (v: boolean) => {
+    if (onEditingChange) onEditingChange(v)
+    else setEditingInternal(v)
+  }
+  const [commOpen, setCommOpen] = useState(false)
   const [form, setForm] = useState<{
     name: string
     type: 'company' | 'person'
@@ -189,19 +206,22 @@ export default function EntityEditPanel({
     onChanged()
   }
 
-  // ── Core field handlers ─────────────────────────────────────────────────────────
-  const startEditCore = () => {
-    if (!entity) return
-    setForm({
-      name: entity.name,
-      type: entity.type,
-      identifier: entity.identifier || '',
-      email: entity.email || '',
-      phone: entity.phone || ''
-    })
-    setEditingCore(true)
-  }
+  // Populate the edit form from the entity whenever edit mode is (re)entered — the Edit
+  // trigger lives in the parent's header, so this seeds the form for controlled editing.
+  useEffect(() => {
+    if (editingCore && entity) {
+      setForm({
+        name: entity.name,
+        type: entity.type,
+        identifier: entity.identifier || '',
+        email: entity.email || '',
+        phone: entity.phone || ''
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingCore])
 
+  // ── Core field handlers ─────────────────────────────────────────────────────────
   const handleSaveCore = async () => {
     if (!entity || !form.name.trim()) return
     setSavingCore(true)
@@ -764,184 +784,130 @@ export default function EntityEditPanel({
 
   return (
     <div>
-      {/* Core fields */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-        {editingCore ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div>
-              <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                Name *
-              </label>
-              <div style={{ position: 'relative' }}>
+      {/* Core fields — identity/name is shown by the parent header; the Edit trigger lives
+          there too. When not editing, this section shows only the contacts (if any). */}
+      {(editingCore || entity.email || entity.phone) && (
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
+          {editingCore ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
+                  Name *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    style={{ width: '100%', paddingRight: '44px' }}
+                    placeholder="Entity name"
+                  />
+                  <CaseToggleBtn
+                    value={form.name}
+                    onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
+                    Type
+                  </label>
+                  <select
+                    value={form.type}
+                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as any }))}
+                    style={{ width: '100%', padding: '8px 10px' }}
+                  >
+                    <option value="company">Company</option>
+                    <option value="person">Person</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
+                    Identifier
+                  </label>
+                  <input
+                    type="text"
+                    value={form.identifier}
+                    onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))}
+                    style={{ width: '100%' }}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
+                  Email(s)
+                </label>
                 <input
                   type="text"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  style={{ width: '100%', paddingRight: '44px' }}
-                  placeholder="Entity name"
-                />
-                <CaseToggleBtn
-                  value={form.name}
-                  onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                  Type
-                </label>
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as any }))}
-                  style={{ width: '100%', padding: '8px 10px' }}
-                >
-                  <option value="company">Company</option>
-                  <option value="person">Person</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                  Identifier
-                </label>
-                <input
-                  type="text"
-                  value={form.identifier}
-                  onChange={(e) => setForm((f) => ({ ...f, identifier: e.target.value }))}
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   style={{ width: '100%' }}
-                  placeholder="Optional"
+                  placeholder="Separate multiple with commas"
                 />
               </div>
-            </div>
-            <div>
-              <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                Email(s)
-              </label>
-              <input
-                type="text"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                style={{ width: '100%' }}
-                placeholder="Separate multiple with commas"
-              />
-            </div>
-            <div>
-              <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
-                Phone
-              </label>
-              <input
-                type="text"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                style={{ width: '100%' }}
-                placeholder="Phone number"
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={handleSaveCore}
-                disabled={!form.name.trim() || savingCore}
-                className="btn-primary"
-                style={{
-                  padding: '6px 16px',
-                  fontSize: '0.8rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                {savingCore ? <Loader2 size={13} className="spinner" /> : <Save size={13} />} Save
-              </button>
-              <button
-                onClick={() => setEditingCore(false)}
-                className="btn-secondary"
-                style={{ padding: '6px 16px', fontSize: '0.8rem' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '6px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                {entity.type === 'company' ? (
-                  <Building2 size={16} color="var(--accent-primary)" />
-                ) : (
-                  <User size={16} color="var(--accent-primary)" />
-                )}
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {entity.name}
-                </span>
+              <div>
+                <label style={{ ...sectionLabel, display: 'block', marginBottom: '4px' }}>
+                  Phone
+                </label>
+                <input
+                  type="text"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  style={{ width: '100%' }}
+                  placeholder="Phone number"
+                />
               </div>
-              {canManage && (
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={startEditCore}
-                  className="btn-secondary"
+                  onClick={handleSaveCore}
+                  disabled={!form.name.trim() || savingCore}
+                  className="btn-primary"
                   style={{
-                    padding: '4px 10px',
-                    fontSize: '0.74rem',
+                    padding: '6px 16px',
+                    fontSize: '0.8rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '5px'
                   }}
                 >
-                  <Pencil size={12} /> Edit
+                  {savingCore ? <Loader2 size={13} className="spinner" /> : <Save size={13} />} Save
                 </button>
-              )}
+                <button
+                  onClick={() => setEditingCore(false)}
+                  className="btn-secondary"
+                  style={{ padding: '6px 16px', fontSize: '0.8rem' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
+          ) : (
             <div
               style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                textTransform: 'capitalize'
+                fontSize: '0.8rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px'
               }}
             >
-              {entity.type}
-              {entity.identifier ? ` · ${entity.identifier}` : ''}
+              {entity.email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Mail size={12} color="var(--text-secondary)" />
+                  <span style={{ color: 'var(--accent-primary)' }}>{entity.email}</span>
+                </div>
+              )}
+              {entity.phone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Phone size={12} color="var(--text-secondary)" />
+                  <span>{entity.phone}</span>
+                </div>
+              )}
             </div>
-            {(entity.email || entity.phone) && (
-              <div
-                style={{
-                  marginTop: '8px',
-                  fontSize: '0.8rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '3px'
-                }}
-              >
-                {entity.email && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Mail size={12} color="var(--text-secondary)" />
-                    <span style={{ color: 'var(--accent-primary)' }}>{entity.email}</span>
-                  </div>
-                )}
-                {entity.phone && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Phone size={12} color="var(--text-secondary)" />
-                    <span>{entity.phone}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Sanctions */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
@@ -953,99 +919,6 @@ export default function EntityEditPanel({
         <div style={{ ...sectionLabel, marginBottom: '10px' }}>Documents</div>
         <DocRow ent={entity} />
       </div>
-
-      {/* Commission overrides */}
-      {showCommissions && policyTypes.length > 0 && (
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
-          <div style={{ ...sectionLabel, marginBottom: '10px' }}>Commission Rates</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {policyTypes.map((pt) => {
-              const override = commissions.find((c) => c.policyTypeId === pt.id)
-              const defaultVal = commDefaults[pt.id]
-              return (
-                <div key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      minWidth: '80px'
-                    }}
-                  >
-                    {pt.code || pt.name}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    disabled={!canManage}
-                    value={override?.commissionPercent ?? ''}
-                    placeholder={defaultVal != null ? `${defaultVal}%` : '—'}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value)
-                      if (!isNaN(val)) {
-                        setCommissions((prev) => {
-                          const existing = prev.find((c) => c.policyTypeId === pt.id)
-                          if (existing)
-                            return prev.map((c) =>
-                              c.policyTypeId === pt.id ? { ...c, commissionPercent: val } : c
-                            )
-                          return [...prev, { policyTypeId: pt.id, commissionPercent: val }]
-                        })
-                      }
-                    }}
-                    onBlur={(e) => {
-                      const val = parseFloat(e.target.value)
-                      if (!isNaN(val)) {
-                        window.api.commissionSetOverride(entity.id, pt.id, val).catch(() => {})
-                      } else if (e.target.value === '' && override) {
-                        window.api
-                          .commissionDeleteOverride(entity.id, pt.id)
-                          .then(() => {
-                            setCommissions((prev) => prev.filter((c) => c.policyTypeId !== pt.id))
-                          })
-                          .catch(() => {})
-                      }
-                    }}
-                    style={{
-                      width: '70px',
-                      padding: '4px 6px',
-                      textAlign: 'right',
-                      fontSize: '0.82rem',
-                      borderRadius: '4px',
-                      border: '1px solid var(--input-border)',
-                      background: 'transparent',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>%</span>
-                  {override && (
-                    <span
-                      style={{
-                        fontSize: '0.6rem',
-                        padding: '1px 4px',
-                        borderRadius: '3px',
-                        background: 'rgba(0,170,200,0.1)',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      override
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          <p
-            style={{
-              fontSize: '0.7rem',
-              color: 'var(--text-secondary)',
-              marginTop: '6px',
-              marginBottom: 0
-            }}
-          >
-            Clear a field to use the default rate. Set a value to override for this customer.
-          </p>
-        </div>
-      )}
 
       {/* Addresses */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
@@ -1469,6 +1342,139 @@ export default function EntityEditPanel({
           </div>
         )}
       </div>
+
+      {/* Commission overrides — collapsed by default, at the bottom */}
+      {showCommissions && policyTypes.length > 0 && (
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--table-border)' }}>
+          <button
+            onClick={() => setCommOpen((o) => !o)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0
+            }}
+          >
+            {commOpen ? (
+              <ChevronDown size={13} color="var(--text-secondary)" />
+            ) : (
+              <ChevronRight size={13} color="var(--text-secondary)" />
+            )}
+            <span style={sectionLabel}>Commission Rates</span>
+            {commissions.length > 0 && (
+              <span
+                style={{
+                  marginLeft: '4px',
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  background: accentBg,
+                  color: 'var(--accent-primary)',
+                  fontWeight: 700,
+                  fontSize: '0.6rem'
+                }}
+              >
+                {commissions.length} override{commissions.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </button>
+          {commOpen && (
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {policyTypes.map((pt) => {
+                  const override = commissions.find((c) => c.policyTypeId === pt.id)
+                  const defaultVal = commDefaults[pt.id]
+                  return (
+                    <div key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        style={{
+                          fontSize: '0.78rem',
+                          color: 'var(--text-secondary)',
+                          minWidth: '80px'
+                        }}
+                      >
+                        {pt.code || pt.name}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        disabled={!canManage}
+                        value={override?.commissionPercent ?? ''}
+                        placeholder={defaultVal != null ? `${defaultVal}%` : '—'}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value)
+                          if (!isNaN(val)) {
+                            setCommissions((prev) => {
+                              const existing = prev.find((c) => c.policyTypeId === pt.id)
+                              if (existing)
+                                return prev.map((c) =>
+                                  c.policyTypeId === pt.id ? { ...c, commissionPercent: val } : c
+                                )
+                              return [...prev, { policyTypeId: pt.id, commissionPercent: val }]
+                            })
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = parseFloat(e.target.value)
+                          if (!isNaN(val)) {
+                            window.api.commissionSetOverride(entity.id, pt.id, val).catch(() => {})
+                          } else if (e.target.value === '' && override) {
+                            window.api
+                              .commissionDeleteOverride(entity.id, pt.id)
+                              .then(() => {
+                                setCommissions((prev) =>
+                                  prev.filter((c) => c.policyTypeId !== pt.id)
+                                )
+                              })
+                              .catch(() => {})
+                          }
+                        }}
+                        style={{
+                          width: '70px',
+                          padding: '4px 6px',
+                          textAlign: 'right',
+                          fontSize: '0.82rem',
+                          borderRadius: '4px',
+                          border: '1px solid var(--input-border)',
+                          background: 'transparent',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>%</span>
+                      {override && (
+                        <span
+                          style={{
+                            fontSize: '0.6rem',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            background: 'rgba(0,170,200,0.1)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
+                          override
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <p
+                style={{
+                  fontSize: '0.7rem',
+                  color: 'var(--text-secondary)',
+                  marginTop: '6px',
+                  marginBottom: 0
+                }}
+              >
+                Clear a field to use the default rate. Set a value to override for this customer.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {sanctionsModal.show && (
         <SanctionsModal

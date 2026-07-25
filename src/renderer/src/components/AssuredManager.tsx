@@ -73,6 +73,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
   const [editingVesselAssuredId, setEditingVesselAssuredId] = useState<string | null>(null)
   const [editRoleValue, setEditRoleValue] = useState('')
   const [isUpdatingRole, setIsUpdatingRole] = useState(false)
+  // Controls the shared EntityEditPanel's core-field edit mode (triggered from the header)
+  const [editingEntityCore, setEditingEntityCore] = useState(false)
 
   // Loading states
   const [isAddingAssured, setIsAddingAssured] = useState(false)
@@ -811,6 +813,21 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                   {selectedVA.role} <span style={{ opacity: 0.4 }}>|</span> {selectedEntity.type}
                 </div>
               </div>
+              {canManageAssureds && (
+                <button
+                  onClick={() => setEditingEntityCore(true)}
+                  className="btn-secondary"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.74rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
               <button
                 onClick={() => setSelectedAssuredId(null)}
                 style={{
@@ -1015,6 +1032,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
               entityId={selectedVA.entityId}
               canManage={canManageAssureds}
               onChanged={loadData}
+              editing={editingEntityCore}
+              onEditingChange={setEditingEntityCore}
             />
           </div>
         )}

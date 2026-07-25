@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Loader2,
   X,
+  Pencil,
   Trash2,
   AlertTriangle,
   CheckCircle2,
@@ -114,6 +115,7 @@ export default function EntityDirectory({
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [viewingVessel, setViewingVessel] = useState<Vessel | null>(null)
+  const [editingEntityCore, setEditingEntityCore] = useState(false)
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
@@ -819,6 +821,7 @@ export default function EntityDirectory({
   // Track recent item view when an entity is selected (addresses/commissions/docs are
   // now handled by the shared EntityEditPanel).
   useEffect(() => {
+    setEditingEntityCore(false)
     if (selectedEntity) {
       window.api
         .recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type)
@@ -1696,8 +1699,23 @@ export default function EntityDirectory({
                 </div>
               )}
 
-              {/* Directory-level actions (merge / delete / remap) */}
+              {/* Directory-level actions (edit / merge / delete / remap) */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
+                {hasPermission('entities:edit') && (
+                  <button
+                    onClick={() => setEditingEntityCore(true)}
+                    className="btn-secondary"
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
                 <button
                   onClick={() => openMergeModal(selectedEntity)}
                   className="btn-secondary"
@@ -1749,6 +1767,8 @@ export default function EntityDirectory({
               entityId={selectedEntity.id}
               canManage={hasPermission('entities:edit')}
               onChanged={loadData}
+              editing={editingEntityCore}
+              onEditingChange={setEditingEntityCore}
             />
 
             {/* Vessels section */}
