@@ -987,7 +987,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
             {/* Step comment modal */}
             {showStepCommentModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => { setShowStepCommentModal(null); setStepComment('') }}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
                     <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '400px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ margin: '0 0 16px', fontSize: '1rem' }}>Move to {reachableSteps.find(s => s.id === showStepCommentModal)?.name}</h3>
                         <textarea
@@ -1007,7 +1007,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
             {/* Draft export confirmation modal */}
             {showDraftExportModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowDraftExportModal(null)}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
                     <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '440px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Quotation Not Approved</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 20px', lineHeight: 1.5 }}>
@@ -1445,7 +1445,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
     }
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '520px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Copy from Quotation</h3>

@@ -1277,7 +1277,7 @@ export default function FileManager() {
 
       {/* ======================== Rename Modal ======================== */}
       {renameModal && (
-        <div style={modalBackdrop} onClick={() => setRenameModal(null)}>
+        <div style={modalBackdrop}>
           <div style={modalBox} onClick={(e) => e.stopPropagation()}>
             <div style={modalTitle}>
               <Edit3 size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -1334,7 +1334,7 @@ export default function FileManager() {
 
       {/* ======================== Move Modal ======================== */}
       {moveModal && (
-        <div style={modalBackdrop} onClick={() => setMoveModal(null)}>
+        <div style={modalBackdrop}>
           <div
             style={{ ...modalBox, maxWidth: 520 }}
             onClick={(e) => e.stopPropagation()}
@@ -1430,7 +1430,7 @@ export default function FileManager() {
 
       {/* ======================== New Folder Modal ======================== */}
       {newFolderModal && (
-        <div style={modalBackdrop} onClick={() => setNewFolderModal(null)}>
+        <div style={modalBackdrop}>
           <div style={modalBox} onClick={(e) => e.stopPropagation()}>
             <div style={modalTitle}>
               <FolderPlus size={18} style={{ color: 'var(--accent-primary)' }} />

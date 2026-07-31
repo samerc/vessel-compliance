@@ -677,7 +677,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={closeModal}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '520px', maxWidth: '90vw', border: '1px solid var(--glass-border)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
             {/* Modal header */}

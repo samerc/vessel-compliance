@@ -1992,7 +1992,6 @@ export default function EntityDirectory({
             justifyContent: 'center',
             zIndex: 1000
           }}
-          onClick={() => setShowCreateModal(false)}
         >
           <div
             style={{
@@ -2219,7 +2218,6 @@ export default function EntityDirectory({
             justifyContent: 'center',
             zIndex: 1000
           }}
-          onClick={() => setShowMergeModal(false)}
         >
           <div
             style={{
