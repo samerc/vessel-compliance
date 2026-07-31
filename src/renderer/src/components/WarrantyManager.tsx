@@ -727,7 +727,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* ── Add/Edit Modal ─────────────────────────────────────── */}
       {showAddModal && (
-        <div style={modalBg} onClick={() => setShowAddModal(false)}>
+        <div style={modalBg}>
           <div style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>{editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}</h3>
@@ -804,7 +804,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* ── Log Reminder Modal ────────────────────────────────── */}
       {reminderWarrantyId && (
-        <div style={modalBg} onClick={() => setReminderWarrantyId(null)}>
+        <div style={modalBg}>
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
@@ -846,7 +846,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* ── Waive Modal ───────────────────────────────────────── */}
       {waiveWarrantyId && (
-        <div style={modalBg} onClick={() => setWaiveWarrantyId(null)}>
+        <div style={modalBg}>
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
@@ -880,7 +880,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* ── Complete Modal ────────────────────────────────────── */}
       {completeWarrantyId && (
-        <div style={modalBg} onClick={() => setCompleteWarrantyId(null)}>
+        <div style={modalBg}>
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
@@ -913,7 +913,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* ── Link to Survey Modal ──────────────────────────────── */}
       {linkWarranty && (
-        <div style={modalBg} onClick={() => setLinkWarranty(null)}>
+        <div style={modalBg}>
           <div style={{ ...modalCard, width: '560px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Link to Survey</h3>
