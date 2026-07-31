@@ -22,6 +22,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
     const [newGroupName, setNewGroupName] = useState('')
     const [coInputValue, setCoInputValue] = useState(quotation.coName || '')
     const [showCoDropdown, setShowCoDropdown] = useState(false)
+    const [showEntityDropdown, setShowEntityDropdown] = useState(false)
     const [customerType, setCustomerType] = useState<'broker' | 'direct' | ''>(quotation.customerType || '')
 
     useEffect(() => { loadData() }, [])
@@ -125,6 +126,11 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
 
     const coFiltered = entities.filter(e =>
         coInputValue.length > 0 && e.name.toLowerCase().includes(coInputValue.toLowerCase())
+    ).slice(0, 8)
+
+    const entityFiltered = entities.filter(e =>
+        newName.length > 0 && e.name.toLowerCase().includes(newName.toLowerCase())
+        && e.name.toLowerCase() !== newName.toLowerCase()
     ).slice(0, 8)
 
     const renderAssuredRow = (a: QuotationAssured, _idx: number) => {
@@ -248,25 +254,33 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                 </button>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <select
-                    value={newEntityId}
-                    onChange={e => {
-                        setNewEntityId(e.target.value)
-                        const ent = entities.find(x => x.id === e.target.value)
-                        if (ent) setNewName(ent.name)
-                    }}
-                    style={{ padding: '8px 12px', borderRadius: '8px', minWidth: '180px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
-                >
-                    <option value="">Select entity or type manually</option>
-                    {entities.map(e => <option key={e.id} value={e.id}>{e.name} ({e.type})</option>)}
-                </select>
-                <input
-                    type="text"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    placeholder="Assured name"
-                    style={{ flex: 1, minWidth: '160px' }}
-                />
+                <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={e => { setNewName(e.target.value); setNewEntityId(''); setShowEntityDropdown(true) }}
+                        onFocus={() => { if (newName) setShowEntityDropdown(true) }}
+                        onBlur={() => setTimeout(() => setShowEntityDropdown(false), 150)}
+                        onKeyDown={e => { if (e.key === 'Enter') { setShowEntityDropdown(false); handleAddAssured() } }}
+                        placeholder="Search entity or type a new assured name..."
+                        style={{ width: '100%', border: '1px solid var(--input-border)' }}
+                    />
+                    {showEntityDropdown && entityFiltered.length > 0 && (
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '220px', overflowY: 'auto', marginTop: '2px' }}>
+                            {entityFiltered.map(e => (
+                                <div
+                                    key={e.id}
+                                    onMouseDown={() => { setNewName(e.name); setNewEntityId(e.id); setShowEntityDropdown(false) }}
+                                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
+                                    onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.08)')}
+                                    onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
+                                >
+                                    {e.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({e.type})</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 {showNewRoleInput ? (
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         <input
