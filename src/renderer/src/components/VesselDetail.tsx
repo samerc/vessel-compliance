@@ -1175,6 +1175,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <Download size={16} /> Export <ChevronDown size={14} />
                                 </button>
                                 {showExportMenu && (
+                                    <>
+                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowExportMenu(false)} />
                                     <div style={{
                                         position: 'absolute',
                                         top: '100%',
@@ -1387,6 +1389,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             <Copy size={16} /> Copy Missing Documents
                                         </button>
                                     </div>
+                                    </>
                                 )}
                             </div>
                             {hasPermission('vessels:delete') && (
