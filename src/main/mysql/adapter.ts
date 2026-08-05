@@ -6621,7 +6621,10 @@ export class MySQLAdapter {
 
         if (criteria.policyTypeIds && criteria.policyTypeIds.length > 0) {
             const placeholders = criteria.policyTypeIds.map(() => '?').join(',')
-            conditions.push(`v.id IN (SELECT vessel_id FROM vessel_policies WHERE policy_type_id IN (${placeholders}))`)
+            // Match vessels that actually have an ACTIVE dynamic policy of the selected type(s).
+            // (The legacy vessel_policies junction is sparsely populated and misses most real
+            //  policies — customer/assured associations live on vessel_dynamic_policies.)
+            conditions.push(`v.id IN (SELECT vessel_id FROM vessel_dynamic_policies WHERE policy_type_id IN (${placeholders}) AND status = 'active')`)
             params.push(...criteria.policyTypeIds)
         }
 
