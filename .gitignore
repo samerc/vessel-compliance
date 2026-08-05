@@ -105,6 +105,8 @@ Thumbs.db
 !TESTING.md
 !.claude/design-guide.md
 !.claude/lessons-learned.md
+.claude/*.lock
+.claude/scheduled_tasks.lock
 db/db-config.json
 sanctions.db
 documents
