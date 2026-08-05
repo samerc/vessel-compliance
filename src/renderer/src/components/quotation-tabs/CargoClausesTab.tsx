@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, ChevronDown } from 'lucide-react'
-import { Quotation, CargoClause, CargoInstituteClause, QuotationCargoClause, QuotationCargoCustomClause } from '../../../../shared/types'
+import { Plus, Trash2, ChevronDown, Layers } from 'lucide-react'
+import { Quotation, CargoClause, CargoInstituteClause, CargoClauseSet, QuotationCargoClause, QuotationCargoCustomClause } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 
 const SECTION_LABELS: Record<string, string> = {
@@ -121,18 +121,42 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
     const [editingCustom, setEditingCustom] = useState<string | null>(null)
     const [newCustomText, setNewCustomText] = useState('')
     const [instituteClauses, setInstituteClauses] = useState<CargoInstituteClause[]>([])
+    const [sets, setSets] = useState<CargoClauseSet[]>([])
+    const [showSetPicker, setShowSetPicker] = useState(false)
+    const setPickerRef = useRef<HTMLDivElement>(null)
 
     const loadData = async () => {
         try {
-            const [all, sel, cust] = await Promise.all([
+            const [all, sel, cust, sts] = await Promise.all([
                 window.api.cargoGetClauses(section),
                 window.api.cargoGetQuotationClauses(quotation.id, section),
-                window.api.cargoGetQuotationCustomClauses(quotation.id, section)
+                window.api.cargoGetQuotationCustomClauses(quotation.id, section),
+                window.api.cargoGetClauseSets(section)
             ])
             setAllClauses(Array.isArray(all) ? all : [])
             setSelectedClauses(Array.isArray(sel) ? sel : [])
             setCustomClauses(Array.isArray(cust) ? cust : [])
+            setSets(Array.isArray(sts) ? sts : [])
         } catch {}
+    }
+
+    useEffect(() => {
+        if (!showSetPicker) return
+        const handler = (e: MouseEvent) => { if (setPickerRef.current && !setPickerRef.current.contains(e.target as Node)) setShowSetPicker(false) }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [showSetPicker])
+
+    const applySet = async (set: CargoClauseSet) => {
+        try {
+            const existing = selectedClauses.map(c => ({ cargoClauseId: c.cargoClauseId, textOverride: c.textOverride || undefined, amount: c.amount ?? null }))
+            const existingIds = new Set(existing.map(e => e.cargoClauseId))
+            const additions = set.clauseIds.filter(id => !existingIds.has(id)).map(id => ({ cargoClauseId: id }))
+            setShowSetPicker(false)
+            if (additions.length === 0) return
+            await window.api.cargoSetQuotationClauses(quotation.id, section, [...existing, ...additions])
+            await loadData()
+        } catch (err: any) { showError(err.message || 'Failed to apply set') }
     }
 
     const loadInstituteClauses = async () => {
@@ -223,11 +247,35 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '1rem', margin: 0 }}>{section === 'conditions' ? 'Additional Conditions' : SECTION_LABELS[section]}</h3>
-                <button onClick={() => setShowPicker(!showPicker)} className="btn-secondary"
-                    style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ChevronDown size={14} style={{ transform: showPicker ? 'rotate(180deg)' : 'none', transition: '0.15s' }} />
-                    {showPicker ? 'Hide' : 'Select'} Clauses
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {sets.length > 0 && (
+                        <div style={{ position: 'relative' }} ref={setPickerRef}>
+                            <button onClick={() => setShowSetPicker(!showSetPicker)} className="btn-secondary"
+                                style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Layers size={14} /> Apply Set
+                                <ChevronDown size={14} style={{ transform: showSetPicker ? 'rotate(180deg)' : 'none', transition: '0.15s' }} />
+                            </button>
+                            {showSetPicker && (
+                                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxHeight: '280px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--input-border)', background: isLight ? '#ffffff' : '#1a1d28', zIndex: 999, boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.12)' : '0 8px 24px rgba(0,0,0,0.5)' }}>
+                                    {sets.map(s => (
+                                        <div key={s.id} onClick={() => applySet(s)}
+                                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.82rem', borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)')}
+                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                            {s.name}
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '6px' }}>({s.clauseIds.length})</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <button onClick={() => setShowPicker(!showPicker)} className="btn-secondary"
+                        style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <ChevronDown size={14} style={{ transform: showPicker ? 'rotate(180deg)' : 'none', transition: '0.15s' }} />
+                        {showPicker ? 'Hide' : 'Select'} Clauses
+                    </button>
+                </div>
             </div>
 
             {/* Clause picker */}

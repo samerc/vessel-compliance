@@ -2437,6 +2437,11 @@ app.whenReady().then(() => {
   safeHandle('cargo:deleteClause', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteCargoClause(id) })
   safeHandle('cargo:reorderClauses', async (event, ids) => { await requirePermission(event, 'quotations:settings'); return db.reorderCargoClauses(ids) })
 
+  safeHandle('cargo:getClauseSets', (event, section) => { requireSession(event); return db.getCargoClauseSets(section) })
+  safeHandle('cargo:addClauseSet', async (event, section, name, clauseIds) => { await requirePermission(event, 'quotations:settings'); return db.addCargoClauseSet(section, name, clauseIds) })
+  safeHandle('cargo:updateClauseSet', async (event, id, name, clauseIds) => { await requirePermission(event, 'quotations:settings'); return db.updateCargoClauseSet(id, name, clauseIds) })
+  safeHandle('cargo:deleteClauseSet', async (event, id) => { await requirePermission(event, 'quotations:settings'); return db.deleteCargoClauseSet(id) })
+
   safeHandle('cargo:getQuotationClauses', (event, qId, section) => { requireSession(event); return db.getQuotationCargoClauses(qId, section) })
   safeHandle('cargo:setQuotationClauses', async (event, qId, section, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationCargoClauses(qId, section, items) })
   safeHandle('cargo:getQuotationCustomClauses', (event, qId, section) => { requireSession(event); return db.getQuotationCargoCustomClauses(qId, section) })

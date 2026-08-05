@@ -2971,6 +2971,23 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: cargo clause sets (named bundles of cargo clauses, scoped per section)
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS cargo_clause_sets (
+                    id VARCHAR(36) PRIMARY KEY,
+                    section VARCHAR(20) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    order_index INT DEFAULT 0
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS cargo_clause_set_items (
+                    id VARCHAR(36) PRIMARY KEY,
+                    set_id VARCHAR(36) NOT NULL,
+                    cargo_clause_id VARCHAR(36) NOT NULL,
+                    order_index INT DEFAULT 0,
+                    INDEX idx_ccsi_set (set_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+            } catch {}
+
             // Seed Cargo type if not exists (now in policy_types, legacy quotation_types kept for migration)
             try {
                 const [existingCargo] = await this.pool.query("SELECT id FROM policy_types WHERE code = 'C'") as any[]
@@ -14674,6 +14691,47 @@ export class MySQLAdapter {
         for (let i = 0; i < ids.length; i++) {
             await this.pool.execute('UPDATE cargo_clauses SET order_index = ? WHERE id = ?', [i, ids[i]])
         }
+    }
+
+    // Cargo clause sets (named bundles of clauses, per section)
+    async getCargoClauseSets(section?: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = section
+            ? await this.pool.query('SELECT id, section, name, order_index as `order` FROM cargo_clause_sets WHERE section = ? ORDER BY order_index ASC, name ASC', [section])
+            : await this.pool.query('SELECT id, section, name, order_index as `order` FROM cargo_clause_sets ORDER BY section, order_index ASC, name ASC')
+        const sets = rows as any[]
+        for (const set of sets) {
+            const [items] = await this.pool.query('SELECT cargo_clause_id FROM cargo_clause_set_items WHERE set_id = ? ORDER BY order_index ASC', [set.id])
+            set.clauseIds = (items as any[]).map(i => i.cargo_clause_id)
+        }
+        return sets
+    }
+
+    async addCargoClauseSet(section: string, name: string, clauseIds: string[]): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_clause_sets WHERE section = ?', [section])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute('INSERT INTO cargo_clause_sets (id, section, name, order_index) VALUES (?, ?, ?, ?)', [id, section, name, order])
+        for (let i = 0; i < clauseIds.length; i++) {
+            await this.pool.execute('INSERT INTO cargo_clause_set_items (id, set_id, cargo_clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])
+        }
+        return { id, section, name, order, clauseIds }
+    }
+
+    async updateCargoClauseSet(id: string, name: string, clauseIds: string[]): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE cargo_clause_sets SET name = ? WHERE id = ?', [name, id])
+        await this.pool.execute('DELETE FROM cargo_clause_set_items WHERE set_id = ?', [id])
+        for (let i = 0; i < clauseIds.length; i++) {
+            await this.pool.execute('INSERT INTO cargo_clause_set_items (id, set_id, cargo_clause_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, clauseIds[i], i])
+        }
+    }
+
+    async deleteCargoClauseSet(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM cargo_clause_set_items WHERE set_id = ?', [id])
+        await this.pool.execute('DELETE FROM cargo_clause_sets WHERE id = ?', [id])
     }
 
     // Per-quotation cargo clauses

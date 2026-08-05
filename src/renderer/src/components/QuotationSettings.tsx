@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck, GripVertical } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Shield, AlertTriangle, FileText, BookOpen, Scale, Tag, Calendar, Download, Upload, List, GitBranch, ArrowRight, Check, Copy, DollarSign, ClipboardCheck, GripVertical, Layers } from 'lucide-react'
 import { PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIWarrantySet, PIDeductible, PITextDeductible, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, PISectionTexts, PISanctionsVersion, InstalmentDefaults, PISubjectivity, DocumentType, VesselType, QuotationType, HullAgreedValueText, HullClause, HullClauseCondition, HullAdditionalCondition, HullConditionSection, WarCondition, WarSettings, WorkflowStep, WorkflowTransition, PERMISSION_CATEGORIES, PremiumTextTemplate, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, TradingCustomText } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { sanitizeHtml } from '../utils/sanitize'
@@ -4968,6 +4968,125 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     )
 }
 
+// ==================== Cargo Clause Sets Manager ====================
+
+function CargoClauseSetsManager({ section, sectionLabel, showSuccess, showError, isLight }: { section: string; sectionLabel: string; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
+    const [sets, setSets] = useState<any[]>([])
+    const [clauses, setClauses] = useState<any[]>([])
+    const [open, setOpen] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null) // set id, or 'new'
+    const [name, setName] = useState('')
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+    const loadData = async () => {
+        try {
+            const [sts, cls] = await Promise.all([
+                window.api.cargoGetClauseSets(section),
+                window.api.cargoGetClauses(section)
+            ])
+            setSets(Array.isArray(sts) ? sts : [])
+            setClauses((Array.isArray(cls) ? cls : []).filter((c: any) => c.active !== false))
+        } catch { setSets([]); setClauses([]) }
+    }
+    useEffect(() => { loadData() }, [section])
+
+    const startNew = () => { setEditingId('new'); setName(''); setSelectedIds(new Set()) }
+    const startEdit = (s: any) => { setEditingId(s.id); setName(s.name); setSelectedIds(new Set(s.clauseIds || [])) }
+    const cancel = () => { setEditingId(null); setName(''); setSelectedIds(new Set()) }
+    const toggle = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+    const save = async () => {
+        if (!name.trim()) { showError('Set name is required'); return }
+        // Preserve clause order from the master list
+        const ordered = clauses.filter(c => selectedIds.has(c.id)).map(c => c.id)
+        try {
+            if (editingId === 'new') await window.api.cargoAddClauseSet(section, name.trim(), ordered)
+            else if (editingId) await window.api.cargoUpdateClauseSet(editingId, name.trim(), ordered)
+            showSuccess('Set saved')
+            cancel()
+            loadData()
+        } catch (err: any) { showError(err.message || 'Failed to save set') }
+    }
+
+    const remove = async (id: string) => {
+        try { await window.api.cargoDeleteClauseSet(id); showSuccess('Set deleted'); loadData() }
+        catch (err: any) { showError(err.message || 'Failed to delete set') }
+    }
+
+    return (
+        <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+            <div onClick={() => setOpen(!open)} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: open ? '14px' : 0 }}>
+                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                <Layers size={16} style={{ color: 'var(--accent-primary)' }} />
+                <h3 style={{ fontSize: '1rem', margin: 0 }}>{sectionLabel} Sets</h3>
+                <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--table-header-bg)', color: 'var(--text-secondary)' }}>{sets.length}</span>
+            </div>
+            {open && (
+                <>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                        Named bundles of {sectionLabel.toLowerCase()} clauses. In a cargo quotation, click &quot;Apply Set&quot; to add all of a set&apos;s clauses at once.
+                    </p>
+
+                    {sets.map(s => (
+                        <div key={s.id}>
+                            {editingId === s.id ? (
+                                <div style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--accent-primary)', marginBottom: '8px' }}>
+                                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Set name" style={{ width: '100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', marginBottom: '10px' }} />
+                                    <ClausePicker clauses={clauses} selectedIds={selectedIds} toggle={toggle} isLight={isLight} />
+                                    <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                                        <button onClick={save} className="btn-primary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}><Save size={12} /> Save</button>
+                                        <button onClick={cancel} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{s.name}</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>{(s.clauseIds || []).length} clause{(s.clauseIds || []).length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    <button onClick={() => startEdit(s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Pencil size={14} /></button>
+                                    <button onClick={() => remove(s.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {editingId === 'new' ? (
+                        <div style={{ padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--accent-primary)', marginTop: '8px' }}>
+                            <input value={name} onChange={e => setName(e.target.value)} placeholder="Set name (e.g. Standard ICC(A) Set)" autoFocus style={{ width: '100%', padding: '8px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', marginBottom: '10px' }} />
+                            <ClausePicker clauses={clauses} selectedIds={selectedIds} toggle={toggle} isLight={isLight} />
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                                <button onClick={save} className="btn-primary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}><Save size={12} /> Save Set</button>
+                                <button onClick={cancel} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.78rem' }}><X size={12} /> Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button onClick={startNew} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}><Plus size={14} /> New Set</button>
+                    )}
+
+                    {clauses.length === 0 && (
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '10px' }}>Add clauses below first — sets are built from the clause library.</p>
+                    )}
+                </>
+            )}
+        </section>
+    )
+}
+
+function ClausePicker({ clauses, selectedIds, toggle, isLight }: { clauses: any[]; selectedIds: Set<string>; toggle: (id: string) => void; isLight: boolean }) {
+    return (
+        <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--input-border)', borderRadius: '8px', padding: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+            {clauses.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px' }}>No clauses in this section yet.</p>}
+            {clauses.map(c => (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 2px', cursor: 'pointer', fontSize: '0.83rem' }}>
+                    <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c.id)} style={{ marginTop: '3px' }} />
+                    <span>{c.code && <strong style={{ marginRight: '6px' }}>{c.code}</strong>}{c.title}</span>
+                </label>
+            ))}
+        </div>
+    )
+}
+
 // ==================== Cargo Clauses Tab ====================
 
 function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabProps & { section: string; sectionLabel: string }) {
@@ -5142,6 +5261,7 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
 
     return (
         <>
+        <CargoClauseSetsManager section={section} sectionLabel={sectionLabel} showSuccess={showSuccess} showError={showError} isLight={isLight} />
         {section === 'conditions' && (
             <section className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Institute Cargo Clauses</h3>

@@ -924,6 +924,14 @@ export interface CargoInstituteClause {
   active: boolean
 }
 
+export interface CargoClauseSet {
+  id: string
+  section: 'conditions' | 'special' | 'law'
+  name: string
+  order: number
+  clauseIds: string[]
+}
+
 export interface QuotationCargoClause {
   id: string
   quotationId: string
