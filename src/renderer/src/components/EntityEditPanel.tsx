@@ -892,12 +892,19 @@ export default function EntityEditPanel({
                 gap: '3px'
               }}
             >
-              {entity.email && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Mail size={12} color="var(--text-secondary)" />
-                  <span style={{ color: 'var(--accent-primary)' }}>{entity.email}</span>
-                </div>
-              )}
+              {entity.email &&
+                entity.email
+                  .split(',')
+                  .map((em) => em.trim())
+                  .filter(Boolean)
+                  .map((em, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={12} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                      <span style={{ color: 'var(--accent-primary)', wordBreak: 'break-all' }}>
+                        {em}
+                      </span>
+                    </div>
+                  ))}
               {entity.phone && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Phone size={12} color="var(--text-secondary)" />
