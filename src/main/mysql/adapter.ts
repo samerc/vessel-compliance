@@ -14133,6 +14133,11 @@ export class MySQLAdapter {
     async runReport(dataSource: string, config: ReportConfig): Promise<any[]> {
         if (!this.pool) return []
 
+        // Vessel classification can live in the legacy single column (v.classification_society)
+        // and/or the vessel_classifications junction (dual/multi-class). Resolve every linked
+        // society id to its name, dedup, and concat so both filter and display catch all classes.
+        const vesselClassExpr = `COALESCE((SELECT GROUP_CONCAT(DISTINCT cs2.name ORDER BY cs2.name SEPARATOR ', ') FROM classification_societies cs2 WHERE cs2.id = v.classification_society OR cs2.id IN (SELECT vc2.classification_society_id FROM vessel_classifications vc2 WHERE vc2.vessel_id = v.id)), v.classification_society)`
+
         // Define allowed columns per data source to prevent SQL injection
         const DATA_SOURCE_DEFS: Record<string, {
             baseQuery: string
@@ -14145,8 +14150,7 @@ export class MySQLAdapter {
                     LEFT JOIN fleets f ON v.fleet_id = f.id
                     LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
                     LEFT JOIN entities cust ON v.customer_id = cust.id
-                    LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id
-                    LEFT JOIN classification_societies cs ON v.classification_society = cs.id`,
+                    LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id`,
                 columnMap: {
                     name: 'v.name AS name',
                     imoNumber: 'v.imo_number AS imoNumber',
@@ -14155,7 +14159,7 @@ export class MySQLAdapter {
                     builtYear: 'v.built_year AS builtYear',
                     rebuiltYear: 'v.rebuilt_year AS rebuiltYear',
                     grossTonnage: 'v.gross_tonnage AS grossTonnage',
-                    classification: 'COALESCE(cs.name, v.classification_society) AS classification',
+                    classification: `${vesselClassExpr} AS classification`,
                     customer: 'cust.name AS customer',
                     fleet: 'f.name AS fleet',
                     isActive: 'v.is_active AS isActive',
@@ -14173,7 +14177,10 @@ export class MySQLAdapter {
                     flagStateId: (params, val) => { params.push(val); return 'v.flag_state_id = ?' },
                     customerId: (params, val) => { params.push(val); return 'v.customer_id = ?' },
                     vesselType: (params, val) => { params.push(val); return 'v.vessel_type_id = ?' },
-                    classificationId: (params, val) => { params.push(val); return 'v.classification_society = ?' },
+                    classificationId: (params, val) => {
+                        params.push(val, val)
+                        return '(v.classification_society = ? OR v.id IN (SELECT vc.vessel_id FROM vessel_classifications vc WHERE vc.classification_society_id = ?))'
+                    },
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s)
@@ -14185,7 +14192,7 @@ export class MySQLAdapter {
                     fleet: 'f.name',
                     vesselType: 'COALESCE(rvt.name, v.vessel_type)',
                     flagState: 'fs.name',
-                    classification: 'COALESCE(cs.name, v.classification_society)'
+                    classification: vesselClassExpr
                 }
             },
             policies: {
