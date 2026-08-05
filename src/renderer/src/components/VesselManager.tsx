@@ -78,6 +78,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const VESSEL_COLUMNS: ColumnDef[] = [
         { id: 'name', label: 'Vessel Name', defaultVisible: true },
         { id: 'imo', label: 'IMO Number', defaultVisible: true },
+        { id: 'vesselType', label: 'Vessel Type', defaultVisible: true },
         { id: 'sanctions', label: 'Sanctions', defaultVisible: true },
         { id: 'fleet', label: 'Fleet', defaultVisible: true },
         { id: 'actions', label: 'Actions', defaultVisible: true }
@@ -862,6 +863,9 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         </span>
                                     </th>
                                 )}
+                                {visibleSet.has('vesselType') && (
+                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap' }}>Vessel Type</th>
+                                )}
                                 {visibleSet.has('sanctions') && (
                                     <th scope="col" style={{ padding: '14px 16px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-secondary)', userSelect: 'none', whiteSpace: 'nowrap', width: '120px' }}>Sanctions</th>
                                 )}
@@ -954,6 +958,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         {visibleSet.has('imo') && (
                                         <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                                             <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
+                                        </td>
+                                        )}
+                                        {visibleSet.has('vesselType') && (
+                                        <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                                            {v.vesselType || '—'}
                                         </td>
                                         )}
                                         {visibleSet.has('sanctions') && (
