@@ -1073,6 +1073,7 @@ export interface Quotation {
   portOfLoading?: string
   portOfDestination?: string
   estimatedDeparture?: string
+  estimatedType?: string
   subjectMatter?: string
   anyOtherVessel?: boolean
   premiumRate?: number

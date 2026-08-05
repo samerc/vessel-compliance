@@ -1060,7 +1060,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })]
       }))
     }
-    if (st(data, 'insuredFooter')) {
+    if (st(data, 'insuredFooter') && data.quotation.quotationTypeCode !== 'C') {
       insuredContent.push(emptyP())
       insuredContent.push(...mp(st(data, 'insuredFooter')))
     }
@@ -2072,8 +2072,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     rowMap.set('warTrading', makeRow('Trading Warranty', [np(data.quotation.tradingWarrantyIntro)]))
   }
 
-  // ---- Trading Warranty (not for War — War uses warTrading) ----
-  if (data.quotation.quotationTypeCode !== 'W') {
+  // ---- Trading Warranty (not for War — War uses warTrading; not for Cargo) ----
+  if (data.quotation.quotationTypeCode !== 'W' && data.quotation.quotationTypeCode !== 'C') {
     const wq = data.quotation
     const tradContent: (Paragraph | Table)[] = []
     const wExcCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
@@ -2171,8 +2171,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (tradContent.length > 0) rowMap.set('trading', makeRow('Trading Warranty', tradContent))
   }
 
-  // ---- Warranties ----
-  {
+  // ---- Warranties (not for Cargo) ----
+  if (data.quotation.quotationTypeCode !== 'C') {
     const warContent: (Paragraph | Table)[] = []
     const dPiMultiAltW = data.piAlternatives.length > 1
 
@@ -2935,7 +2935,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       if (data.quotation.estimatedDeparture) {
         voyContent.push(emptyP())
-        voyContent.push(np(data.quotation.estimatedDeparture))
+        const etLabel = data.quotation.estimatedType || 'ETD'
+        voyContent.push(np(`${etLabel}: ${data.quotation.estimatedDeparture}`))
       }
       if (data.quotation.voyageText) {
         voyContent.push(emptyP())
@@ -3101,7 +3102,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       spacing: { after: 100 },
       children: [
         new TextRun({ text: data.quotation.quotationTypeCode === 'C'
-          ? `Marine Cargo Quotation for ${data.quotation.title || vName}${data.quotation.subjectMatter ? ' - ' + stripHtml(data.quotation.subjectMatter).substring(0, 50) : ''}`
+          ? `Marine Cargo Quotation for ${data.quotation.title || vName}`
           : `${data.quotation.quotationTypeCode === 'H' ? 'HULL' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`, bold: true, size: 26, font: 'Arial', color: '000000' })
       ]
     }),

@@ -37,8 +37,8 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
         setDocTypes(safeDts)
         setQVessels(Array.isArray(qv) ? qv : [])
 
-        // Auto-populate on first load if no subjectivities yet (skip for War — subjectivities not included by default)
-        if (!autoPopulateRan.current && safeSubjs.length === 0 && filteredMasters.length > 0 && quotation.quotationTypeCode !== 'W') {
+        // Auto-populate on first load if no subjectivities yet (skip for War and Cargo — subjectivities not included by default)
+        if (!autoPopulateRan.current && safeSubjs.length === 0 && filteredMasters.length > 0 && quotation.quotationTypeCode !== 'W' && quotation.quotationTypeCode !== 'C') {
             autoPopulateRan.current = true
             await autoPopulate(filteredMasters, safeDts)
         }
