@@ -14145,7 +14145,8 @@ export class MySQLAdapter {
                     LEFT JOIN fleets f ON v.fleet_id = f.id
                     LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
                     LEFT JOIN entities cust ON v.customer_id = cust.id
-                    LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id`,
+                    LEFT JOIN vessel_types rvt ON v.vessel_type_id = rvt.id
+                    LEFT JOIN classification_societies cs ON v.classification_society = cs.id`,
                 columnMap: {
                     name: 'v.name AS name',
                     imoNumber: 'v.imo_number AS imoNumber',
@@ -14154,7 +14155,7 @@ export class MySQLAdapter {
                     builtYear: 'v.built_year AS builtYear',
                     rebuiltYear: 'v.rebuilt_year AS rebuiltYear',
                     grossTonnage: 'v.gross_tonnage AS grossTonnage',
-                    classification: 'v.classification_society AS classification',
+                    classification: 'COALESCE(cs.name, v.classification_society) AS classification',
                     customer: 'cust.name AS customer',
                     fleet: 'f.name AS fleet',
                     isActive: 'v.is_active AS isActive',
@@ -14172,6 +14173,7 @@ export class MySQLAdapter {
                     flagStateId: (params, val) => { params.push(val); return 'v.flag_state_id = ?' },
                     customerId: (params, val) => { params.push(val); return 'v.customer_id = ?' },
                     vesselType: (params, val) => { params.push(val); return 'v.vessel_type_id = ?' },
+                    classificationId: (params, val) => { params.push(val); return 'v.classification_society = ?' },
                     search: (params, val) => {
                         const s = `%${val}%`
                         params.push(s, s)
@@ -14182,7 +14184,8 @@ export class MySQLAdapter {
                     customer: 'cust.name',
                     fleet: 'f.name',
                     vesselType: 'COALESCE(rvt.name, v.vessel_type)',
-                    flagState: 'fs.name'
+                    flagState: 'fs.name',
+                    classification: 'COALESCE(cs.name, v.classification_society)'
                 }
             },
             policies: {

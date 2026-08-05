@@ -91,6 +91,12 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         type: 'select',
         loadOptions: loadFlagStateOptions
       },
+      {
+        key: 'classificationId',
+        label: 'Classification',
+        type: 'select',
+        loadOptions: loadClassificationOptions
+      },
       { key: 'customerId', label: 'Customer', type: 'select', loadOptions: loadEntityOptions },
       { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel name, IMO...' }
     ],
@@ -98,7 +104,8 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'customer', label: 'Customer' },
       { key: 'fleet', label: 'Fleet' },
       { key: 'vesselType', label: 'Vessel Type' },
-      { key: 'flagState', label: 'Flag State' }
+      { key: 'flagState', label: 'Flag State' },
+      { key: 'classification', label: 'Classification' }
     ],
     defaultSort: 'name'
   },
@@ -424,6 +431,14 @@ async function loadFlagStateOptions(): Promise<{ value: string; label: string }[
   return [
     { value: 'all', label: 'All' },
     ...flags.map((f: any) => ({ value: f.id, label: f.name }))
+  ]
+}
+
+async function loadClassificationOptions(): Promise<{ value: string; label: string }[]> {
+  const societies = await window.api.getClassificationSocieties()
+  return [
+    { value: 'all', label: 'All' },
+    ...societies.map((c: any) => ({ value: c.id, label: c.name }))
   ]
 }
 
