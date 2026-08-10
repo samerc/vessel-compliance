@@ -181,7 +181,6 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                 background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
             }}
-            onClick={onClose}
         >
             <div
                 style={{
