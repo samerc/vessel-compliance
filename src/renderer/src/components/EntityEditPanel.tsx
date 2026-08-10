@@ -87,6 +87,8 @@ export default function EntityEditPanel({
   const [entity, setEntity] = useState<Entity | null>(null)
   const [docTypes, setDocTypes] = useState<EntityDocumentType[]>([])
   const [docs, setDocs] = useState<EntityDocument[]>([])
+  // Physical file-existence per entity_document id (false = path stored but file missing on disk)
+  const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
   const [addresses, setAddresses] = useState<EntityAddress[]>([])
   const [ubos, setUbos] = useState<EntityUBO[]>([])
   const [commissions, setCommissions] = useState<
@@ -156,9 +158,31 @@ export default function EntityEditPanel({
       setEntities(entList)
       setEntity(entList.find((e) => e.id === entityId) || null)
       setDocTypes(Array.isArray(dts) ? dts.filter((t: any) => t.isActive) : [])
-      setDocs(Array.isArray(allDocs) ? allDocs : [])
+      const safeDocs = Array.isArray(allDocs) ? allDocs : []
+      const safeUbos = Array.isArray(allUbos) ? allUbos : []
+      setDocs(safeDocs)
       setAddresses(Array.isArray(addrs) ? addrs : [])
-      setUbos(Array.isArray(allUbos) ? allUbos : [])
+      setUbos(safeUbos)
+
+      // Verify files physically exist on disk (a stored path may point to a deleted/moved file).
+      // Only check this entity's docs + its UBOs' docs to bound the number of fs calls.
+      const relevantEntityIds = new Set<string>([
+        entityId,
+        ...safeUbos.filter((u: any) => u.entityId === entityId).map((u: any) => u.uboEntityId)
+      ])
+      const fstatus: Record<string, boolean> = {}
+      await Promise.all(
+        safeDocs
+          .filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
+          .map(async (d) => {
+            try {
+              fstatus[d.id] = await window.api.fsExists(d.filePath!)
+            } catch {
+              fstatus[d.id] = true
+            }
+          })
+      )
+      setFileStatus(fstatus)
     } catch {
       /* ignore */
     }
@@ -525,7 +549,13 @@ export default function EntityEditPanel({
       (t) => t.isRequired && (t.entityScope === 'both' || t.entityScope === entityType)
     )
     const have = applicable.filter((t) =>
-      docs.some((d) => d.entityId === eId && d.documentTypeId === t.id && d.filePath)
+      docs.some(
+        (d) =>
+          d.entityId === eId &&
+          d.documentTypeId === t.id &&
+          d.filePath &&
+          fileStatus[d.id] !== false
+      )
     ).length
     return { have, total: applicable.length }
   }
@@ -654,6 +684,10 @@ export default function EntityEditPanel({
         {applicable.map((dt) => {
           const doc = docsForEnt.find((d) => d.documentTypeId === dt.id)
           const hasFile = !!doc?.filePath
+          // A stored path may point to a file that was since deleted/moved on disk.
+          const fileExists = doc ? fileStatus[doc.id] !== false : true
+          const onFile = hasFile && fileExists
+          const fileMissing = hasFile && !fileExists
           return (
             <div
               key={dt.id}
@@ -662,14 +696,14 @@ export default function EntityEditPanel({
               style={{
                 padding: '8px 12px',
                 borderRadius: '8px',
-                background: hasFile
+                background: onFile
                   ? isLight
                     ? 'rgba(0,140,70,0.06)'
                     : 'rgba(0,255,136,0.04)'
                   : isLight
                     ? 'rgba(200,0,0,0.04)'
                     : 'rgba(255,77,77,0.04)',
-                border: hasFile
+                border: onFile
                   ? isLight
                     ? '1px solid rgba(0,140,70,0.15)'
                     : '1px solid rgba(0,255,136,0.12)'
@@ -681,7 +715,7 @@ export default function EntityEditPanel({
                 gap: '8px'
               }}
             >
-              {hasFile ? (
+              {onFile ? (
                 <CheckCircle2 size={14} color={isLight ? '#008c46' : '#00ff88'} />
               ) : (
                 <AlertTriangle size={14} color={isLight ? '#c00000' : '#ff4d4d'} />
@@ -690,18 +724,24 @@ export default function EntityEditPanel({
                 style={{
                   flex: 1,
                   fontSize: '0.82rem',
-                  color: hasFile
+                  color: onFile
                     ? isLight
                       ? '#008c46'
                       : 'rgba(0,255,136,0.85)'
                     : isLight
                       ? '#c00000'
                       : 'rgba(255,77,77,0.85)',
-                  cursor: hasFile ? 'pointer' : 'default'
+                  cursor: onFile ? 'pointer' : 'default'
                 }}
-                onClick={hasFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}
+                onClick={onFile ? () => window.api.fsOpen(doc!.filePath!) : undefined}
+                title={fileMissing ? doc!.filePath! : undefined}
               >
                 {dt.name}
+                {fileMissing && (
+                  <span style={{ fontSize: '0.7rem', fontWeight: 600, marginLeft: '6px' }}>
+                    (file missing)
+                  </span>
+                )}
               </span>
               {hasFile ? (
                 <div style={{ display: 'flex', gap: '4px' }}>
