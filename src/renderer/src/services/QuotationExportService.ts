@@ -2256,19 +2256,25 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const removedWars = renderRemovedWarranties()
     if (removedWars.length > 0) warContent.push(...removedWars)
 
-    if (st(data, 'warrantiesAdditionalText')) {
-      warContent.push(emptyP())
-      warContent.push(...mp(st(data, 'warrantiesAdditionalText')))
+    // Only build the Warranties section when there is at least one actual warranty
+    // item (selected/custom/survey, or a removed one shown in a renewal diff). The
+    // standard additional/breach/note texts must NOT create the section on their own.
+    const hasWarrantyItems = warContent.length > 0
+    if (hasWarrantyItems) {
+      if (st(data, 'warrantiesAdditionalText')) {
+        warContent.push(emptyP())
+        warContent.push(...mp(st(data, 'warrantiesAdditionalText')))
+      }
+      if (st(data, 'warrantiesBreach')) {
+        warContent.push(emptyP())
+        warContent.push(...mp(st(data, 'warrantiesBreach')))
+      }
+      if (st(data, 'warrantiesNote')) {
+        warContent.push(emptyP())
+        warContent.push(...mp(st(data, 'warrantiesNote')))
+      }
+      rowMap.set('warranties', makeRow('Warranties', warContent))
     }
-    if (st(data, 'warrantiesBreach')) {
-      warContent.push(emptyP())
-      warContent.push(...mp(st(data, 'warrantiesBreach')))
-    }
-    if (st(data, 'warrantiesNote')) {
-      warContent.push(emptyP())
-      warContent.push(...mp(st(data, 'warrantiesNote')))
-    }
-    if (warContent.length > 0) rowMap.set('warranties', makeRow('Warranties', warContent))
   }
 
   // ---- Deductibles ----
