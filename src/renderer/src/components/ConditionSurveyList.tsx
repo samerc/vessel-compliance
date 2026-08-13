@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Search, RefreshCw, Eye, ChevronUp, ChevronDown, Download } from 'lucide-react'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import XLSX from 'xlsx-js-style'
@@ -45,6 +46,9 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [typeFilter, setTypeFilter] = useState('')
   const [openDefectsOnly, setOpenDefectsOnly] = useState(false)
   const { showError, showSuccess } = useToast()
+  const { theme } = useTheme()
+  const isLight = theme === 'light' || theme === 'aurora'
+  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
   const { visibleColumns: svVisibleCols, setVisibleColumns: setSvVisibleCols } = useColumnPrefs('surveys', SURVEY_COLUMNS)
   const svVisSet = new Set(svVisibleCols)
 
@@ -246,7 +250,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
             {surveyorDropdownOpen && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setSurveyorDropdownOpen(false)} />
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 91, background: 'var(--bg-card)', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '340px' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 91, background: dropdownBg, border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '340px' }}>
                   <div style={{ position: 'relative', padding: '8px', borderBottom: '1px solid var(--table-border)' }}>
                     <Search size={14} style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                     <input
