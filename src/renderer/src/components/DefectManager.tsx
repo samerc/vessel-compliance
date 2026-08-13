@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare } from 'lucide-react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare, List, ListOrdered, Type } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -510,14 +510,14 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               style={{ minWidth: '140px' }}
             />
           </div>
-          <textarea
+          <FormattedTextArea
             placeholder="Description *"
             value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
+            onChange={setNewDescription}
             required
             rows={4}
-            style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
-            aria-label="Defect description"
+            ariaLabel="Defect description"
+            isLight={isLight}
           />
           <textarea
             placeholder="Notes (optional)"
@@ -548,7 +548,10 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
             const isExpanded = expandedDefectIds.has(defect.id)
             const overdue = isOverdue(defect)
             const sevColor = severityColors[defect.severity || ''] || 'var(--table-border)'
-            const hasExpandContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt || defect.reopenReason
+            // Multi-line or long descriptions are collapsed to 2 lines; allow expanding to reveal the rest.
+            const descNeedsExpand = defect.description.includes('\n') || defect.description.length > 120
+            const hasNoteContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt || defect.reopenReason
+            const hasExpandContent = descNeedsExpand || hasNoteContent
 
             if (isEditing) {
               return (
@@ -592,14 +595,14 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       style={{ minWidth: '140px' }}
                     />
                   </div>
-                  <textarea
+                  <FormattedTextArea
                     placeholder="Description *"
                     value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
+                    onChange={setEditDescription}
                     required
                     rows={4}
-                    style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
-                    aria-label="Defect description"
+                    ariaLabel="Defect description"
+                    isLight={isLight}
                   />
                   <textarea
                     placeholder="Notes (optional)"
@@ -691,6 +694,8 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       color: 'var(--text-primary)',
                       fontSize: '13px',
                       lineHeight: '1.4',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
                       ...(isExpanded ? {} : {
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
@@ -853,7 +858,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                 </div>
 
                 {/* Expanded Content */}
-                {isExpanded && hasExpandContent && (
+                {isExpanded && hasNoteContent && (
                   <div style={{
                     padding: '0 16px 14px 52px',
                     borderTop: '1px solid var(--table-border)',
@@ -1075,6 +1080,87 @@ function StatBadge({ label, value, color, alert }: {
       }}>
         {value}
       </span>
+    </div>
+  )
+}
+
+// Plain-text textarea with a toggleable formatting toolbar (bullet / numbered lists).
+// Storage stays plain text — the list marker characters (•, 1.) are inserted at the
+// start of the selected lines, and the display renders with preserved line breaks.
+function FormattedTextArea({ value, onChange, placeholder, rows = 4, required, ariaLabel, isLight, marginBottom = '10px' }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  rows?: number
+  required?: boolean
+  ariaLabel?: string
+  isLight: boolean
+  marginBottom?: string
+}) {
+  const [showTools, setShowTools] = useState(false)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const bulletRe = /^(\s*)•\s+/
+  const numRe = /^(\s*)\d+\.\s+/
+
+  const applyLinePrefix = (mode: 'bullet' | 'number') => {
+    const ta = ref.current
+    if (!ta) return
+    const selStart = ta.selectionStart
+    const selEnd = ta.selectionEnd
+    const lineStart = value.lastIndexOf('\n', selStart - 1) + 1
+    let lineEnd = value.indexOf('\n', selEnd)
+    if (lineEnd === -1) lineEnd = value.length
+    const block = value.slice(lineStart, lineEnd)
+    const lines = block.split('\n')
+    const nonEmpty = lines.filter(l => l.trim() !== '')
+    const testRe = mode === 'bullet' ? bulletRe : numRe
+    const allMarked = nonEmpty.length > 0 && nonEmpty.every(l => testRe.test(l))
+    let counter = 1
+    const newLines = lines.map(l => {
+      if (l.trim() === '') return l
+      const stripped = l.replace(bulletRe, '$1').replace(numRe, '$1')
+      if (allMarked) return stripped // toggle off
+      return mode === 'bullet' ? `• ${stripped}` : `${counter++}. ${stripped}`
+    })
+    const newBlock = newLines.join('\n')
+    onChange(value.slice(0, lineStart) + newBlock + value.slice(lineEnd))
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(lineStart, lineStart + newBlock.length)
+    })
+  }
+
+  const toolBtn = (icon: React.ReactNode, label: string, onClick: () => void) => (
+    <button type="button" onClick={onClick}
+      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      {icon} {label}
+    </button>
+  )
+
+  return (
+    <div style={{ marginBottom }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+        <button type="button" onClick={() => setShowTools(s => !s)} title="Formatting tools"
+          style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: showTools ? (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)') : 'transparent', color: showTools ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Type size={13} /> Format
+        </button>
+      </div>
+      {showTools && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+          {toolBtn(<List size={13} />, 'Bullets', () => applyLinePrefix('bullet'))}
+          {toolBtn(<ListOrdered size={13} />, 'Numbered', () => applyLinePrefix('number'))}
+        </div>
+      )}
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        required={required}
+        aria-label={ariaLabel}
+        style={{ width: '100%', resize: 'vertical' }}
+      />
     </div>
   )
 }
