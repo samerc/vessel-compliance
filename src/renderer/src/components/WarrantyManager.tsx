@@ -63,6 +63,16 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const [linkSearch, setLinkSearch] = useState('')
   const [linkLoading, setLinkLoading] = useState(false)
 
+  // Convert-to-survey modal
+  const [convertWarranty, setConvertWarranty] = useState<SurveyWarranty | null>(null)
+  const [convertSurveyorId, setConvertSurveyorId] = useState('')
+  const [convertDate, setConvertDate] = useState('')
+  const [convertType, setConvertType] = useState('')
+  const [convertReference, setConvertReference] = useState('')
+  const [convertSaving, setConvertSaving] = useState(false)
+  const [surveyorsList, setSurveyorsList] = useState<Surveyor[]>([])
+  const [surveyTypesList, setSurveyTypesList] = useState<{ id: string; name: string }[]>([])
+
   // Add/edit form
   const [formDescription, setFormDescription] = useState('')
   const [formDeadlineType, setFormDeadlineType] = useState<'days' | 'event'>('days')
@@ -71,6 +81,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const [formInceptionDate, setFormInceptionDate] = useState('')
   const [formPolicyId, setFormPolicyId] = useState('')
   const [formNotes, setFormNotes] = useState('')
+  const [formReference, setFormReference] = useState('')
   const [formStatus, setFormStatus] = useState<WarrantyStatus>('pending')
 
   // Reminder form
@@ -141,9 +152,21 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     return val?.valueDate || new Date().toISOString().split('T')[0]
   }
 
+  // Reference is SUR + the policy serial: strip the leading letter + 4-digit year
+  // code (e.g. P2620 / H2520) and keep the rest. P26209438 -> SUR9438, and it
+  // extends naturally when serials reach 5 digits (P262010000 -> SUR10000).
+  const deriveSurReference = (policyId: string): string => {
+    const policy = dynamicPolicies.find(p => p.id === policyId)
+    const num = (policy as any)?.policyNumber as string | undefined
+    if (!num) return ''
+    const serial = num.trim().replace(/^[A-Za-z]\d{4}/, '')
+    return serial ? `SUR${serial}` : ''
+  }
+
   const handlePolicyChange = (policyId: string) => {
     setFormPolicyId(policyId)
     if (policyId) setFormInceptionDate(getPolicyInceptionDate(policyId))
+    setFormReference(deriveSurReference(policyId))
   }
 
   // ── Add / Edit ──────────────────────────────────────────────────
@@ -157,6 +180,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setFormPolicyId(firstPolicyId)
     setFormInceptionDate(firstPolicyId ? getPolicyInceptionDate(firstPolicyId) : new Date().toISOString().split('T')[0])
     setFormNotes('')
+    setFormReference(deriveSurReference(firstPolicyId))
     setFormStatus('pending')
     setShowAddModal(true)
   }
@@ -170,6 +194,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setFormInceptionDate(w.inceptionDate)
     setFormPolicyId(w.policyId || '')
     setFormNotes(w.notes || '')
+    setFormReference(w.reference || '')
     setFormStatus(w.status)
     setShowAddModal(true)
   }
@@ -189,7 +214,8 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         deadlineDays: formDeadlineType === 'days' ? parseInt(formDeadlineDays) : null,
         deadlineEvent: formDeadlineType === 'event' ? formDeadlineEvent.trim() : null,
         inceptionDate: formInceptionDate,
-        notes: formNotes.trim() || null
+        notes: formNotes.trim() || null,
+        reference: formReference.trim() || null
       }
 
       if (editingWarranty) {
@@ -211,34 +237,60 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const handleMarkSurveyDone = async (w: SurveyWarranty) => {
     try {
       await window.api.surveyWarrantyUpdate(w.id, { status: 'survey_done' })
-      showSuccess('Warranty marked as survey done')
+      showSuccess('Warranty marked as survey carried out')
       loadWarranties()
     } catch (err: any) {
       showError(err.message || 'Failed to update status')
     }
   }
 
-  // ── Convert to Survey ───────────────────────────────────────────
-  const handleConvertToSurvey = async (w: SurveyWarranty) => {
+  // ── Convert to Survey (quick modal) ─────────────────────────────
+  const openConvertModal = async (w: SurveyWarranty) => {
+    setConvertWarranty(w)
+    setConvertDate(new Date().toISOString().split('T')[0])
+    setConvertReference(w.reference || '')
+    setConvertSurveyorId('')
+    setConvertType('Warranty Survey')
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const [surveyors, types] = await Promise.all([
+        window.api.getSurveyors(),
+        window.api.getConditionSurveyTypes()
+      ])
+      setSurveyorsList(Array.isArray(surveyors) ? surveyors : [])
+      const safeTypes = Array.isArray(types) ? types : []
+      setSurveyTypesList(safeTypes)
+      // Default the type to a "warranty" survey type if one exists, else the first
+      const warrantyType = safeTypes.find(t => /warranty/i.test(t.name))
+      setConvertType(warrantyType?.name || safeTypes[0]?.name || 'Warranty Survey')
+    } catch { /* keep defaults */ }
+  }
+
+  const handleConfirmConvert = async () => {
+    if (!convertWarranty) return
+    if (!convertSurveyorId) { showError('Please choose a surveyor'); return }
+    if (!convertDate) { showError('Survey date is required'); return }
+    setConvertSaving(true)
+    try {
       const newSurvey = await window.api.addConditionSurvey({
-        vesselId: w.vesselId,
-        surveyDate: today,
-        surveyorId: '',
-        surveyType: 'Warranty Survey',
-        reference: w.description.length > 100 ? w.description.substring(0, 100) + '...' : w.description,
-        notes: `Warranty: ${w.description}`,
+        vesselId: convertWarranty.vesselId,
+        surveyDate: convertDate,
+        surveyorId: convertSurveyorId,
+        surveyType: convertType || 'Warranty Survey',
+        reference: convertReference.trim() || undefined,
+        notes: undefined,
         createdBy: user?.username || 'System'
       })
-      await window.api.surveyWarrantyUpdate(w.id, {
+      await window.api.surveyWarrantyUpdate(convertWarranty.id, {
         conditionSurveyId: newSurvey.id,
         status: 'survey_done'
       })
       showSuccess('Survey created and linked to warranty')
+      setConvertWarranty(null)
       loadWarranties()
     } catch (err: any) {
       showError(err.message || 'Failed to convert to survey')
+    } finally {
+      setConvertSaving(false)
     }
   }
 
@@ -458,6 +510,9 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         >
           <ChevronDown size={16} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform 0.2s', color: 'var(--text-secondary)', flexShrink: 0 }} />
           <span style={{ fontWeight: '600', fontSize: '0.9rem', flex: 1 }}>{w.description}</span>
+          {w.reference && (
+            <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', padding: '2px 8px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>{w.reference}</span>
+          )}
           {w.policyTypeName && (
             <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{w.policyTypeName}</span>
           )}
@@ -607,7 +662,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               )}
               {canManage && w.status === 'pending' && !w.conditionSurveyId && (
                 <button
-                  onClick={() => handleConvertToSurvey(w)}
+                  onClick={() => openConvertModal(w)}
                   className="btn-secondary"
                   style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aac8', borderColor: 'rgba(0,170,200,0.35)' }}
                 >
@@ -750,6 +805,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 </select>
               </div>
               <div>
+                <label style={labelStyle}>Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(auto from policy)</span></label>
+                <input value={formReference} onChange={e => setFormReference(e.target.value)} placeholder="e.g. SUR9438" style={inputStyle} />
+              </div>
+              <div>
                 <label style={labelStyle}>Inception Date *</label>
                 <input type="date" value={formInceptionDate} onChange={e => setFormInceptionDate(e.target.value)} style={inputStyle} />
               </div>
@@ -797,6 +856,59 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
               <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={handleSaveWarranty} className="btn-primary">{editingWarranty ? 'Save Changes' : 'Add Warranty'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Convert to Survey Modal ───────────────────────────── */}
+      {convertWarranty && (
+        <div style={modalBg}>
+          <div style={{ ...modalCard, width: '440px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>Convert to Survey</h3>
+              <button onClick={() => setConvertWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Creates a new condition survey and links it to “{convertWarranty.description}”.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Surveyor *</label>
+                <select value={convertSurveyorId} onChange={e => setConvertSurveyorId(e.target.value)} style={inputStyle} autoFocus>
+                  <option value="">— Select a surveyor —</option>
+                  {surveyorsList.map(s => (
+                    <option key={s.id} value={s.id}>{s.companyName}{s.country ? ` (${s.country})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Survey Date *</label>
+                <input type="date" value={convertDate} onChange={e => setConvertDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Survey Type</label>
+                {surveyTypesList.length > 0 ? (
+                  <select value={convertType} onChange={e => setConvertType(e.target.value)} style={inputStyle}>
+                    {!surveyTypesList.some(t => t.name === convertType) && convertType && (
+                      <option value={convertType}>{convertType}</option>
+                    )}
+                    {surveyTypesList.map(t => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={convertType} onChange={e => setConvertType(e.target.value)} style={inputStyle} />
+                )}
+              </div>
+              <div>
+                <label style={labelStyle}>Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(from warranty)</span></label>
+                <input value={convertReference} onChange={e => setConvertReference(e.target.value)} placeholder="e.g. SUR9438" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
+              <button onClick={() => setConvertWarranty(null)} className="btn-secondary">Cancel</button>
+              <button onClick={handleConfirmConvert} disabled={convertSaving} className="btn-primary">{convertSaving ? 'Creating…' : 'Create & Link'}</button>
             </div>
           </div>
         </div>

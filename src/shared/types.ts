@@ -381,6 +381,7 @@ export interface SurveyWarranty {
   completedAt?: string | null
   completionNotes?: string | null
   conditionSurveyId?: string | null
+  reference?: string | null
   createdAt?: string
   // joined fields from queries
   vesselName?: string

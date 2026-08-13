@@ -1260,6 +1260,7 @@ export class MySQLAdapter {
                     completed_at DATETIME NULL,
                     completion_notes TEXT NULL,
                     condition_survey_id VARCHAR(36) NULL,
+                    reference VARCHAR(50) NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_sw_vessel (vessel_id),
                     INDEX idx_sw_policy (policy_id),
@@ -1287,6 +1288,10 @@ export class MySQLAdapter {
                 const [swColCr] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'created_at'")
                 if ((swColCr as any[]).length === 0) {
                     await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`)
+                }
+                const [swColRef] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'reference'")
+                if ((swColRef as any[]).length === 0) {
+                    await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN reference VARCHAR(50) NULL`)
                 }
                 // Ensure status ENUM includes all values
                 const [swStatusInfo] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'status'")
@@ -6123,6 +6128,7 @@ export class MySQLAdapter {
                 sw.waiver_reason as waiverReason, sw.completed_at as completedAt,
                 sw.completion_notes as completionNotes,
                 sw.condition_survey_id as conditionSurveyId,
+                sw.reference,
                 sw.created_at as createdAt,
                 pt.name as policyTypeName,
                 (SELECT COUNT(*) FROM survey_warranty_reminders swr WHERE swr.warranty_id = sw.id) as reminderCount,
@@ -6147,6 +6153,7 @@ export class MySQLAdapter {
                 sw.waiver_reason as waiverReason, sw.completed_at as completedAt,
                 sw.completion_notes as completionNotes,
                 sw.condition_survey_id as conditionSurveyId,
+                sw.reference,
                 sw.created_at as createdAt,
                 v.name as vesselName, v.imo_number as imoNumber, v.is_active as vesselIsActive,
                 COALESCE(ce.name, e.name) as customerName,
@@ -6214,9 +6221,9 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('No DB')
         const id = require('crypto').randomUUID()
         await this.pool.query(
-            `INSERT INTO survey_warranties (id, vessel_id, policy_id, description, deadline_type, deadline_days, deadline_event, inception_date, notes, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [id, data.vesselId, data.policyId || null, data.description, data.deadlineType, data.deadlineDays ?? null, data.deadlineEvent || null, data.inceptionDate, data.notes || null]
+            `INSERT INTO survey_warranties (id, vessel_id, policy_id, description, deadline_type, deadline_days, deadline_event, inception_date, notes, reference, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [id, data.vesselId, data.policyId || null, data.description, data.deadlineType, data.deadlineDays ?? null, data.deadlineEvent || null, data.inceptionDate, data.notes || null, data.reference || null]
         )
         const [rows] = await this.pool.query('SELECT * FROM survey_warranties WHERE id = ?', [id])
         return (rows as any[])[0]
@@ -6226,7 +6233,7 @@ export class MySQLAdapter {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
-        const allowed = ['description', 'deadlineType', 'deadlineDays', 'deadlineEvent', 'inceptionDate', 'notes', 'status', 'waiverReason', 'completedAt', 'completionNotes', 'conditionSurveyId', 'policyId']
+        const allowed = ['description', 'deadlineType', 'deadlineDays', 'deadlineEvent', 'inceptionDate', 'notes', 'status', 'waiverReason', 'completedAt', 'completionNotes', 'conditionSurveyId', 'policyId', 'reference']
         const colMap: Record<string, string> = { deadlineType: 'deadline_type', deadlineDays: 'deadline_days', deadlineEvent: 'deadline_event', inceptionDate: 'inception_date', waiverReason: 'waiver_reason', completedAt: 'completed_at', completionNotes: 'completion_notes', conditionSurveyId: 'condition_survey_id', policyId: 'policy_id' }
         for (const key of allowed) {
             if (key in data) {
