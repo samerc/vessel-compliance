@@ -326,6 +326,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     const data = await window.api.getSurveyHistory(vessel.id)
     const rows = data.map(s => ({
       'Survey Date': s.surveyDate,
+      'Reference': s.reference || '',
       'Surveyor': s.surveyorName,
       'Company': s.surveyorCompany || '',
       'Type': s.surveyType,

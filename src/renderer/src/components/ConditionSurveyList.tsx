@@ -16,10 +16,11 @@ interface SurveyWithCounts extends ConditionSurvey {
   totalDefects: number
 }
 
-type SortKey = 'vessel' | 'date' | 'type' | 'surveyor' | 'location' | 'defects'
+type SortKey = 'vessel' | 'reference' | 'date' | 'type' | 'surveyor' | 'location' | 'defects'
 
 const SURVEY_COLUMNS: ColumnDef[] = [
   { id: 'vessel', label: 'Vessel', defaultVisible: true },
+  { id: 'reference', label: 'Reference', defaultVisible: true },
   { id: 'date', label: 'Survey Date', defaultVisible: true },
   { id: 'type', label: 'Type', defaultVisible: true },
   { id: 'surveyor', label: 'Surveyor', defaultVisible: true },
@@ -110,7 +111,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
         const imoNumber = vessel?.imoNumber?.toLowerCase() || ''
         const surveyType = s.surveyType?.toLowerCase() || ''
         const surveyor = surveyorMap.get(s.surveyorId)?.companyName?.toLowerCase() || ''
-        return vesselName.includes(term) || imoNumber.includes(term) || surveyType.includes(term) || surveyor.includes(term)
+        const reference = s.reference?.toLowerCase() || ''
+        return vesselName.includes(term) || imoNumber.includes(term) || surveyType.includes(term) || surveyor.includes(term) || reference.includes(term)
       })
     }
     if (dateFrom) result = result.filter(s => s.surveyDate >= dateFrom)
@@ -154,6 +156,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
           const bName = vesselMap.get(b.vesselId)?.name || ''
           return aName.localeCompare(bName) * dir
         }
+        case 'reference':
+          return (a.reference || '').localeCompare(b.reference || '') * dir
         case 'date':
           return (new Date(a.surveyDate).getTime() - new Date(b.surveyDate).getTime()) * dir
         case 'type':
@@ -182,6 +186,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
     const data = sorted.map(s => ({
       'Vessel': vesselMap.get(s.vesselId)?.name || '',
       'IMO': vesselMap.get(s.vesselId)?.imoNumber || '',
+      'Reference': s.reference || '',
       'Date': s.surveyDate,
       'Type': s.surveyType || '',
       'Surveyor': surveyorMap.get(s.surveyorId)?.companyName || '',
@@ -190,7 +195,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
       'Total Defects': s.totalDefects
     }))
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 12 }]
+    ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 12 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Surveys')
     XLSX.writeFile(wb, `Condition Surveys.xlsx`)
@@ -376,6 +381,13 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                   </span>
                 </th>
                 )}
+                {svVisSet.has('reference') && (
+                <th style={thStyle} onClick={() => handleSort('reference')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Reference <SortIcon col="reference" />
+                  </span>
+                </th>
+                )}
                 {svVisSet.has('date') && (
                 <th style={thStyle} onClick={() => handleSort('date')}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -438,7 +450,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
               {isLoading && surveys.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{
                       padding: '40px',
                       textAlign: 'center',
@@ -451,7 +463,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
               ) : sorted.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{
                       padding: '40px',
                       textAlign: 'center',
@@ -492,6 +504,13 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                             IMO: {vessel.imoNumber}
                           </div>
                         )}
+                      </td>
+                      )}
+                      {svVisSet.has('reference') && (
+                      <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                        {survey.reference
+                          ? <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--accent-primary)' }}>{survey.reference}</span>
+                          : <span style={{ color: 'var(--text-secondary)' }}>-</span>}
                       </td>
                       )}
                       {svVisSet.has('date') && (

@@ -584,6 +584,11 @@ export default function SurveyorDirectory() {
                           <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
                             {formatDateShort(survey.surveyDate)}
                           </span>
+                          {survey.reference && (
+                            <span style={{ fontSize: '0.73rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              {survey.reference}
+                            </span>
+                          )}
                           {typeName && (
                             <span style={{ fontSize: '0.73rem', padding: '1px 7px', borderRadius: '4px', background: accentBg, border: `1px solid ${isLight ? 'rgba(26,115,232,0.12)' : 'rgba(0,210,255,0.12)'}`, color: 'var(--accent-primary)', fontWeight: 500 }}>
                               {typeName}

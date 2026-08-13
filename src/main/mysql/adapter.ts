@@ -5649,7 +5649,7 @@ export class MySQLAdapter {
             SELECT
                 cs.id as surveyId, cs.survey_date as surveyDate,
                 s.company_name as surveyorName, s.country as surveyorCompany,
-                cs.survey_type as surveyType, cs.location,
+                cs.survey_type as surveyType, cs.reference, cs.location,
                 COUNT(CASE WHEN sd.status = 'OPEN' THEN 1 END) as openDefects,
                 COUNT(CASE WHEN sd.status = 'CLOSED' THEN 1 END) as closedDefects,
                 COUNT(sd.id) as totalDefects
