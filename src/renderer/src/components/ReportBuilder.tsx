@@ -400,7 +400,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         options: [
           { value: 'all', label: 'All' },
           { value: 'pending', label: 'Pending' },
-          { value: 'survey_done', label: 'Survey Done' },
+          { value: 'survey_done', label: 'Survey Carried Out' },
           { value: 'completed', label: 'Completed' },
           { value: 'waived', label: 'Waived' }
         ]

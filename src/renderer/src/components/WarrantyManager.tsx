@@ -14,7 +14,7 @@ interface WarrantyManagerProps {
 
 const STATUS_LABELS: Record<WarrantyStatus, string> = {
   pending: 'Pending',
-  survey_done: 'Survey Done',
+  survey_done: 'Survey Carried Out',
   completed: 'Completed',
   waived: 'Waived'
 }
@@ -629,7 +629,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                   className="btn-secondary"
                   style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aaff', borderColor: 'rgba(0,170,255,0.35)' }}
                 >
-                  <Check size={13} /> Survey Done
+                  <Check size={13} /> Survey Carried Out
                 </button>
               )}
               {canManage && w.status === 'survey_done' && (

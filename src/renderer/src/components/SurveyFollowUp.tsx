@@ -13,7 +13,7 @@ interface SurveyFollowUpProps {
 
 const STATUS_LABELS: Record<WarrantyStatus, string> = {
   pending: 'Pending',
-  survey_done: 'Survey Done',
+  survey_done: 'Survey Carried Out',
   completed: 'Completed',
   waived: 'Waived'
 }
@@ -219,7 +219,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const handleMarkSurveyDone = async (w: SurveyWarranty) => {
     try {
       await window.api.surveyWarrantyUpdate(w.id, { status: 'survey_done' })
-      showSuccess('Marked as Survey Done')
+      showSuccess('Marked as Survey Carried Out')
       loadData()
     } catch (err: any) { showError(err.message || 'Failed') }
   }
@@ -404,7 +404,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         {[
           { label: 'Active', value: activeCount, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' },
           { label: 'Overdue', value: overdueCount, color: 'var(--danger)', bg: 'rgba(255,77,77,0.08)' },
-          { label: 'Survey Done', value: warranties.filter(w => w.status === 'survey_done').length, color: '#00aaff', bg: 'rgba(0,170,255,0.08)' },
+          { label: 'Survey Carried Out', value: warranties.filter(w => w.status === 'survey_done').length, color: '#00aaff', bg: 'rgba(0,170,255,0.08)' },
           { label: 'Endorsements Due', value: endorsementsDue.length, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' }
         ].map(s => (
           <div key={s.label} style={{

@@ -179,9 +179,9 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       surveyDate: editDate,
       surveyorId: editSurveyorId,
       surveyType: editType,
-      reference: editReference || undefined,
-      location: editLocation || undefined,
-      notes: editNotes || undefined
+      reference: editReference.trim(),
+      location: editLocation.trim(),
+      notes: editNotes.trim()
     })
     setEditingSurveyId(null)
     loadData()
@@ -645,7 +645,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               color: 'var(--success, #00944a)',
                               fontSize: 11,
                               fontWeight: 600,
-                            }}>CLOSED</span>
+                            }}>Survey Closed</span>
                           )}
                           {canManage && !survey.completedAt && (
                             <button

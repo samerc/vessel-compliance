@@ -34,16 +34,16 @@ interface ReportRow {
 
 const STATUS_META: Record<DisplayStatus, { label: string; color: string }> = {
   pending: { label: 'Pending', color: '#e0912f' },
-  carried_out: { label: 'Carried Out', color: '#3b9bd6' },
-  survey_done: { label: 'Survey Done', color: '#2fa66a' },
+  carried_out: { label: 'Survey Carried Out', color: '#3b9bd6' },
+  survey_done: { label: 'Survey Closed', color: '#2fa66a' },
   waived: { label: 'Waived', color: '#8a8f9a' }
 }
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
-  { key: 'carried_out', label: 'Carried Out' },
-  { key: 'survey_done', label: 'Survey Done' },
+  { key: 'carried_out', label: 'Survey Carried Out' },
+  { key: 'survey_done', label: 'Survey Closed' },
   { key: 'waived', label: 'Waived' }
 ]
 
