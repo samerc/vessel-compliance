@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare, List, ListOrdered, Type } from 'lucide-react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare, List, ListOrdered, Type, Paperclip, Image as ImageIcon } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
@@ -24,6 +25,7 @@ const severityColors: Record<string, string> = {
 
 export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: DefectManagerProps) {
   const { user, hasPermission } = useAuth()
+  const { showError } = useToast()
   const canManageDefects = hasPermission('surveys:defects')
   const [defects, setDefects] = useState<SurveyDefect[]>([])
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
@@ -548,10 +550,9 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
             const isExpanded = expandedDefectIds.has(defect.id)
             const overdue = isOverdue(defect)
             const sevColor = severityColors[defect.severity || ''] || 'var(--table-border)'
-            // Multi-line or long descriptions are collapsed to 2 lines; allow expanding to reveal the rest.
-            const descNeedsExpand = defect.description.includes('\n') || defect.description.length > 120
-            const hasNoteContent = defect.notes || defect.closureNotes || defect.closedBy || defect.closedAt || defect.reopenReason
-            const hasExpandContent = descNeedsExpand || hasNoteContent
+            // All defects are expandable: the panel reveals the full description, any
+            // notes/closure info, and the rectification-evidence attachments.
+            const hasExpandContent = true
 
             if (isEditing) {
               return (
@@ -858,12 +859,19 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                 </div>
 
                 {/* Expanded Content */}
-                {isExpanded && hasNoteContent && (
+                {isExpanded && (
                   <div style={{
                     padding: '0 16px 14px 52px',
                     borderTop: '1px solid var(--table-border)',
                     background: isLight ? 'rgba(0, 119, 163, 0.03)' : 'rgba(0, 210, 255, 0.03)'
                   }}>
+                    <DefectAttachments
+                      defectId={defect.id}
+                      canManage={canManageDefects}
+                      isLight={isLight}
+                      uploadedBy={user?.username || 'Unknown'}
+                      showError={showError}
+                    />
                     {defect.notes && (
                       <div style={{ marginTop: '12px' }}>
                         <div style={{
@@ -1161,6 +1169,107 @@ function FormattedTextArea({ value, onChange, placeholder, rows = 4, required, a
         aria-label={ariaLabel}
         style={{ width: '100%', resize: 'vertical' }}
       />
+    </div>
+  )
+}
+
+// Optional rectification-evidence attachments per defect. Path-based (drag-drop a
+// file or pick one), mirroring survey attachments — never required to close a defect.
+function DefectAttachments({ defectId, canManage, isLight, uploadedBy, showError }: {
+  defectId: string
+  canManage: boolean
+  isLight: boolean
+  uploadedBy: string
+  showError: (m: string) => void
+}) {
+  const [items, setItems] = useState<any[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => {
+    try {
+      const r = await window.api.defectGetAttachments(defectId)
+      setItems(Array.isArray(r) ? r : [])
+    } catch { setItems([]) }
+  }
+  useEffect(() => { load() }, [defectId])
+
+  const addByPath = async (filePath: string, fileName: string) => {
+    const validation = await window.api.fileTypesValidateFile(filePath)
+    if (!validation.valid) { showError(`File rejected: ${validation.reason}`); return }
+    await window.api.defectAddAttachment({
+      defectId,
+      filePath: (validation as any).canonicalPath || filePath,
+      fileName,
+      uploadedBy
+    })
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setDragOver(false)
+    if (!canManage) return
+    const files = e.dataTransfer.files
+    if (!files.length) return
+    setBusy(true)
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]
+        const p = window.api.getFilePath(f)
+        if (p) await addByPath(p, f.name)
+      }
+      await load()
+    } catch (err: any) { showError(err.message || 'Upload failed') } finally { setBusy(false) }
+  }
+
+  const handlePick = async () => {
+    if (!canManage) return
+    try {
+      const p = await window.api.dialogOpenFileAny()
+      if (!p) return
+      setBusy(true)
+      await addByPath(p, p.split(/[\\/]/).pop() || 'file')
+      await load()
+    } catch (err: any) { showError(err.message || 'Upload failed') } finally { setBusy(false) }
+  }
+
+  const remove = async (id: string) => {
+    try {
+      await window.api.defectDeleteAttachment(id)
+      setItems(prev => prev.filter(a => a.id !== id))
+    } catch (err: any) { showError(err.message || 'Delete failed') }
+  }
+
+  const isImg = (name: string) => /\.(png|jpe?g|gif|bmp|webp|heic|tiff?)$/i.test(name)
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+        Rectification Evidence{items.length > 0 && <span style={{ color: 'var(--accent-primary)' }}> ({items.length})</span>}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        {items.map(a => (
+          <span key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', fontSize: '0.76rem', maxWidth: '220px' }}>
+            {isImg(a.fileName) ? <ImageIcon size={12} style={{ flexShrink: 0 }} /> : <Paperclip size={12} style={{ flexShrink: 0 }} />}
+            <span onClick={() => window.api.fsOpen(a.filePath)} title={a.fileName} style={{ cursor: 'pointer', color: 'var(--accent-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.fileName}</span>
+            {canManage && (
+              <button onClick={() => remove(a.id)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0, display: 'flex', flexShrink: 0 }}>
+                <X size={12} />
+              </button>
+            )}
+          </span>
+        ))}
+        {canManage && (
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={handlePick}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '6px', border: `1px dashed ${dragOver ? 'var(--accent-primary)' : 'var(--input-border)'}`, background: dragOver ? 'rgba(0,210,255,0.06)' : 'transparent', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
+          >
+            <Paperclip size={12} /> {busy ? 'Uploading…' : 'Drop or attach file'}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
