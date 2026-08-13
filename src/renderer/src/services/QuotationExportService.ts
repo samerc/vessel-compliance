@@ -394,7 +394,11 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     cargoSpecialCustom: Array.isArray(cargoSpecialCustom) ? cargoSpecialCustom : [],
     cargoLawCustom: Array.isArray(cargoLawCustom) ? cargoLawCustom : [],
     subjectivityDays: quotation.subjectivityDays ?? 0,
-    tradingIntros: snapshot ? ((snapshot as any).tradingIntros || []) : (Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : [])
+    // Per-vessel trading intros are per-quotation content (like excludedCountries / subjectivities /
+    // customWarranties) and are always read live — NOT frozen in the export snapshot. The snapshot only
+    // freezes settings/master-list data. Gating this on `snapshot` dropped per-vessel intros on re-export
+    // (the snapshot never stored them), collapsing every vessel back to the shared intro.
+    tradingIntros: Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : []
   }
 }
 
