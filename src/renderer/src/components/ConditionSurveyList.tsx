@@ -121,6 +121,15 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   // Unique survey types for filter dropdown
   const surveyTypes = useMemo(() => [...new Set(surveys.map(s => s.surveyType).filter(Boolean))].sort(), [surveys])
 
+  // Per-surveyor survey counts (only surveyors that actually have surveys), most first
+  const surveyorCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const s of surveys) m.set(s.surveyorId, (m.get(s.surveyorId) || 0) + 1)
+    return [...m.entries()]
+      .map(([id, count]) => ({ id, count, name: surveyorMap.get(id)?.companyName || 'Unknown' }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [surveys, surveyorMap])
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
@@ -213,6 +222,49 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
         </p>
       </div>
 
+      {/* By surveyor — prominent quick-filter chips with per-surveyor counts */}
+      {surveyorCounts.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+            Surveys by Surveyor
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {(() => {
+              const chip = (active: boolean): React.CSSProperties => ({
+                display: 'inline-flex', alignItems: 'center', gap: '7px',
+                padding: '6px 12px', borderRadius: '18px', cursor: 'pointer',
+                fontSize: '0.82rem', fontWeight: 600,
+                border: active ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                background: active ? 'rgba(0,210,255,0.1)' : 'transparent',
+                color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
+                transition: 'all 0.12s'
+              })
+              const badge = (active: boolean): React.CSSProperties => ({
+                minWidth: '20px', textAlign: 'center', padding: '1px 7px', borderRadius: '10px',
+                fontSize: '0.72rem', fontWeight: 700,
+                background: active ? 'var(--accent-primary)' : 'var(--table-header-bg)',
+                color: active ? '#fff' : 'var(--text-secondary)'
+              })
+              return (
+                <>
+                  <button onClick={() => setSurveyorFilter('')} style={chip(!surveyorFilter)}>
+                    All <span style={badge(!surveyorFilter)}>{surveys.length}</span>
+                  </button>
+                  {surveyorCounts.map(sc => {
+                    const active = surveyorFilter === sc.id
+                    return (
+                      <button key={sc.id} onClick={() => setSurveyorFilter(active ? '' : sc.id)} style={chip(active)} title={`${sc.count} survey${sc.count !== 1 ? 's' : ''}`}>
+                        {sc.name} <span style={badge(active)}>{sc.count}</span>
+                      </button>
+                    )
+                  })}
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Search and refresh bar */}
       <div
         style={{
@@ -254,10 +306,6 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }} title="From date" />
         <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>to</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }} title="To date" />
-        <select value={surveyorFilter} onChange={e => setSurveyorFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
-          <option value="">All Surveyors</option>
-          {surveyors.map(s => <option key={s.id} value={s.id}>{s.companyName}</option>)}
-        </select>
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.82rem' }}>
           <option value="">All Types</option>
           {surveyTypes.map(t => <option key={t} value={t}>{t}</option>)}
