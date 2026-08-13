@@ -2092,27 +2092,32 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
     })
-    // Per-vessel trading intros (or single shared intro)
+    // Per-vessel trading intros (or single shared intro). Separate blocks with a LEADING blank line
+    // (not trailing) — the following section (e.g. "Excluding …") adds its own leading emptyP, so a
+    // trailing one here produced a double gap before it.
     const dPerVesselIntros = data.tradingIntros.filter(ti => ti.vesselScope && ti.vesselScope.length > 0)
     if (dPerVesselIntros.length > 0) {
+      let dFirstIntro = true
       for (const ti of dPerVesselIntros) {
         const vesselNames = (ti.vesselScope || []).map(vid => {
           const v = data.quotationVessels.find(qv => qv.id === vid)
           return v ? `M/V ${(v.name || v.vesselLabel).toUpperCase()}` : ''
         }).filter(Boolean)
+        if (!dFirstIntro) tradContent.push(emptyP())
+        dFirstIntro = false
         if (vesselNames.length > 0) tradContent.push(bup(vesselNames.join(' and ') + ':'))
         tradContent.push(...mp(ti.text))
-        tradContent.push(emptyP())
       }
       const dOverrideVIds = new Set(dPerVesselIntros.flatMap(ti => ti.vesselScope || []))
       const dSharedVessels = data.quotationVessels.filter(v => !dOverrideVIds.has(v.id))
       if (dSharedVessels.length > 0 && wq.tradingWarrantyIntro) {
+        if (!dFirstIntro) tradContent.push(emptyP())
+        dFirstIntro = false
         if (data.quotationVessels.length > 1) {
           const names = dSharedVessels.map(v => `M/V ${(v.name || v.vesselLabel).toUpperCase()}`).join(' and ')
           tradContent.push(bup(names + ':'))
         }
         tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
-        tradContent.push(emptyP())
       }
     } else if (wq.tradingWarrantyIntro) {
       tradContent.push(...mp(wq.tradingWarrantyIntro, tradIntroChanged ? RED : undefined))
