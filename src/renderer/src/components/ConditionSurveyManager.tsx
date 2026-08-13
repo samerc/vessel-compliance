@@ -831,13 +831,13 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       {/* Endorsement question modal */}
       {endorsementSurveyId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 420, width: '90%' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 460, width: '90%' }}>
             <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>Reservations Endorsement</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 24px' }}>
               Did you issue a reservations endorsement for this survey?
             </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEndorsementSurveyId(null)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-secondary)', cursor: 'pointer' }}>Skip</button>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button onClick={() => setEndorsementSurveyId(null)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-secondary)', cursor: 'pointer' }}>No endorsement needed</button>
               <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,77,77,0.35)', background: 'rgba(255,77,77,0.12)', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600 }}>No — remind me in 2 days</button>
               <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, true)} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--accent, #00aac8)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Yes</button>
             </div>
