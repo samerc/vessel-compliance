@@ -40,6 +40,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [surveyorFilter, setSurveyorFilter] = useState('')
+  const [surveyorDropdownOpen, setSurveyorDropdownOpen] = useState(false)
+  const [surveyorSearch, setSurveyorSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [openDefectsOnly, setOpenDefectsOnly] = useState(false)
   const { showError, showSuccess } = useToast()
@@ -222,45 +224,70 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
         </p>
       </div>
 
-      {/* By surveyor — prominent quick-filter chips with per-surveyor counts */}
+      {/* By surveyor — searchable dropdown with per-surveyor survey counts */}
       {surveyorCounts.length > 0 && (
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '20px', maxWidth: '380px' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
             Surveys by Surveyor
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {(() => {
-              const chip = (active: boolean): React.CSSProperties => ({
-                display: 'inline-flex', alignItems: 'center', gap: '7px',
-                padding: '6px 12px', borderRadius: '18px', cursor: 'pointer',
-                fontSize: '0.82rem', fontWeight: 600,
-                border: active ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                background: active ? 'rgba(0,210,255,0.1)' : 'transparent',
-                color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
-                transition: 'all 0.12s'
-              })
-              const badge = (active: boolean): React.CSSProperties => ({
-                minWidth: '20px', textAlign: 'center', padding: '1px 7px', borderRadius: '10px',
-                fontSize: '0.72rem', fontWeight: 700,
-                background: active ? 'var(--accent-primary)' : 'var(--table-header-bg)',
-                color: active ? '#fff' : 'var(--text-secondary)'
-              })
-              return (
-                <>
-                  <button onClick={() => setSurveyorFilter('')} style={chip(!surveyorFilter)}>
-                    All <span style={badge(!surveyorFilter)}>{surveys.length}</span>
-                  </button>
-                  {surveyorCounts.map(sc => {
-                    const active = surveyorFilter === sc.id
-                    return (
-                      <button key={sc.id} onClick={() => setSurveyorFilter(active ? '' : sc.id)} style={chip(active)} title={`${sc.count} survey${sc.count !== 1 ? 's' : ''}`}>
-                        {sc.name} <span style={badge(active)}>{sc.count}</span>
-                      </button>
-                    )
-                  })}
-                </>
-              )
-            })()}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => { setSurveyorDropdownOpen(o => !o); setSurveyorSearch('') }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: `1px solid ${surveyorFilter ? 'var(--accent-primary)' : 'var(--input-border)'}`, background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {surveyorFilter ? (surveyorMap.get(surveyorFilter)?.companyName || 'Unknown') : 'All Surveyors'}
+                <span style={{ marginLeft: '8px', color: 'var(--accent-primary)' }}>
+                  {surveyorFilter ? (surveyorCounts.find(sc => sc.id === surveyorFilter)?.count ?? 0) : surveys.length}
+                </span>
+              </span>
+              <ChevronDown size={16} style={{ flexShrink: 0, opacity: 0.6, transform: surveyorDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+            {surveyorDropdownOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setSurveyorDropdownOpen(false)} />
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 91, background: 'var(--bg-card)', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '340px' }}>
+                  <div style={{ position: 'relative', padding: '8px', borderBottom: '1px solid var(--table-border)' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                    <input
+                      autoFocus
+                      value={surveyorSearch}
+                      onChange={e => setSurveyorSearch(e.target.value)}
+                      placeholder="Search surveyors..."
+                      style={{ width: '100%', paddingLeft: '30px', fontSize: '0.84rem' }}
+                    />
+                  </div>
+                  <div style={{ overflowY: 'auto' }}>
+                    <div
+                      onClick={() => { setSurveyorFilter(''); setSurveyorDropdownOpen(false) }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: !surveyorFilter ? 700 : 500, background: !surveyorFilter ? 'rgba(0,210,255,0.08)' : 'transparent' }}
+                      onMouseEnter={e => { if (surveyorFilter) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
+                      onMouseLeave={e => { if (surveyorFilter) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <span>All Surveyors</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>{surveys.length}</span>
+                    </div>
+                    {surveyorCounts
+                      .filter(sc => !surveyorSearch || sc.name.toLowerCase().includes(surveyorSearch.toLowerCase()))
+                      .map(sc => {
+                        const active = surveyorFilter === sc.id
+                        return (
+                          <div
+                            key={sc.id}
+                            onClick={() => { setSurveyorFilter(sc.id); setSurveyorDropdownOpen(false) }}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: active ? 700 : 500, color: active ? 'var(--accent-primary)' : 'var(--text-primary)', background: active ? 'rgba(0,210,255,0.08)' : 'transparent' }}
+                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
+                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
+                            <span style={{ flexShrink: 0, minWidth: '22px', textAlign: 'center', padding: '1px 7px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, background: 'var(--table-header-bg)', color: 'var(--text-secondary)' }}>{sc.count}</span>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
