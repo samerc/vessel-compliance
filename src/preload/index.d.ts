@@ -292,6 +292,7 @@ export interface Api {
   surveyWarrantyGetAll: () => Promise<SurveyWarranty[]>
   surveyWarrantyGetDueToday: () => Promise<SurveyWarranty[]>
   surveyWarrantyGetEndorsementsDue: () => Promise<any[]>
+  surveyWarrantyGetUnsentEndorsements: () => Promise<any[]>
   surveyWarrantyCreate: (data: Omit<SurveyWarranty, 'id' | 'status' | 'createdAt'>) => Promise<SurveyWarranty>
   surveyWarrantyUpdate: (id: string, data: Partial<SurveyWarranty>) => Promise<void>
   surveyWarrantyDelete: (id: string) => Promise<void>

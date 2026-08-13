@@ -6217,6 +6217,26 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
+    // All unsent (pending) reservations endorsements — includes ones not yet due (reminder date in the
+    // future), so the Survey Follow-Up tab can track them before the 2-day reminder window elapses.
+    async getUnsentEndorsements(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT cs.id as surveyId, cs.vessel_id as vesselId,
+                cs.survey_date as surveyDate, cs.survey_type as surveyType,
+                cs.reference as reference,
+                cs.endorsement_reminder_date as endorsementReminderDate,
+                v.name as vesselName, v.imo_number as imoNumber
+            FROM condition_surveys cs
+            JOIN vessels v ON v.id = cs.vessel_id
+            WHERE cs.endorsement_issued = 0
+              AND cs.endorsement_reminder_date IS NOT NULL
+              AND cs.completed_at IS NULL
+            ORDER BY cs.endorsement_reminder_date ASC
+        `)
+        return rows as any[]
+    }
+
     async createSurveyWarranty(data: any): Promise<any> {
         if (!this.pool) throw new Error('No DB')
         const id = require('crypto').randomUUID()

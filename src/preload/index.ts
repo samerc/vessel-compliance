@@ -277,6 +277,7 @@ const api = {
   surveyWarrantyGetAll: () => ipcRenderer.invoke('survey_warranty:getAll'),
   surveyWarrantyGetDueToday: () => ipcRenderer.invoke('survey_warranty:getDueToday'),
   surveyWarrantyGetEndorsementsDue: () => ipcRenderer.invoke('survey_warranty:getEndorsementsDue'),
+  surveyWarrantyGetUnsentEndorsements: () => ipcRenderer.invoke('survey_warranty:getUnsentEndorsements'),
   surveyWarrantyCreate: (data) => ipcRenderer.invoke('survey_warranty:create', data),
   surveyWarrantyUpdate: (id, data) => ipcRenderer.invoke('survey_warranty:update', id, data),
   surveyWarrantyDelete: (id) => ipcRenderer.invoke('survey_warranty:delete', id),

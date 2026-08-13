@@ -138,7 +138,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
     try {
       const [ws, eds] = await Promise.all([
         window.api.surveyWarrantyGetAll(),
-        window.api.surveyWarrantyGetEndorsementsDue()
+        window.api.surveyWarrantyGetUnsentEndorsements()
       ])
       if (ws && (ws as any).error) {
         showError('Failed to load warranties: ' + (ws as any).message)
@@ -174,6 +174,16 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
       }
     }
     setSelectedIds(new Set()); setSelectMode(false); loadData()
+  }
+
+  const handleMarkEndorsementIssued = async (surveyId: string) => {
+    try {
+      await window.api.updateConditionSurveyEndorsement(surveyId, true)
+      showSuccess('Endorsement marked as issued')
+      loadData()
+    } catch (err: any) {
+      showError('Failed to update: ' + (err.message || err))
+    }
   }
 
   const exportExcel = () => {
@@ -405,7 +415,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           { label: 'Active', value: activeCount, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' },
           { label: 'Overdue', value: overdueCount, color: 'var(--danger)', bg: 'rgba(255,77,77,0.08)' },
           { label: 'Survey Carried Out', value: warranties.filter(w => w.status === 'survey_done').length, color: '#00aaff', bg: 'rgba(0,170,255,0.08)' },
-          { label: 'Endorsements Due', value: endorsementsDue.length, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' }
+          { label: 'Unsent Endorsements', value: endorsementsDue.length, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' }
         ].map(s => (
           <div key={s.label} style={{
             padding: '14px 16px', borderRadius: '10px', background: s.bg,
@@ -676,21 +686,27 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
       </div>}
 
       {/* ── Endorsements Tab ─────────────────────────────────────── */}
-      {activeTab === 'endorsements' && <div className="glass-card" style={{ padding: '20px' }}>
+      {activeTab === 'endorsements' && (() => {
+        const dueTodayYmd = new Date().toISOString().split('T')[0]
+        const remYmd = (v: any) => (v ? new Date(v).toISOString().split('T')[0] : '')
+        return <div className="glass-card" style={{ padding: '20px' }}>
+        <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Reservations endorsements not yet sent. <strong style={{ color: '#e6a800' }}>DUE</strong> means the reminder date has arrived; <strong>Upcoming</strong> is still within the reminder window. Mark issued once you send it.
+        </p>
         {endorsementsDue.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            No endorsement reminders due.
+            No unsent endorsements.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', tableLayout: 'fixed' }}>
             <colgroup>
-              {[{ key: 'e_vessel', def: '25%' }, { key: 'e_date', def: '20%' }, { key: 'e_type', def: '15%' }, { key: 'e_reminder', def: '20%' }, { key: 'e_action', def: '20%' }].map(c => (
+              {[{ key: 'e_vessel', def: '20%' }, { key: 'e_ref', def: '12%' }, { key: 'e_date', def: '13%' }, { key: 'e_type', def: '12%' }, { key: 'e_reminder', def: '15%' }, { key: 'e_status', def: '11%' }, { key: 'e_action', def: '17%' }].map(c => (
                 <col key={c.key} style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : c.def }} />
               ))}
             </colgroup>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
-                {[{ key: 'e_vessel', label: 'Vessel' }, { key: 'e_date', label: 'Survey Date' }, { key: 'e_type', label: 'Type' }, { key: 'e_reminder', label: 'Reminder Date' }, { key: 'e_action', label: 'Action' }].map(h => (
+                {[{ key: 'e_vessel', label: 'Vessel' }, { key: 'e_ref', label: 'Reference' }, { key: 'e_date', label: 'Survey Date' }, { key: 'e_type', label: 'Type' }, { key: 'e_reminder', label: 'Reminder Date' }, { key: 'e_status', label: 'Status' }, { key: 'e_action', label: 'Action' }].map(h => (
                   <th key={h.key} style={{ padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', position: 'relative' }}>
                     {h.label}
                     <ResizeHandle colKey={h.key} />
@@ -699,43 +715,67 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
               </tr>
             </thead>
             <tbody>
-              {endorsementsDue.map((e: any, idx: number) => (
-                <tr key={e.id} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.01)') }}>
+              {endorsementsDue.map((e: any, idx: number) => {
+                const isDue = remYmd(e.endorsementReminderDate || e.endorsement_reminder_date) <= dueTodayYmd
+                return (
+                <tr key={e.surveyId || e.id} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.01)') }}>
                   <td style={{ padding: '8px 10px' }}>
                     <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <Ship size={13} style={{ color: 'var(--text-secondary)' }} />
                       {onNavigateToVessel ? (
-                        <button onClick={() => onNavigateToVessel(e.vesselId)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: '600', padding: 0, fontSize: '0.85rem' }}>
+                        <button onClick={() => onNavigateToVessel(e.vesselId)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: '600', padding: 0, fontSize: '0.85rem', textAlign: 'left' }}>
                           {e.vesselName || e.vessel_name || '—'}
                         </button>
                       ) : (e.vesselName || e.vessel_name || '—')}
                     </div>
                   </td>
+                  <td style={{ padding: '8px 10px' }}>
+                    {e.reference
+                      ? <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--accent-primary)' }}>{e.reference}</span>
+                      : <span style={{ color: 'var(--text-secondary)' }}>—</span>}
+                  </td>
                   <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{formatDateOrDash(e.surveyDate || e.survey_date)}</td>
                   <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{e.surveyType || e.survey_type || '—'}</td>
                   <td style={{ padding: '8px 10px' }}>
-                    <span style={{ color: '#e6a800', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ color: isDue ? '#e6a800' : 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Bell size={12} />
                       {formatDateOrDash(e.endorsementReminderDate || e.endorsement_reminder_date)}
                     </span>
                   </td>
                   <td style={{ padding: '8px 10px' }}>
-                    {onNavigateToVessel && (
+                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', background: isDue ? 'rgba(255,165,0,0.15)' : 'rgba(128,128,128,0.12)', color: isDue ? '#e6a800' : 'var(--text-secondary)' }}>
+                      {isDue ? 'Due' : 'Upcoming'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       <button
-                        onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id)}
-                        className="btn-secondary"
+                        onClick={() => handleMarkEndorsementIssued(e.surveyId || e.id)}
+                        className="btn-primary"
                         style={{ fontSize: '0.78rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title="Mark this reservations endorsement as issued"
                       >
-                        <Ship size={12} /> View Survey
+                        <Check size={12} /> Mark Issued
                       </button>
-                    )}
+                      {onNavigateToVessel && (
+                        <button
+                          onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id)}
+                          className="btn-secondary"
+                          style={{ fontSize: '0.78rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Ship size={12} /> View
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         )}
-      </div>}
+        </div>
+      })()}
 
       {/* ── Log Reminder Modal ───────────────────────────────────── */}
       {logReminderFor && (

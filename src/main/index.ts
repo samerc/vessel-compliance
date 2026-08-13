@@ -1695,6 +1695,7 @@ app.whenReady().then(() => {
   safeHandle('survey_warranty:getAll', (event) => { requireSession(event); return db.getAllSurveyWarranties() })
   safeHandle('survey_warranty:getDueToday', (event) => { requireSession(event); return db.getSurveyWarrantiesDueToday() })
   safeHandle('survey_warranty:getEndorsementsDue', (event) => { requireSession(event); return db.getEndorsementsDue() })
+  safeHandle('survey_warranty:getUnsentEndorsements', (event) => { requireSession(event); return db.getUnsentEndorsements() })
   safeHandle('survey_warranty:create', async (event, data) => { await requirePermission(event, 'surveys:manage'); return db.createSurveyWarranty(data) })
   safeHandle('survey_warranty:update', async (event, id, data) => { await requirePermission(event, 'surveys:manage'); return db.updateSurveyWarranty(id, data) })
   safeHandle('survey_warranty:delete', async (event, id) => { await requirePermission(event, 'surveys:manage'); return db.deleteSurveyWarranty(id) })
