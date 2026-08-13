@@ -3931,22 +3931,32 @@ app.whenReady().then(() => {
     // Notify users with relevant permissions about workflow transitions
     try {
       const toStepName = toStep?.name || 'unknown'
+      // Resolve the quotation's reference so notifications identify WHICH quotation moved
+      let quotationRef = assignedRef
+      if (!quotationRef) {
+        try {
+          const [refRows] = await (db as any).pool.query('SELECT reference_number FROM quotations WHERE id = ?', [quotationId])
+          quotationRef = (refRows as any[])[0]?.reference_number || ''
+        } catch { quotationRef = '' }
+      }
+      const movedTitle = quotationRef ? `Quotation ${quotationRef} moved to ${toStepName}` : `Quotation moved to ${toStepName}`
       db.notifyUsersWithPermission(
         'quotations:approve',
         'workflow_action_needed',
-        `Quotation moved to ${toStepName}`,
+        movedTitle,
         comment || undefined,
         'quotation',
         quotationId,
         user.id
       ).catch(() => {})
       // Also notify groups subscribed to quotation_workflow
-      db.notifyGroupsForEvent('quotation_workflow', `Quotation moved to ${toStepName}`, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
+      db.notifyGroupsForEvent('quotation_workflow', movedTitle, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
       // If the target step requires approval permission, also fire approval event
       const transitionsToStep = transitions.filter(t => t.toStepId === toStepId)
       const needsApproval = transitionsToStep.some(t => t.permissionKey === 'quotations:approve')
       if (needsApproval) {
-        db.notifyGroupsForEvent('quotation_approval_needed', `Quotation requires approval (${toStepName})`, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
+        const approvalTitle = quotationRef ? `Quotation ${quotationRef} requires approval (${toStepName})` : `Quotation requires approval (${toStepName})`
+        db.notifyGroupsForEvent('quotation_approval_needed', approvalTitle, comment || undefined, 'quotation', quotationId, user.id).catch(() => {})
       }
     } catch (err) { console.error('Workflow notification error:', err) }
     return { success: true }
