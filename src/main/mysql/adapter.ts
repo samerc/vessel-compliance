@@ -5127,6 +5127,12 @@ export class MySQLAdapter {
 
     async updateUser(userId: string, updates: { username?: string; fullName?: string }): Promise<void> {
         if (!this.pool) return
+        // Capture the current username so a rename can cascade to denormalized snapshot columns
+        let oldUsername: string | null = null
+        if (updates.username !== undefined) {
+            const [cur] = await this.pool.query('SELECT username FROM users WHERE id = ?', [userId])
+            oldUsername = (cur as any[])[0]?.username ?? null
+        }
         const fields: string[] = []
         const values: any[] = []
         if (updates.username !== undefined) {
@@ -5139,6 +5145,38 @@ export class MySQLAdapter {
         if (fields.length === 0) return
         values.push(userId)
         await this.pool.execute(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
+
+        // Cascade the rename to every table that stores a denormalized username snapshot, so historical
+        // records (audit trails, notes, workflow log, activity log) show the new name everywhere.
+        if (updates.username !== undefined && oldUsername !== null && oldUsername !== updates.username) {
+            await this.cascadeUsernameRename(userId, oldUsername, updates.username)
+        }
+    }
+
+    // Propagate a username change into all denormalized snapshot columns. Tables that also store the
+    // user_id are matched by id (precise); the two audit tables that store only the username string are
+    // matched by the old name. Each statement is isolated so a missing table/column never blocks a rename.
+    async cascadeUsernameRename(userId: string, oldUsername: string, newUsername: string): Promise<void> {
+        if (!this.pool) return
+        // Tables with a user_id column — match by id (unambiguous)
+        const byId: Array<[string, string, string]> = [
+            ['activity_log', 'username', 'user_id'],
+            ['quotation_workflow_log', 'username', 'user_id'],
+            ['vessel_notes', 'created_by_username', 'created_by_user_id'],
+            ['quotation_notes', 'author_username', 'author_user_id'],
+            ['policy_renewal_notes', 'created_by_username', 'created_by_user_id']
+        ]
+        for (const [table, nameCol, idCol] of byId) {
+            try { await this.pool.execute(`UPDATE ${table} SET ${nameCol} = ? WHERE ${idCol} = ?`, [newUsername, userId]) } catch { /* table/column may not exist yet */ }
+        }
+        // Audit tables that store only the username string — match by the previous name
+        const byName: Array<[string, string]> = [
+            ['vessel_audit_log', 'changed_by'],
+            ['vessel_name_history', 'changed_by']
+        ]
+        for (const [table, nameCol] of byName) {
+            try { await this.pool.execute(`UPDATE ${table} SET ${nameCol} = ? WHERE ${nameCol} = ?`, [newUsername, oldUsername]) } catch { /* ignore */ }
+        }
     }
 
     async updateUserLastLogin(userId: string): Promise<void> {
