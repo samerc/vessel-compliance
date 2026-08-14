@@ -80,6 +80,37 @@ export function AlternativeScopeChips({ alternatives, currentAltId, onChangeAltI
     )
 }
 
+// Multi-select alternative scope: an item can apply to ALL alternatives (selectedAltIds === null) or to
+// any SUBSET (e.g. Alt 2 + Alt 3). Clicking a specific alternative while "All" is active starts a fresh
+// subset with just that one; deselecting down to none — or selecting every alternative — reverts to All.
+export function AlternativeMultiScopeChips({ alternatives, selectedAltIds, onChange }: { alternatives: QuotationPIAlternative[]; selectedAltIds: string[] | null; onChange: (altIds: string[] | null) => void }) {
+    if (alternatives.length < 2) return null
+    const allIds = alternatives.map(a => a.id)
+    const isAll = selectedAltIds === null
+    const set = new Set(selectedAltIds || [])
+    const toggleAlt = (altId: string) => {
+        if (isAll) { onChange([altId]); return } // start a fresh subset from "All"
+        const next = new Set(set)
+        if (next.has(altId)) next.delete(altId); else next.add(altId)
+        if (next.size === 0 || next.size === allIds.length) { onChange(null); return }
+        onChange(allIds.filter(id => next.has(id))) // preserve alternative order
+    }
+    const chip = (active: boolean, color: string, label: string, onClick: () => void, key?: string) => (
+        <button key={key} onClick={onClick} style={{
+            padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
+            border: active ? `1.5px solid ${color}` : '1px solid var(--input-border)',
+            background: active ? `${color}18` : 'transparent',
+            color: active ? color : 'var(--text-secondary)', cursor: 'pointer'
+        }}>{label}</button>
+    )
+    return (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+            {chip(isAll, '#00aac8', 'All', () => onChange(null))}
+            {alternatives.map((alt, idx) => chip(!isAll && set.has(alt.id), ALT_COLORS[idx % ALT_COLORS.length], alt.label || `Alt ${idx + 1}`, () => toggleAlt(alt.id), alt.id))}
+        </div>
+    )
+}
+
 export function PickerDropdown({ placeholder, options, onSelect, fontSize = '0.85rem' }: { placeholder: string; options: { value: string; label: string }[]; onSelect: (value: string) => void; fontSize?: string }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)

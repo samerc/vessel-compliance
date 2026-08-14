@@ -3,13 +3,13 @@ import { Plus, Trash2, GripVertical, X, Pencil, Upload, AlertTriangle } from 'lu
 import { Quotation, PIClause, PIExclusion, QuotationCustomExclusion, QuotationPIAlternative, QuotationVessel, Vessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips } from './shared'
+import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
 
 export default function ExclusionsTab({ quotation, showSuccess, piAlternatives = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedRows, setSelectedRows] = useState<any[]>([])
-    // Single-scope model: an exclusion is "selected" if it has ANY row (regardless of alternative).
-    // Its scope (All / a specific alternative) is set via the AlternativeScopeChips below.
+    // An exclusion is "selected" if it has ANY row (regardless of alternative). Its alternative scope
+    // (All, or a subset like Alt 2 + Alt 3 — one row per alternative) is set via the multi-scope chips.
     const selectedIds = useMemo(() => {
         return new Set(selectedRows.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
     }, [selectedRows])
@@ -140,15 +140,32 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
     }
 
-    const updateExclusionAltId = async (id: string, altId: string | null) => {
-        const row = selectedRows.find((r: any) => r.id === id)
-        await window.api.updateQuotationItemAlternativeId('quotation_exclusions', id, altId)
-        // Exclusive scope: an exclusion has ONE scope — remove any other rows for the same master
-        // exclusion (also cleans up legacy duplicates that lived on multiple alternatives).
-        if (row?.piExclusionId) {
-            for (const s of selectedRows.filter((r: any) => r.id !== id && r.piExclusionId === row.piExclusionId)) {
-                await window.api.deleteQuotationExclusion(s.id)
+    // Current alternative scope of a master exclusion: null = All alternatives; else the subset of
+    // alternative IDs it is scoped to (one quotation_exclusions row per alternative).
+    const exclusionAltSet = (piExclusionId: string): string[] | null => {
+        const rows = selectedRows.filter((r: any) => r.piExclusionId === piExclusionId)
+        if (rows.some((r: any) => !r.alternativeId)) return null // any shared row → applies to All
+        return rows.map((r: any) => r.alternativeId)
+    }
+
+    // Sync the exclusion's rows to the chosen scope: null = single shared row (All); array = one row
+    // per alternative in the subset. Reuses existing rows where possible (preserves vessel scope/order).
+    const setExclusionAltSet = async (piExclusionId: string, target: string[] | null) => {
+        const rows = selectedRows.filter((r: any) => r.piExclusionId === piExclusionId)
+        const allIds = piAlternatives.map(a => a.id)
+        const wantAll = target === null || target.length === 0 || target.length === allIds.length
+        if (wantAll) {
+            const keep = rows.find((r: any) => !r.alternativeId) || rows[0]
+            for (const r of rows) if (r.id !== keep?.id) await window.api.deleteQuotationExclusion(r.id)
+            if (keep && keep.alternativeId) await window.api.updateQuotationItemAlternativeId('quotation_exclusions', keep.id, null)
+            if (!keep) await window.api.addQuotationExclusion(quotation.id, piExclusionId, null)
+        } else {
+            const want = new Set(target)
+            for (const r of rows) {
+                if (!r.alternativeId || !want.has(r.alternativeId)) await window.api.deleteQuotationExclusion(r.id)
             }
+            const have = new Set(rows.filter((r: any) => r.alternativeId && want.has(r.alternativeId)).map((r: any) => r.alternativeId))
+            for (const altId of target) if (!have.has(altId)) await window.api.addQuotationExclusion(quotation.id, piExclusionId, altId)
         }
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
@@ -264,7 +281,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                             {row && (
                                 <div style={{ paddingLeft: '30px' }}>
                                     {qVessels.length > 1 && <VesselScopeChips vessels={qVessels} vesselScope={row.vesselScope} onChange={scope => updateExclusionScope(row.id, scope)} />}
-                                    <AlternativeScopeChips alternatives={piAlternatives} currentAltId={row.alternativeId || null} onChangeAltId={altId => updateExclusionAltId(row.id, altId)} />
+                                    <AlternativeMultiScopeChips alternatives={piAlternatives} selectedAltIds={exclusionAltSet(e.id)} onChange={altIds => setExclusionAltSet(e.id, altIds)} />
                                 </div>
                             )}
                         </div>
