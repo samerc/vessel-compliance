@@ -1180,66 +1180,70 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
     })
     const wordSubLimitParas: Paragraph[] = data.subLimits.map(sl => slPara(resolveSlText(sl)))
+    // Render LOL body text WITHOUT stray blank paragraphs (collapseEmpty for HTML; drop blank lines for
+    // plain text). Spacing between logical blocks is controlled explicitly with single emptyP()s below.
+    const lolTextParas = (text: string): (Paragraph | Table)[] => {
+      if (!text) return []
+      if (isHtml(text)) return parseHtmlToParagraphs(text, { size: 22, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED, collapseEmpty: true })
+      return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => np(l))
+    }
     const injectSubLimits = (rawText: string): (Paragraph | Table)[] => {
-      if (!rawText.includes('{sub_limits}')) return mp(rawText)
+      if (!rawText.includes('{sub_limits}')) return lolTextParas(rawText)
       const parts = rawText.split('{sub_limits}')
       const out: (Paragraph | Table)[] = []
-      if (parts[0]?.trim()) out.push(...mp(parts[0].trim()))
-      if (wordSubLimitParas.length > 0) {
-        out.push(...wordSubLimitParas)
-        out.push(emptyP())
-      }
-      if (parts[1]?.trim()) out.push(...mp(parts[1].trim()))
+      if (parts[0]?.trim()) out.push(...lolTextParas(parts[0].trim()))
+      if (wordSubLimitParas.length > 0) out.push(emptyP(), ...wordSubLimitParas)
+      if (parts[1]?.trim()) out.push(emptyP(), ...lolTextParas(parts[1].trim()))
       return out
     }
-    // LOL option lines — alternatives first, then shared text
-    if (dHasLolOptions) {
-      for (const opt of data.lolOptions) {
-        const optCur = opt.currency || cur
-        liabContent.push(np(`${opt.label || `Alternative ${data.lolOptions.indexOf(opt) + 1}`}: ${formatCurrency(opt.amount, optCur)}`))
+    // LOL amount lines (P&I alternatives or LOL options): a single "USD X" line when every alternative
+    // carries the same limit, otherwise one line per alternative. No "all claims in the aggregate" suffix
+    // (that wording lives in the intro paragraph). Rendered right after the intro paragraph, not at the end.
+    const buildLolAmountParas = (): Paragraph[] => {
+      let items: { label: string; amount: number; currency: string }[] = []
+      if (dHasLolOptions) {
+        items = data.lolOptions.filter(o => o.amount != null).map((o, i) => ({ label: o.label || `Alternative ${i + 1}`, amount: o.amount as number, currency: o.currency || cur }))
+      } else if (dPiAltLol) {
+        items = data.piAlternatives.filter(a => a.lolAmount != null).map((a, i) => ({ label: a.label || `Alternative ${i + 1}`, amount: a.lolAmount as number, currency: a.lolCurrency || cur }))
       }
-      liabContent.push(emptyP())
+      if (items.length === 0) return []
+      const allSame = items.every(x => x.amount === items[0].amount && x.currency === items[0].currency)
+      if (allSame) return [np(formatCurrency(items[0].amount, items[0].currency))]
+      return items.map(x => np(`${x.label}: ${formatCurrency(x.amount, x.currency)}`))
     }
+    const dLolAmountParas = buildLolAmountParas()
 
     const dCurDisplay = dHasLolOptions ? '' : cur
-    // Render LOL text, splitting at "Under no circumstances" to insert sub-limits before it
-    const renderLolTextWithSubLimits = (text: string) => {
-      const cleanText = text.replace(/  +/g, ' ').trim()
-      const underNoMatch = cleanText.match(/(Under\s+no\s+circumstances.*)/is)
-      if (underNoMatch && wordSubLimitParas.length > 0 && !cleanText.includes('{sub_limits}')) {
+    // Section order: intro paragraph → LOL amounts → sub-limits → "Under no circumstances" closing
+    const renderLolTextWithSubLimits = (text: string): boolean => {
+      const cleanText = text.replace(/[ \t]{2,}/g, ' ').trim()
+      const hasPlaceholder = cleanText.includes('{sub_limits}')
+      const underNoMatch = !hasPlaceholder ? cleanText.match(/(Under\s+no\s+circumstances.*)/is) : null
+      if (underNoMatch) {
         const beforeUnderNo = cleanText.substring(0, underNoMatch.index!).trim()
         const underNoPart = underNoMatch[1].trim()
-        if (beforeUnderNo) liabContent.push(...injectSubLimits(beforeUnderNo))
-        liabContent.push(emptyP(), ...wordSubLimitParas, emptyP())
-        liabContent.push(...mp(underNoPart))
-        return true // sub-limits already inserted
+        if (beforeUnderNo) liabContent.push(...lolTextParas(beforeUnderNo))
+        if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
+        if (wordSubLimitParas.length > 0) liabContent.push(emptyP(), ...wordSubLimitParas)
+        liabContent.push(emptyP(), ...lolTextParas(underNoPart))
+        return wordSubLimitParas.length > 0
       }
       liabContent.push(...injectSubLimits(cleanText))
-      return false
+      if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
+      return hasPlaceholder && wordSubLimitParas.length > 0
     }
     let dSubLimitsInserted = false
     if (data.quotation.limitOfLiabilityText) {
-      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay).split('\n').map(l => l.trimStart()).join('\n')
+      const cleaned = data.quotation.limitOfLiabilityText.replace('{amount}', amountDisplay).replace('{currency}', dCurDisplay)
       dSubLimitsInserted = renderLolTextWithSubLimits(cleaned)
-    } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions)) {
+    } else if (st(data, 'limitOfLiabilityDefaultText') && (baseAmt != null || dHasLolOptions || dPiAltLol)) {
       const lolText = st(data, 'limitOfLiabilityDefaultText')
         .replace('{amount}', amountDisplay)
         .replace('{currency}', dCurDisplay)
       dSubLimitsInserted = renderLolTextWithSubLimits(lolText)
-    } else if (baseAmt != null || dHasLolOptions) {
+    } else if (baseAmt != null || dHasLolOptions || dPiAltLol) {
       liabContent.push(np(`${amountDisplay} all claims in the aggregate.`.replace(/  +/g, ' ').trim()))
-    }
-
-    // Per-alternative LOL lines
-    if (dPiAltLol) {
-      liabContent.push(emptyP())
-      for (let ai = 0; ai < data.piAlternatives.length; ai++) {
-        const alt = data.piAlternatives[ai]
-        const altCur = alt.lolCurrency || cur
-        const altAmt = alt.lolAmount
-        if (altAmt == null) continue
-        liabContent.push(np(`${alt.label || `Alternative ${ai + 1}`}: ${formatCurrency(altAmt, altCur)} all claims in the aggregate`))
-      }
+      if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
     }
 
     const lolRawHasPlaceholder = (data.quotation.limitOfLiabilityText || st(data, 'limitOfLiabilityDefaultText') || '').includes('{sub_limits}')
