@@ -9762,15 +9762,14 @@ export class MySQLAdapter {
     async piMigrateSharedToAlternative(quotationId: string, alternativeId: string): Promise<void> {
         if (!this.pool) return
         // Migrate all shared (NULL alternative_id) items to the given alternative.
-        // NOTE: quotation_additional_clauses is intentionally EXCLUDED — additional clauses should stay
-        // shared ("All alternatives") when alternatives are created, not be pinned to Alternative 1.
+        // NOTE: additional clauses AND exclusions are intentionally EXCLUDED — they should stay shared
+        // ("All alternatives") when alternatives are created (user scopes only the few that differ),
+        // not be pinned to Alternative 1.
         const tables = [
             'quotation_clauses',
             'quotation_warranties',
             'quotation_deductibles',
             'quotation_text_deductibles',
-            'quotation_exclusions',
-            'quotation_custom_exclusions',
             'quotation_custom_warranties'
         ]
         for (const table of tables) {
