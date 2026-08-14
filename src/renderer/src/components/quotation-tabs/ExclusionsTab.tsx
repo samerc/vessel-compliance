@@ -5,16 +5,14 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 
-export default function ExclusionsTab({ quotation, showSuccess, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
+export default function ExclusionsTab({ quotation, showSuccess, piAlternatives = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
     const [selectedRows, setSelectedRows] = useState<any[]>([])
+    // Single-scope model: an exclusion is "selected" if it has ANY row (regardless of alternative).
+    // Its scope (All / a specific alternative) is set via the AlternativeScopeChips below.
     const selectedIds = useMemo(() => {
-        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-        const filtered = altId
-            ? selectedRows.filter((r: any) => !r.alternativeId || r.alternativeId === altId)
-            : selectedRows
-        return new Set(filtered.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
-    }, [selectedRows, piAlternatives, selectedPIAltId])
+        return new Set(selectedRows.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId))
+    }, [selectedRows])
     const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
     const [customExclusions, setCustomExclusions] = useState<QuotationCustomExclusion[]>([])
     const [newCustomText, setNewCustomText] = useState('')
@@ -100,15 +98,13 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     })
 
     const toggle = async (id: string) => {
-        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-        // Find the row matching this exclusion for the CURRENT alternative only
-        const row = altId
-            ? selectedRows.find((r: any) => r.piExclusionId === id && r.alternativeId === altId)
-            : selectedRows.find((r: any) => r.piExclusionId === id)
-        if (row) {
-            await window.api.deleteQuotationExclusion(row.id)
+        // Single-scope model: selecting adds ONE shared row (scope defaults to All — user scopes to a
+        // specific alternative via the chip); deselecting removes every row for this exclusion.
+        const existing = selectedRows.filter((r: any) => r.piExclusionId === id)
+        if (existing.length > 0) {
+            for (const r of existing) await window.api.deleteQuotationExclusion(r.id)
         } else {
-            await window.api.addQuotationExclusion(quotation.id, id, altId)
+            await window.api.addQuotationExclusion(quotation.id, id, null)
         }
         const qe = await window.api.getQuotationExclusions(quotation.id)
         setSelectedRows(Array.isArray(qe) ? qe : [])
@@ -119,19 +115,11 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         const fromIdx = dragExcRef.current
         dragExcRef.current = null
         if (fromIdx === null || fromIdx === targetIdx) return
-        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-        const filtered = altId
-            ? selectedRows.filter((r: any) => r.alternativeId === altId)
-            : selectedRows
-        const newOrder = [...filtered]
+        // Single-scope model: reorder the full selected list (no per-alternative filtering)
+        const newOrder = [...selectedRows]
         const [moved] = newOrder.splice(fromIdx, 1)
         newOrder.splice(targetIdx, 0, moved)
-        if (altId) {
-            const otherRows = selectedRows.filter((r: any) => r.alternativeId !== altId)
-            setSelectedRows([...otherRows, ...newOrder])
-        } else {
-            setSelectedRows(newOrder)
-        }
+        setSelectedRows(newOrder)
         await window.api.reorderQuotationExclusions(newOrder.map(r => r.id))
     }
 
@@ -153,8 +141,17 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     }
 
     const updateExclusionAltId = async (id: string, altId: string | null) => {
+        const row = selectedRows.find((r: any) => r.id === id)
         await window.api.updateQuotationItemAlternativeId('quotation_exclusions', id, altId)
-        setSelectedRows(prev => prev.map(e => e.id === id ? { ...e, alternativeId: altId } : e))
+        // Exclusive scope: an exclusion has ONE scope — remove any other rows for the same master
+        // exclusion (also cleans up legacy duplicates that lived on multiple alternatives).
+        if (row?.piExclusionId) {
+            for (const s of selectedRows.filter((r: any) => r.id !== id && r.piExclusionId === row.piExclusionId)) {
+                await window.api.deleteQuotationExclusion(s.id)
+            }
+        }
+        const qe = await window.api.getQuotationExclusions(quotation.id)
+        setSelectedRows(Array.isArray(qe) ? qe : [])
     }
 
     const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
@@ -165,12 +162,8 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     // Custom exclusion handlers
     const addCustom = async () => {
         if (!newCustomText.trim()) return
-        const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
+        // Single-scope model: new custom exclusions default to All (shared); scope via the chip below.
         const result = await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: newCustomText.trim(), order: customExclusions.length })
-        if (altId && result && !(result as any).error) {
-            await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', result.id, altId)
-            result.alternativeId = altId
-        }
         if (result && !(result as any).error) {
             setCustomExclusions(prev => [...prev, result])
             setNewCustomText('')
@@ -225,21 +218,18 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     return (
         <div>
             <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Exclusions</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select exclusions for this quotation. If an exclusion applies to multiple alternatives, select it separately for each alternative.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 12px' }}>Select exclusions for this quotation.{piAlternatives.length >= 2 ? ' Each exclusion applies to all alternatives by default — use the scope chips to apply one to a specific alternative only.' : ''}</p>
 
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                 <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }} onClick={async () => {
-                    const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
                     for (const e of visibleExclusions) {
-                        if (!selectedIds.has(e.id)) await window.api.addQuotationExclusion(quotation.id, e.id, altId)
+                        if (!selectedIds.has(e.id)) await window.api.addQuotationExclusion(quotation.id, e.id, null)
                     }
                     const qe = await window.api.getQuotationExclusions(quotation.id)
                     setSelectedRows(Array.isArray(qe) ? qe : [])
                 }}>Select All</button>
                 <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.78rem' }} onClick={async () => {
-                    const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-                    const toRemove = altId ? selectedRows.filter((r: any) => r.alternativeId === altId) : selectedRows
-                    for (const r of toRemove) await window.api.deleteQuotationExclusion(r.id)
+                    for (const r of selectedRows) await window.api.deleteQuotationExclusion(r.id)
                     const qe = await window.api.getQuotationExclusions(quotation.id)
                     setSelectedRows(Array.isArray(qe) ? qe : [])
                 }}>Deselect All</button>
@@ -285,10 +275,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
 
             {/* Selected Exclusion Order */}
             {(() => {
-                const altId = piAlternatives.length >= 2 ? selectedPIAltId : null
-                const orderedSelected = altId
-                    ? selectedRows.filter((r: any) => r.alternativeId === altId)
-                    : selectedRows
+                const orderedSelected = selectedRows
                 if (orderedSelected.length < 2) return null
                 return (
                     <div style={{ marginTop: '16px', borderTop: '1px solid var(--table-border)', paddingTop: '12px' }}>
@@ -319,10 +306,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                     <button onClick={() => setShowImportModal(true)} className="btn-secondary" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px' }}><Upload size={13} /> Import</button>
                 </div>
 
-                {customExclusions.filter(ce => {
-                    if (piAlternatives.length < 2 || !selectedPIAltId) return true
-                    return ce.alternativeId === selectedPIAltId
-                }).map((ce, i) => (
+                {customExclusions.map((ce, i) => (
                     <div key={ce.id} draggable={editingCustomId !== ce.id} onDragStart={() => handleCustomDragStart(i)} onDragOver={e => e.preventDefault()} onDrop={() => handleCustomDrop(i)} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', cursor: editingCustomId === ce.id ? 'default' : 'grab' }}>
                         {editingCustomId === ce.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
