@@ -113,3 +113,5 @@ documents
 .deploy-config.json
 # Production DB dumps (PII) — never commit
 policies/*.sql
+# Sanctions blacklist source (PII) — never commit
+BDL Black List.xlsx
