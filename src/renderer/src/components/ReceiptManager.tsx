@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
 import {
-  exportReceiptDocx, buildBeingText, amountInWords, formatReceiptAmount
+  exportReceiptDocx, ordinal, amountInWords, formatReceiptAmount
 } from '../services/ReceiptExportService'
 import {
   Receipt as ReceiptIcon, Plus, FileDown, Trash2, Pencil, Search, X, Settings, Ship
@@ -16,8 +16,9 @@ interface PolicyLite {
   id: string
   policyNumber: string
   vesselId: string
-  quotationTypeName?: string
+  typeName?: string
   status?: string
+  source: 'issued' | 'dynamic'
 }
 
 interface ReceiptManagerProps {
@@ -26,7 +27,7 @@ interface ReceiptManagerProps {
   embedded?: boolean
 }
 
-interface FormPolicy { policyDocId: string | null; policyNumber: string }
+interface FormPolicy { policyDocId: string | null; policyNumber: string; typeName?: string; instalment: number }
 
 export default function ReceiptManager({ vesselId, vesselName, embedded = false }: ReceiptManagerProps) {
   const { theme } = useTheme()
@@ -235,8 +236,10 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const [amount, setAmount] = useState<string>(editing?.amount != null ? String(editing.amount) : '')
   const [currency, setCurrency] = useState(editing?.currency ?? 'USD')
   const [instalmentNumber, setInstalmentNumber] = useState<string>(editing?.instalmentNumber != null ? String(editing.instalmentNumber) : '1')
-  const [selectedPolicies, setSelectedPolicies] = useState<FormPolicy[]>(editing?.policies?.map(p => ({ policyDocId: p.policyDocId ?? null, policyNumber: p.policyNumber })) ?? [])
+  const [selectedPolicies, setSelectedPolicies] = useState<FormPolicy[]>(editing?.policies?.map(p => ({ policyDocId: p.policyDocId ?? null, policyNumber: p.policyNumber, instalment: editing.instalmentNumber || 1 })) ?? [])
+  const [policySearch, setPolicySearch] = useState('')
   const [freeCovers, setFreeCovers] = useState('')
+  const [payerMode, setPayerMode] = useState<'select' | 'other'>(editing && !editing.payerEntityId ? 'other' : 'select')
   const [receiptDate, setReceiptDate] = useState(editing?.receiptDate || today)
   const [numberPreview, setNumberPreview] = useState(editing?.receiptNumber || '')
   const [numberOverride, setNumberOverride] = useState(!!editing)
@@ -293,12 +296,31 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
         const as = await window.api.getVesselAssureds(vId)
         setAssureds(Array.isArray(as) ? as : [])
       } catch { setAssureds([]) }
+      const merged: PolicyLite[] = []
+      const seen = new Set<string>()
       try {
         const all = await window.api.getPoliciesList()
-        const mine = (Array.isArray(all) ? all : []).filter((p: any) => p.vesselId === vId)
-          .map((p: any) => ({ id: p.id, policyNumber: p.policyNumber, vesselId: p.vesselId, quotationTypeName: p.quotationTypeName || p.policyTypeName, status: p.status }))
-        setPolicies(mine)
-      } catch { setPolicies([]) }
+        for (const p of (Array.isArray(all) ? all : []).filter((p: any) => p.vesselId === vId)) {
+          if (!p.policyNumber) continue
+          merged.push({ id: p.id, policyNumber: p.policyNumber, vesselId: p.vesselId, typeName: p.quotationTypeName || p.policyTypeName, status: p.status, source: 'issued' })
+          seen.add(p.policyNumber)
+        }
+      } catch { /* ignore */ }
+      try {
+        const dyn = await window.api.getVesselDynamicPolicies(vId)
+        for (const p of (Array.isArray(dyn) ? dyn : [])) {
+          if (!p.policyNumber || seen.has(p.policyNumber)) continue
+          merged.push({ id: p.id, policyNumber: p.policyNumber, vesselId: p.vesselId || vId, typeName: p.policyTypeName, status: p.status, source: 'dynamic' })
+          seen.add(p.policyNumber)
+        }
+      } catch { /* ignore */ }
+      setPolicies(merged)
+      // Backfill type names on already-selected policies (e.g. when editing an existing receipt)
+      setSelectedPolicies(prev => prev.map(sp => {
+        if (sp.typeName) return sp
+        const m = merged.find(mp => mp.policyNumber === sp.policyNumber)
+        return m ? { ...sp, typeName: m.typeName, policyDocId: sp.policyDocId ?? (m.source === 'issued' ? m.id : null) } : sp
+      }))
     })()
   }, [vId])
 
@@ -310,20 +332,27 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     setSelectedPolicies([])
   }
 
+  const defaultInst = parseInt(instalmentNumber, 10) || 1
+
+  const setPolicyInstalment = (policyNumber: string, value: string) => {
+    const n = parseInt(value, 10) || 1
+    setSelectedPolicies(prev => prev.map(sp => sp.policyNumber === policyNumber ? { ...sp, instalment: n } : sp))
+  }
+
   const togglePolicy = async (p: PolicyLite) => {
-    const exists = selectedPolicies.some(sp => sp.policyDocId === p.id)
+    const exists = selectedPolicies.some(sp => sp.policyDocId === p.id || sp.policyNumber === p.policyNumber)
     let next: FormPolicy[]
     if (exists) {
-      next = selectedPolicies.filter(sp => sp.policyDocId !== p.id)
+      next = selectedPolicies.filter(sp => sp.policyDocId !== p.id && sp.policyNumber !== p.policyNumber)
     } else {
-      next = [...selectedPolicies, { policyDocId: p.id, policyNumber: p.policyNumber }]
+      next = [...selectedPolicies, { policyDocId: p.source === 'issued' ? p.id : null, policyNumber: p.policyNumber, typeName: p.typeName, instalment: defaultInst }]
     }
     setSelectedPolicies(next)
-    // Auto-suggest amount from a single converted policy's instalment schedule
-    if (!exists && next.length === 1 && !amount) {
+    // Auto-suggest amount from a single converted (issued) policy's instalment schedule
+    if (!exists && next.length === 1 && !amount && p.source === 'issued') {
       try {
         const inst = await window.api.policyGetInstalments(p.id)
-        const num = parseInt(instalmentNumber, 10) || 1
+        const num = defaultInst
         const row = (Array.isArray(inst) ? inst : []).find((i: any) => Number(i.instalmentNumber) === num) || (Array.isArray(inst) ? inst[num - 1] : null)
         if (row && row.premiumAmount != null) setAmount(String(Number(row.premiumAmount)))
       } catch { /* no schedule */ }
@@ -337,15 +366,23 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const workingPolicies = useMemo(() => {
     const list = [...selectedPolicies]
     freeCovers.split(/[,&]/).map(s => s.trim()).filter(Boolean).forEach(pn => {
-      if (!list.some(p => p.policyNumber === pn)) list.push({ policyDocId: null, policyNumber: pn })
+      if (!list.some(p => p.policyNumber === pn)) list.push({ policyDocId: null, policyNumber: pn, instalment: defaultInst })
     })
     return list
-  }, [selectedPolicies, freeCovers])
+  }, [selectedPolicies, freeCovers, defaultInst])
 
-  const autoBeing = useMemo(() => buildBeingText({
-    policies: workingPolicies.map(p => ({ policyNumber: p.policyNumber, policyDocId: p.policyDocId })),
-    instalmentNumber: instNum, vesselName: vName, coversText: null
-  } as any), [workingPolicies, instNum, vName])
+  // Split description: one clause per policy (its own instalment + type), joined with AND.
+  const autoBeing = useMemo(() => {
+    const clauses = workingPolicies
+      .filter(p => p.policyNumber)
+      .map(p => {
+        const typ = p.typeName ? `${p.typeName.toUpperCase()} ` : ''
+        return `${ordinal(p.instalment || 1)} INSTALLMENT OF ${typ}COVER ${p.policyNumber}`
+      })
+    let s = clauses.length > 0 ? `SETTLEMENT ${clauses.join(' AND ')}` : 'SETTLEMENT'
+    if (vName) s += ` RE: M/V “${vName}”`
+    return s
+  }, [workingPolicies, vName])
 
   const autoWords = useMemo(() => amountInWords(amountNum, currency), [amountNum, currency])
 
@@ -480,56 +517,96 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
             </div>
             <div>
               <label style={label}>Instalment #</label>
-              <input style={input} type="number" min={1} value={instalmentNumber} onChange={e => setInstalmentNumber(e.target.value)} placeholder="1" />
+              <input style={input} type="number" min={1} value={instalmentNumber} onChange={e => setInstalmentNumber(e.target.value)} placeholder="1" title="Default instalment for newly selected policies" />
             </div>
           </div>
 
           {/* Policies */}
           <div>
             <label style={label}>Policies covered</label>
+            {vId && policies.length > 0 && (
+              <input
+                style={{ ...input, marginBottom: '8px' }}
+                value={policySearch}
+                onChange={e => setPolicySearch(e.target.value)}
+                placeholder="Search policies by number or type…"
+              />
+            )}
             {vId && policies.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                {policies.map(p => {
-                  const on = selectedPolicies.some(sp => sp.policyDocId === p.id)
-                  return (
-                    <button key={p.id} onClick={() => togglePolicy(p)} style={{
-                      padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'monospace',
-                      border: on ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                      background: on ? 'rgba(0,170,200,0.12)' : 'transparent',
-                      color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                    }}>
-                      {p.policyNumber}{p.quotationTypeName ? ` · ${p.quotationTypeName}` : ''}
-                    </button>
-                  )
-                })}
+                {policies
+                  .filter(p => {
+                    const q = policySearch.trim().toLowerCase()
+                    if (!q) return true
+                    return p.policyNumber.toLowerCase().includes(q) || (p.typeName || '').toLowerCase().includes(q)
+                  })
+                  .map(p => {
+                    const on = selectedPolicies.some(sp => sp.policyNumber === p.policyNumber)
+                    return (
+                      <button key={p.id} onClick={() => togglePolicy(p)} style={{
+                        padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'monospace',
+                        border: on ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
+                        background: on ? 'rgba(0,170,200,0.12)' : 'transparent',
+                        color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                      }}>
+                        {p.policyNumber}{p.typeName ? ` · ${p.typeName}` : ''}{p.source === 'dynamic' ? ' ·' : ''}
+                      </button>
+                    )
+                  })}
               </div>
             ) : (
               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                {vId ? 'No issued policies for this vessel — type policy numbers below.' : 'Select a vessel to list its policies.'}
+                {vId ? 'No policies on file for this vessel — type policy numbers below.' : 'Select a vessel to list its policies.'}
               </div>
             )}
             <input style={{ ...input, fontFamily: 'monospace' }} value={freeCovers} onChange={e => setFreeCovers(e.target.value)} placeholder="Or type policy numbers, separated by & or comma (e.g. H26209901 & P26209902)" />
+
+            {/* Per-policy instalment (split descriptions) */}
+            {selectedPolicies.length > 0 && (
+              <div style={{ marginTop: '10px', display: 'grid', gap: '6px' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Instalment per policy (description is split)</div>
+                {selectedPolicies.map(sp => (
+                  <div key={sp.policyNumber} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>{sp.policyNumber}{sp.typeName ? ` · ${sp.typeName}` : ''}</span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>Instalment</span>
+                    <input type="number" min={1} value={sp.instalment} onChange={e => setPolicyInstalment(sp.policyNumber, e.target.value)} style={{ ...input, width: '70px', padding: '6px 8px' }} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Payer */}
           <div>
             <label style={label}>Received From</label>
-            {assureds.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                {assureds.map(a => {
-                  const name = entityMap[a.entityId] || ''
-                  return (
-                    <button key={a.id} onClick={() => { setPayerName(name.toUpperCase()); setPayerEntityId(a.entityId || null) }} style={{
-                      padding: '5px 10px', borderRadius: '6px', fontSize: '0.76rem', cursor: 'pointer',
-                      border: payerEntityId === a.entityId ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                      background: payerEntityId === a.entityId ? 'rgba(0,170,200,0.12)' : 'transparent',
-                      color: payerEntityId === a.entityId ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                    }}>{name || a.entityId}{a.role ? ` · ${a.role}` : ''}</button>
-                  )
-                })}
-              </div>
+            <select
+              style={input}
+              value={payerMode === 'other' ? '__other__' : (payerEntityId || '')}
+              onChange={e => {
+                const val = e.target.value
+                if (val === '__other__') {
+                  setPayerMode('other')
+                  setPayerEntityId(null)
+                  setPayerName('')
+                } else {
+                  setPayerMode('select')
+                  const a = assureds.find(x => x.entityId === val)
+                  const name = a ? (entityMap[a.entityId] || '') : ''
+                  setPayerEntityId(val || null)
+                  setPayerName(name.toUpperCase())
+                }
+              }}
+            >
+              <option value="" disabled>{assureds.length > 0 ? 'Select payer…' : 'No assureds — choose Other'}</option>
+              {assureds.map(a => {
+                const name = entityMap[a.entityId] || a.entityId
+                return <option key={a.id} value={a.entityId}>{name}{a.role ? ` (${a.role})` : ''}</option>
+              })}
+              <option value="__other__">Other…</option>
+            </select>
+            {payerMode === 'other' && (
+              <input style={{ ...input, marginTop: '8px' }} value={payerName} onChange={e => { setPayerName(e.target.value); setPayerEntityId(null) }} placeholder="Type payer name" autoFocus />
             )}
-            <input style={input} value={payerName} onChange={e => { setPayerName(e.target.value); setPayerEntityId(null) }} placeholder="Payer name" />
           </div>
 
           {/* Auto text: The Sum Of / Being */}
