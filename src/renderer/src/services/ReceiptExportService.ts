@@ -147,7 +147,8 @@ function labelValueRow(label: string, value: string, opts?: { valueBold?: boolea
         verticalAlign: VerticalAlign.TOP,
         borders: cellBorders,
         margins: { top: 80, bottom: 80, left: 0, right: 0 },
-        children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: value, bold: opts?.valueBold, size: FONT_SIZE, font: FONT, color: '000000' })] })]
+        // Multi-line values (e.g. the BEING section) render one paragraph per line
+        children: value.split('\n').map(line => new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: line, bold: opts?.valueBold, size: FONT_SIZE, font: FONT, color: '000000' })] }))
       })
     ]
   })

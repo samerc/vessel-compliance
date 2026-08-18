@@ -249,7 +249,6 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const [payerEntityId, setPayerEntityId] = useState<string | null>(editing?.payerEntityId ?? null)
   const [amount, setAmount] = useState<string>(editing?.amount != null ? String(editing.amount) : '')
   const [currency, setCurrency] = useState(editing?.currency ?? 'USD')
-  const [instalmentNumber, setInstalmentNumber] = useState<string>(editing?.instalmentNumber != null ? String(editing.instalmentNumber) : '1')
   const [selectedPolicies, setSelectedPolicies] = useState<FormPolicy[]>(editing?.policies?.map(p => ({ policyDocId: p.policyDocId ?? null, policyNumber: p.policyNumber, instalments: [editing.instalmentNumber || 1] })) ?? [])
   const [policySearch, setPolicySearch] = useState('')
   const [freeCovers, setFreeCovers] = useState('')
@@ -346,7 +345,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     setSelectedPolicies([])
   }
 
-  const defaultInst = parseInt(instalmentNumber, 10) || 1
+  const defaultInst = 1
 
   const setPolicyInstalments = (policyNumber: string, value: string) => {
     const nums = parseInstalments(value)
@@ -374,7 +373,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   }
 
   const amountNum = parseFloat(amount) || 0
-  const instNum = instalmentNumber ? (parseInt(instalmentNumber, 10) || null) : null
+  const instNum = selectedPolicies[0]?.instalments?.[0] ?? null
 
   // Merge selected policies + any free-typed covers into the working receipt for auto-text
   const workingPolicies = useMemo(() => {
@@ -385,7 +384,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     return list
   }, [selectedPolicies, freeCovers, defaultInst])
 
-  // Split description: one clause per policy (its own instalment + type), joined with AND.
+  // Split description: one clause per policy on its own line, joined with a trailing AND.
   const autoBeing = useMemo(() => {
     const clauses = workingPolicies
       .filter(p => p.policyNumber)
@@ -393,7 +392,10 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
         const typ = p.typeName ? `${p.typeName.toUpperCase()} ` : ''
         return `${instalmentPhrase(p.instalments, ordinal)} OF ${typ}COVER ${p.policyNumber}`
       })
-    let s = clauses.length > 0 ? `SETTLEMENT ${clauses.join(' AND ')}` : 'SETTLEMENT'
+    if (clauses.length === 0) return vName ? `SETTLEMENT RE: M/V “${vName}”` : 'SETTLEMENT'
+    // Each policy on its own line; "AND" trails every line except the last.
+    const lines = clauses.map((c, i) => `${i === 0 ? 'SETTLEMENT ' : ''}${c}${i < clauses.length - 1 ? ' AND' : ''}`)
+    let s = lines.join('\n')
     if (vName) s += ` RE: M/V “${vName}”`
     return s
   }, [workingPolicies, vName])
@@ -517,8 +519,8 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
             )}
           </div>
 
-          {/* Amount + currency + instalment */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1fr', gap: '14px' }}>
+          {/* Amount + currency */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
             <div>
               <label style={label}>Amount</label>
               <input style={input} type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
@@ -528,10 +530,6 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
               <select style={input} value={currency} onChange={e => setCurrency(e.target.value)}>
                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div>
-              <label style={label}>Instalment #</label>
-              <input style={input} type="number" min={1} value={instalmentNumber} onChange={e => setInstalmentNumber(e.target.value)} placeholder="1" title="Default instalment for newly selected policies" />
             </div>
           </div>
 
