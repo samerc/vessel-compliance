@@ -35,14 +35,19 @@ export function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
 }
 
-const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY',
-  'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December']
 
-// "BEIRUT, AUGUST 12, 2026"
+// Title-case a city that may be stored uppercase, e.g. "BEIRUT" → "Beirut"
+function titleCaseCity(city: string): string {
+  return (city || 'Beirut').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// "Beirut, August 12, 2026"
 export function formatReceiptDate(iso: string, city: string): string {
-  if (!iso) return (city || 'BEIRUT').toUpperCase()
+  if (!iso) return titleCaseCity(city)
   const [y, m, d] = iso.split('-').map(Number)
-  return `${(city || 'BEIRUT').toUpperCase()}, ${MONTHS[(m || 1) - 1]} ${d}, ${y}`
+  return `${titleCaseCity(city)}, ${MONTHS[(m || 1) - 1]} ${d}, ${y}`
 }
 
 // Auto-compose the BEING line from policies + instalment + vessel (fallback only —
