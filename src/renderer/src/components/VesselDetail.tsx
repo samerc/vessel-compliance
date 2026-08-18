@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2, Receipt } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,12 +18,13 @@ import WarrantyManager from './WarrantyManager'
 import ConfirmationModal from './ConfirmationModal'
 import RemapFilePathsModal from './RemapFilePathsModal'
 import VesselQuotationsView from './VesselQuotationsView'
+import ReceiptManager from './ReceiptManager'
 
 interface VesselDetailProps {
     vessel: Vessel
     onBack: () => void
     backLabel?: string
-    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'
+    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
     initialEditing?: boolean
     onNavigateToQuotation?: (quotationId: string) => void
 }
@@ -381,7 +382,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const [editImo, setEditImo] = useState(vessel.imoNumber)
     const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
     const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'>(initialSection === 'history' as any ? 'timeline' : initialSection || 'documents')
+    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'>(initialSection === 'history' as any ? 'timeline' : initialSection || 'documents')
     useEffect(() => {
         if (initialSection) {
             setDetailView(initialSection)
@@ -1423,7 +1424,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                 marginBottom: '16px',
                 alignItems: 'center'
             }}>
-                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'timeline'] as const).map(view => (
+                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'payments', 'timeline'] as const).map(view => (
                     <button
                         key={view}
                         onClick={() => {
@@ -1451,6 +1452,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         {view === 'surveys' && <ClipboardList size={18} />}
                         {view === 'policies' && <Shield size={18} />}
                         {view === 'quotations' && <Hash size={18} />}
+                        {view === 'payments' && <Receipt size={18} />}
                         {view === 'timeline' && <Clock size={18} />}
                         {view === 'assureds' ? 'Assured' : view === 'timeline' ? 'Activity' : view.charAt(0).toUpperCase() + view.slice(1)}
                     </button>
@@ -2087,6 +2089,10 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         isLight={isLight}
                     />
                 </>
+            )}
+
+            {detailView === 'payments' && (
+                <ReceiptManager vesselId={vessel.id} vesselName={vessel.name} embedded />
             )}
 
             {detailView === 'timeline' && (

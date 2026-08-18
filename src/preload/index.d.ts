@@ -821,6 +821,15 @@ export interface Api {
   warBreachDelete: (id: string) => Promise<void>
   sanctionsReportSave: (data: import('../shared/types').SanctionsReportCheckInput) => Promise<{ id: string }>
   sanctionsReportList: () => Promise<import('../shared/types').SanctionsReportCheck[]>
+  receiptList: () => Promise<import('../shared/types').Receipt[]>
+  receiptListByVessel: (vesselId: string) => Promise<import('../shared/types').Receipt[]>
+  receiptGet: (id: string) => Promise<import('../shared/types').Receipt | null>
+  receiptNextNumber: (year?: number) => Promise<{ serial: number; year: number; number: string }>
+  receiptCreate: (data: import('../shared/types').ReceiptInput) => Promise<import('../shared/types').Receipt>
+  receiptUpdate: (id: string, data: Partial<import('../shared/types').ReceiptInput>) => Promise<import('../shared/types').Receipt>
+  receiptDelete: (id: string) => Promise<{ success: boolean }>
+  receiptGetSettings: () => Promise<import('../shared/types').ReceiptSettings>
+  receiptSetSettings: (settings: import('../shared/types').ReceiptSettings) => Promise<{ success: boolean }>
   analyticsGetPresets: () => Promise<import('../shared/types').AnalyticsPreset[]>
   analyticsAddPreset: (name: string, filters: any) => Promise<import('../shared/types').AnalyticsPreset>
   analyticsUpdatePreset: (id: string, name: string, filters: any) => Promise<void>

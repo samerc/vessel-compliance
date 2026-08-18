@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download, Receipt } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -23,6 +23,7 @@ import type { RecentItem } from '../../shared/types'
 // Heavy components — lazy loaded to reduce initial bundle size
 const SanctionsSearch = lazy(() => import('./components/SanctionsSearch'))
 const Calculators = lazy(() => import('./components/Calculators'))
+const ReceiptManager = lazy(() => import('./components/ReceiptManager'))
 const QuotationManager = lazy(() => import('./components/QuotationManager'))
 const ConditionSurveyList = lazy(() => import('./components/ConditionSurveyList'))
 const SurveyFollowUp = lazy(() => import('./components/SurveyFollowUp'))
@@ -44,7 +45,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications' | 'receipts'>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -327,7 +328,7 @@ function App(): React.JSX.Element {
     'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
     quotations: 'Quotations', 'vessel-filter': 'Vessel Filter', renewals: 'Renewals',
     reports: 'Reports', analytics: 'Fleet Analytics', 'activity-log': 'Activity Log',
-    templates: 'Templates',
+    templates: 'Templates', receipts: 'Receipts',
     'policies-list': 'Policies',
     'policy-detail': 'Policies', notifications: 'Notifications', 'policy-setup': 'Policy Setup'
   }
@@ -630,6 +631,7 @@ function App(): React.JSX.Element {
               {hasPermission('policies:view') && navItem('renewals', <Calendar size={18} />, 'Renewals')}
               {hasPermission('quotations:view') && navItem('quotations', <FileText size={18} />, 'Quotations')}
               {hasPermission('policies:view') && navItem('policies-list', <FileCheck size={18} />, 'Policies')}
+              {hasPermission('policies:view') && navItem('receipts', <Receipt size={18} />, 'Receipts')}
             </NavGroup>
 
             <NavGroup id="operations" label="Operations" icon={<Layers size={14} />}
@@ -774,6 +776,7 @@ function App(): React.JSX.Element {
           {activeTab === 'surveys' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'survey-followup' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
+          {activeTab === 'receipts' && (hasPermission('policies:view') ? <Suspense fallback={<LoadingFallback />}><ReceiptManager /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager
             onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }}
             onNavigateToPolicySetup={(quotationId) => { setPolicySetupQuotationId(quotationId); setActiveTab('policy-setup') }}

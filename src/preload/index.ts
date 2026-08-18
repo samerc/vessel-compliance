@@ -771,6 +771,17 @@ const api = {
   sanctionsReportSave: (data: any) => ipcRenderer.invoke('sanctionsReport:save', data),
   sanctionsReportList: () => ipcRenderer.invoke('sanctionsReport:list'),
 
+  // Receipts
+  receiptList: () => ipcRenderer.invoke('receipt:list'),
+  receiptListByVessel: (vesselId: string) => ipcRenderer.invoke('receipt:listByVessel', vesselId),
+  receiptGet: (id: string) => ipcRenderer.invoke('receipt:get', id),
+  receiptNextNumber: (year?: number) => ipcRenderer.invoke('receipt:nextNumber', year),
+  receiptCreate: (data: any) => ipcRenderer.invoke('receipt:create', data),
+  receiptUpdate: (id: string, data: any) => ipcRenderer.invoke('receipt:update', id, data),
+  receiptDelete: (id: string) => ipcRenderer.invoke('receipt:delete', id),
+  receiptGetSettings: () => ipcRenderer.invoke('receipt:getSettings'),
+  receiptSetSettings: (settings: any) => ipcRenderer.invoke('receipt:setSettings', settings),
+
   // Analytics
   analyticsGetPresets: () => ipcRenderer.invoke('analytics:getPresets'),
   analyticsAddPreset: (name: string, filters: any) => ipcRenderer.invoke('analytics:addPreset', name, filters),

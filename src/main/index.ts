@@ -1825,6 +1825,46 @@ app.whenReady().then(() => {
     return db.getSanctionsReportChecks()
   })
 
+  // ── Receipts ──
+  safeHandle('receipt:list', (event) => {
+    requireSession(event)
+    return db.getReceipts()
+  })
+  safeHandle('receipt:listByVessel', (event, vesselId: string) => {
+    requireSession(event)
+    return db.getReceiptsByVessel(vesselId)
+  })
+  safeHandle('receipt:get', (event, id: string) => {
+    requireSession(event)
+    return db.getReceipt(id)
+  })
+  safeHandle('receipt:nextNumber', (event, year?: number) => {
+    requireSession(event)
+    return db.getNextReceiptNumber(year)
+  })
+  safeHandle('receipt:create', async (event, data: any) => {
+    const user = requireSession(event)
+    return db.createReceipt(data, user.id)
+  })
+  safeHandle('receipt:update', async (event, id: string, data: any) => {
+    requireSession(event)
+    return db.updateReceipt(id, data)
+  })
+  safeHandle('receipt:delete', async (event, id: string) => {
+    requireSession(event)
+    await db.deleteReceipt(id)
+    return { success: true }
+  })
+  safeHandle('receipt:getSettings', (event) => {
+    requireSession(event)
+    return db.getReceiptSettings()
+  })
+  safeHandle('receipt:setSettings', async (event, settings: any) => {
+    const user = requireSession(event)
+    await db.setReceiptSettings(settings, user.id)
+    return { success: true }
+  })
+
   // ── Analytics Presets ──
   safeHandle('analytics:getPresets', (event) => {
     const user = requireSession(event)

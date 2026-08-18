@@ -1736,3 +1736,58 @@ export interface SanctionsReportCheck extends SanctionsReportCheckInput {
   id: string
   checkedAt: string
 }
+
+// Receipts — payment receipts issued against vessel policies
+export interface ReceiptPolicy {
+  id?: string
+  receiptId?: string
+  policyDocId?: string | null
+  policyNumber: string
+  orderIndex?: number
+}
+
+export interface Receipt {
+  id: string
+  receiptNumber: string
+  receiptSerial: number
+  receiptYear: number
+  vesselId?: string | null
+  vesselName?: string | null
+  payerName: string
+  payerEntityId?: string | null
+  amount: number
+  currency: string
+  instalmentNumber?: number | null
+  coversText?: string | null
+  beingText?: string | null
+  amountWords?: string | null
+  city?: string | null
+  receiptDate: string
+  policies?: ReceiptPolicy[]
+  createdBy?: string | null
+  createdByName?: string | null
+  createdAt?: string
+  updatedAt?: string | null
+}
+
+export interface ReceiptInput {
+  vesselId?: string | null
+  vesselName?: string | null
+  payerName: string
+  payerEntityId?: string | null
+  amount: number
+  currency: string
+  instalmentNumber?: number | null
+  coversText?: string | null
+  beingText?: string | null
+  amountWords?: string | null
+  city?: string | null
+  receiptDate: string
+  receiptNumber?: string
+  policies?: ReceiptPolicy[]
+}
+
+export interface ReceiptSettings {
+  nextSerial: number
+  city: string
+}

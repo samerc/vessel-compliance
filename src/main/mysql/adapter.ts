@@ -1393,6 +1393,47 @@ export class MySQLAdapter {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             }
 
+            // Migration: Create receipts + receipt_policies tables (payment receipts)
+            {
+                const [rTables] = await this.pool.query("SHOW TABLES LIKE 'receipts'")
+                if ((rTables as any[]).length === 0) {
+                    await this.pool.query(`CREATE TABLE receipts (
+                        id VARCHAR(36) PRIMARY KEY,
+                        receipt_number VARCHAR(50) NOT NULL,
+                        receipt_serial INT NOT NULL,
+                        receipt_year INT NOT NULL,
+                        vessel_id VARCHAR(36) NULL,
+                        vessel_name VARCHAR(255) NULL,
+                        payer_name VARCHAR(255) NULL,
+                        payer_entity_id VARCHAR(36) NULL,
+                        amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+                        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+                        instalment_number INT NULL,
+                        covers_text VARCHAR(500) NULL,
+                        being_text TEXT NULL,
+                        amount_words TEXT NULL,
+                        city VARCHAR(100) NULL DEFAULT 'BEIRUT',
+                        receipt_date DATE NULL,
+                        created_by VARCHAR(36) NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NULL,
+                        INDEX idx_receipt_vessel (vessel_id),
+                        INDEX idx_receipt_year (receipt_year)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                }
+                const [rpTables] = await this.pool.query("SHOW TABLES LIKE 'receipt_policies'")
+                if ((rpTables as any[]).length === 0) {
+                    await this.pool.query(`CREATE TABLE receipt_policies (
+                        id VARCHAR(36) PRIMARY KEY,
+                        receipt_id VARCHAR(36) NOT NULL,
+                        policy_doc_id VARCHAR(36) NULL,
+                        policy_number VARCHAR(100) NULL,
+                        order_index INT DEFAULT 0,
+                        INDEX idx_rp_receipt (receipt_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                }
+            }
+
             // Warranty sets tables (disable FK checks to avoid collation mismatch)
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
@@ -10942,6 +10983,228 @@ export class MySQLAdapter {
             premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined,
             commissionPercent: r.commissionPercent != null ? Number(r.commissionPercent) : undefined
         }))
+    }
+
+    // ── Receipts ──────────────────────────────────────────────────────────
+    private mapReceiptRow(r: any): any {
+        return {
+            id: r.id,
+            receiptNumber: r.receiptNumber,
+            receiptSerial: Number(r.receiptSerial || 0),
+            receiptYear: Number(r.receiptYear || 0),
+            vesselId: r.vesselId || null,
+            vesselName: r.vesselName || null,
+            payerName: r.payerName || '',
+            payerEntityId: r.payerEntityId || null,
+            amount: r.amount != null ? Number(r.amount) : 0,
+            currency: r.currency || 'USD',
+            instalmentNumber: r.instalmentNumber != null ? Number(r.instalmentNumber) : null,
+            coversText: r.coversText || null,
+            beingText: r.beingText || null,
+            amountWords: r.amountWords || null,
+            city: r.city || null,
+            receiptDate: r.receiptDate ? (r.receiptDate instanceof Date ? r.receiptDate.toISOString().slice(0, 10) : String(r.receiptDate).slice(0, 10)) : '',
+            createdBy: r.createdBy || null,
+            createdByName: r.createdByName || null,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt || null
+        }
+    }
+
+    async getReceipts(): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
+                    r.receipt_year AS receiptYear, r.vessel_id AS vesselId,
+                    COALESCE(v.name, r.vessel_name) AS vesselName,
+                    r.payer_name AS payerName, r.payer_entity_id AS payerEntityId,
+                    r.amount, r.currency, r.instalment_number AS instalmentNumber,
+                    r.covers_text AS coversText, r.being_text AS beingText,
+                    r.amount_words AS amountWords, r.city, r.receipt_date AS receiptDate,
+                    r.created_by AS createdBy, u.username AS createdByName,
+                    r.created_at AS createdAt, r.updated_at AS updatedAt
+             FROM receipts r
+             LEFT JOIN vessels v ON r.vessel_id = v.id
+             LEFT JOIN users u ON r.created_by = u.id
+             ORDER BY r.receipt_year DESC, r.receipt_serial DESC`
+        )
+        return (rows as any[]).map(r => this.mapReceiptRow(r))
+    }
+
+    async getReceiptsByVessel(vesselId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
+                    r.receipt_year AS receiptYear, r.vessel_id AS vesselId,
+                    COALESCE(v.name, r.vessel_name) AS vesselName,
+                    r.payer_name AS payerName, r.payer_entity_id AS payerEntityId,
+                    r.amount, r.currency, r.instalment_number AS instalmentNumber,
+                    r.covers_text AS coversText, r.being_text AS beingText,
+                    r.amount_words AS amountWords, r.city, r.receipt_date AS receiptDate,
+                    r.created_by AS createdBy, u.username AS createdByName,
+                    r.created_at AS createdAt, r.updated_at AS updatedAt
+             FROM receipts r
+             LEFT JOIN vessels v ON r.vessel_id = v.id
+             LEFT JOIN users u ON r.created_by = u.id
+             WHERE r.vessel_id = ?
+             ORDER BY r.receipt_year DESC, r.receipt_serial DESC`,
+            [vesselId]
+        )
+        return (rows as any[]).map(r => this.mapReceiptRow(r))
+    }
+
+    async getReceipt(id: string): Promise<any | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
+                    r.receipt_year AS receiptYear, r.vessel_id AS vesselId,
+                    COALESCE(v.name, r.vessel_name) AS vesselName,
+                    r.payer_name AS payerName, r.payer_entity_id AS payerEntityId,
+                    r.amount, r.currency, r.instalment_number AS instalmentNumber,
+                    r.covers_text AS coversText, r.being_text AS beingText,
+                    r.amount_words AS amountWords, r.city, r.receipt_date AS receiptDate,
+                    r.created_by AS createdBy, u.username AS createdByName,
+                    r.created_at AS createdAt, r.updated_at AS updatedAt
+             FROM receipts r
+             LEFT JOIN vessels v ON r.vessel_id = v.id
+             LEFT JOIN users u ON r.created_by = u.id
+             WHERE r.id = ?`,
+            [id]
+        )
+        const list = rows as any[]
+        if (list.length === 0) return null
+        const receipt = this.mapReceiptRow(list[0])
+        const [pols] = await this.pool.query(
+            `SELECT id, receipt_id AS receiptId, policy_doc_id AS policyDocId,
+                    policy_number AS policyNumber, order_index AS orderIndex
+             FROM receipt_policies WHERE receipt_id = ? ORDER BY order_index`,
+            [id]
+        )
+        receipt.policies = pols as any[]
+        return receipt
+    }
+
+    async getReceiptSettings(): Promise<{ nextSerial: number; city: string }> {
+        const nextSerialRaw = await this.getSetting('receipt_next_serial')
+        const city = await this.getSetting('receipt_city')
+        return {
+            nextSerial: nextSerialRaw != null ? parseInt(nextSerialRaw, 10) || 1 : 1,
+            city: city || 'BEIRUT'
+        }
+    }
+
+    async setReceiptSettings(settings: { nextSerial: number; city: string }, updatedBy?: string): Promise<void> {
+        await this.setSetting('receipt_next_serial', String(Math.max(1, Math.floor(settings.nextSerial || 1))), updatedBy)
+        await this.setSetting('receipt_city', settings.city || 'BEIRUT', updatedBy)
+    }
+
+    // Peek the next receipt number without consuming the serial
+    async getNextReceiptNumber(year?: number): Promise<{ serial: number; year: number; number: string }> {
+        const { nextSerial } = await this.getReceiptSettings()
+        const y = year || new Date().getFullYear()
+        return { serial: nextSerial, year: y, number: `H${nextSerial}/${y}` }
+    }
+
+    async createReceipt(data: any, userId?: string): Promise<any> {
+        if (!this.pool) throw new Error('Database not connected')
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.beginTransaction()
+            const year = data.receiptDate ? new Date(data.receiptDate).getFullYear() : new Date().getFullYear()
+            let serial: number
+            let receiptNumber: string
+            // Allow an explicit override of the receipt number; otherwise consume the running serial
+            if (data.receiptNumber && String(data.receiptNumber).trim()) {
+                receiptNumber = String(data.receiptNumber).trim()
+                const m = receiptNumber.match(/(\d+)/)
+                serial = m ? parseInt(m[1], 10) : 0
+            } else {
+                const { nextSerial } = await this.getReceiptSettings()
+                serial = nextSerial
+                receiptNumber = `H${serial}/${year}`
+            }
+            const id = uuidv4()
+            await conn.execute(
+                `INSERT INTO receipts (id, receipt_number, receipt_serial, receipt_year, vessel_id, vessel_name,
+                    payer_name, payer_entity_id, amount, currency, instalment_number, covers_text,
+                    being_text, amount_words, city, receipt_date, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [id, receiptNumber, serial, year, data.vesselId || null, data.vesselName || null,
+                 data.payerName || '', data.payerEntityId || null, data.amount || 0, data.currency || 'USD',
+                 data.instalmentNumber != null ? data.instalmentNumber : null, data.coversText || null,
+                 data.beingText || null, data.amountWords || null, data.city || 'BEIRUT',
+                 data.receiptDate || null, userId || null]
+            )
+            const policies = Array.isArray(data.policies) ? data.policies : []
+            for (let i = 0; i < policies.length; i++) {
+                const p = policies[i]
+                await conn.execute(
+                    `INSERT INTO receipt_policies (id, receipt_id, policy_doc_id, policy_number, order_index)
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [uuidv4(), id, p.policyDocId || null, p.policyNumber || '', i]
+                )
+            }
+            // Advance the running serial past the one just used (only when auto-numbered / higher)
+            const { nextSerial: currentNext } = await this.getReceiptSettings()
+            if (serial >= currentNext) {
+                await this.setSetting('receipt_next_serial', String(serial + 1), userId)
+            }
+            await conn.commit()
+            return await this.getReceipt(id)
+        } catch (e) {
+            await conn.rollback()
+            throw e
+        } finally {
+            conn.release()
+        }
+    }
+
+    async updateReceipt(id: string, data: any): Promise<any> {
+        if (!this.pool) throw new Error('Database not connected')
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.beginTransaction()
+            const fields: string[] = []
+            const values: any[] = []
+            const map: Record<string, string> = {
+                receiptNumber: 'receipt_number', vesselId: 'vessel_id', vesselName: 'vessel_name',
+                payerName: 'payer_name', payerEntityId: 'payer_entity_id', amount: 'amount',
+                currency: 'currency', instalmentNumber: 'instalment_number', coversText: 'covers_text',
+                beingText: 'being_text', amountWords: 'amount_words', city: 'city', receiptDate: 'receipt_date'
+            }
+            for (const [key, col] of Object.entries(map)) {
+                if (key in data) { fields.push(`${col} = ?`); values.push(data[key] === undefined ? null : data[key]) }
+            }
+            if (fields.length > 0) {
+                fields.push('updated_at = CURRENT_TIMESTAMP')
+                values.push(id)
+                await conn.execute(`UPDATE receipts SET ${fields.join(', ')} WHERE id = ?`, values)
+            }
+            if (Array.isArray(data.policies)) {
+                await conn.execute('DELETE FROM receipt_policies WHERE receipt_id = ?', [id])
+                for (let i = 0; i < data.policies.length; i++) {
+                    const p = data.policies[i]
+                    await conn.execute(
+                        `INSERT INTO receipt_policies (id, receipt_id, policy_doc_id, policy_number, order_index)
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [uuidv4(), id, p.policyDocId || null, p.policyNumber || '', i]
+                    )
+                }
+            }
+            await conn.commit()
+            return await this.getReceipt(id)
+        } catch (e) {
+            await conn.rollback()
+            throw e
+        } finally {
+            conn.release()
+        }
+    }
+
+    async deleteReceipt(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM receipt_policies WHERE receipt_id = ?', [id])
+        await this.pool.execute('DELETE FROM receipts WHERE id = ?', [id])
     }
 
     async findActivePolicyDocForVessel(vesselId: string, quotationTypeCode: string): Promise<string | null> {
