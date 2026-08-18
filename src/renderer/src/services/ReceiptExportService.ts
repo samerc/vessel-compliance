@@ -1,20 +1,22 @@
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType,
-  BorderStyle, AlignmentType, VerticalAlign, Header, Footer, ImageRun
+  BorderStyle, AlignmentType, VerticalAlign, Header, Footer, ImageRun, TableLayoutType
 } from 'docx'
 import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
+import { numberToWords } from '../utils/numberToWords'
 import { Receipt } from '../../../shared/types'
 
 const FONT = 'Arial'
 const FONT_SIZE = 22 // 11pt
 
+// Column widths shared by the title row and the body table so they line up (DXA)
+const COL_LABEL = 2600
+const COL_VALUE = 6800
+const TABLE_W = COL_LABEL + COL_VALUE
+
 // ── Currency helpers ────────────────────────────────────────────────────
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$', EUR: '€', GBP: '£', AED: 'AED ', LBP: 'LBP ', CHF: 'CHF ', JPY: '¥'
-}
-const CURRENCY_WORDS: Record<string, string> = {
-  USD: 'US DOLLARS', EUR: 'EUROS', GBP: 'BRITISH POUNDS', AED: 'UAE DIRHAMS',
-  LBP: 'LEBANESE POUNDS', CHF: 'SWISS FRANCS', JPY: 'JAPANESE YEN'
 }
 
 export function currencySymbol(code: string): string {
@@ -26,61 +28,9 @@ export function formatReceiptAmount(amount: number, currency: string): string {
   return `${currencySymbol(currency)}${n}. -`
 }
 
-// ── Number → words (uppercase, hyphenated compound tens) ────────────────
-const ONES = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
-  'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN']
-const TENS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY']
-
-function twoDigitsToWords(n: number): string {
-  if (n < 20) return ONES[n]
-  const t = Math.floor(n / 10)
-  const o = n % 10
-  return o === 0 ? TENS[t] : `${TENS[t]}-${ONES[o]}`
-}
-
-function threeDigitsToWords(n: number): string {
-  const h = Math.floor(n / 100)
-  const rest = n % 100
-  const parts: string[] = []
-  if (h > 0) parts.push(`${ONES[h]} HUNDRED`)
-  if (rest > 0) parts.push(twoDigitsToWords(rest))
-  return parts.join(' ')
-}
-
-export function integerToWords(n: number): string {
-  if (n === 0) return 'ZERO'
-  const scales: [number, string][] = [
-    [1_000_000_000, 'BILLION'],
-    [1_000_000, 'MILLION'],
-    [1_000, 'THOUSAND']
-  ]
-  const parts: string[] = []
-  let remaining = Math.floor(n)
-  for (const [value, name] of scales) {
-    if (remaining >= value) {
-      const count = Math.floor(remaining / value)
-      parts.push(`${threeDigitsToWords(count)} ${name}`)
-      remaining %= value
-    }
-  }
-  if (remaining > 0) parts.push(threeDigitsToWords(remaining))
-  return parts.join(' ')
-}
-
-// Full uppercase amount in words: "US DOLLARS FIFTY-SEVEN THOUSAND TWO HUNDRED FIFTY ONLY"
-export function amountInWords(amount: number, currency: string): string {
-  const word = CURRENCY_WORDS[(currency || 'USD').toUpperCase()] || (currency || 'US DOLLARS').toUpperCase()
-  const rounded = Math.round((amount || 0) * 100) / 100
-  const intPart = Math.floor(rounded)
-  const cents = Math.round((rounded - intPart) * 100)
-  let s = `${word} ${integerToWords(intPart)}`
-  if (cents > 0) s += ` AND ${integerToWords(cents)} CENTS`
-  return `${s} ONLY`
-}
-
-// Ordinal for instalment: 1 → 1ST, 2 → 2ND, 3 → 3RD, 4 → 4TH ...
+// Ordinal for instalment: 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th ...
 export function ordinal(n: number): string {
-  const s = ['TH', 'ST', 'ND', 'RD']
+  const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
 }
@@ -95,17 +45,18 @@ export function formatReceiptDate(iso: string, city: string): string {
   return `${(city || 'BEIRUT').toUpperCase()}, ${MONTHS[(m || 1) - 1]} ${d}, ${y}`
 }
 
-// Auto-compose the BEING line from policies + instalment + vessel
+// Auto-compose the BEING line from policies + instalment + vessel (fallback only —
+// the editor normally stores the composed beingText). Proper case to match the receipt.
 export function buildBeingText(receipt: Receipt): string {
   const covers = (receipt.policies && receipt.policies.length > 0)
     ? receipt.policies.map(p => p.policyNumber).filter(Boolean).join(' & ')
     : (receipt.coversText || '')
   const instalmentPart = receipt.instalmentNumber
-    ? `${ordinal(receipt.instalmentNumber)} INSTALLMENT OF `
+    ? `${ordinal(receipt.instalmentNumber)} installment of `
     : ''
-  const coversPart = covers ? `COVERS ${covers} ` : ''
-  const vesselPart = receipt.vesselName ? `RE: M/V “${receipt.vesselName}”` : ''
-  return `SETTLEMENT ${instalmentPart}${coversPart}${vesselPart}`.trim()
+  const coversPart = covers ? `cover ${covers} ` : ''
+  const vesselPart = receipt.vesselName ? `Re: M/V “${receipt.vesselName}”` : ''
+  return `Settlement ${instalmentPart}${coversPart}${vesselPart}`.trim()
 }
 
 async function loadLogoAsBuffer(logoPath: string): Promise<{ buffer: ArrayBuffer; width: number; height: number } | null> {
@@ -136,14 +87,14 @@ function labelValueRow(label: string, value: string, opts?: { valueBold?: boolea
   return new TableRow({
     children: [
       new TableCell({
-        width: { size: 2600, type: WidthType.DXA },
+        width: { size: COL_LABEL, type: WidthType.DXA },
         verticalAlign: VerticalAlign.TOP,
         borders: cellBorders,
         margins: { top: 80, bottom: 80, left: 0, right: 120 },
         children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: label, bold: true, size: FONT_SIZE, font: FONT, color: '000000' })] })]
       }),
       new TableCell({
-        width: { size: 6800, type: WidthType.DXA },
+        width: { size: COL_VALUE, type: WidthType.DXA },
         verticalAlign: VerticalAlign.TOP,
         borders: cellBorders,
         margins: { top: 80, bottom: 80, left: 0, right: 0 },
@@ -173,7 +124,7 @@ export async function buildReceiptBlob(receipt: Receipt): Promise<{ blob: Blob; 
   } catch { /* no footer */ }
 
   const being = receipt.beingText && receipt.beingText.trim() ? receipt.beingText.trim() : buildBeingText(receipt)
-  const words = receipt.amountWords && receipt.amountWords.trim() ? receipt.amountWords.trim() : amountInWords(receipt.amount, receipt.currency)
+  const words = receipt.amountWords && receipt.amountWords.trim() ? receipt.amountWords.trim() : numberToWords(receipt.amount, receipt.currency)
   const dateStr = formatReceiptDate(receipt.receiptDate, receipt.city || 'BEIRUT')
 
   const children: (Paragraph | Table)[] = []
@@ -195,19 +146,21 @@ export async function buildReceiptBlob(receipt: Receipt): Promise<{ blob: Blob; 
     }
   }
 
-  // Title row: RECEIPT (left, large bold) + number (right, bold)
+  // Title row: RECEIPT (left) + number (right) — same column widths as the body so they line up
   children.push(new Table({
-    width: { size: 9400, type: WidthType.DXA },
+    width: { size: TABLE_W, type: WidthType.DXA },
+    columnWidths: [COL_LABEL, COL_VALUE],
+    layout: TableLayoutType.FIXED,
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
     rows: [new TableRow({
       children: [
         new TableCell({
-          width: { size: 4700, type: WidthType.DXA }, borders: cellBorders, verticalAlign: VerticalAlign.CENTER,
-          children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: 'RECEIPT', bold: true, size: 34, font: FONT, color: '000000' })] })]
+          width: { size: COL_LABEL, type: WidthType.DXA }, borders: cellBorders, verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: 'RECEIPT', bold: true, size: 26, font: FONT, color: '000000' })] })]
         }),
         new TableCell({
-          width: { size: 4700, type: WidthType.DXA }, borders: cellBorders, verticalAlign: VerticalAlign.CENTER,
-          children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [new TextRun({ text: receipt.receiptNumber, bold: true, size: 26, font: FONT, color: '000000' })] })]
+          width: { size: COL_VALUE, type: WidthType.DXA }, borders: cellBorders, verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [new TextRun({ text: receipt.receiptNumber, bold: true, size: 24, font: FONT, color: '000000' })] })]
         })
       ]
     })]
@@ -216,11 +169,13 @@ export async function buildReceiptBlob(receipt: Receipt): Promise<{ blob: Blob; 
 
   // Body label/value table
   children.push(new Table({
-    width: { size: 9400, type: WidthType.DXA },
+    width: { size: TABLE_W, type: WidthType.DXA },
+    columnWidths: [COL_LABEL, COL_VALUE],
+    layout: TableLayoutType.FIXED,
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
     rows: [
       labelValueRow('AMOUNT', formatReceiptAmount(receipt.amount, receipt.currency), { valueBold: true }),
-      labelValueRow('RECEIVED FROM', (receipt.payerName || '').toUpperCase(), { valueBold: true }),
+      labelValueRow('RECEIVED FROM', receipt.payerName || '', { valueBold: true }),
       labelValueRow('THE SUM OF', words),
       labelValueRow('BEING', being),
       labelValueRow('DATE', dateStr)

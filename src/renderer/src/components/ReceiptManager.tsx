@@ -4,8 +4,9 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
 import {
-  exportReceiptDocx, ordinal, amountInWords, formatReceiptAmount
+  exportReceiptDocx, ordinal, formatReceiptAmount
 } from '../services/ReceiptExportService'
+import { numberToWords } from '../utils/numberToWords'
 import {
   Receipt as ReceiptIcon, Plus, FileDown, Trash2, Pencil, Search, X, Settings, Ship
 } from 'lucide-react'
@@ -35,12 +36,12 @@ function parseInstalments(value: string): number[] {
   return Array.from(new Set(nums)).sort((a, b) => a - b)
 }
 
-// [1] → "1ST INSTALLMENT" · [1,2] → "1ST & 2ND INSTALLMENTS" · [1,2,3] → "1ST, 2ND & 3RD INSTALLMENTS"
+// [1] → "1st installment" · [1,2] → "1st & 2nd installments" · [1,2,3] → "1st, 2nd & 3rd installments"
 function instalmentPhrase(nums: number[], ord: (n: number) => string): string {
   const list = nums.length ? nums : [1]
   const ords = list.map(ord)
   const joined = ords.length === 1 ? ords[0] : `${ords.slice(0, -1).join(', ')} & ${ords[ords.length - 1]}`
-  return `${joined} INSTALLMENT${list.length > 1 ? 'S' : ''}`
+  return `${joined} installment${list.length > 1 ? 's' : ''}`
 }
 
 export default function ReceiptManager({ vesselId, vesselName, embedded = false }: ReceiptManagerProps) {
@@ -384,23 +385,23 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     return list
   }, [selectedPolicies, freeCovers, defaultInst])
 
-  // Split description: one clause per policy on its own line, joined with a trailing AND.
+  // Split description: one clause per policy on its own line, joined with a trailing "and".
   const autoBeing = useMemo(() => {
     const clauses = workingPolicies
       .filter(p => p.policyNumber)
       .map(p => {
-        const typ = p.typeName ? `${p.typeName.toUpperCase()} ` : ''
-        return `${instalmentPhrase(p.instalments, ordinal)} OF ${typ}COVER ${p.policyNumber}`
+        const typ = p.typeName ? `${p.typeName} ` : ''
+        return `${instalmentPhrase(p.instalments, ordinal)} of ${typ}cover ${p.policyNumber}`
       })
-    if (clauses.length === 0) return vName ? `SETTLEMENT RE: M/V “${vName}”` : 'SETTLEMENT'
-    // Each policy on its own line; "AND" trails every line except the last.
-    const lines = clauses.map((c, i) => `${i === 0 ? 'SETTLEMENT ' : ''}${c}${i < clauses.length - 1 ? ' AND' : ''}`)
+    if (clauses.length === 0) return vName ? `Settlement Re: M/V “${vName}”` : 'Settlement'
+    // Each policy on its own line; "and" trails every line except the last.
+    const lines = clauses.map((c, i) => `${i === 0 ? 'Settlement ' : ''}${c}${i < clauses.length - 1 ? ' and' : ''}`)
     let s = lines.join('\n')
-    if (vName) s += ` RE: M/V “${vName}”`
+    if (vName) s += ` Re: M/V “${vName}”`
     return s
   }, [workingPolicies, vName])
 
-  const autoWords = useMemo(() => amountInWords(amountNum, currency), [amountNum, currency])
+  const autoWords = useMemo(() => numberToWords(amountNum, currency), [amountNum, currency])
 
   const beingValue = beingOverride != null ? beingOverride : autoBeing
   const wordsValue = wordsOverride != null ? wordsOverride : autoWords
@@ -612,7 +613,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
                   const a = assureds.find(x => x.entityId === val)
                   const name = a ? (entityMap[a.entityId] || '') : ''
                   setPayerEntityId(val || null)
-                  setPayerName(name.toUpperCase())
+                  setPayerName(name)
                 }
               }}
             >
