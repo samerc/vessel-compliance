@@ -136,9 +136,11 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
         .filter(t => !items.some(it => it.hullTextId === t.id))
         .filter(t => quotation.ivEnabled || (t.section || 'hm') !== 'iv')
 
-    // Per-vessel combined H&M/IV table (fleet quotations, no value options / single hull clause).
-    // Currency can be overridden per vessel; untouched vessels inherit the quotation default.
-    const perVesselMode = valueOptions.length === 0 && hullAlts.filter(a => !a.vesselScopeId).length <= 1 && qVessels.length > 1
+    // Per-vessel combined H&M/IV table (fleet quotations, no value options).
+    // Agreed value is a per-vessel property, so multiple vessels always use this table —
+    // alternatives only affect conditions/premium, not the value. Currency can be overridden
+    // per vessel; untouched vessels inherit the quotation default.
+    const perVesselMode = valueOptions.length === 0 && qVessels.length > 1
     const curOf = (qv: QuotationVessel) => qv.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'
     const sumByCur = (field: 'agreedValue' | 'ivValue') => {
         const m: Record<string, number> = {}
@@ -204,7 +206,7 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                         <Plus size={12} /> Add Option
                     </button>
                 </div>
-            ) : hullAlts.filter(a => !a.vesselScopeId).length > 1 ? (
+            ) : hullAlts.filter(a => !a.vesselScopeId).length > 1 && qVessels.length <= 1 ? (
                 <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1 }}>

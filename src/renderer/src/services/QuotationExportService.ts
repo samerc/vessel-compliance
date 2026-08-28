@@ -1380,8 +1380,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dHasPerVesselValues = dIsMultiVessel && data.quotationVessels.some(v => v.agreedValue != null)
     const dHmCurr = data.quotation.agreedValueCurrency || 'USD'
 
-    // Per-alternative agreed values
-    const dHasPerAltValues = data.hullAlternatives.length > 1 && data.hullAlternatives.some(a => a.agreedValue != null)
+    // Per-alternative agreed values — only for single-vessel quotes; with multiple vessels the
+    // agreed value is a per-vessel property (alternatives affect conditions/premium, not value).
+    const dHasPerAltValues = !dIsMultiVessel && data.hullAlternatives.length > 1 && data.hullAlternatives.some(a => a.agreedValue != null)
 
     // Multi-value options (independent of alternatives)
     const dHasValueOptions = data.agreedValueOptions.length > 0
