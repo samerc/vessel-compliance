@@ -253,6 +253,9 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         const ud = v.upccExcluded ? 0 : (upccType === 'amount' ? upccFixedAmt : an * upccPct / 100)
         return an - ud
     }
+    // Instalment amount (editor only): payable (or premium when no discount) ÷ number of instalments
+    const numInst = quotation.numInstalments || 1
+    const instFor = (tech: number, v: typeof qVessels[0]) => (hasDiscount ? payableFor(tech, v) : tech) / numInst
     const renderHullAltPremiums = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
             {hullAlternatives.map((alt, idx) => {
@@ -280,6 +283,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                             placeholder={premiumLabel} style={{ width: '160px', textAlign: 'right' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                         {hasDiscount && tech > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(payableFor(tech, v))}</span>}
+                                        {numInst > 1 && tech > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>· {numInst} × {currency} {fmtAmt(instFor(tech, v))}</span>}
                                     </div>
                                 )
                             })}
@@ -288,6 +292,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 <span style={{ width: '160px', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>{altTotal > 0 ? fmtAmt(altTotal) : '-'}</span>
                                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                 {hasDiscount && altTotal > 0 && <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(altPayable)}</span>}
+                                {numInst > 1 && altTotal > 0 && <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>· {numInst} × {currency} {fmtAmt((hasDiscount ? altPayable : altTotal) / numInst)}</span>}
                             </div>
                         </div>
                     )
@@ -502,6 +507,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         </label>
                                         <input type="number" value={quotation.premiumAmount || ''} onChange={e => setQ(p => ({ ...p, premiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('premiumAmount', parseFloat(e.target.value) || null)} placeholder="Amount" style={{ flex: 1, maxWidth: '200px' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        {numInst > 1 && (quotation.premiumAmount || 0) > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>· {numInst} × {currency} {fmtAmt((hasDiscount ? payablePremium : (quotation.premiumAmount || 0)) / numInst)}</span>}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
                                             <label style={{ fontSize: '0.72rem', color: 'var(--danger)', whiteSpace: 'nowrap' }}>Previous:</label>
                                             <input type="number" value={quotation.previousPremiumAmount ?? ''} onChange={e => setQ(p => ({ ...p, previousPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('previousPremiumAmount', parseFloat(e.target.value) || null)} placeholder="—" style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }} />
@@ -620,6 +626,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         <td style={{ padding: '6px 10px', fontWeight: 600, textTransform: 'uppercase' }}>{v.name || v.vesselLabel}</td>
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.premiumAmount || ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, premiumAmount: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null)} style={{ width: '130px', padding: '3px 6px', textAlign: 'right' }} />
+                                            {numInst > 1 && vPrem > 0 && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{numInst} × {currency} {fmtAmt((hasDiscount ? vPayable : vPrem) / numInst)}</div>}
                                         </td>
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.previousPremium ?? ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, previousPremium: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null, 'previousPremium')} placeholder="—" style={{ width: '100px', padding: '3px 6px', textAlign: 'right', fontSize: '0.78rem', color: 'var(--danger)' }} />
