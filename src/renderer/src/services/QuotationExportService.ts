@@ -2557,7 +2557,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       return afterNcb - upccDed
     }
     const wIsMultiVessel = data.quotationVessels.length >= 2
-    const wHasVesselPremiums = wIsMultiVessel && data.quotationVessels.some(v => v.premiumAmount)
+    // Hull quotes with alternatives price per alternative, not per vessel — don't let stale
+    // per-vessel premium values divert the export away from the per-alternative rendering.
+    const wHullMultiAlt = wq.quotationTypeCode === 'H' && (data.hullAlternatives.filter(a => !a.vesselScopeId).length > 1 || data.hullAlternatives.some(a => a.vesselScopeId))
+    const wHasVesselPremiums = wIsMultiVessel && !wHullMultiAlt && data.quotationVessels.some(v => v.premiumAmount)
 
     if (wHasVesselPremiums) {
       const vpColonW = 200

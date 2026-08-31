@@ -178,7 +178,9 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const upccPct = quotation.upccDiscountPercent || 0
     const upccFixedAmt = quotation.upccDiscountAmount || 0
     const isMultiVessel = qVessels.length >= 2
-    const technicalPremium = isMultiVessel
+    // Hull quotes with alternatives price per alternative (not per vessel), regardless of vessel count.
+    const hullMultiAlt = quotation.quotationTypeCode === 'H' && (hullAlternatives.filter(a => !a.vesselScopeId).length > 1 || hullAlternatives.some(a => a.vesselScopeId))
+    const technicalPremium = (isMultiVessel && !hullMultiAlt)
         ? qVessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
         : (quotation.premiumAmount || 0)
 
@@ -194,7 +196,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const ncbDeduction = ncbType === 'amount' ? ncbFixedAmt : technicalPremium * ncbPct / 100
     const afterNcb = technicalPremium - ncbDeduction
     const upccDeduction = upccType === 'amount' ? upccFixedAmt : afterNcb * upccPct / 100
-    const payablePremium = isMultiVessel && hasDiscount
+    const payablePremium = (isMultiVessel && !hullMultiAlt && hasDiscount)
         ? qVessels.reduce((sum, v) => sum + vesselPayable(v), 0)
         : afterNcb - upccDeduction
     const premiumLabel = hasDiscount ? 'Technical Premium' : 'Premium'
@@ -220,6 +222,37 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         })))
         setInstalments(updated)
     }
+
+    // Per-alternative hull premium inputs — shared by single- and multi-vessel layouts
+    const renderHullAltPremiums = () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+            {hullAlternatives.map((alt, idx) => {
+                const clause = hullClauses.find(c => c.id === alt.hullClauseId)
+                const vessel = alt.vesselScopeId ? qVessels.find(v => v.id === alt.vesselScopeId) : null
+                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                const accentColor = altColors[idx % altColors.length]
+                const label = vessel
+                    ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
+                    : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
+                return (
+                    <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
+                            {label}
+                        </label>
+                        <input type="number" value={alt.premiumAmount || ''} onChange={e => setHullAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updateAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                    </div>
+                )
+            })}
+            {quotation.ivEnabled && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Increased Value</label>
+                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                </div>
+            )}
+        </div>
+    )
 
     return (
         <div>
@@ -272,34 +305,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         </div>
                     ) :
                     /* Hull with multiple alternatives or per-vessel mode: per-alternative/vessel premium */
-                    quotation.quotationTypeCode === 'H' && (hullAlternatives.length > 1 || hullAlternatives.some(a => a.vesselScopeId)) ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
-                            {hullAlternatives.map((alt, idx) => {
-                                const clause = hullClauses.find(c => c.id === alt.hullClauseId)
-                                const vessel = alt.vesselScopeId ? qVessels.find(v => v.id === alt.vesselScopeId) : null
-                                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-                                const accentColor = altColors[idx % altColors.length]
-                                const label = vessel
-                                    ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
-                                    : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
-                                return (
-                                    <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
-                                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
-                                            {label}
-                                        </label>
-                                        <input type="number" value={alt.premiumAmount || ''} onChange={e => setHullAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updateAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
-                                    </div>
-                                )
-                            })}
-                            {quotation.ivEnabled && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Increased Value</label>
-                                    <input type="number" value={quotation.ivPremiumAmount || ''} onChange={e => setQ(p => ({ ...p, ivPremiumAmount: parseFloat(e.target.value) || undefined }))} onBlur={e => updateField('ivPremiumAmount', parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
-                                </div>
-                            )}
-                        </div>
+                    hullMultiAlt ? (
+                        renderHullAltPremiums()
                     ) : valueOptions.length > 0 ? (
                         /* Value options replace Section A — each option has its own premium */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
@@ -525,8 +532,11 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 </div>
             )}
 
-            {/* Multi-vessel: per-vessel premium table (standard, non-war-excess) */}
-            {isMultiVessel && !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) && (() => {
+            {/* Multi-vessel hull with alternatives: per-alternative premium (not per vessel) */}
+            {isMultiVessel && hullMultiAlt && renderHullAltPremiums()}
+
+            {/* Multi-vessel: per-vessel premium table (standard, non-war-excess, non-hull-alternatives) */}
+            {isMultiVessel && !hullMultiAlt && !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) && (() => {
                 return (
                 <div style={{ marginBottom: '16px' }}>
                     <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: '700px', fontSize: '0.82rem' }}>
@@ -588,8 +598,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 </div>
             )})()}
 
-            {/* Payable Premium summary (single vessel only) */}
-            {!isMultiVessel && hasDiscount && technicalPremium > 0 && (() => {
+            {/* Payable Premium summary (single vessel, or multi-vessel hull with alternatives) */}
+            {(!isMultiVessel || hullMultiAlt) && hasDiscount && technicalPremium > 0 && (() => {
                 const computePayable = (tech: number) => {
                     const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
                     const an = tech - nd
@@ -597,7 +607,6 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                     return an - ud
                 }
                 const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
-                const hullMultiAlt = quotation.quotationTypeCode === 'H' && (hullAlternatives.length > 1 || hullAlternatives.some(a => a.vesselScopeId))
                 const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
                 const anyMultiAlt = hullMultiAlt || piMultiAlt || valueOptions.length > 0
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
