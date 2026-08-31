@@ -2618,6 +2618,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         mRows.push(new TableRow({ children: ivCells }))
       }
       premContent.push(new Table({ rows: mRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: mCols, layout: TableLayoutType.FIXED }))
+      premContent.push(emptyP())
     } else if (wHasVesselPremiums) {
       const vpColonW = 200
       const vpNameW = Math.round(BODY_W * 0.40)
