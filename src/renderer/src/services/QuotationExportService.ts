@@ -2576,9 +2576,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (wHullMatrix) {
       // Table: column header (Vessel | Technical Premium | Payable Premium), then a block per
       // alternative — alternative name (with "per annum"), vessel rows (plain amounts), bold total.
-      const mNameW = wHasDiscount ? Math.round(BODY_W * 0.40) : Math.round(BODY_W * 0.55)
-      const mPremW = wHasDiscount ? Math.round(BODY_W * 0.32) : (BODY_W - mNameW)
-      const mPayW = BODY_W - mNameW - mPremW
+      // Fit inside the body cell's content area (cell has 80 DXA left+right insets) so the
+      // right-aligned Payable column isn't clipped at the page margin.
+      const mTableW = BODY_W - 200
+      const mNameW = wHasDiscount ? Math.round(mTableW * 0.38) : Math.round(mTableW * 0.55)
+      const mPremW = wHasDiscount ? Math.round(mTableW * 0.31) : (mTableW - mNameW)
+      const mPayW = mTableW - mNameW - mPremW
       const mCols = wHasDiscount ? [mNameW, mPremW, mPayW] : [mNameW, mPremW]
       const mNone = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
       const mLine = { style: BorderStyle.SINGLE, size: 4, color: '999999' }
@@ -2588,8 +2591,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         width: { size: w, type: WidthType.DXA },
         children: [new Paragraph({ alignment: opts?.align, spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: opts?.bold, color: '000000' })] })]
       })
-      const mSpanRow = (text: string) => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })] })
-      const mSpacerRow = () => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [emptyP()] })] })
+      const mSpanRow = (text: string) => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: mTableW, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })] })
+      const mSpacerRow = () => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: mTableW, type: WidthType.DXA }, children: [emptyP()] })] })
       const mRows: TableRow[] = []
       // Column header
       const headerCells = [mCell('Vessel', mNameW, { bold: true, bottom: true }), mCell(wHasDiscount ? 'Technical Premium' : 'Premium', mPremW, { bold: true, align: AlignmentType.RIGHT, bottom: true })]
@@ -2619,7 +2622,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (wHasDiscount) ivCells.push(mCell('', mPayW))
         mRows.push(new TableRow({ children: ivCells }))
       }
-      premContent.push(new Table({ rows: mRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: mCols, layout: TableLayoutType.FIXED }))
+      premContent.push(new Table({ rows: mRows, width: { size: mTableW, type: WidthType.DXA }, columnWidths: mCols, layout: TableLayoutType.FIXED }))
       premContent.push(emptyP())
     } else if (wHasVesselPremiums) {
       const vpColonW = 200
