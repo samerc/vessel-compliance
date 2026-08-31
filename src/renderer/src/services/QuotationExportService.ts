@@ -1011,9 +1011,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
               }))
             }))
           }
-          // Assureds without a vessel label
+          // Assureds without a vessel label apply to all vessels — give them their own header
+          // so they don't visually attach to the last vessel's block.
           const noLabel = data.assureds.filter(a => !a.vesselLabel)
           if (noLabel.length > 0) {
+            insuredContent.push(bp('ALL VESSELS'))
             insuredContent.push(new Table({
               width: { size: BODY_W, type: WidthType.DXA },
               layout: TableLayoutType.FIXED,
