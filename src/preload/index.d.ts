@@ -365,6 +365,8 @@ export interface Api {
   hullUpdateQuotationAlternative: (id: string, updates: { hullClauseId?: string; label?: string; premiumAmount?: number | null; vesselScopeId?: string | null; agreedValue?: number | null; agreedValueCurrency?: string; includeInShared?: boolean }) => Promise<void>
   hullDeleteQuotationAlternative: (id: string) => Promise<void>
   hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
+  hullGetAltVesselPremiums: (quotationId: string) => Promise<import('../shared/types').HullAltVesselPremium[]>
+  hullSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) => Promise<number>
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>
   hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>

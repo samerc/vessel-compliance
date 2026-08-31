@@ -1434,6 +1434,27 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: per-vessel premium under a hull alternative (fleet quotes with alternatives)
+            {
+                const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_hull_alt_vessel_premiums'")
+                if ((t as any[]).length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    try {
+                        await this.pool.query(`CREATE TABLE quotation_hull_alt_vessel_premiums (
+                            id VARCHAR(36) PRIMARY KEY,
+                            alternative_id VARCHAR(36) NOT NULL,
+                            quotation_vessel_id VARCHAR(36) NOT NULL,
+                            premium_amount DECIMAL(15,2) DEFAULT NULL,
+                            UNIQUE KEY uniq_alt_vessel (alternative_id, quotation_vessel_id),
+                            INDEX idx_havp_alt (alternative_id),
+                            FOREIGN KEY (alternative_id) REFERENCES quotation_hull_alternatives(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    } finally {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                }
+            }
+
             // Warranty sets tables (disable FK checks to avoid collation mismatch)
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
@@ -12800,6 +12821,44 @@ export class MySQLAdapter {
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_hull_alternatives SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    // Per-vessel premium under a hull alternative (matrix for fleet quotes with alternatives)
+    async getHullAltVesselPremiums(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT havp.id, havp.alternative_id AS alternativeId, havp.quotation_vessel_id AS quotationVesselId,
+                    havp.premium_amount AS premiumAmount
+             FROM quotation_hull_alt_vessel_premiums havp
+             JOIN quotation_hull_alternatives a ON havp.alternative_id = a.id
+             WHERE a.quotation_id = ?`,
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({ ...r, premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null }))
+    }
+
+    // Upsert a vessel's premium for an alternative, then recompute + store the alternative total.
+    // Returns the new alternative total (sum of its vessels).
+    async setHullAltVesselPremium(alternativeId: string, quotationVesselId: string, amount: number | null): Promise<number> {
+        if (!this.pool) return 0
+        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        try {
+            await this.pool.execute(
+                `INSERT INTO quotation_hull_alt_vessel_premiums (id, alternative_id, quotation_vessel_id, premium_amount)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE premium_amount = VALUES(premium_amount)`,
+                [uuidv4(), alternativeId, quotationVesselId, amount ?? null]
+            )
+        } finally {
+            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+        }
+        const [sumRows] = await this.pool.query(
+            'SELECT COALESCE(SUM(premium_amount), 0) AS total FROM quotation_hull_alt_vessel_premiums WHERE alternative_id = ?',
+            [alternativeId]
+        )
+        const total = Number((sumRows as any[])[0]?.total || 0)
+        await this.pool.execute('UPDATE quotation_hull_alternatives SET premium_amount = ? WHERE id = ?', [total || null, alternativeId])
+        return total
     }
 
     async deleteQuotationHullAlternative(id: string): Promise<void> {

@@ -838,6 +838,14 @@ export interface QuotationHullAlternative {
   includeInShared?: boolean
 }
 
+// Per-vessel premium under a specific hull alternative (fleet quotes with alternatives)
+export interface HullAltVesselPremium {
+  id: string
+  alternativeId: string
+  quotationVesselId: string
+  premiumAmount: number | null
+}
+
 export interface QuotationPIAlternative {
   id: string
   quotationId: string

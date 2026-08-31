@@ -97,6 +97,7 @@ interface QuotationData {
   hullAdditionalConditions: QuotationHullAdditionalCondition[]
   allHullAdditionalConditions: HullAdditionalCondition[]
   hullAlternatives: QuotationHullAlternative[]
+  hullAltVesselPremiums: { alternativeId: string; quotationVesselId: string; premiumAmount: number | null }[]
   hullCustomConditions: { id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // Survey warranties
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
@@ -236,6 +237,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
 
   // Fetch agreed value options
   const agreedValueOptionsRaw = await window.api.hullGetAgreedValueOptions(quotation.id)
+  const hullAltVesselPremiumsRaw = await window.api.hullGetAltVesselPremiums(quotation.id)
 
   // Fetch cargo-specific data
   const isCargo = quotation.quotationTypeCode === 'C'
@@ -365,6 +367,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+    hullAltVesselPremiums: Array.isArray(hullAltVesselPremiumsRaw) ? hullAltVesselPremiumsRaw : [],
     hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => {
       let resolved = (sw.text || '')
@@ -2561,8 +2564,37 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     // per-vessel premium values divert the export away from the per-alternative rendering.
     const wHullMultiAlt = wq.quotationTypeCode === 'H' && (data.hullAlternatives.filter(a => !a.vesselScopeId).length > 1 || data.hullAlternatives.some(a => a.vesselScopeId))
     const wHasVesselPremiums = wIsMultiVessel && !wHullMultiAlt && data.quotationVessels.some(v => v.premiumAmount)
+    // Fleet hull with shared alternatives → per-vessel premium breakdown under each alternative (matrix)
+    const wSharedAlts = data.hullAlternatives.filter(a => !a.vesselScopeId)
+    const wHullMatrix = wIsMultiVessel && wq.quotationTypeCode === 'H'
+      && wSharedAlts.length > 1 && !data.hullAlternatives.some(a => a.vesselScopeId)
+      && data.hullAltVesselPremiums.length > 0
+    const wAvpMap = new Map(data.hullAltVesselPremiums.map(r => [`${r.alternativeId}:${r.quotationVesselId}`, r.premiumAmount || 0]))
 
-    if (wHasVesselPremiums) {
+    if (wHullMatrix) {
+      for (let ai = 0; ai < wSharedAlts.length; ai++) {
+        const alt = wSharedAlts[ai]
+        const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+        premContent.push(bp(`Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`))
+        let altTech = 0, altPay = 0
+        for (const v of data.quotationVessels) {
+          const tech = wAvpMap.get(`${alt.id}:${v.id}`) || 0
+          altTech += tech
+          const pay = wHasDiscount ? wComputePayable(tech, v) : tech
+          altPay += pay
+          const runs: TextRun[] = [new TextRun({ text: `${(v.name || v.vesselLabel).toUpperCase()}: ${formatCurrency(tech, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', color: '000000' })]
+          if (wHasDiscount) runs.push(new TextRun({ text: `  (payable ${formatCurrency(pay, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: '000000' }))
+          premContent.push(new Paragraph({ children: runs }))
+        }
+        const totalRuns: TextRun[] = [new TextRun({ text: `Total: ${formatCurrency(altTech, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
+        if (wHasDiscount) totalRuns.push(new TextRun({ text: `  (payable ${formatCurrency(altPay, wq.premiumCurrency)})`, size: 22, font: 'Arial', bold: true, color: '000000' }))
+        premContent.push(new Paragraph({ children: totalRuns }))
+        premContent.push(emptyP())
+      }
+      if (wq.ivEnabled && wq.ivPremiumAmount != null) {
+        premContent.push(new Paragraph({ children: [new TextRun({ text: `Increased Value: ${formatCurrency(wq.ivPremiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', color: '000000' })] }))
+      }
+    } else if (wHasVesselPremiums) {
       const vpColonW = 200
       const vpNameW = Math.round(BODY_W * 0.40)
       const vpAmtW = BODY_W - vpNameW - vpColonW

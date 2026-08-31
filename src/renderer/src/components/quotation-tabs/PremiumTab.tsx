@@ -33,6 +33,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
     const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
     const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
+    // Per-vessel premium under each hull alternative, keyed `${altId}:${vesselId}`
+    const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
 
     useEffect(() => {
         loadInstalments()
@@ -57,6 +59,11 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
             window.api.hullGetQuotationAlternatives(quotation.id).then(a => setHullAlternatives(Array.isArray(a) ? a : []))
             window.api.hullGetClauses().then(c => setHullClauses(Array.isArray(c) ? c : []))
             window.api.hullGetAgreedValueOptions(quotation.id).then(o => setValueOptions(Array.isArray(o) ? o : [])).catch(() => {})
+            window.api.hullGetAltVesselPremiums(quotation.id).then(rows => {
+                const m: Record<string, number> = {}
+                for (const r of (Array.isArray(rows) ? rows : [])) if (r.premiumAmount != null) m[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+                setAltVesselPrems(m)
+            }).catch(() => {})
         }
         if (quotation.quotationTypeCode === 'P') {
             window.api.piGetQuotationAlternatives(quotation.id).then(a => setPiAlternatives(Array.isArray(a) ? a : []))
@@ -89,6 +96,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const updatePIAlternativePremium = async (altId: string, amount: number | null) => {
         await window.api.piUpdateQuotationAlternative(altId, { premiumAmount: amount })
         setPiAlternatives(prev => prev.map(a => a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
+    }
+
+    // Fleet hull matrix: set a vessel's premium under an alternative; adapter recomputes the alt total.
+    const updateAltVesselPremium = async (altId: string, vesselId: string, amount: number | null) => {
+        setAltVesselPrems(prev => ({ ...prev, [`${altId}:${vesselId}`]: amount || 0 }))
+        const newAltTotal = await window.api.hullSetAltVesselPremium(altId, vesselId, amount)
+        setHullAlternatives(prev => prev.map(a => a.id === altId ? { ...a, premiumAmount: newAltTotal || undefined } : a))
+        const newTotal = hullAlternatives.reduce((sum, a) => sum + (a.id === altId ? (newAltTotal || 0) : (a.premiumAmount || 0)), 0)
+        setQ(p => ({ ...p, premiumAmount: newTotal || undefined }))
+        updateField('premiumAmount', newTotal || null)
     }
 
     const getDefaultDays = (count: number, index: number): number | undefined => {
@@ -223,17 +240,58 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         setInstalments(updated)
     }
 
-    // Per-alternative hull premium inputs — shared by single- and multi-vessel layouts
+    // Per-alternative hull premium inputs — shared by single- and multi-vessel layouts.
+    // Fleet quotes get a per-vessel breakdown under each alternative (matrix); the alternative
+    // total is the sum of its vessels. Single-vessel quotes keep one input per alternative.
+    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+    const fmtAmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const perVesselAlts = isMultiVessel && !hullAlternatives.some(a => a.vesselScopeId)
+    // Payable (after NCB/UPCC) for an arbitrary technical amount + vessel exclusion flags
+    const payableFor = (tech: number, v: typeof qVessels[0]) => {
+        const nd = v.ncbExcluded ? 0 : (ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100)
+        const an = tech - nd
+        const ud = v.upccExcluded ? 0 : (upccType === 'amount' ? upccFixedAmt : an * upccPct / 100)
+        return an - ud
+    }
     const renderHullAltPremiums = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
             {hullAlternatives.map((alt, idx) => {
                 const clause = hullClauses.find(c => c.id === alt.hullClauseId)
                 const vessel = alt.vesselScopeId ? qVessels.find(v => v.id === alt.vesselScopeId) : null
-                const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                 const accentColor = altColors[idx % altColors.length]
                 const label = vessel
                     ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
                     : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
+                if (perVesselAlts) {
+                    const altTotal = qVessels.reduce((s, v) => s + (altVesselPrems[`${alt.id}:${v.id}`] || 0), 0)
+                    const altPayable = qVessels.reduce((s, v) => s + payableFor(altVesselPrems[`${alt.id}:${v.id}`] || 0, v), 0)
+                    return (
+                        <div key={alt.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: accentColor, marginBottom: '8px' }}>{label}</div>
+                            {qVessels.map(v => {
+                                const tech = altVesselPrems[`${alt.id}:${v.id}`] || 0
+                                return (
+                                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '160px', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name || v.vesselLabel}</span>
+                                        <input type="number"
+                                            value={altVesselPrems[`${alt.id}:${v.id}`] || ''}
+                                            onChange={e => setAltVesselPrems(prev => ({ ...prev, [`${alt.id}:${v.id}`]: parseFloat(e.target.value) || 0 }))}
+                                            onBlur={e => updateAltVesselPremium(alt.id, v.id, parseFloat(e.target.value) || null)}
+                                            placeholder={premiumLabel} style={{ width: '160px', textAlign: 'right' }} />
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        {hasDiscount && tech > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(payableFor(tech, v))}</span>}
+                                    </div>
+                                )
+                            })}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--table-border)', paddingTop: '6px', marginTop: '2px' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, minWidth: '160px' }}>Total</span>
+                                <span style={{ width: '160px', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>{altTotal > 0 ? fmtAmt(altTotal) : '-'}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                {hasDiscount && altTotal > 0 && <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(altPayable)}</span>}
+                            </div>
+                        </div>
+                    )
+                }
                 return (
                     <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', borderLeft: `3px solid ${accentColor}` }}>
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, color: accentColor, minWidth: '140px', whiteSpace: 'nowrap' }}>
@@ -598,8 +656,9 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 </div>
             )})()}
 
-            {/* Payable Premium summary (single vessel, or multi-vessel hull with alternatives) */}
-            {(!isMultiVessel || hullMultiAlt) && hasDiscount && technicalPremium > 0 && (() => {
+            {/* Payable Premium summary (single vessel, or multi-vessel hull with fleet-total alternatives).
+                Suppressed for the per-vessel matrix, which already shows payable inline. */}
+            {(!isMultiVessel || (hullMultiAlt && !perVesselAlts)) && hasDiscount && technicalPremium > 0 && (() => {
                 const computePayable = (tech: number) => {
                     const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
                     const an = tech - nd
