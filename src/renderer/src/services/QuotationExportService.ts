@@ -2572,28 +2572,46 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wAvpMap = new Map(data.hullAltVesselPremiums.map(r => [`${r.alternativeId}:${r.quotationVesselId}`, r.premiumAmount || 0]))
 
     if (wHullMatrix) {
+      // One table: alternative header rows, per-vessel rows (Vessel | Premium | Payable), bold totals
+      const mNameW = wHasDiscount ? Math.round(BODY_W * 0.40) : Math.round(BODY_W * 0.55)
+      const mPremW = wHasDiscount ? Math.round(BODY_W * 0.32) : (BODY_W - mNameW)
+      const mPayW = BODY_W - mNameW - mPremW
+      const mCols = wHasDiscount ? [mNameW, mPremW, mPayW] : [mNameW, mPremW]
+      const mNone = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+      const mTopBorder = { top: { style: BorderStyle.SINGLE, size: 4, color: '999999' }, bottom: mNone, left: mNone, right: mNone }
+      const mCell = (text: string, w: number, opts?: { bold?: boolean; align?: typeof AlignmentType.RIGHT; top?: boolean }) => new TableCell({
+        borders: opts?.top ? mTopBorder : noBorders(),
+        width: { size: w, type: WidthType.DXA },
+        children: [new Paragraph({ alignment: opts?.align, spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: opts?.bold, color: '000000' })] })]
+      })
+      const mSpacerRow = () => new TableRow({ children: [new TableCell({ borders: noBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [emptyP()] })] })
+      const mRows: TableRow[] = []
       for (let ai = 0; ai < wSharedAlts.length; ai++) {
         const alt = wSharedAlts[ai]
         const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
-        premContent.push(bp(`Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`))
+        if (ai > 0) mRows.push(mSpacerRow())
+        mRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })] }))
         let altTech = 0, altPay = 0
         for (const v of data.quotationVessels) {
           const tech = wAvpMap.get(`${alt.id}:${v.id}`) || 0
           altTech += tech
           const pay = wHasDiscount ? wComputePayable(tech, v) : tech
           altPay += pay
-          const runs: TextRun[] = [new TextRun({ text: `${(v.name || v.vesselLabel).toUpperCase()}: ${formatCurrency(tech, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', color: '000000' })]
-          if (wHasDiscount) runs.push(new TextRun({ text: `  (payable ${formatCurrency(pay, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: '000000' }))
-          premContent.push(new Paragraph({ children: runs }))
+          const cells = [mCell((v.name || v.vesselLabel).toUpperCase(), mNameW), mCell(`${formatCurrency(tech, wq.premiumCurrency)} per annum`, mPremW, { align: AlignmentType.RIGHT })]
+          if (wHasDiscount) cells.push(mCell(`payable ${formatCurrency(pay, wq.premiumCurrency)}`, mPayW, { align: AlignmentType.RIGHT }))
+          mRows.push(new TableRow({ children: cells }))
         }
-        const totalRuns: TextRun[] = [new TextRun({ text: `Total: ${formatCurrency(altTech, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
-        if (wHasDiscount) totalRuns.push(new TextRun({ text: `  (payable ${formatCurrency(altPay, wq.premiumCurrency)})`, size: 22, font: 'Arial', bold: true, color: '000000' }))
-        premContent.push(new Paragraph({ children: totalRuns }))
-        premContent.push(emptyP())
+        const totalCells = [mCell('Total', mNameW, { bold: true, top: true }), mCell(`${formatCurrency(altTech, wq.premiumCurrency)} per annum`, mPremW, { bold: true, align: AlignmentType.RIGHT, top: true })]
+        if (wHasDiscount) totalCells.push(mCell(`payable ${formatCurrency(altPay, wq.premiumCurrency)}`, mPayW, { bold: true, align: AlignmentType.RIGHT, top: true }))
+        mRows.push(new TableRow({ children: totalCells }))
       }
       if (wq.ivEnabled && wq.ivPremiumAmount != null) {
-        premContent.push(new Paragraph({ children: [new TextRun({ text: `Increased Value: ${formatCurrency(wq.ivPremiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', color: '000000' })] }))
+        mRows.push(mSpacerRow())
+        const ivCells = [mCell('Increased Value', mNameW, { bold: true }), mCell(`${formatCurrency(wq.ivPremiumAmount, wq.premiumCurrency)} per annum`, mPremW, { bold: true, align: AlignmentType.RIGHT })]
+        if (wHasDiscount) ivCells.push(mCell('', mPayW))
+        mRows.push(new TableRow({ children: ivCells }))
       }
+      premContent.push(new Table({ rows: mRows, width: { size: BODY_W, type: WidthType.DXA }, columnWidths: mCols, layout: TableLayoutType.FIXED }))
     } else if (wHasVesselPremiums) {
       const vpColonW = 200
       const vpNameW = Math.round(BODY_W * 0.40)
