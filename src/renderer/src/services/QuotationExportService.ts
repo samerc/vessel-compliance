@@ -2572,42 +2572,48 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wAvpMap = new Map(data.hullAltVesselPremiums.map(r => [`${r.alternativeId}:${r.quotationVesselId}`, r.premiumAmount || 0]))
 
     if (wHullMatrix) {
-      // One table: alternative header rows, per-vessel rows (Vessel | Premium | Payable), bold totals
+      // Table: column header (Vessel | Technical Premium | Payable Premium), then a block per
+      // alternative — alternative name (with "per annum"), vessel rows (plain amounts), bold total.
       const mNameW = wHasDiscount ? Math.round(BODY_W * 0.40) : Math.round(BODY_W * 0.55)
       const mPremW = wHasDiscount ? Math.round(BODY_W * 0.32) : (BODY_W - mNameW)
       const mPayW = BODY_W - mNameW - mPremW
       const mCols = wHasDiscount ? [mNameW, mPremW, mPayW] : [mNameW, mPremW]
       const mNone = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-      const mTopBorder = { top: { style: BorderStyle.SINGLE, size: 4, color: '999999' }, bottom: mNone, left: mNone, right: mNone }
-      const mCell = (text: string, w: number, opts?: { bold?: boolean; align?: typeof AlignmentType.RIGHT; top?: boolean }) => new TableCell({
-        borders: opts?.top ? mTopBorder : noBorders(),
+      const mLine = { style: BorderStyle.SINGLE, size: 4, color: '999999' }
+      const mBorders = (opts?: { top?: boolean; bottom?: boolean }) => ({ top: opts?.top ? mLine : mNone, bottom: opts?.bottom ? mLine : mNone, left: mNone, right: mNone })
+      const mCell = (text: string, w: number, opts?: { bold?: boolean; align?: typeof AlignmentType.RIGHT; top?: boolean; bottom?: boolean }) => new TableCell({
+        borders: mBorders(opts),
         width: { size: w, type: WidthType.DXA },
         children: [new Paragraph({ alignment: opts?.align, spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: opts?.bold, color: '000000' })] })]
       })
-      const mSpacerRow = () => new TableRow({ children: [new TableCell({ borders: noBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [emptyP()] })] })
+      const mSpanRow = (text: string) => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })] })
+      const mSpacerRow = () => new TableRow({ children: [new TableCell({ borders: mBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [emptyP()] })] })
       const mRows: TableRow[] = []
+      // Column header
+      const headerCells = [mCell('Vessel', mNameW, { bold: true, bottom: true }), mCell(wHasDiscount ? 'Technical Premium' : 'Premium', mPremW, { bold: true, align: AlignmentType.RIGHT, bottom: true })]
+      if (wHasDiscount) headerCells.push(mCell('Payable Premium', mPayW, { bold: true, align: AlignmentType.RIGHT, bottom: true }))
+      mRows.push(new TableRow({ children: headerCells }))
       for (let ai = 0; ai < wSharedAlts.length; ai++) {
         const alt = wSharedAlts[ai]
-        const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
         if (ai > 0) mRows.push(mSpacerRow())
-        mRows.push(new TableRow({ children: [new TableCell({ borders: noBorders(), columnSpan: mCols.length, width: { size: BODY_W, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text: `Alternative ${ai + 1}${clause ? ` (${clause.code})` : ''}`, size: 22, font: 'Arial', bold: true, color: '000000' })] })] })] }))
+        mRows.push(mSpanRow(`Alternative ${ai + 1} (per annum)`))
         let altTech = 0, altPay = 0
         for (const v of data.quotationVessels) {
           const tech = wAvpMap.get(`${alt.id}:${v.id}`) || 0
           altTech += tech
           const pay = wHasDiscount ? wComputePayable(tech, v) : tech
           altPay += pay
-          const cells = [mCell((v.name || v.vesselLabel).toUpperCase(), mNameW), mCell(`${formatCurrency(tech, wq.premiumCurrency)} per annum`, mPremW, { align: AlignmentType.RIGHT })]
-          if (wHasDiscount) cells.push(mCell(`payable ${formatCurrency(pay, wq.premiumCurrency)}`, mPayW, { align: AlignmentType.RIGHT }))
+          const cells = [mCell((v.name || v.vesselLabel).toUpperCase(), mNameW), mCell(formatCurrency(tech, wq.premiumCurrency), mPremW, { align: AlignmentType.RIGHT })]
+          if (wHasDiscount) cells.push(mCell(formatCurrency(pay, wq.premiumCurrency), mPayW, { align: AlignmentType.RIGHT }))
           mRows.push(new TableRow({ children: cells }))
         }
-        const totalCells = [mCell('Total', mNameW, { bold: true, top: true }), mCell(`${formatCurrency(altTech, wq.premiumCurrency)} per annum`, mPremW, { bold: true, align: AlignmentType.RIGHT, top: true })]
-        if (wHasDiscount) totalCells.push(mCell(`payable ${formatCurrency(altPay, wq.premiumCurrency)}`, mPayW, { bold: true, align: AlignmentType.RIGHT, top: true }))
+        const totalCells = [mCell('Total', mNameW, { bold: true, top: true }), mCell(formatCurrency(altTech, wq.premiumCurrency), mPremW, { bold: true, align: AlignmentType.RIGHT, top: true })]
+        if (wHasDiscount) totalCells.push(mCell(formatCurrency(altPay, wq.premiumCurrency), mPayW, { bold: true, align: AlignmentType.RIGHT, top: true }))
         mRows.push(new TableRow({ children: totalCells }))
       }
       if (wq.ivEnabled && wq.ivPremiumAmount != null) {
         mRows.push(mSpacerRow())
-        const ivCells = [mCell('Increased Value', mNameW, { bold: true }), mCell(`${formatCurrency(wq.ivPremiumAmount, wq.premiumCurrency)} per annum`, mPremW, { bold: true, align: AlignmentType.RIGHT })]
+        const ivCells = [mCell('Increased Value (per annum)', mNameW, { bold: true }), mCell(formatCurrency(wq.ivPremiumAmount, wq.premiumCurrency), mPremW, { bold: true, align: AlignmentType.RIGHT })]
         if (wHasDiscount) ivCells.push(mCell('', mPayW))
         mRows.push(new TableRow({ children: ivCells }))
       }
