@@ -273,6 +273,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     // Instalment amount (editor only): payable (or premium when no discount) ÷ number of instalments
     const numInst = quotation.numInstalments || 1
     const instFor = (tech: number, v: typeof qVessels[0]) => (hasDiscount ? payableFor(tech, v) : tech) / numInst
+    const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
+    // Payable (after NCB/UPCC + extra discounts) for a plain technical amount, no per-vessel exclusions.
+    // Used for single-vessel alternative rows (P&I alternatives) where premium lives on each alternative.
+    const payablePlain = (tech: number) => {
+        const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
+        const an = tech - nd
+        const ud = upccType === 'amount' ? upccFixedAmt : an * upccPct / 100
+        return applyExtraDiscounts(an - ud)
+    }
+    const instPlain = (tech: number) => (hasDiscount ? payablePlain(tech) : tech) / numInst
     const renderHullAltPremiums = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
             {hullAlternatives.map((alt, idx) => {
@@ -356,6 +366,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         </label>
                                         <input type="number" value={alt.premiumAmount || ''} onChange={e => setPiAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updatePIAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                                        {hasDiscount && (alt.premiumAmount || 0) > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(payablePlain(alt.premiumAmount || 0))}</span>}
+                                        {numInst > 1 && (alt.premiumAmount || 0) > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>· {numInst} × {currency} {fmtAmt(instPlain(alt.premiumAmount || 0))}</span>}
                                     </div>
                                 )
                             })}
@@ -682,7 +694,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
 
             {/* Payable Premium summary (single vessel, or multi-vessel hull with fleet-total alternatives).
                 Suppressed for the per-vessel matrix, which already shows payable inline. */}
-            {(!isMultiVessel || (hullMultiAlt && !perVesselAlts)) && hasDiscount && technicalPremium > 0 && (() => {
+            {(!isMultiVessel || (hullMultiAlt && !perVesselAlts)) && hasDiscount && (technicalPremium > 0 || (piMultiAlt && piAlternatives.some(a => (a.premiumAmount || 0) > 0))) && (() => {
                 const computePayable = (tech: number) => {
                     const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
                     const an = tech - nd
@@ -694,7 +706,6 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                     quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '',
                     ...discounts.map(d => d.discountType === 'amount' ? `${d.label || 'Discount'} ${currency} ${(d.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `${d.label || 'Discount'} ${d.percent || 0}%`)
                 ].filter(Boolean).join(' + ')
-                const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
                 const anyMultiAlt = hullMultiAlt || piMultiAlt || valueOptions.length > 0
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
