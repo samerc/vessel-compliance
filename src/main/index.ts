@@ -2447,6 +2447,12 @@ app.whenReady().then(() => {
   safeHandle('hull:reorderQuotationAlternatives', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationHullAlternatives(ids) })
   safeHandle('hull:getAltVesselPremiums', (event, qId) => { requireSession(event); return db.getHullAltVesselPremiums(qId) })
   safeHandle('hull:setAltVesselPremium', async (event, altId, vesselId, amount) => { await requirePermission(event, 'quotations:edit'); return db.setHullAltVesselPremium(altId, vesselId, amount) })
+  // Generic per-quotation discounts
+  safeHandle('quotationDiscount:getByQuotation', (event, qId) => { requireSession(event); return db.getQuotationDiscounts(qId) })
+  safeHandle('quotationDiscount:add', async (event, qId, data) => { await requirePermission(event, 'quotations:edit'); return db.addQuotationDiscount(qId, data) })
+  safeHandle('quotationDiscount:update', async (event, id, updates) => { await requirePermission(event, 'quotations:edit'); return db.updateQuotationDiscount(id, updates) })
+  safeHandle('quotationDiscount:delete', async (event, id) => { await requirePermission(event, 'quotations:edit'); return db.deleteQuotationDiscount(id) })
+  safeHandle('quotationDiscount:reorder', async (event, ids) => { await requirePermission(event, 'quotations:edit'); return db.reorderQuotationDiscounts(ids) })
   safeHandle('hull:getQuotationHullConditions', (event, qId) => { requireSession(event); return db.getQuotationHullConditions(qId) })
   safeHandle('hull:setQuotationHullConditions', async (event, qId, items) => { await requirePermission(event, 'quotations:edit'); return db.setQuotationHullConditions(qId, items) })
   safeHandle('hull:getQuotationHullAdditionalConditions', (event, qId) => { requireSession(event); return db.getQuotationHullAdditionalConditions(qId) })

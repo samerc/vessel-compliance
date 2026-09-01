@@ -25,7 +25,7 @@ import {
   QuotationAgreedValueItem, QuotationAgreedValueOption, QuotationHullCondition, QuotationHullAdditionalCondition, QuotationHullAlternative,
   QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings, Fleet,
   QuotationCargoClause, QuotationCargoCustomClause,
-  QuotationAssuredGroup
+  QuotationAssuredGroup, QuotationDiscount
 } from '../../../shared/types'
 import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
@@ -98,6 +98,7 @@ interface QuotationData {
   allHullAdditionalConditions: HullAdditionalCondition[]
   hullAlternatives: QuotationHullAlternative[]
   hullAltVesselPremiums: { alternativeId: string; quotationVesselId: string; premiumAmount: number | null }[]
+  discounts: QuotationDiscount[]
   hullCustomConditions: { id: string; text: string; title?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
   // Survey warranties
   surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
@@ -238,6 +239,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   // Fetch agreed value options
   const agreedValueOptionsRaw = await window.api.hullGetAgreedValueOptions(quotation.id)
   const hullAltVesselPremiumsRaw = await window.api.hullGetAltVesselPremiums(quotation.id)
+  const discountsRaw = await window.api.quotationDiscountGetByQuotation(quotation.id)
 
   // Fetch cargo-specific data
   const isCargo = quotation.quotationTypeCode === 'C'
@@ -368,6 +370,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
     hullAltVesselPremiums: Array.isArray(hullAltVesselPremiumsRaw) ? hullAltVesselPremiumsRaw : [],
+    discounts: Array.isArray(discountsRaw) ? discountsRaw : [],
     hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => {
       let resolved = (sw.text || '')
@@ -653,6 +656,15 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
     if (!order.includes(key)) order.push(key)
   }
 
+  // Insert generic discount sections right after UPCC / NCB / Premium (whichever comes last)
+  if (data.discounts && data.discounts.length > 0) {
+    const discountKeys = data.discounts.map(d => `discount:${d.id}`)
+    const anchor = Math.max(order.lastIndexOf('upcc'), order.lastIndexOf('ncb'), order.lastIndexOf('premium'))
+    const fresh = discountKeys.filter(k => !order.includes(k))
+    if (anchor >= 0) order.splice(anchor + 1, 0, ...fresh)
+    else order.push(...fresh)
+  }
+
   // Ensure all type-relevant default keys are present
   for (const dk of typeDefaultOrder) {
     if (!order.includes(dk)) order.push(dk)
@@ -660,9 +672,11 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
 
   // Remove stale custom keys and sections not relevant to this type
   const validCustomIds = new Set(data.customSections.map(s => s.id))
+  const validDiscountIds = new Set((data.discounts || []).map(d => d.id))
   const typeKeys = new Set(typeDefaultOrder)
   return order.filter(k => {
     if (k.startsWith('custom:')) return validCustomIds.has(k.replace('custom:', ''))
+    if (k.startsWith('discount:')) return validDiscountIds.has(k.replace('discount:', ''))
     return typeKeys.has(k)
   })
 }
@@ -2548,18 +2562,27 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   {
     const premContent: (Paragraph | Table)[] = []
     const wq = data.quotation
-    const wHasDiscount = wq.ncbEnabled || wq.upccEnabled
+    const wHasDiscount = wq.ncbEnabled || wq.upccEnabled || data.discounts.length > 0
     const wNcbType = wq.ncbDiscountType || 'percentage'
     const wNcbPct = wq.ncbDiscountPercent || 0
     const wNcbFixedAmt = wq.ncbDiscountAmount || 0
     const wUpccType = wq.upccDiscountType || 'percentage'
     const wUpccPct = wq.upccDiscountPercent || 0
     const wUpccFixedAmt = wq.upccDiscountAmount || 0
+    // Apply the generic per-quotation discounts sequentially (after NCB/UPCC)
+    const wApplyExtra = (amt: number) => {
+      let r = amt
+      for (const d of data.discounts) {
+        if (d.discountType === 'amount') r -= (d.amount || 0)
+        else r -= r * (d.percent || 0) / 100
+      }
+      return r
+    }
     const wComputePayable = (tech: number, vessel?: any) => {
       const ncbDed = (vessel?.ncbExcluded) ? 0 : (wNcbType === 'amount' ? wNcbFixedAmt : tech * wNcbPct / 100)
       const afterNcb = tech - ncbDed
       const upccDed = (vessel?.upccExcluded) ? 0 : (wUpccType === 'amount' ? wUpccFixedAmt : afterNcb * wUpccPct / 100)
-      return afterNcb - upccDed
+      return wApplyExtra(afterNcb - upccDed)
     }
     const wIsMultiVessel = data.quotationVessels.length >= 2
     // Hull quotes with alternatives price per alternative, not per vessel — don't let stale
@@ -2988,6 +3011,34 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
       }
       rowMap.set('upcc', makeRow('Upfront Continuity (UPCC)', upccContent))
+    }
+
+    // Generic discounts — one section each, placed after NCB/UPCC via section order
+    if (data.discounts.length > 0) {
+      // Running base for {amount}: technical premium after NCB/UPCC, then each prior discount
+      let wDiscBase = (() => {
+        const tech = wq.premiumAmount || 0
+        const ncbDed = wNcbType === 'amount' ? wNcbFixedAmt : tech * wNcbPct / 100
+        const an = tech - ncbDed
+        const upccDed = wUpccType === 'amount' ? wUpccFixedAmt : an * wUpccPct / 100
+        return an - upccDed
+      })()
+      for (const d of data.discounts) {
+        const ded = d.discountType === 'amount' ? (d.amount || 0) : wDiscBase * (d.percent || 0) / 100
+        wDiscBase -= ded
+        const pctStr = `${d.percent || 0}%`
+        const amtStr = formatCurrency(ded, wq.premiumCurrency)
+        const dContent: (Paragraph | Table)[] = []
+        if (d.text) {
+          const resolved = d.text
+            .replace(/\{amount\}/g, amtStr)
+            .replace(/\{percentage\}/g, pctStr)
+            .replace(/\{percent\}/g, pctStr)
+          dContent.push(...mp(resolved))
+        }
+        if (dContent.length === 0) dContent.push(emptyP())
+        rowMap.set(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
+      }
     }
   }
 

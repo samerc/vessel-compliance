@@ -1434,6 +1434,31 @@ export class MySQLAdapter {
                 }
             }
 
+            // Migration: generic per-quotation discounts (beyond NCB/UPCC)
+            {
+                const [dt] = await this.pool.query("SHOW TABLES LIKE 'quotation_discounts'")
+                if ((dt as any[]).length === 0) {
+                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    try {
+                        await this.pool.query(`CREATE TABLE quotation_discounts (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            label VARCHAR(255) NULL,
+                            discount_type VARCHAR(20) NOT NULL DEFAULT 'percentage',
+                            percent DECIMAL(7,3) NULL,
+                            amount DECIMAL(15,2) NULL,
+                            text MEDIUMTEXT NULL,
+                            order_index INT DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_qd_quotation (quotation_id),
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    } finally {
+                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                }
+            }
+
             // Migration: per-vessel premium under a hull alternative (fleet quotes with alternatives)
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_hull_alt_vessel_premiums'")
@@ -8857,6 +8882,34 @@ export class MySQLAdapter {
             )
         }
 
+        // Clone per-vessel-per-alternative premiums (remap both alternative_id and quotation_vessel_id)
+        try {
+            const [srcAvp] = await this.pool.query(
+                `SELECT havp.* FROM quotation_hull_alt_vessel_premiums havp
+                 JOIN quotation_hull_alternatives a ON havp.alternative_id = a.id WHERE a.quotation_id = ?`, [sourceId])
+            for (const r of srcAvp as any[]) {
+                const newAlt = altIdMap[r.alternative_id]
+                const newVes = vesselIdMap[r.quotation_vessel_id]
+                if (newAlt && newVes) {
+                    await this.pool.execute(
+                        'INSERT INTO quotation_hull_alt_vessel_premiums (id, alternative_id, quotation_vessel_id, premium_amount) VALUES (?, ?, ?, ?)',
+                        [uuidv4(), newAlt, newVes, r.premium_amount ?? null]
+                    )
+                }
+            }
+        } catch { /* table may not exist on very old schemas */ }
+
+        // Clone generic discounts
+        try {
+            const [srcDiscounts] = await this.pool.query('SELECT * FROM quotation_discounts WHERE quotation_id = ?', [sourceId])
+            for (const d of srcDiscounts as any[]) {
+                await this.pool.execute(
+                    'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), newId, d.label, d.discount_type, d.percent, d.amount, d.text, d.order_index]
+                )
+            }
+        } catch { /* table may not exist on very old schemas */ }
+
         // Helper to remap vessel_scope JSON
         const remapScope = (scope: string | null): string | null => {
             if (!scope) return null
@@ -12859,6 +12912,61 @@ export class MySQLAdapter {
         const total = Number((sumRows as any[])[0]?.total || 0)
         await this.pool.execute('UPDATE quotation_hull_alternatives SET premium_amount = ? WHERE id = ?', [total || null, alternativeId])
         return total
+    }
+
+    // Generic per-quotation discounts (beyond NCB/UPCC)
+    async getQuotationDiscounts(quotationId: string): Promise<any[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(
+            `SELECT id, quotation_id AS quotationId, label, discount_type AS discountType,
+                    percent, amount, text, order_index AS 'order'
+             FROM quotation_discounts WHERE quotation_id = ? ORDER BY order_index`,
+            [quotationId]
+        )
+        return (rows as any[]).map(r => ({
+            ...r,
+            percent: r.percent != null ? Number(r.percent) : null,
+            amount: r.amount != null ? Number(r.amount) : null
+        }))
+    }
+
+    async addQuotationDiscount(quotationId: string, data: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null }): Promise<any> {
+        if (!this.pool) throw new Error('DB not connected')
+        const id = uuidv4()
+        const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_discounts WHERE quotation_id = ?', [quotationId])
+        const order = (maxRow as any[])[0].nextOrder
+        await this.pool.execute(
+            `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, order_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, quotationId, data.label || null, data.discountType || 'percentage', data.percent ?? null, data.amount ?? null, data.text ?? null, order]
+        )
+        return { id, quotationId, label: data.label || '', discountType: data.discountType || 'percentage', percent: data.percent ?? null, amount: data.amount ?? null, text: data.text ?? null, order }
+    }
+
+    async updateQuotationDiscount(id: string, updates: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null }): Promise<void> {
+        if (!this.pool) return
+        const fields: string[] = []
+        const values: any[] = []
+        if (updates.label !== undefined) { fields.push('label = ?'); values.push(updates.label || null) }
+        if (updates.discountType !== undefined) { fields.push('discount_type = ?'); values.push(updates.discountType || 'percentage') }
+        if (updates.percent !== undefined) { fields.push('percent = ?'); values.push(updates.percent ?? null) }
+        if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount ?? null) }
+        if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text ?? null) }
+        if (fields.length === 0) return
+        values.push(id)
+        await this.pool.execute(`UPDATE quotation_discounts SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    async deleteQuotationDiscount(id: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM quotation_discounts WHERE id = ?', [id])
+    }
+
+    async reorderQuotationDiscounts(ids: string[]): Promise<void> {
+        if (!this.pool || ids.length === 0) return
+        for (let i = 0; i < ids.length; i++) {
+            await this.pool.execute('UPDATE quotation_discounts SET order_index = ? WHERE id = ?', [i, ids[i]])
+        }
     }
 
     async deleteQuotationHullAlternative(id: string): Promise<void> {

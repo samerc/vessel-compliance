@@ -367,6 +367,11 @@ export interface Api {
   hullReorderQuotationAlternatives: (ids: string[]) => Promise<void>
   hullGetAltVesselPremiums: (quotationId: string) => Promise<import('../shared/types').HullAltVesselPremium[]>
   hullSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) => Promise<number>
+  quotationDiscountGetByQuotation: (quotationId: string) => Promise<import('../shared/types').QuotationDiscount[]>
+  quotationDiscountAdd: (quotationId: string, data: Partial<import('../shared/types').QuotationDiscount>) => Promise<import('../shared/types').QuotationDiscount>
+  quotationDiscountUpdate: (id: string, updates: Partial<import('../shared/types').QuotationDiscount>) => Promise<void>
+  quotationDiscountDelete: (id: string) => Promise<void>
+  quotationDiscountReorder: (ids: string[]) => Promise<void>
   hullGetQuotationHullConditions: (qId: string) => Promise<QuotationHullCondition[]>
   hullSetQuotationHullConditions: (qId: string, items: { hullConditionId: string; textOverride?: string; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]) => Promise<void>
   hullGetQuotationHullAdditionalConditions: (qId: string) => Promise<QuotationHullAdditionalCondition[]>

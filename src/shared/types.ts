@@ -846,6 +846,19 @@ export interface HullAltVesselPremium {
   premiumAmount: number | null
 }
 
+// Generic per-quotation discount (beyond NCB/UPCC). Applied to the payable premium
+// sequentially, after NCB and UPCC. Text supports {amount} and {percentage} placeholders.
+export interface QuotationDiscount {
+  id: string
+  quotationId: string
+  label: string
+  discountType: 'percentage' | 'amount'
+  percent?: number | null
+  amount?: number | null
+  text?: string | null
+  order: number
+}
+
 export interface QuotationPIAlternative {
   id: string
   quotationId: string

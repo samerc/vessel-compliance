@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAlternative, QuotationVessel, PISectionTexts, InstalmentDefaults, PremiumTextTemplate, HullClause, QuotationAgreedValueOption, WarSettings } from '../../../../shared/types'
+import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAlternative, QuotationVessel, PISectionTexts, InstalmentDefaults, PremiumTextTemplate, HullClause, QuotationAgreedValueOption, WarSettings, QuotationDiscount } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './shared'
+import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 
 /** Parse periodText to extract number of months. Returns null if unparseable. */
 function parsePeriodMonths(text: string | undefined): number | null {
@@ -35,9 +36,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
     // Per-vessel premium under each hull alternative, keyed `${altId}:${vesselId}`
     const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
+    const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
+
+    const loadDiscounts = async () => {
+        const d = await window.api.quotationDiscountGetByQuotation(quotation.id)
+        setDiscounts(Array.isArray(d) ? d : [])
+    }
 
     useEffect(() => {
         loadInstalments()
+        loadDiscounts()
         loadVessels()
         window.api.piGetInstalmentDefaults().then(d => setInstalmentDefaults(d || {}))
         // Populate outstanding premium text if enabled but empty (new quotation default)
@@ -187,7 +195,16 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const proRataMonths = Math.max(0, quotation.proRataMonths || parsePeriodMonths(quotation.periodText) || 0)
     const computeProRata = (annual: number) => proRataMonths > 0 ? Math.round(annual / 12 * proRataMonths * 100) / 100 : 0
 
-    const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled
+    const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled || discounts.length > 0
+    // Apply the generic per-quotation discounts sequentially (after NCB/UPCC) to an amount
+    const applyExtraDiscounts = (amt: number) => {
+        let r = amt
+        for (const d of discounts) {
+            if (d.discountType === 'amount') r -= (d.amount || 0)
+            else r -= r * (d.percent || 0) / 100
+        }
+        return r
+    }
     const ncbType = quotation.ncbDiscountType || 'percentage'
     const ncbPct = quotation.ncbDiscountPercent || 0
     const ncbFixedAmt = quotation.ncbDiscountAmount || 0
@@ -207,7 +224,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         const nd = v.ncbExcluded ? 0 : (ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100)
         const an = tech - nd
         const ud = v.upccExcluded ? 0 : (upccType === 'amount' ? upccFixedAmt : an * upccPct / 100)
-        return an - ud
+        return applyExtraDiscounts(an - ud)
     }
 
     const ncbDeduction = ncbType === 'amount' ? ncbFixedAmt : technicalPremium * ncbPct / 100
@@ -215,7 +232,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     const upccDeduction = upccType === 'amount' ? upccFixedAmt : afterNcb * upccPct / 100
     const payablePremium = (isMultiVessel && !hullMultiAlt && hasDiscount)
         ? qVessels.reduce((sum, v) => sum + vesselPayable(v), 0)
-        : afterNcb - upccDeduction
+        : applyExtraDiscounts(afterNcb - upccDeduction)
     const premiumLabel = hasDiscount ? 'Technical Premium' : 'Premium'
     const currency = quotation.premiumCurrency || 'USD'
 
@@ -251,7 +268,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         const nd = v.ncbExcluded ? 0 : (ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100)
         const an = tech - nd
         const ud = v.upccExcluded ? 0 : (upccType === 'amount' ? upccFixedAmt : an * upccPct / 100)
-        return an - ud
+        return applyExtraDiscounts(an - ud)
     }
     // Instalment amount (editor only): payable (or premium when no discount) ÷ number of instalments
     const numInst = quotation.numInstalments || 1
@@ -670,9 +687,13 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                     const nd = ncbType === 'amount' ? ncbFixedAmt : tech * ncbPct / 100
                     const an = tech - nd
                     const ud = upccType === 'amount' ? upccFixedAmt : an * upccPct / 100
-                    return an - ud
+                    return applyExtraDiscounts(an - ud)
                 }
-                const discountLabel = (quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '') + (quotation.ncbEnabled && quotation.upccEnabled ? ' + ' : '') + (quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '')
+                const discountLabel = [
+                    quotation.ncbEnabled ? (ncbType === 'amount' ? `NCB ${currency} ${ncbFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `NCB ${ncbPct}%`) : '',
+                    quotation.upccEnabled ? (upccType === 'amount' ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `UPCC ${upccPct}%`) : '',
+                    ...discounts.map(d => d.discountType === 'amount' ? `${d.label || 'Discount'} ${currency} ${(d.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `${d.label || 'Discount'} ${d.percent || 0}%`)
+                ].filter(Boolean).join(' + ')
                 const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
                 const anyMultiAlt = hullMultiAlt || piMultiAlt || valueOptions.length > 0
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
@@ -863,6 +884,65 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Additional discounts (beyond NCB/UPCC) — applied to payable after NCB/UPCC */}
+            <div style={{ marginBottom: '20px', padding: '14px 18px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: discounts.length > 0 ? '12px' : '0' }}>
+                    <h4 style={{ fontSize: '0.9rem', margin: 0 }}>Additional Discounts</h4>
+                    <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        onClick={async () => {
+                            const created = await window.api.quotationDiscountAdd(quotation.id, { label: '', discountType: 'percentage', percent: null, amount: null, text: '' })
+                            if (created && !(created as any).error) setDiscounts(prev => [...prev, created])
+                        }}>
+                        <Plus size={14} /> Add Discount
+                    </button>
+                </div>
+                {discounts.length === 0 ? (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
+                        No extra discounts. Use these for discounts other than NCB/UPCC — each is applied to the payable premium in order. Wording supports <code>{'{percentage}'}</code> and <code>{'{amount}'}</code>.
+                    </p>
+                ) : discounts.map((d, idx) => {
+                    const patch = (u: Partial<QuotationDiscount>) => setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, ...u } : x))
+                    const save = (u: Partial<QuotationDiscount>) => window.api.quotationDiscountUpdate(d.id, u)
+                    const move = async (dir: -1 | 1) => {
+                        const j = idx + dir
+                        if (j < 0 || j >= discounts.length) return
+                        const arr = [...discounts]; [arr[idx], arr[j]] = [arr[j], arr[idx]]
+                        setDiscounts(arr)
+                        await window.api.quotationDiscountReorder(arr.map(x => x.id))
+                    }
+                    return (
+                        <div key={d.id} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                                <input value={d.label || ''} placeholder="Discount name (e.g. Loyalty Discount)"
+                                    onChange={e => patch({ label: e.target.value })} onBlur={e => save({ label: e.target.value })}
+                                    style={{ flex: '1 1 200px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer' }}>
+                                    <input type="radio" name={`dtype-${d.id}`} checked={d.discountType === 'percentage'} onChange={() => { patch({ discountType: 'percentage' }); save({ discountType: 'percentage' }) }} style={{ accentColor: 'var(--accent-primary)' }} /> %
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer' }}>
+                                    <input type="radio" name={`dtype-${d.id}`} checked={d.discountType === 'amount'} onChange={() => { patch({ discountType: 'amount' }); save({ discountType: 'amount' }) }} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
+                                </label>
+                                {d.discountType === 'amount' ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ fontSize: '0.78rem' }}>{currency}</span>
+                                        <input type="number" min={0} step={0.01} value={d.amount ?? ''} onChange={e => patch({ amount: e.target.value ? parseFloat(e.target.value) : null })} onBlur={e => save({ amount: e.target.value ? parseFloat(e.target.value) : null })} style={{ width: '110px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <input type="number" min={0} max={100} step={0.1} value={d.percent ?? ''} onChange={e => patch({ percent: e.target.value ? parseFloat(e.target.value) : null })} onBlur={e => save({ percent: e.target.value ? parseFloat(e.target.value) : null })} style={{ width: '70px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                                        <span style={{ fontSize: '0.78rem' }}>%</span>
+                                    </div>
+                                )}
+                                <button onClick={() => move(-1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1, padding: '2px' }}><ChevronUp size={16} /></button>
+                                <button onClick={() => move(1)} disabled={idx === discounts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === discounts.length - 1 ? 0.3 : 1, padding: '2px' }}><ChevronDown size={16} /></button>
+                                <button onClick={async () => { await window.api.quotationDiscountDelete(d.id); setDiscounts(prev => prev.filter(x => x.id !== d.id)) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={16} /></button>
+                            </div>
+                            <RichTextEditor value={d.text || ''} onChange={val => { patch({ text: val }); save({ text: val }) }} placeholder="Wording — use {percentage} and {amount} placeholders…" minHeight={80} showFontSize showAlignment />
+                        </div>
+                    )
+                })}
             </div>
 
             {/* Instalment Schedule moved up — right after count input */}
