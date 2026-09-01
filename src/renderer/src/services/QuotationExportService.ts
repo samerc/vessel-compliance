@@ -1151,14 +1151,24 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   // ---- Limit of Liability ----
   {
     const liabContent: (Paragraph | Table)[] = []
-    const cur = data.quotation.limitOfLiabilityCurrency || 'USD'
-    const baseAmt = data.quotation.limitOfLiabilityAmount
+    let cur = data.quotation.limitOfLiabilityCurrency || 'USD'
+    let baseAmt = data.quotation.limitOfLiabilityAmount
     const lolVA = data.quotation.limitOfLiabilityVesselAmounts
     const multiVessel = data.quotationVessels.length >= 2
 
     // Per-alternative LOL (P&I with 2+ alternatives) or LOL options
     const dHasLolOptions = data.lolOptions.length > 0
-    const dPiAltLol = !dHasLolOptions && data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+    const dPiAltLolRaw = !dHasLolOptions && data.piAlternatives.length > 1 && data.piAlternatives.some(a => a.lolAmount != null)
+    // When every alternative carries the SAME limit, render it as a single LOL (identical to a
+    // non-alternative quotation: "USD X all claims…") instead of "values as per below" + a bare amount.
+    const dPiAltLolItems = dPiAltLolRaw ? data.piAlternatives.filter(a => a.lolAmount != null) : []
+    const dPiAltLolAllSame = dPiAltLolItems.length > 0 &&
+      dPiAltLolItems.every(a => a.lolAmount === dPiAltLolItems[0].lolAmount && (a.lolCurrency || cur) === (dPiAltLolItems[0].lolCurrency || cur))
+    const dPiAltLol = dPiAltLolRaw && !dPiAltLolAllSame
+    if (dPiAltLolAllSame) {
+      if (baseAmt == null) baseAmt = dPiAltLolItems[0].lolAmount as number
+      cur = dPiAltLolItems[0].lolCurrency || cur
+    }
 
     // Determine if per-vessel amounts differ
     let hasDifferentLol = false

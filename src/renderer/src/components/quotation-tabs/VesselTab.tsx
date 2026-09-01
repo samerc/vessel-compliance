@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, Layers, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, Layers, RefreshCw, Pencil, Check, X } from 'lucide-react'
 import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
@@ -12,6 +12,8 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
     const [vesselSearch, setVesselSearch] = useState('')
     const [vesselDropdownOpen, setVesselDropdownOpen] = useState(false)
     const [newData, setNewData] = useState(EMPTY_NEW_VESSEL)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
     const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
     const [classDropdownOpen, setClassDropdownOpen] = useState(false)
     const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
@@ -192,6 +194,74 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
         if (onVesselsChanged) onVesselsChanged()
     }
 
+    const startEdit = (qv: QuotationVessel) => {
+        setShowAddForm(false)
+        setEditingId(qv.id)
+        setEditData({
+            name: qv.name || '',
+            imoNumber: qv.imoNumber || '',
+            builtYear: qv.builtYear != null ? String(qv.builtYear) : '',
+            rebuiltYear: qv.rebuiltYear != null ? String(qv.rebuiltYear) : '',
+            grossTonnage: qv.grossTonnage != null ? String(qv.grossTonnage) : '',
+            flag: qv.flag || '',
+            vesselType: qv.vesselType || '',
+            classification: qv.classification || '',
+            callSign: qv.callSign || ''
+        })
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editingId) return
+        try {
+            await window.api.updateQuotationVessel(editingId, {
+                name: editData.name.toUpperCase(),
+                imoNumber: editData.imoNumber || undefined,
+                builtYear: editData.builtYear ? parseInt(editData.builtYear) : undefined,
+                rebuiltYear: editData.rebuiltYear ? parseInt(editData.rebuiltYear) : null,
+                grossTonnage: editData.grossTonnage ? parseFloat(editData.grossTonnage) : undefined,
+                flag: editData.flag || undefined,
+                vesselType: editData.vesselType || undefined,
+                classification: editData.classification || undefined,
+                callSign: editData.callSign || undefined
+            } as any)
+            setEditingId(null)
+            showSuccess('Vessel details updated')
+            loadData()
+            if (onVesselsChanged) onVesselsChanged()
+        } catch (err: any) { showError(err.message || 'Failed to update vessel') }
+    }
+
+    // Re-sync the stored snapshot from the linked registry vessel (the values shown/exported are the
+    // per-quotation snapshot, not live registry data).
+    const handleRefresh = async () => {
+        try {
+            const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+            let synced = 0
+            for (const qv of qVessels) {
+                if (!qv.vesselId) continue
+                const v = vessels.find(vv => vv.id === qv.vesselId)
+                if (!v) continue
+                const flagName = v.flagStateId ? (flagStates.find((f: any) => f.id === v.flagStateId)?.name || '') : ''
+                const classifName = (await resolveClassification(qv.vesselId)) || v.classificationSociety || ''
+                await window.api.updateQuotationVessel(qv.id, {
+                    name: v.name,
+                    imoNumber: v.imoNumber,
+                    builtYear: v.builtYear,
+                    rebuiltYear: v.rebuiltYear ?? null,
+                    grossTonnage: v.grossTonnage,
+                    flag: flagName,
+                    vesselType: v.vesselType,
+                    classification: classifName,
+                    callSign: v.callSign
+                } as any)
+                synced++
+            }
+            await loadData()
+            showSuccess(synced > 0 ? `Refreshed ${synced} vessel${synced > 1 ? 's' : ''} from registry` : 'No registry-linked vessels to refresh')
+            if (onVesselsChanged) onVesselsChanged()
+        } catch (err: any) { showError(err.message || 'Failed to refresh') }
+    }
+
     const loadFleets = async () => {
         const fleets = await window.api.getFleets().catch(() => [])
         const fleetsArr = Array.isArray(fleets) ? fleets : []
@@ -363,7 +433,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ fontSize: '1rem', marginBottom: '14px' }}>Vessels ({qVessels.length})</h3>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => { loadData(); showSuccess('Vessel details refreshed') }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 10px' }} title="Refresh vessel details from registry">
+                    <button onClick={handleRefresh} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 10px' }} title="Refresh vessel details from registry">
                         <RefreshCw size={13} /> Refresh
                     </button>
                     {!showAddForm && (
@@ -586,18 +656,21 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
 
             {qVessels.map(qv => {
                 const reg = qv.vesselId ? vessels.find(v => v.id === qv.vesselId) : null
-                const name = reg?.name || qv.name || '(unnamed)'
-                const imo = reg?.imoNumber || qv.imoNumber
-                const built = reg?.builtYear || qv.builtYear
-                const rebuilt = reg?.rebuiltYear || qv.rebuiltYear
-                const gt = reg?.grossTonnage || qv.grossTonnage
+                // Show the per-quotation snapshot (what is exported), falling back to the linked registry
+                // record. Use the "Refresh" button to re-sync the snapshot from the registry.
+                const name = qv.name || reg?.name || '(unnamed)'
+                const imo = qv.imoNumber || reg?.imoNumber
+                const built = qv.builtYear || reg?.builtYear
+                const rebuilt = qv.rebuiltYear || reg?.rebuiltYear
+                const gt = qv.grossTonnage || reg?.grossTonnage
                 const flag = qv.flag
-                const vtype = reg?.vesselType || qv.vesselType
-                const classif = (qv.vesselId && vesselClassNames[qv.vesselId]) || qv.classification
-                const callSign = reg?.callSign || qv.callSign
+                const vtype = qv.vesselType || reg?.vesselType
+                const classif = qv.classification || (qv.vesselId ? vesselClassNames[qv.vesselId] : '')
+                const callSign = qv.callSign || reg?.callSign
+                const isEditing = editingId === qv.id
                 return (
                     <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                        {qVessels.length > 1 && (
+                        {qVessels.length > 1 && !isEditing && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
                                 <button onClick={() => handleMoveVessel(qv.id, 'up')} disabled={qVessels.indexOf(qv) === 0} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                                 <button onClick={() => handleMoveVessel(qv.id, 'down')} disabled={qVessels.indexOf(qv) === qVessels.length - 1} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
@@ -606,20 +679,57 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0,210,255,0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>
                             {qv.vesselLabel}
                         </div>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase' }}>{name}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                                {imo && <span>IMO: {imo}</span>}
-                                {built && <span>Built: {rebuilt ? `${built}/${rebuilt}` : built}</span>}
-                                {gt && <span>GT: {Number(gt).toLocaleString()}</span>}
-                                {flag && <span>Flag: {flag}</span>}
-                                {vtype && <span>Type: {vtype}</span>}
-                                {classif && <span>Class: {classif}</span>}
-                                {callSign && <span>Call Sign: {callSign}</span>}
-                                {reg && <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem' }}>● From registry</span>}
+                        {isEditing ? (
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    {([
+                                        ['name', 'Name *', true],
+                                        ['imoNumber', 'IMO Number', true],
+                                        ['builtYear', 'Built Year', false],
+                                        ['rebuiltYear', 'Rebuilt Year', false],
+                                        ['grossTonnage', 'Gross Tonnage', false],
+                                        ['callSign', 'Call Sign', true],
+                                        ['flag', 'Flag', false],
+                                        ['vesselType', 'Vessel Type', false],
+                                        ['classification', 'Classification', false]
+                                    ] as [keyof typeof EMPTY_NEW_VESSEL, string, boolean][]).map(([field, label, upper]) => (
+                                        <div key={field}>
+                                            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{label}</label>
+                                            <input
+                                                type="text"
+                                                value={editData[field]}
+                                                onChange={e => setEditData(p => ({ ...p, [field]: upper ? e.target.value.toUpperCase() : e.target.value }))}
+                                                style={{ width: '100%', ...(upper ? { textTransform: 'uppercase' } : {}) }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                                    <button onClick={handleSaveEdit} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem' }}><Check size={14} /> Save</button>
+                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem' }}><X size={14} /> Cancel</button>
+                                </div>
                             </div>
-                        </div>
-                        <button onClick={() => handleDelete(qv.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', flexShrink: 0 }}><Trash2 size={16} /></button>
+                        ) : (
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase' }}>{name}</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                                    {imo && <span>IMO: {imo}</span>}
+                                    {built && <span>Built: {rebuilt ? `${built}/${rebuilt}` : built}</span>}
+                                    {gt && <span>GT: {Number(gt).toLocaleString()}</span>}
+                                    {flag && <span>Flag: {flag}</span>}
+                                    {vtype && <span>Type: {vtype}</span>}
+                                    {classif && <span>Class: {classif}</span>}
+                                    {callSign && <span>Call Sign: {callSign}</span>}
+                                    {reg && <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem' }}>● From registry</span>}
+                                </div>
+                            </div>
+                        )}
+                        {!isEditing && (
+                            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                <button onClick={() => startEdit(qv)} title="Edit vessel details" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Pencil size={16} /></button>
+                                <button onClick={() => handleDelete(qv.id)} title="Remove vessel" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={16} /></button>
+                            </div>
+                        )}
                     </div>
                 )
             })}
