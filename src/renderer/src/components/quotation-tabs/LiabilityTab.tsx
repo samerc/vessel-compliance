@@ -52,10 +52,30 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
         setNewAmount('')
     }
 
+    // Resolve the {amount}/{currency} shown in the preview. When the limit lives on alternatives
+    // (P&I alternatives or LOL options) rather than the quotation, derive it from them — mirroring the
+    // export: all alternatives with the SAME limit collapse to one amount; differing limits show
+    // "values as per below".
+    const altLolItems = piAlts.length >= 2
+        ? piAlts.filter(a => a.lolAmount != null).map(a => ({ amount: a.lolAmount as number, currency: a.lolCurrency || quotation.limitOfLiabilityCurrency || 'USD' }))
+        : lolOptions.filter(o => o.amount != null).map(o => ({ amount: o.amount, currency: o.currency || quotation.limitOfLiabilityCurrency || 'USD' }))
+    let previewCurrency = quotation.limitOfLiabilityCurrency || 'USD'
+    let previewAmount: string
+    if (altLolItems.length > 0) {
+        const allSame = altLolItems.every(x => x.amount === altLolItems[0].amount && x.currency === altLolItems[0].currency)
+        if (allSame) {
+            previewCurrency = altLolItems[0].currency
+            previewAmount = altLolItems[0].amount.toLocaleString()
+        } else {
+            previewAmount = 'values as per below'
+        }
+    } else {
+        previewAmount = quotation.limitOfLiabilityAmount ? quotation.limitOfLiabilityAmount.toLocaleString() : '___'
+    }
     // Standard text with placeholders replaced
     const resolvedStandardText = (quotation.sectionTextsOverride?.limitOfLiabilityDefaultText ?? getEffectiveText('limitOfLiabilityDefaultText'))
-        .replace(/\{currency\}/g, quotation.limitOfLiabilityCurrency || 'USD')
-        .replace(/\{amount\}/g, quotation.limitOfLiabilityAmount ? quotation.limitOfLiabilityAmount.toLocaleString() : '___')
+        .replace(/\{currency\}/g, previewCurrency)
+        .replace(/\{amount\}/g, previewAmount)
 
     return (
         <div>
