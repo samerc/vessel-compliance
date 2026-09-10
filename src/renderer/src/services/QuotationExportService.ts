@@ -2573,12 +2573,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const premContent: (Paragraph | Table)[] = []
     const wq = data.quotation
     const wHasDiscount = wq.ncbEnabled || wq.upccEnabled || data.discounts.length > 0
+    // Only apply a discount when its feature is enabled — a disabled NCB/UPCC can still carry a
+    // leftover percent/amount in the DB, which must NOT reduce the payable premium.
     const wNcbType = wq.ncbDiscountType || 'percentage'
-    const wNcbPct = wq.ncbDiscountPercent || 0
-    const wNcbFixedAmt = wq.ncbDiscountAmount || 0
+    const wNcbPct = wq.ncbEnabled ? (wq.ncbDiscountPercent || 0) : 0
+    const wNcbFixedAmt = wq.ncbEnabled ? (wq.ncbDiscountAmount || 0) : 0
     const wUpccType = wq.upccDiscountType || 'percentage'
-    const wUpccPct = wq.upccDiscountPercent || 0
-    const wUpccFixedAmt = wq.upccDiscountAmount || 0
+    const wUpccPct = wq.upccEnabled ? (wq.upccDiscountPercent || 0) : 0
+    const wUpccFixedAmt = wq.upccEnabled ? (wq.upccDiscountAmount || 0) : 0
     // Apply the generic per-quotation discounts sequentially (after NCB/UPCC)
     const wApplyExtra = (amt: number) => {
       let r = amt

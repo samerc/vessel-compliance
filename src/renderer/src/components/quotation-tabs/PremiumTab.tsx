@@ -205,12 +205,14 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         }
         return r
     }
+    // Only apply a discount when its feature is enabled — a disabled NCB/UPCC can still carry a
+    // leftover percent/amount in the DB, which must NOT reduce the payable premium.
     const ncbType = quotation.ncbDiscountType || 'percentage'
-    const ncbPct = quotation.ncbDiscountPercent || 0
-    const ncbFixedAmt = quotation.ncbDiscountAmount || 0
+    const ncbPct = quotation.ncbEnabled ? (quotation.ncbDiscountPercent || 0) : 0
+    const ncbFixedAmt = quotation.ncbEnabled ? (quotation.ncbDiscountAmount || 0) : 0
     const upccType = quotation.upccDiscountType || 'percentage'
-    const upccPct = quotation.upccDiscountPercent || 0
-    const upccFixedAmt = quotation.upccDiscountAmount || 0
+    const upccPct = quotation.upccEnabled ? (quotation.upccDiscountPercent || 0) : 0
+    const upccFixedAmt = quotation.upccEnabled ? (quotation.upccDiscountAmount || 0) : 0
     const isMultiVessel = qVessels.length >= 2
     // Hull quotes with alternatives price per alternative (not per vessel), regardless of vessel count.
     const hullMultiAlt = quotation.quotationTypeCode === 'H' && (hullAlternatives.filter(a => !a.vesselScopeId).length > 1 || hullAlternatives.some(a => a.vesselScopeId))
