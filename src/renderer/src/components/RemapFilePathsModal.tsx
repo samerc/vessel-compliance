@@ -44,14 +44,6 @@ function detectCommonPrefix(paths: string[]): string {
     return commonParts.join(sep)
 }
 
-function shortenPath(p: string, maxLen = 55): string {
-    if (p.length <= maxLen) return p
-    const sep = p.includes('\\') ? '\\' : '/'
-    const parts = p.split(sep)
-    if (parts.length <= 2) return p
-    return parts[0] + sep + '...' + sep + parts.slice(-2).join(sep)
-}
-
 function applyPrefix(filePath: string, oldPrefix: string, newPrefix: string): string {
     if (!oldPrefix) return filePath
     // Normalize separators for comparison
@@ -184,7 +176,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
         >
             <div
                 style={{
-                    width: '90%', maxWidth: '760px', background: bg,
+                    width: '92%', maxWidth: '960px', background: bg,
                     borderRadius: '16px', border: `1px solid ${borderColor}`,
                     boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
                     display: 'flex', flexDirection: 'column', maxHeight: '85vh'
@@ -303,9 +295,9 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                             {entries.slice(0, 4).map(e => (
                                 <div key={e.id} style={{
                                     fontSize: '0.75rem', fontFamily: 'monospace',
-                                    color: 'var(--text-secondary)', padding: '2px 0'
+                                    color: 'var(--text-secondary)', padding: '2px 0', wordBreak: 'break-all'
                                 }}>
-                                    {shortenPath(e.filePath)}
+                                    {e.filePath}
                                 </div>
                             ))}
                             {entries.length > 4 && (
@@ -389,9 +381,9 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                                                         {row.entry.source}
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: '10px 16px', maxWidth: 180 }}>
+                                                <td style={{ padding: '10px 16px', maxWidth: 320 }}>
                                                     <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
-                                                        {shortenPath(row.entry.filePath, 45)}
+                                                        {row.entry.filePath}
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '10px 8px', width: 20 }}>
@@ -402,7 +394,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                             <CheckCircle size={14} color="var(--success, #22c55e)" />
                                                             <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                                                                {shortenPath(resolvedPath, 45)}
+                                                                {resolvedPath}
                                                             </span>
                                                         </div>
                                                     ) : row.status === 'accessible' ? (
