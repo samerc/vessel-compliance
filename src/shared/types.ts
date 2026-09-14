@@ -856,6 +856,9 @@ export interface QuotationDiscount {
   percent?: number | null
   amount?: number | null
   text?: string | null
+  /** When set, the discount wording is appended to that existing export section (e.g. 'premium')
+   *  instead of rendering as its own standalone section. Null/empty = own section. */
+  targetSection?: string | null
   order: number
 }
 

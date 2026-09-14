@@ -3,6 +3,7 @@ import { Quotation, QuotationInstalment, QuotationPIAlternative, QuotationHullAl
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './shared'
+import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 
 /** Parse periodText to extract number of months. Returns null if unparseable. */
@@ -951,6 +952,22 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                 <button onClick={() => move(-1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1, padding: '2px' }}><ChevronUp size={16} /></button>
                                 <button onClick={() => move(1)} disabled={idx === discounts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === discounts.length - 1 ? 0.3 : 1, padding: '2px' }}><ChevronDown size={16} /></button>
                                 <button onClick={async () => { await window.api.quotationDiscountDelete(d.id); setDiscounts(prev => prev.filter(x => x.id !== d.id)) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={16} /></button>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Placement:</span>
+                                <select
+                                    value={d.targetSection || ''}
+                                    onChange={e => { const v = e.target.value || null; patch({ targetSection: v }); save({ targetSection: v }) }}
+                                    style={{ flex: '0 1 260px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                                >
+                                    <option value="">Own section</option>
+                                    {getDefaultSectionOrder(quotation.quotationTypeCode).map(k => (
+                                        <option key={k} value={k}>{SECTION_LABELS[k] || k}</option>
+                                    ))}
+                                </select>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                    {d.targetSection ? 'Wording appended to this section' : 'Renders as its own section'}
+                                </span>
                             </div>
                             <RichTextEditor value={d.text || ''} onChange={val => { patch({ text: val }); save({ text: val }) }} placeholder="Wording — use {percentage} and {amount} placeholders…" minHeight={80} showFontSize showAlignment />
                         </div>

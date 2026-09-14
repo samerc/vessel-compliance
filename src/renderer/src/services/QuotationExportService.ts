@@ -656,9 +656,10 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
     if (!order.includes(key)) order.push(key)
   }
 
-  // Insert generic discount sections right after UPCC / NCB / Premium (whichever comes last)
+  // Insert standalone discount sections right after UPCC / NCB / Premium (whichever comes last).
+  // Discounts assigned to an existing section are merged into that section, not ordered here.
   if (data.discounts && data.discounts.length > 0) {
-    const discountKeys = data.discounts.map(d => `discount:${d.id}`)
+    const discountKeys = data.discounts.filter(d => !d.targetSection).map(d => `discount:${d.id}`)
     const anchor = Math.max(order.lastIndexOf('upcc'), order.lastIndexOf('ncb'), order.lastIndexOf('premium'))
     const fresh = discountKeys.filter(k => !order.includes(k))
     if (anchor >= 0) order.splice(anchor + 1, 0, ...fresh)
@@ -672,11 +673,13 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
 
   // Remove stale custom keys and sections not relevant to this type
   const validCustomIds = new Set(data.customSections.map(s => s.id))
-  const validDiscountIds = new Set((data.discounts || []).map(d => d.id))
   const typeKeys = new Set(typeDefaultOrder)
   return order.filter(k => {
     if (k.startsWith('custom:')) return validCustomIds.has(k.replace('custom:', ''))
-    if (k.startsWith('discount:')) return validDiscountIds.has(k.replace('discount:', ''))
+    if (k.startsWith('discount:')) {
+      const dd = (data.discounts || []).find(x => x.id === k.replace('discount:', ''))
+      return !!dd && !dd.targetSection
+    }
     return typeKeys.has(k)
   })
 }
@@ -883,7 +886,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const thinBorders = () => ({ top: thin, bottom: thin, left: thin, right: thin })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
-    return new TableRow({
+    const row = new TableRow({
       children: [
         new TableCell({
           width: { size: TITLE_W, type: WidthType.DXA },
@@ -904,10 +907,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
       ]
     })
+    // Retain title/content so a discount targeting this section can rebuild it with extra content
+    ;(row as any).__title = title
+    ;(row as any).__content = content
+    return row
   }
 
   // Build rows into a map keyed by section ID for dynamic ordering
   const rowMap = new Map<string, TableRow>()
+  // Discounts whose wording is merged into an existing section instead of a standalone row
+  const targetedDiscounts: { id: string; label: string; targetSection: string; content: (Paragraph | Table)[] }[] = []
 
   // ---- Insured ----
   {
@@ -3049,7 +3058,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           dContent.push(...mp(resolved))
         }
         if (dContent.length === 0) dContent.push(emptyP())
-        rowMap.set(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
+        if (d.targetSection) {
+          targetedDiscounts.push({ id: d.id, label: d.label || 'Discount', targetSection: d.targetSection, content: dContent })
+        } else {
+          rowMap.set(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
+        }
       }
     }
   }
@@ -3162,6 +3175,19 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (cs.text) csContent.push(...mp(cs.text))
     if (csContent.length === 0) csContent.push(emptyP())
     rowMap.set(`custom:${cs.id}`, makeRow(cs.title, csContent))
+  }
+
+  // Merge discounts that target an existing section: append their wording to that section's row.
+  // Falls back to a standalone discount row if the target section isn't present for this quotation.
+  for (const td of targetedDiscounts) {
+    const existing = rowMap.get(td.targetSection)
+    if (existing) {
+      const base = ((existing as any).__content as (Paragraph | Table)[]) || []
+      const title = ((existing as any).__title as string) || ''
+      rowMap.set(td.targetSection, makeRow(title, [...base, emptyP(), ...td.content]))
+    } else {
+      rowMap.set(`discount:${td.id}`, makeRow(td.label, td.content))
+    }
   }
 
   // Resolve section order and build final rows array

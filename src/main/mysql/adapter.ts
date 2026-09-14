@@ -1448,6 +1448,7 @@ export class MySQLAdapter {
                             percent DECIMAL(7,3) NULL,
                             amount DECIMAL(15,2) NULL,
                             text MEDIUMTEXT NULL,
+                            target_section VARCHAR(50) NULL,
                             order_index INT DEFAULT 0,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             INDEX idx_qd_quotation (quotation_id),
@@ -1455,6 +1456,12 @@ export class MySQLAdapter {
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                     } finally {
                         await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    }
+                } else {
+                    // Migration: discount can be merged into an existing section instead of its own
+                    const [qdCols] = await this.pool.query("SHOW COLUMNS FROM quotation_discounts LIKE 'target_section'")
+                    if ((qdCols as any[]).length === 0) {
+                        await this.pool.query('ALTER TABLE quotation_discounts ADD COLUMN target_section VARCHAR(50) NULL')
                     }
                 }
             }
@@ -8904,8 +8911,8 @@ export class MySQLAdapter {
             const [srcDiscounts] = await this.pool.query('SELECT * FROM quotation_discounts WHERE quotation_id = ?', [sourceId])
             for (const d of srcDiscounts as any[]) {
                 await this.pool.execute(
-                    'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    [uuidv4(), newId, d.label, d.discount_type, d.percent, d.amount, d.text, d.order_index]
+                    'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [uuidv4(), newId, d.label, d.discount_type, d.percent, d.amount, d.text, d.target_section ?? null, d.order_index]
                 )
             }
         } catch { /* table may not exist on very old schemas */ }
@@ -12919,7 +12926,7 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id AS quotationId, label, discount_type AS discountType,
-                    percent, amount, text, order_index AS 'order'
+                    percent, amount, text, target_section AS targetSection, order_index AS 'order'
              FROM quotation_discounts WHERE quotation_id = ? ORDER BY order_index`,
             [quotationId]
         )
@@ -12930,20 +12937,20 @@ export class MySQLAdapter {
         }))
     }
 
-    async addQuotationDiscount(quotationId: string, data: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null }): Promise<any> {
+    async addQuotationDiscount(quotationId: string, data: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null; targetSection?: string | null }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_discounts WHERE quotation_id = ?', [quotationId])
         const order = (maxRow as any[])[0].nextOrder
         await this.pool.execute(
-            `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, order_index)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, quotationId, data.label || null, data.discountType || 'percentage', data.percent ?? null, data.amount ?? null, data.text ?? null, order]
+            `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, quotationId, data.label || null, data.discountType || 'percentage', data.percent ?? null, data.amount ?? null, data.text ?? null, data.targetSection ?? null, order]
         )
-        return { id, quotationId, label: data.label || '', discountType: data.discountType || 'percentage', percent: data.percent ?? null, amount: data.amount ?? null, text: data.text ?? null, order }
+        return { id, quotationId, label: data.label || '', discountType: data.discountType || 'percentage', percent: data.percent ?? null, amount: data.amount ?? null, text: data.text ?? null, targetSection: data.targetSection ?? null, order }
     }
 
-    async updateQuotationDiscount(id: string, updates: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null }): Promise<void> {
+    async updateQuotationDiscount(id: string, updates: { label?: string; discountType?: string; percent?: number | null; amount?: number | null; text?: string | null; targetSection?: string | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -12952,6 +12959,7 @@ export class MySQLAdapter {
         if (updates.percent !== undefined) { fields.push('percent = ?'); values.push(updates.percent ?? null) }
         if (updates.amount !== undefined) { fields.push('amount = ?'); values.push(updates.amount ?? null) }
         if (updates.text !== undefined) { fields.push('text = ?'); values.push(updates.text ?? null) }
+        if (updates.targetSection !== undefined) { fields.push('target_section = ?'); values.push(updates.targetSection || null) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE quotation_discounts SET ${fields.join(', ')} WHERE id = ?`, values)
