@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
-import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb } from '../services/ReportSettingsService'
+import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb, CUSTOMIZABLE_REPORTS, getReportText } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 const FileManager = lazy(() => import('./FileManager'))
@@ -2213,6 +2213,49 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             </div>
                         </div>
                     </div>
+
+                    {/* Per-report intro / end text */}
+                    <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Report Texts</h4>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 16px' }}>
+                            Optional intro and end text added to specific report exports. Leave blank to omit. Separate paragraphs with a new line.
+                        </p>
+                        {CUSTOMIZABLE_REPORTS.map(report => {
+                            const texts = getReportText(reportSettings, report.key)
+                            const setReportText = (field: 'intro' | 'end', value: string) => setReportSettings(prev => ({
+                                ...prev,
+                                reportTexts: { ...(prev.reportTexts || {}), [report.key]: { ...(prev.reportTexts?.[report.key] || {}), [field]: value } }
+                            }))
+                            return (
+                                <div key={report.key} style={{ marginBottom: '18px' }}>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>{report.label}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Intro Text</label>
+                                            <textarea
+                                                value={texts.intro}
+                                                onChange={e => setReportText('intro', e.target.value)}
+                                                rows={4}
+                                                placeholder="Shown before the report content. One paragraph per line."
+                                                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>End Text</label>
+                                            <textarea
+                                                value={texts.end}
+                                                onChange={e => setReportText('end', e.target.value)}
+                                                rows={4}
+                                                placeholder="Shown at the end of the report. One paragraph per line."
+                                                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button
                             onClick={handleSaveReportSettings}

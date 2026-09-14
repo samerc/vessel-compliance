@@ -1535,6 +1535,9 @@ export interface ReportSettings {
   companySubtitle: string
   footerText: string
   primaryColor: [number, number, number]
+  /** Per-report custom intro/end text, keyed by report key (see CUSTOMIZABLE_REPORTS).
+   *  Each value supports multiple paragraphs (separated by newlines). */
+  reportTexts?: Record<string, { intro?: string; end?: string }>
 }
 
 // ==================== Survey Warranty Templates (Quotations) ====================

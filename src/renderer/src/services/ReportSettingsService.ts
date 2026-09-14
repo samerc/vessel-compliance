@@ -7,6 +7,45 @@ export const REPORT_SETTINGS_DEFAULTS: ReportSettings = {
   primaryColor: [28, 52, 95],
 }
 
+/** Reports that support custom intro/end text (shown in Admin → Report Settings → Report Texts).
+ *  Add a report here and read its text via getReportText() in that report's exporter. */
+export interface CustomizableReport {
+  key: string
+  label: string
+  /** Seeded default for the End text — shown when the user hasn't configured one. */
+  defaultEnd?: string
+}
+
+export const CUSTOMIZABLE_REPORTS: CustomizableReport[] = [
+  {
+    key: 'conditionSurveyDefects',
+    label: 'Condition Survey — Defects Report',
+    defaultEnd: 'Subject to the terms, conditions and warranties of the policy.'
+  }
+]
+
+/** Resolve the effective intro/end text for a report. End falls back to the catalog default
+ *  only when it was never configured (undefined); an explicit empty string suppresses it. */
+export function getReportText(
+  settings: ReportSettings,
+  key: string
+): { intro: string; end: string } {
+  const stored = settings.reportTexts?.[key]
+  const def = CUSTOMIZABLE_REPORTS.find((r) => r.key === key)
+  return {
+    intro: stored?.intro ?? '',
+    end: stored?.end ?? def?.defaultEnd ?? ''
+  }
+}
+
+/** Split a configured text block into paragraphs (blank lines separate paragraphs). */
+export function reportTextParagraphs(text: string): string[] {
+  return text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+}
+
 let cache: ReportSettings | null = null
 
 export async function getReportSettings(): Promise<ReportSettings> {

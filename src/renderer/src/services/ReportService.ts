@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable'
 import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
+import { getReportSettings, getReportText, reportTextParagraphs } from './ReportSettingsService'
 
 // Guard against IPC error objects (safeHandle returns { error:true } on failure)
 const safeArray = (v: unknown): any[] => Array.isArray(v) ? v : []
@@ -942,6 +943,12 @@ export const ReportService = {
     const surveyor: Surveyor | undefined = surveyors.find((s: Surveyor) => s.id === survey.surveyorId)
     const flagState = flagStatesRaw.find((f: any) => f.id === vessel.flagStateId)
 
+    // Configurable intro / end text (Admin → Report Settings → Report Texts)
+    const reportSettings = await getReportSettings()
+    const { intro: introText, end: endText } = getReportText(reportSettings, 'conditionSurveyDefects')
+    const introParas = reportTextParagraphs(introText)
+    const endParas = reportTextParagraphs(endText)
+
     const openCount = defects.filter(d => d.status === 'OPEN').length
     const closedCount = defects.filter(d => d.status === 'CLOSED').length
     const criticalCount = defects.filter(d => d.severity === 'Critical').length
@@ -1056,6 +1063,22 @@ export const ReportService = {
     doc.setLineWidth(0.5)
     doc.line(14, y, 196, y)
     y += 6
+
+    // ── Intro text (configurable) ────────────────────────────────────
+    if (introParas.length > 0) {
+      doc.setFontSize(9.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(40, 40, 40)
+      for (const para of introParas) {
+        for (const line of doc.splitTextToSize(para, 182)) {
+          if (y > 260) { doc.addPage(); y = 20 }
+          doc.text(line, 14, y)
+          y += 5
+        }
+        y += 2
+      }
+      y += 4
+    }
 
     // ── Defects table ────────────────────────────────────────────────
     if (defects.length === 0) {
@@ -1184,13 +1207,21 @@ export const ReportService = {
       }
     }
 
-    // ── Closing sentence ─────────────────────────────────────────────
-    let closingY = ny + 12
-    if (closingY > 255) { doc.addPage(); closingY = 25 }
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'italic')
-    doc.setTextColor(40, 40, 40)
-    doc.text('Subject to the terms, conditions and warranties of the policy.', 14, closingY)
+    // ── End text (configurable; defaults to the policy-terms sentence) ─
+    if (endParas.length > 0) {
+      let closingY = ny + 12
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(40, 40, 40)
+      for (const para of endParas) {
+        for (const line of doc.splitTextToSize(para, 182)) {
+          if (closingY > 262) { doc.addPage(); closingY = 25 }
+          doc.text(line, 14, closingY)
+          closingY += 5
+        }
+        closingY += 2
+      }
+    }
 
     // ── Page footers (y=274 keeps footer within printable area) ──────
     const pageCount = doc.getNumberOfPages()
