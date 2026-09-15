@@ -185,11 +185,10 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                                 onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { currency: e.target.value })}
                                 style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
-                            <input
-                                type="number"
-                                value={opt.amount || ''}
-                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
-                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
+                            <MoneyInput
+                                value={opt.amount}
+                                onChange={val => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: val || 0 } : o))}
+                                onBlur={val => window.api.hullUpdateAgreedValueOption(opt.id, { amount: val || 0 })}
                                 placeholder="Insured value"
                                 style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
@@ -232,18 +231,17 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                                                 }}
                                                 style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
                                             />
-                                            <input
-                                                type="number"
-                                                value={alt.agreedValue ?? ''}
-                                                onChange={e => {
-                                                    const val = e.target.value ? Number(e.target.value) : null
-                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValue: val } : a))
+                                            <MoneyInput
+                                                value={alt.agreedValue}
+                                                onChange={val => {
+                                                    const nv = val ?? null
+                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValue: nv } : a))
                                                 }}
-                                                onBlur={async e => {
-                                                    const val = e.target.value ? Number(e.target.value) : null
-                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValue: val })
+                                                onBlur={async val => {
+                                                    const nv = val ?? null
+                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValue: nv })
                                                     // Sync total to quotation-level agreedValue
-                                                    const updatedAlts = hullAlts.map(a => a.id === alt.id ? { ...a, agreedValue: val } : a)
+                                                    const updatedAlts = hullAlts.map(a => a.id === alt.id ? { ...a, agreedValue: nv } : a)
                                                     const total = updatedAlts.reduce((sum, a) => sum + (a.agreedValue || 0), 0)
                                                     setQ(p => ({ ...p, agreedValue: total || undefined }))
                                                     updateField('agreedValue', total || null)
@@ -348,17 +346,16 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
                     <div style={{ flex: 1, maxWidth: '250px' }}>
                         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
-                        <input
-                            type="number"
-                            value={quotation.agreedValue ?? ''}
-                            onChange={e => setQ(p => ({ ...p, agreedValue: e.target.value ? Number(e.target.value) : undefined }))}
-                            onBlur={async e => {
-                                const val = e.target.value ? Number(e.target.value) : null
-                                updateField('agreedValue', val)
+                        <MoneyInput
+                            value={quotation.agreedValue}
+                            onChange={val => setQ(p => ({ ...p, agreedValue: val }))}
+                            onBlur={async val => {
+                                const nv = val ?? null
+                                updateField('agreedValue', nv)
                                 // Sync to single vessel record
                                 if (qVessels.length === 1) {
-                                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: val })
-                                    setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, agreedValue: val } : v))
+                                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: nv })
+                                    setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, agreedValue: nv } : v))
                                 }
                             }}
                             placeholder="0.00"
@@ -406,18 +403,17 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                                     <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {qv.vesselLabel}: {qv.name || 'Unnamed'}
                                     </span>
-                                    <input
-                                        type="number"
-                                        value={qv.ivValue ?? ''}
-                                        onChange={e => {
-                                            const val = e.target.value ? Number(e.target.value) : null
-                                            setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, ivValue: val } : v))
+                                    <MoneyInput
+                                        value={qv.ivValue}
+                                        onChange={val => {
+                                            const nv = val ?? null
+                                            setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, ivValue: nv } : v))
                                         }}
-                                        onBlur={async e => {
-                                            const val = e.target.value ? Number(e.target.value) : null
-                                            await window.api.updateQuotationVessel(qv.id, { ivValue: val })
+                                        onBlur={async val => {
+                                            const nv = val ?? null
+                                            await window.api.updateQuotationVessel(qv.id, { ivValue: nv })
                                             // Sync total to quotation-level
-                                            const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, ivValue: val } : v)
+                                            const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, ivValue: nv } : v)
                                             const total = updatedVessels.reduce((sum, v) => sum + (v.ivValue || 0), 0)
                                             setQ(p => ({ ...p, ivValue: total || undefined }))
                                             updateField('ivValue', total || null)
@@ -450,17 +446,16 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
                 <div style={{ flex: 1, maxWidth: '250px' }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>IV Value</label>
-                    <input
-                        type="number"
-                        value={quotation.ivValue ?? ''}
-                        onChange={e => setQ(p => ({ ...p, ivValue: e.target.value ? Number(e.target.value) : undefined }))}
-                        onBlur={async e => {
-                            const val = e.target.value ? Number(e.target.value) : null
-                            updateField('ivValue', val)
+                    <MoneyInput
+                        value={quotation.ivValue}
+                        onChange={val => setQ(p => ({ ...p, ivValue: val }))}
+                        onBlur={async val => {
+                            const nv = val ?? null
+                            updateField('ivValue', nv)
                             // Sync to single vessel record
                             if (qVessels.length === 1) {
-                                await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: val })
-                                setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, ivValue: val } : v))
+                                await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: nv })
+                                setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, ivValue: nv } : v))
                             }
                         }}
                         placeholder="0.00"
