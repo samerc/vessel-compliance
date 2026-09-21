@@ -268,6 +268,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                             onChange={val => updateDeductibleVesselAmount(d.id, v.id, val)}
                                             onBlur={() => saveDeductibleVesselAmounts(d.id)}
                                             placeholder="0"
+                                            showZero
                                             style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
                                         />
                                         {hasSecondary && (
@@ -276,6 +277,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                                 onChange={val => updateDeductibleVesselSecondaryAmount(d.id, v.id, val)}
                                                 onBlur={() => saveDeductibleVesselSecondaryAmounts(d.id)}
                                                 placeholder="0"
+                                                showZero
                                                 style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
                                             />
                                         )}

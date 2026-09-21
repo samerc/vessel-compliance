@@ -20,24 +20,28 @@ export function parseMoney(str: string): number | undefined {
 }
 
 /** Number input that shows commas when not focused, raw number while editing */
-export function MoneyInput({ value, placeholder, onChange, onBlur, style, className }: {
+export function MoneyInput({ value, placeholder, onChange, onBlur, style, className, showZero }: {
     value: number | undefined | null
     placeholder?: string
     onChange: (val: number | undefined) => void
     onBlur?: (val: number | undefined) => void
     style?: React.CSSProperties
     className?: string
+    /** Render a stored 0 as a visible "0" instead of blank — lets a pinned zero be told apart
+     *  from an empty field (which falls back to a default amount). */
+    showZero?: boolean
 }) {
     const [editing, setEditing] = useState(false)
     const [raw, setRaw] = useState('')
-    const displayVal = editing ? raw : fmtMoney(value)
+    const zeroStr = showZero && value === 0 ? '0' : ''
+    const displayVal = editing ? raw : (fmtMoney(value) || zeroStr)
     return (
         <input
             type="text"
             className={className}
             value={displayVal}
             placeholder={placeholder}
-            onFocus={() => { setEditing(true); setRaw(value != null && value !== 0 ? String(value) : '') }}
+            onFocus={() => { setEditing(true); setRaw(value != null && value !== 0 ? String(value) : zeroStr) }}
             onChange={e => { const v = e.target.value.replace(/[^0-9.,\-]/g, ''); setRaw(v); onChange(parseMoney(v)) }}
             onBlur={() => { setEditing(false); const parsed = parseMoney(raw); onBlur?.(parsed) }}
             style={style}
