@@ -1220,6 +1220,7 @@ export interface QuotationDeductible {
   vesselScope?: string[] | null
   alternativeId?: string | null
   vesselAmounts?: Record<string, number> | null
+  vesselSecondaryAmounts?: Record<string, number> | null
   previousAmount?: number | null
   previousSecondaryAmount?: number | null
 }

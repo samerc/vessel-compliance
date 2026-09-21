@@ -3008,6 +3008,10 @@ export class MySQLAdapter {
                 if ((dvaCols as any[]).length === 0) {
                     await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN vessel_amounts TEXT DEFAULT NULL")
                 }
+                const [dvsaCols] = await this.pool.query("SHOW COLUMNS FROM quotation_deductibles LIKE 'vessel_secondary_amounts'") as any[]
+                if ((dvsaCols as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE quotation_deductibles ADD COLUMN vessel_secondary_amounts TEXT DEFAULT NULL")
+                }
             }
 
             // Migration: Per-vessel LOL amounts
@@ -8980,7 +8984,7 @@ export class MySQLAdapter {
             { table: 'quotation_additional_clauses', cols: 'quotation_id, pi_additional_clause_id, custom_text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_warranties', cols: 'quotation_id, pi_warranty_id, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_custom_warranties', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
-            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id, vessel_amounts, previous_amount, previous_secondary_amount' },
+            { table: 'quotation_deductibles', cols: 'quotation_id, pi_deductible_id, title, description, amount, currency, secondary_amount, secondary_description, order_index, vessel_scope, alternative_id, vessel_amounts, vessel_secondary_amounts, previous_amount, previous_secondary_amount' },
             { table: 'quotation_text_deductibles', cols: 'quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope, alternative_id' },
             { table: 'quotation_exclusions', cols: 'quotation_id, pi_exclusion_id, custom_text, vessel_scope, alternative_id' },
             { table: 'quotation_custom_exclusions', cols: 'quotation_id, text, order_index, vessel_scope, alternative_id' },
@@ -10002,10 +10006,10 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
-                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts,
+                secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts, vessel_secondary_amounts as vesselSecondaryAmounts,
                 previous_amount as previousAmount, previous_secondary_amount as previousSecondaryAmount
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, previousAmount: r.previousAmount != null ? Number(r.previousAmount) : null, previousSecondaryAmount: r.previousSecondaryAmount != null ? Number(r.previousSecondaryAmount) : null }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselSecondaryAmounts: r.vesselSecondaryAmounts ? JSON.parse(r.vesselSecondaryAmounts) : null, previousAmount: r.previousAmount != null ? Number(r.previousAmount) : null, previousSecondaryAmount: r.previousSecondaryAmount != null ? Number(r.previousSecondaryAmount) : null }))
     }
 
     async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[]; vesselAmounts?: Record<string, number> | null }): Promise<any> {
@@ -10017,7 +10021,7 @@ export class MySQLAdapter {
         return { id, ...data }
     }
 
-    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null; previousAmount?: number | null; previousSecondaryAmount?: number | null }): Promise<void> {
+    async updateQuotationDeductible(id: string, updates: { title?: string; description?: string; amount?: number; currency?: string; secondaryAmount?: number; secondaryDescription?: string; vesselScope?: string[] | null; vesselAmounts?: Record<string, number> | null; vesselSecondaryAmounts?: Record<string, number> | null; previousAmount?: number | null; previousSecondaryAmount?: number | null }): Promise<void> {
         if (!this.pool) return
         const fields: string[] = []
         const values: any[] = []
@@ -10029,6 +10033,7 @@ export class MySQLAdapter {
         if (updates.secondaryDescription !== undefined) { fields.push('secondary_description = ?'); values.push(updates.secondaryDescription) }
         if (updates.vesselScope !== undefined) { fields.push('vessel_scope = ?'); values.push(updates.vesselScope ? JSON.stringify(updates.vesselScope) : null) }
         if (updates.vesselAmounts !== undefined) { fields.push('vessel_amounts = ?'); values.push(updates.vesselAmounts ? JSON.stringify(updates.vesselAmounts) : null) }
+        if (updates.vesselSecondaryAmounts !== undefined) { fields.push('vessel_secondary_amounts = ?'); values.push(updates.vesselSecondaryAmounts ? JSON.stringify(updates.vesselSecondaryAmounts) : null) }
         if (updates.previousAmount !== undefined) { fields.push('previous_amount = ?'); values.push(updates.previousAmount) }
         if (updates.previousSecondaryAmount !== undefined) { fields.push('previous_secondary_amount = ?'); values.push(updates.previousSecondaryAmount) }
         if (fields.length === 0) return

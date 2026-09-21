@@ -87,7 +87,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
         showSuccess('Custom deductible added'); loadData()
     }
 
-    const handleUpdate = async (id: string, updates: { title?: string; amount?: number; currency?: string; secondaryAmount?: number; description?: string; vesselAmounts?: Record<string, number> | null; previousAmount?: number | null; previousSecondaryAmount?: number | null }) => {
+    const handleUpdate = async (id: string, updates: { title?: string; amount?: number; currency?: string; secondaryAmount?: number; description?: string; vesselAmounts?: Record<string, number> | null; vesselSecondaryAmounts?: Record<string, number> | null; previousAmount?: number | null; previousSecondaryAmount?: number | null }) => {
         await window.api.updateQuotationDeductible(id, updates)
     }
 
@@ -113,6 +113,30 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
         const ded = deductibles.find(d => d.id === dedId)
         if (!ded) return
         await handleUpdate(dedId, { amount: ded.amount, vesselAmounts: ded.vesselAmounts || null })
+    }
+
+    const updateDeductibleVesselSecondaryAmount = (dedId: string, vesselId: string, amount: number | undefined) => {
+        setDeductibles(prev => prev.map(d => {
+            if (d.id !== dedId) return d
+            const va = { ...(d.vesselSecondaryAmounts || {}) }
+            if (amount == null) {
+                delete va[vesselId]
+            } else {
+                va[vesselId] = amount
+            }
+            // If all vessel amounts are the same, collapse to the single secondary amount
+            const vals = Object.values(va)
+            if (vals.length === qVessels.length && vals.length > 0 && vals.every(v => v === vals[0])) {
+                return { ...d, secondaryAmount: vals[0], vesselSecondaryAmounts: null }
+            }
+            return { ...d, vesselSecondaryAmounts: Object.keys(va).length > 0 ? va : null }
+        }))
+    }
+
+    const saveDeductibleVesselSecondaryAmounts = async (dedId: string) => {
+        const ded = deductibles.find(d => d.id === dedId)
+        if (!ded) return
+        await handleUpdate(dedId, { secondaryAmount: ded.secondaryAmount, vesselSecondaryAmounts: ded.vesselSecondaryAmounts || null })
     }
 
     const moveDeductible = async (index: number, direction: 'up' | 'down') => {
@@ -218,13 +242,20 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         )}
                     </div>
                     {/* Per-vessel amount inputs */}
-                    {qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts) && (
+                    {qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts) && (() => {
+                        const hasSecondary = !!(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description))
+                        return (
                         <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount (per vessel):</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', width: '140px' }}>Amount (per vessel):</span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', width: '150px' }}>Primary</span>
+                                {hasSecondary && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', width: '150px' }}>2nd</span>}
+                            </div>
                             {qVessels.map(v => {
-                                const va = d.vesselAmounts
-                                const perVesselVal = va ? va[v.id] : undefined
+                                const perVesselVal = d.vesselAmounts ? d.vesselAmounts[v.id] : undefined
                                 const displayVal = perVesselVal ?? d.amount ?? ''
+                                const perVesselSec = d.vesselSecondaryAmounts ? d.vesselSecondaryAmounts[v.id] : undefined
+                                const displaySec = perVesselSec ?? d.secondaryAmount ?? undefined
                                 return (
                                     <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={(v.name || v.vesselLabel).toUpperCase()}>
@@ -237,11 +268,21 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                             placeholder="0"
                                             style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
                                         />
+                                        {hasSecondary && (
+                                            <MoneyInput
+                                                value={displaySec}
+                                                onChange={val => updateDeductibleVesselSecondaryAmount(d.id, v.id, val)}
+                                                onBlur={() => saveDeductibleVesselSecondaryAmounts(d.id)}
+                                                placeholder="0"
+                                                style={{ width: '150px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                                            />
+                                        )}
                                     </div>
                                 )
                             })}
                         </div>
-                    )}
+                        )
+                    })()}
                     {/* Description (editable) */}
                     {editingDescId === d.id ? (
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>

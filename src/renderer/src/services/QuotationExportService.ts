@@ -2353,17 +2353,20 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
             const vaOrigDed = origDed
             const vaColor = (isNewDed || (vaOrigDed && vaOrigDed.amount !== va)) ? RED : '000000'
+            // Per-vessel secondary/maximum (drives the {amount} in the pollution-style wording); falls back to the shared value
+            const perVesselSec = d.vesselSecondaryAmounts?.[vessel.id] ?? d.secondaryAmount
+            const vMainDesc = replaceDedPlaceholders(d.description, d.currency, perVesselSec)
             dedRows.push(new TableRow({
               children: [
                 new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(va, d.currency), size: 22, font: 'Arial', color: vaColor })] })] }),
-                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${mainDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
+                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${vMainDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
               ]
             }))
             if (d.secondaryDescription) {
-              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, d.secondaryAmount)
+              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, perVesselSec)
               dedRows.push(new TableRow({
                 children: [
-                  new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? formatCurrency(d.secondaryAmount, d.currency) : '', size: 22, font: 'Arial', color: vaColor })] })] }),
+                  new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: perVesselSec != null ? formatCurrency(perVesselSec, d.currency) : '', size: 22, font: 'Arial', color: vaColor })] })] }),
                   new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${secDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
                 ]
               }))
