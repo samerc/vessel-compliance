@@ -241,8 +241,10 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                             </div>
                         )}
                     </div>
-                    {/* Per-vessel amount inputs */}
-                    {qVessels.length >= 2 && !d.vesselScope && (d.amount > 0 || d.vesselAmounts) && (() => {
+                    {/* Per-vessel amount inputs (only the vessels this deductible is scoped to) */}
+                    {(() => {
+                        const scopedVessels = d.vesselScope ? qVessels.filter(v => d.vesselScope!.includes(v.id)) : qVessels
+                        if (scopedVessels.length < 2 || !(d.amount > 0 || d.vesselAmounts)) return null
                         const hasSecondary = !!(d.secondaryDescription || /\{currency\}|\{amount\}/.test(d.description))
                         return (
                         <div style={{ paddingLeft: '24px', marginBottom: '6px' }}>
@@ -251,7 +253,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', width: '150px' }}>Primary</span>
                                 {hasSecondary && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', width: '150px' }}>2nd</span>}
                             </div>
-                            {qVessels.map(v => {
+                            {scopedVessels.map(v => {
                                 const perVesselVal = d.vesselAmounts ? d.vesselAmounts[v.id] : undefined
                                 const displayVal = perVesselVal ?? d.amount ?? ''
                                 const perVesselSec = d.vesselSecondaryAmounts ? d.vesselSecondaryAmounts[v.id] : undefined

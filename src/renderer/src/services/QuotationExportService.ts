@@ -2348,6 +2348,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Per-vessel amounts: emit one row per vessel
         if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
           for (const vessel of data.quotationVessels) {
+            // Respect vessel scope — a vessel removed from this deductible keeps its stored amount
+            // but must not appear in the export.
+            if (d.vesselScope && d.vesselScope.length > 0 && !d.vesselScope.includes(vessel.id)) continue
             const va = d.vesselAmounts[vessel.id]
             if (va == null) continue
             const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
