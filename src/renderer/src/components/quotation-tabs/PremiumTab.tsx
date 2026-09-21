@@ -658,7 +658,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         <td style={{ padding: '6px 10px', fontWeight: 600, textTransform: 'uppercase' }}>{v.name || v.vesselLabel}</td>
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.premiumAmount || ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, premiumAmount: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null)} style={{ width: '130px', padding: '3px 6px', textAlign: 'right' }} />
-                                            {numInst > 1 && vPrem > 0 && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{numInst} × {currency} {fmtAmt((hasDiscount ? vPayable : vPrem) / numInst)}</div>}
+                                            {numInst > 1 && vPrem > 0 && !hasDiscount && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{numInst} × {currency} {fmtAmt(vPrem / numInst)}</div>}
                                         </td>
                                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                                             <input type="number" value={v.previousPremium ?? ''} onChange={e => setQVessels(prev => prev.map(pv => pv.id === v.id ? { ...pv, previousPremium: parseFloat(e.target.value) || undefined } : pv))} onBlur={e => updateVesselPremium(v.id, parseFloat(e.target.value) || null, 'previousPremium')} placeholder="—" style={{ width: '100px', padding: '3px 6px', textAlign: 'right', fontSize: '0.78rem', color: 'var(--danger)' }} />
@@ -679,6 +679,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                                     </label>
                                                 )}
                                             </div>
+                                            {numInst > 1 && vPrem > 0 && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{numInst} × {currency} {fmtAmt(vPayable / numInst)}</div>}
                                         </td>}
                                     </tr>
                                 )
