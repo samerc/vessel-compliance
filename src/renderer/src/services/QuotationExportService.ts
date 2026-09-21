@@ -2345,32 +2345,43 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const amountChanged = origDed && origDed.amount !== d.amount
         const dedColor = (isNewDed || amountChanged) ? RED : '000000'
         const mainDesc = replaceDedPlaceholders(d.description, d.currency, d.secondaryAmount)
-        // Per-vessel amounts: emit one row per vessel
-        if (d.vesselAmounts && Object.keys(d.vesselAmounts).length > 0) {
-          for (const vessel of data.quotationVessels) {
-            // Respect vessel scope — a vessel removed from this deductible keeps its stored amount
-            // but must not appear in the export.
-            if (d.vesselScope && d.vesselScope.length > 0 && !d.vesselScope.includes(vessel.id)) continue
-            const va = d.vesselAmounts[vessel.id]
-            if (va == null) continue
-            const vName = `(M/V ${(vessel.name || vessel.vesselLabel).toUpperCase()})`
-            const vaOrigDed = origDed
-            const vaColor = (isNewDed || (vaOrigDed && vaOrigDed.amount !== va)) ? RED : '000000'
-            // Per-vessel secondary/maximum (drives the {amount} in the pollution-style wording); falls back to the shared value
-            const perVesselSec = d.vesselSecondaryAmounts?.[vessel.id] ?? d.secondaryAmount
-            const vMainDesc = replaceDedPlaceholders(d.description, d.currency, perVesselSec)
+        // In-scope vessels for this deductible (no scope = all vessels)
+        const dInScope = data.quotationVessels.filter(v => !d.vesselScope || d.vesselScope.length === 0 || d.vesselScope.includes(v.id))
+        // Group the in-scope vessels by their effective (primary, secondary) amount. This keeps
+        // vessels that use the base amount (no explicit override) in the export, and collapses
+        // vessels sharing the same amount into a single row instead of dropping them.
+        const dHasPerVessel = dInScope.length > 0 && dInScope.some(v =>
+          (d.vesselAmounts && d.vesselAmounts[v.id] != null) || (d.vesselSecondaryAmounts && d.vesselSecondaryAmounts[v.id] != null))
+        if (dHasPerVessel) {
+          const groups: { amt: number; sec: number | null; vessels: QuotationVessel[] }[] = []
+          for (const v of dInScope) {
+            const amt = d.vesselAmounts?.[v.id] ?? d.amount
+            const sec = (d.vesselSecondaryAmounts?.[v.id] ?? d.secondaryAmount) ?? null
+            let g = groups.find(x => x.amt === amt && x.sec === sec)
+            if (!g) { g = { amt, sec, vessels: [] }; groups.push(g) }
+            g.vessels.push(v)
+          }
+          const groupSuffix = (vessels: QuotationVessel[]) => {
+            if (vessels.length === data.quotationVessels.length) return ''
+            const names = vessels.map(v => (v.name || v.vesselLabel).toUpperCase())
+            return names.length === 1 ? ` (M/V ${names[0]})` : ` (${names.join(', ')})`
+          }
+          for (const g of groups) {
+            const gColor = (isNewDed || (origDed && origDed.amount !== g.amt)) ? RED : '000000'
+            const suffix = groupSuffix(g.vessels)
+            const gMainDesc = replaceDedPlaceholders(d.description, d.currency, g.sec)
             dedRows.push(new TableRow({
               children: [
-                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(va, d.currency), size: 22, font: 'Arial', color: vaColor })] })] }),
-                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${vMainDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
+                new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(g.amt, d.currency), size: 22, font: 'Arial', color: gColor })] })] }),
+                new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${gMainDesc}${suffix}`, size: 22, font: 'Arial', color: gColor })] })] })
               ]
             }))
             if (d.secondaryDescription) {
-              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, perVesselSec)
+              const secDesc = replaceDedPlaceholders(d.secondaryDescription, d.currency, g.sec)
               dedRows.push(new TableRow({
                 children: [
-                  new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: perVesselSec != null ? formatCurrency(perVesselSec, d.currency) : '', size: 22, font: 'Arial', color: vaColor })] })] }),
-                  new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${secDesc} ${vName}`, size: 22, font: 'Arial', color: vaColor })] })] })
+                  new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: g.sec != null ? formatCurrency(g.sec, d.currency) : '', size: 22, font: 'Arial', color: gColor })] })] }),
+                  new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: noBorders(), children: [new Paragraph({ children: [new TextRun({ text: `${secDesc}${suffix}`, size: 22, font: 'Arial', color: gColor })] })] })
                 ]
               }))
             }
