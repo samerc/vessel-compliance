@@ -687,7 +687,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                             <tr style={{ fontWeight: 700 }}>
                                 <td style={{ padding: '8px 10px' }}>Total</td>
                                 <td style={{ padding: '8px 10px', textAlign: 'right' }}>{technicalPremium > 0 ? technicalPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-                                <td />
+                                <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--danger)' }}>{(() => { const tp = qVessels.reduce((s, v) => s + (v.previousPremium || 0), 0); return tp > 0 ? tp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' })()}</td>
                                 {hasDiscount && <td style={{ padding: '8px 10px', textAlign: 'right' }}>{technicalPremium > 0 ? payablePremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>}
                             </tr>
                         </tbody>
