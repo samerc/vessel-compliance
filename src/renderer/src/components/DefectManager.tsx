@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare, List, ListOrdered, Type, Paperclip, Image as ImageIcon } from 'lucide-react'
+import { Trash2, Plus, X, CheckCircle, AlertCircle, Edit, Save, FileText, Download, ChevronDown, ChevronUp, RotateCcw, Clock, Search, CheckSquare, List, ListOrdered, Type, Paperclip, Image as ImageIcon, Copy, Check } from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -25,7 +25,7 @@ const severityColors: Record<string, string> = {
 
 export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: DefectManagerProps) {
   const { user, hasPermission } = useAuth()
-  const { showError } = useToast()
+  const { showError, showSuccess } = useToast()
   const canManageDefects = hasPermission('surveys:defects')
   const [defects, setDefects] = useState<SurveyDefect[]>([])
   const [sortField, setSortField] = useState<'defectNumber' | 'createdAt'>('defectNumber')
@@ -36,6 +36,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [closureNotes, setClosureNotes] = useState('')
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
   const [expandedDefectIds, setExpandedDefectIds] = useState<Set<string>>(new Set())
+  const [copiedDefectId, setCopiedDefectId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectMode, setSelectMode] = useState(false)
@@ -241,6 +242,17 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       }
       return newSet
     })
+  }
+
+  const handleCopyDefect = async (defect: SurveyDefect) => {
+    try {
+      await navigator.clipboard.writeText(defect.description || '')
+      setCopiedDefectId(defect.id)
+      showSuccess(`Defect #${defect.defectNumber} copied`)
+      setTimeout(() => setCopiedDefectId(prev => (prev === defect.id ? null : prev)), 1500)
+    } catch {
+      showError('Could not copy to clipboard')
+    }
   }
 
   const isOverdue = (defect: SurveyDefect) => {
@@ -810,6 +822,18 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       </span>
                     )}
                   </div>
+
+                  {/* Copy defect text — always available (read-only), no selection needed */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCopyDefect(defect) }}
+                    title="Copy defect text"
+                    aria-label={`Copy defect ${defect.defectNumber}`}
+                    style={{ padding: '6px', background: 'transparent', border: 'none', borderRadius: '6px', cursor: 'pointer', color: copiedDefectId === defect.id ? (isLight ? '#008c46' : '#00ff88') : 'var(--text-secondary)', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '8px', transition: 'all 0.12s' }}
+                    onMouseEnter={e => { if (copiedDefectId !== defect.id) { e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'var(--accent-primary)' } }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = copiedDefectId === defect.id ? (isLight ? '#008c46' : '#00ff88') : 'var(--text-secondary)' }}
+                  >
+                    {copiedDefectId === defect.id ? <Check size={15} /> : <Copy size={15} />}
+                  </button>
 
                   {/* Action Buttons — icon-only, clearly interactive */}
                   {canManageDefects && (
