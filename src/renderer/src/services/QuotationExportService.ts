@@ -2921,13 +2921,16 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         premContent.push(emptyP())
       } else if (!dWarExcessPrem) {
         // Single premium, no discount — plain bold text (skip if war excess already rendered)
-        if (wq.isProRata && wq.annualPremiumAmount) {
-          const annualRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.annualPremiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
-          if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== wq.annualPremiumAmount) {
-            annualRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
+        if (wq.isProRata) {
+          // Pro-rata: the charged premium as the bold headline, the annual figure below (not bold)
+          const proRataRuns: TextRun[] = [new TextRun({ text: `${formatCurrency(wq.premiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', bold: true, color: '000000' })]
+          if (wq.previousPremiumAmount != null && wq.previousPremiumAmount !== (wq.premiumAmount || 0)) {
+            proRataRuns.push(new TextRun({ text: ` (previously ${formatCurrency(wq.previousPremiumAmount, wq.premiumCurrency)})`, size: 22, font: 'Arial', color: RED }))
           }
-          premContent.push(new Paragraph({ children: annualRuns }))
-          premContent.push(new Paragraph({ children: [new TextRun({ text: `Pro-rata premium: ${formatCurrency(wq.premiumAmount, wq.premiumCurrency)}`, size: 22, font: 'Arial', bold: true, color: '000000' })] }))
+          premContent.push(new Paragraph({ children: proRataRuns }))
+          if (wq.annualPremiumAmount) {
+            premContent.push(new Paragraph({ children: [new TextRun({ text: `Pro-rata ${formatCurrency(wq.annualPremiumAmount, wq.premiumCurrency)} per annum`, size: 22, font: 'Arial', color: '000000' })] }))
+          }
           premContent.push(emptyP())
         } else {
           const premChanged = origData && origData.quotation.premiumAmount !== wq.premiumAmount
