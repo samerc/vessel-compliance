@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { Quotation, QuotationSubLimit, QuotationVessel, QuotationPIAlternative, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
-import { ALT_COLORS } from './shared'
+import { ALT_COLORS, MoneyInput } from './shared'
 import { sanitizeHtml } from '../../utils/sanitize'
 
 export default function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
@@ -100,17 +100,10 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                                 onBlur={e => window.api.piUpdateQuotationAlternative(alt.id, { lolCurrency: e.target.value || undefined })}
                                 style={{ width: '60px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'center' }}
                             />
-                            <input
-                                type="number"
-                                value={alt.lolAmount ?? ''}
-                                onChange={e => {
-                                    const val = e.target.value ? parseFloat(e.target.value) : undefined
-                                    setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolAmount: val } : a))
-                                }}
-                                onBlur={e => {
-                                    const val = e.target.value ? parseFloat(e.target.value) : null
-                                    window.api.piUpdateQuotationAlternative(alt.id, { lolAmount: val })
-                                }}
+                            <MoneyInput
+                                value={alt.lolAmount}
+                                onChange={val => setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolAmount: val } : a))}
+                                onBlur={val => window.api.piUpdateQuotationAlternative(alt.id, { lolAmount: val ?? null })}
                                 placeholder="LOL Amount"
                                 style={{ flex: 1, maxWidth: '200px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
                             />
@@ -125,7 +118,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Amount:</span>
-                        <input type="number" value={quotation.limitOfLiabilityAmount || ''} onChange={e => { setQ(p => ({ ...p, limitOfLiabilityAmount: parseFloat(e.target.value) || undefined })) }} onBlur={e => updateField('limitOfLiabilityAmount', parseFloat(e.target.value) || null)} style={{ width: '180px' }} />
+                        <MoneyInput value={quotation.limitOfLiabilityAmount} onChange={val => setQ(p => ({ ...p, limitOfLiabilityAmount: val }))} onBlur={val => updateField('limitOfLiabilityAmount', val ?? null)} style={{ width: '180px' }} />
                     </div>
                 </div>
             )}
@@ -147,20 +140,18 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                                         onBlur={e => window.api.lolUpdateOption(opt.id, { currency: e.target.value })}
                                         style={{ width: '55px', fontSize: '0.85rem', textAlign: 'center' }}
                                     />
-                                    <input
-                                        type="number"
-                                        value={opt.amount || ''}
-                                        onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: parseFloat(e.target.value) || 0 } : o))}
-                                        onBlur={e => window.api.lolUpdateOption(opt.id, { amount: parseFloat(e.target.value) || 0 })}
+                                    <MoneyInput
+                                        value={opt.amount}
+                                        onChange={val => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: val || 0 } : o))}
+                                        onBlur={val => window.api.lolUpdateOption(opt.id, { amount: val || 0 })}
                                         placeholder="Amount"
                                         style={{ flex: 1, maxWidth: '200px', fontSize: '0.85rem', textAlign: 'right' }}
                                     />
                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Premium:</span>
-                                    <input
-                                        type="number"
-                                        value={opt.premiumAmount ?? ''}
-                                        onChange={e => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: e.target.value ? parseFloat(e.target.value) : null } : o))}
-                                        onBlur={e => window.api.lolUpdateOption(opt.id, { premiumAmount: e.target.value ? parseFloat(e.target.value) : null })}
+                                    <MoneyInput
+                                        value={opt.premiumAmount}
+                                        onChange={val => setLolOptions(prev => prev.map(o => o.id === opt.id ? { ...o, premiumAmount: val ?? null } : o))}
+                                        onBlur={val => window.api.lolUpdateOption(opt.id, { premiumAmount: val ?? null })}
                                         placeholder="—"
                                         style={{ width: '120px', fontSize: '0.85rem', textAlign: 'right' }}
                                     />
@@ -218,12 +209,10 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                             <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 600, minWidth: '24px', color: 'var(--accent-primary)' }}>{v.vesselLabel}</span>
                                 <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: '80px' }}>{(v.name || v.vesselLabel).toUpperCase()}</span>
-                                <input
-                                    type="number"
-                                    value={vesselAmount ?? ''}
+                                <MoneyInput
+                                    value={vesselAmount}
                                     placeholder={quotation.limitOfLiabilityAmount?.toLocaleString() || '0'}
-                                    onChange={e => {
-                                        const val = e.target.value ? parseFloat(e.target.value) : undefined
+                                    onChange={val => {
                                         const updated = { ...(quotation.limitOfLiabilityVesselAmounts || {}) }
                                         if (val !== undefined) updated[v.id] = val
                                         else delete updated[v.id]
