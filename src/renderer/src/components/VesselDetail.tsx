@@ -1601,8 +1601,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         onDrop={e => handleDrop(e, rowType.id)}
                                     >
                                         <td style={{ padding: '16px' }}>
-                                            <div style={{ fontWeight: isExtra ? '400' : '600', paddingLeft: isExtra ? '20px' : '0', color: isExtra ? 'var(--text-secondary)' : 'inherit' }}>
+                                            <div style={{ fontWeight: isExtra ? '400' : '600', paddingLeft: isExtra ? '20px' : '0', color: isExtra ? 'var(--text-secondary)' : 'inherit', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                 {isExtra ? `${rowType.name} (copy)` : rowType.name}
+                                                {rowHasFile && <DocExpiryBadge expiryDate={rowDoc?.expiryDate} isLight={isLight} />}
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px' }}>
@@ -1869,6 +1870,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 color: isLight ? '#3b82f6' : '#93c5fd',
                                                 fontWeight: '500'
                                             }}>Custom</span>
+                                            {rowHasFile && <DocExpiryBadge expiryDate={doc?.expiryDate} isLight={isLight} />}
                                         </div>
                                     </td>
                                     <td style={{ padding: '16px' }}>
@@ -2474,6 +2476,26 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 }
 
 // ==================== Dynamic Policies View ====================
+
+/** Visible EXPIRED / EXPIRING SOON badge for a document row (same thresholds as the row's
+ *  left border: past = expired, within 30 days = expiring soon). Null when fine or no date. */
+function DocExpiryBadge({ expiryDate, isLight }: { expiryDate?: string | null; isLight: boolean }) {
+    if (!expiryDate || expiryDate === '0000-00-00') return null
+    const exp = new Date(expiryDate)
+    if (isNaN(exp.getTime())) return null
+    const now = new Date()
+    const soon = new Date(); soon.setDate(soon.getDate() + 30)
+    const expired = exp < now
+    if (!expired && exp >= soon) return null
+    const color = expired ? 'var(--danger)' : (isLight ? '#b45309' : '#e6a800')
+    const bg = expired ? (isLight ? 'rgba(200,0,0,0.1)' : 'rgba(255,77,77,0.14)') : (isLight ? 'rgba(180,83,9,0.1)' : 'rgba(230,168,0,0.14)')
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase', color, background: bg, border: `1px solid ${color}`, whiteSpace: 'nowrap' }}>
+            <AlertCircle size={11} />
+            {expired ? 'Expired' : 'Expiring Soon'}
+        </span>
+    )
+}
 
 function formatCurrency(value?: number, currency?: string): string {
     if (value == null) return '-'
