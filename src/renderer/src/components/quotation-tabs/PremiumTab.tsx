@@ -334,6 +334,8 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                         </label>
                         <input type="number" value={alt.premiumAmount || ''} onChange={e => setHullAlternatives(prev => prev.map(a => a.id === alt.id ? { ...a, premiumAmount: parseFloat(e.target.value) || undefined } : a))} onBlur={e => updateAlternativePremium(alt.id, parseFloat(e.target.value) || null)} placeholder={premiumLabel} style={{ flex: 1, maxWidth: '200px' }} />
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
+                        {hasDiscount && (alt.premiumAmount || 0) > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>payable {currency} {fmtAmt(payablePlain(alt.premiumAmount || 0))}</span>}
+                        {numInst > 1 && (alt.premiumAmount || 0) > 0 && <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>· {numInst} × {currency} {fmtAmt(instPlain(alt.premiumAmount || 0))}</span>}
                     </div>
                 )
             })}
