@@ -138,6 +138,7 @@ export interface Api {
 
 
   fsExists: (filePath: string) => Promise<boolean>
+  fsExistsMany: (filePaths: string[]) => Promise<boolean[]>
   fsOpen: (filePath: string) => Promise<void>
   getFilePath: (file: File) => string
   getFilePathCanonicalized: (file: File) => Promise<string>

@@ -172,17 +172,13 @@ export default function EntityEditPanel({
         ...safeUbos.filter((u: any) => u.entityId === entityId).map((u: any) => u.uboEntityId)
       ])
       const fstatus: Record<string, boolean> = {}
-      await Promise.all(
-        safeDocs
-          .filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
-          .map(async (d) => {
-            try {
-              fstatus[d.id] = await window.api.fsExists(d.filePath!)
-            } catch {
-              fstatus[d.id] = true
-            }
-          })
-      )
+      const withFile = safeDocs.filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
+      try {
+        const exists = await window.api.fsExistsMany(withFile.map((d) => d.filePath!))
+        if (Array.isArray(exists)) withFile.forEach((d, i) => { fstatus[d.id] = exists[i] })
+      } catch {
+        /* unknown = shown as present */
+      }
       setFileStatus(fstatus)
     } catch {
       /* ignore */

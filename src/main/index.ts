@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, screen, Menu } from 'electron'
 import { join, dirname, resolve, normalize, extname, basename } from 'path'
 import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
+import { access as fsAccess } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { db } from './mysql/adapter'
@@ -1926,11 +1927,20 @@ app.whenReady().then(() => {
   })
 
   // File System IPC Handlers (session required, path validation)
-  safeHandle('fs:exists', (event, filePath: string) => {
-    requireSession(event)
+  // Async: a sync existsSync on a slow/unreachable network share blocks the whole main process
+  const fileExistsAsync = async (filePath: unknown): Promise<boolean> => {
     if (typeof filePath !== 'string' || !filePath) return false
-    const resolved = resolveFilePath(filePath)
-    return existsSync(normalize(resolved))
+    try { await fsAccess(normalize(resolveFilePath(filePath))); return true } catch { return false }
+  }
+  safeHandle('fs:exists', async (event, filePath: string) => {
+    requireSession(event)
+    return fileExistsAsync(filePath)
+  })
+  // Many paths in one round-trip, checked in parallel (document lists)
+  safeHandle('fs:existsMany', async (event, filePaths: string[]) => {
+    requireSession(event)
+    if (!Array.isArray(filePaths)) return []
+    return Promise.all(filePaths.slice(0, 5000).map(fileExistsAsync))
   })
 
   safeHandle('fs:open', async (event, filePath: string) => {

@@ -3,15 +3,9 @@ import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moo
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
-import AdminPanel from './components/AdminPanel'
-import FleetManager from './components/FleetManager'
-import Directory from './components/Directory'
-import ComplianceCenter from './components/ComplianceCenter'
-import UserManager from './components/UserManager'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
 import UserProfileModal from './components/UserProfileModal'
-import VesselFilter from './components/VesselFilter'
 import { useAuth } from './contexts/AuthContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpdateNotification } from './components/UpdateNotification'
@@ -22,6 +16,12 @@ import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
 const SanctionsSearch = lazy(() => import('./components/SanctionsSearch'))
+const AdminPanel = lazy(() => import('./components/AdminPanel'))
+const FleetManager = lazy(() => import('./components/FleetManager'))
+const Directory = lazy(() => import('./components/Directory'))
+const ComplianceCenter = lazy(() => import('./components/ComplianceCenter'))
+const UserManager = lazy(() => import('./components/UserManager'))
+const VesselFilter = lazy(() => import('./components/VesselFilter'))
 const Calculators = lazy(() => import('./components/Calculators'))
 const ReceiptManager = lazy(() => import('./components/ReceiptManager'))
 const QuotationManager = lazy(() => import('./components/QuotationManager'))
@@ -769,12 +769,14 @@ function App(): React.JSX.Element {
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
             onNavigateToQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }}
           />}
+          <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}
           {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
           {activeTab === 'users' && isAdmin && <UserManager />}
           {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} />}
           {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter initialTab={complianceSubTab} onTabChange={setComplianceSubTab} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
+          </Suspense>
           {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'surveys' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'survey-followup' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}

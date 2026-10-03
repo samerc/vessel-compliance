@@ -177,6 +177,23 @@ export default function FleetManager() {
   const assignedCount = useMemo(() => vessels.filter(v => v.fleetId).length, [vessels])
   const unassignedCount = useMemo(() => vessels.filter(v => !v.fleetId).length, [vessels])
 
+  // Lookup maps: the tables below used to scan the full vessel / entity / flag lists per row
+  const fleetCounts = useMemo(() => {
+    const m = new Map<string, { total: number; active: number }>()
+    for (const v of vessels) {
+      if (!v.fleetId) continue
+      const c = m.get(v.fleetId) || { total: 0, active: 0 }
+      c.total++
+      if (v.isActive) c.active++
+      m.set(v.fleetId, c)
+    }
+    return m
+  }, [vessels])
+  const vesselById = useMemo(() => new Map(vessels.map(v => [v.id, v])), [vessels])
+  const entityById = useMemo(() => new Map(entities.map(e => [e.id, e])), [entities])
+  const flagById = useMemo(() => new Map(flagStates.map(f => [f.id, f])), [flagStates])
+  const fleetById = useMemo(() => new Map(fleets.map(f => [f.id, f])), [fleets])
+
   // Filtered fleet list
   const filteredFleets = useMemo(() => {
     if (!fleetSearch.trim()) return fleets
@@ -188,15 +205,15 @@ export default function FleetManager() {
   const sortedFleets = useMemo(() => {
     return [...filteredFleets].sort((a, b) => {
       if (fleetSortKey === 'vessels') {
-        const aCount = vessels.filter(v => v.fleetId === a.id).length
-        const bCount = vessels.filter(v => v.fleetId === b.id).length
+        const aCount = fleetCounts.get(a.id)?.total ?? 0
+        const bCount = fleetCounts.get(b.id)?.total ?? 0
         return fleetSortDir === 'asc' ? aCount - bCount : bCount - aCount
       }
       return fleetSortDir === 'asc'
         ? a.name.localeCompare(b.name)
         : b.name.localeCompare(a.name)
     })
-  }, [filteredFleets, fleetSortKey, fleetSortDir, vessels])
+  }, [filteredFleets, fleetSortKey, fleetSortDir, fleetCounts])
 
   const toggleFleetSort = (key: 'name' | 'vessels') => {
     if (fleetSortKey === key) {
@@ -234,7 +251,7 @@ export default function FleetManager() {
     // Derive customer groups from active policies
     const activePolicies = allPolicies.filter(p => p.status === 'active' && p.customerEntityId)
     for (const policy of activePolicies) {
-      const vessel = vessels.find(v => v.id === policy.vesselId)
+      const vessel = vesselById.get(policy.vesselId)
       if (!vessel) continue
 
       if (typeFilter !== 'all' && policy.customerType !== typeFilter) continue
@@ -251,7 +268,7 @@ export default function FleetManager() {
       if (existing) {
         if (!existing.vessels.some(v => v.id === vessel.id)) existing.vessels.push(vessel)
       } else {
-        const entity = entities.find(e => e.id === custId)
+        const entity = entityById.get(custId)
         if (entity) map.set(custId, { entity, vessels: [vessel] })
       }
       assignedVesselIds.add(vessel.id)
@@ -276,7 +293,7 @@ export default function FleetManager() {
       directGroups: sortGroups(Array.from(directMap.values())),
       customerUnassigned: unassignedList,
     }
-  }, [vessels, entities, allPolicies, customerSearch, typeFilter])
+  }, [vessels, vesselById, entityById, allPolicies, customerSearch, typeFilter])
 
   // ------- Navigation -------
   if (selectedFleetDetail) {
@@ -306,14 +323,14 @@ export default function FleetManager() {
   // ------- Helpers -------
 
   const VesselFlag = ({ vessel }: { vessel: Vessel }) => {
-    const fs = flagStates.find(f => f.id === vessel.flagStateId)
+    const fs = vessel.flagStateId ? flagById.get(vessel.flagStateId) : undefined
     const cls = fs ? getFlagClass(fs.iso3Code) : ''
     return cls ? <span className={cls} style={{ fontSize: '0.95rem', opacity: 0.85 }} /> : null
   }
 
   const renderCustomerVesselRow = (vessel: Vessel) => {
-    const fleet = fleets.find(f => f.id === vessel.fleetId)
-    const fs = flagStates.find(f => f.id === vessel.flagStateId)
+    const fleet = vessel.fleetId ? fleetById.get(vessel.fleetId) : undefined
+    const fs = vessel.flagStateId ? flagById.get(vessel.flagStateId) : undefined
     const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
     return (
       <tr key={vessel.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
@@ -821,8 +838,8 @@ export default function FleetManager() {
                     </tr>
                   ) : (
                     sortedFleets.map((fleet, idx) => {
-                      const count = vessels.filter(v => v.fleetId === fleet.id).length
-                      const activeCount = vessels.filter(v => v.fleetId === fleet.id && v.isActive).length
+                      const count = fleetCounts.get(fleet.id)?.total ?? 0
+                      const activeCount = fleetCounts.get(fleet.id)?.active ?? 0
                       const inactiveCount = count - activeCount
                       const isSelected = panelFleet?.id === fleet.id
                       return (

@@ -374,18 +374,41 @@ export default function EntityDirectory({
     }
   }
 
+  const fetchPage = () =>
+    window.api.getEntitiesPaginated({
+      page,
+      limit,
+      search: debouncedSearch,
+      type: typeFilter,
+      ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
+      customersOnly: viewMode === 'customers' ? true : undefined
+    })
+  const applyPage = (result: any) => {
+    setEntities(Array.isArray(result?.data) ? result.data : [])
+    setTotal(result?.total ?? 0)
+    setTotalPages(result?.totalPages ?? 1)
+  }
+
+  // Search / filter / paging only changes the page: don't re-fetch every vessel, assured,
+  // UBO, entity and document on each keystroke (the full reload is for mount and edits)
+  const pageReqRef = useRef(0)
+  const loadPage = async () => {
+    const req = ++pageReqRef.current
+    setIsLoading(true)
+    try {
+      const result = await fetchPage()
+      if (req === pageReqRef.current) applyPage(result)
+    } finally {
+      if (req === pageReqRef.current) setIsLoading(false)
+    }
+  }
+
   const loadData = async () => {
+    const req = ++pageReqRef.current
     setIsLoading(true)
     try {
       const [result, v, va, eu, allEnts, edTypes, allDocs] = await Promise.all([
-        window.api.getEntitiesPaginated({
-          page,
-          limit,
-          search: debouncedSearch,
-          type: typeFilter,
-          ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
-          customersOnly: viewMode === 'customers' ? true : undefined
-        }),
+        fetchPage(),
         window.api.getVessels(),
         window.api.getVesselAssureds(),
         window.api.getEntityUBOs(),
@@ -393,9 +416,7 @@ export default function EntityDirectory({
         window.api.getEntityDocumentTypes(),
         window.api.getEntityDocuments()
       ])
-      setEntities(Array.isArray(result?.data) ? result.data : [])
-      setTotal(result?.total ?? 0)
-      setTotalPages(result?.totalPages ?? 1)
+      if (req === pageReqRef.current) applyPage(result)
       setVessels(Array.isArray(v) ? v : [])
       setVesselAssureds(Array.isArray(va) ? va : [])
       setEntityUBOs(Array.isArray(eu) ? eu : [])
@@ -405,12 +426,18 @@ export default function EntityDirectory({
       )
       setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
     } finally {
-      setIsLoading(false)
+      if (req === pageReqRef.current) setIsLoading(false)
     }
   }
 
+  const initialLoadDone = useRef(false)
   useEffect(() => {
-    loadData()
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      loadData()
+    } else {
+      loadPage()
+    }
   }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
   useEffect(() => {
     setPage(1)

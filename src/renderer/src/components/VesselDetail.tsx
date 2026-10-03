@@ -95,11 +95,11 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
         // Check if files exist on disk
         const status: Record<string, boolean> = {}
-        for (const doc of docs) {
-            if (doc.filePath) {
-                status[doc.documentTypeId] = await window.api.fsExists(doc.filePath)
-            }
-        }
+        const withFile = docs.filter((d: VesselDocument) => d.filePath)
+        try {
+            const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
+            if (Array.isArray(exists)) withFile.forEach((d: VesselDocument, i: number) => { status[d.documentTypeId] = exists[i] })
+        } catch { /* unknown = shown as present */ }
         setFileStatus(status)
 
         // Load supplementary data separately so failures don't break core functionality

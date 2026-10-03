@@ -124,6 +124,7 @@ const api = {
 
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
+  fsExistsMany: (filePaths) => ipcRenderer.invoke('fs:existsMany', filePaths),
   fsOpen: (filePath) => ipcRenderer.invoke('fs:open', filePath),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
   getFilePathCanonicalized: async (file: File) => {

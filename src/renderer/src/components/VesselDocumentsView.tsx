@@ -109,9 +109,11 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     setVesselDocs(docs)
     setCustomDocTypes(customTypes)
     const status: Record<string, boolean> = {}
-    for (const doc of docs) {
-      if (doc.filePath) status[doc.documentTypeId] = await window.api.fsExists(doc.filePath)
-    }
+    const withFile = docs.filter((d: VesselDocument) => d.filePath)
+    try {
+      const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
+      if (Array.isArray(exists)) withFile.forEach((d: VesselDocument, i: number) => { status[d.documentTypeId] = exists[i] })
+    } catch { /* unknown = shown as present */ }
     setFileStatus(status)
   }
 

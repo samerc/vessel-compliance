@@ -68,25 +68,28 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const loadData = async () => {
     setIsLoading(true)
     try {
-      const [allSurveys, allVessels, allSurveyors] = await Promise.all([
+      const [allSurveys, allVessels, allSurveyors, allDefects] = await Promise.all([
         window.api.getConditionSurveys(),
         window.api.getVessels(),
-        window.api.getSurveyors()
+        window.api.getSurveyors(),
+        // All defects in ONE call (was one IPC round-trip per survey)
+        window.api.getSurveyDefects().catch(() => [] as SurveyDefect[])
       ])
       setVessels(Array.isArray(allVessels) ? allVessels : [])
       setSurveyors(Array.isArray(allSurveyors) ? allSurveyors : [])
 
-      // Load defect counts for each survey
-      const surveysWithCounts: SurveyWithCounts[] = await Promise.all(
-        (Array.isArray(allSurveys) ? allSurveys : []).map(async (survey) => {
-          try {
-            const defects: SurveyDefect[] = await window.api.getSurveyDefects(survey.id)
-            const openDefects = defects.filter((d) => d.status === 'OPEN').length
-            return { ...survey, openDefects, totalDefects: defects.length }
-          } catch {
-            return { ...survey, openDefects: 0, totalDefects: 0 }
-          }
-        })
+      const counts = new Map<string, { open: number; total: number }>()
+      for (const d of (Array.isArray(allDefects) ? allDefects : []) as SurveyDefect[]) {
+        const c = counts.get(d.surveyId) || { open: 0, total: 0 }
+        c.total++
+        if (d.status === 'OPEN') c.open++
+        counts.set(d.surveyId, c)
+      }
+      const surveysWithCounts: SurveyWithCounts[] = (Array.isArray(allSurveys) ? allSurveys : []).map(
+        (survey) => {
+          const c = counts.get(survey.id)
+          return { ...survey, openDefects: c?.open ?? 0, totalDefects: c?.total ?? 0 }
+        }
       )
 
       setSurveys(surveysWithCounts)

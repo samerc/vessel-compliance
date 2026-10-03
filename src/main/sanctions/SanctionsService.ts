@@ -91,6 +91,8 @@ export class SanctionsService {
   private searchable: any[] = []
   private gramIndex: Map<string, number[]> = new Map()
   private gramCounts: Uint16Array = new Uint16Array(0)
+  // Slots of `searchable` replaced/removed by a SIC edit since the last full build (tombstones)
+  private dead = new Set<number>()
   public initialized = false
 
   initialize(dbDir: string): void {
@@ -106,35 +108,65 @@ export class SanctionsService {
     this.initialized = false
   }
 
+  private static toSearchable(e: SanctionsEntity): any {
+    return { ...e, aliasesFlat: Array.isArray(e.aliases) ? e.aliases.join(' ') : '' }
+  }
+
+  // Inverted trigram index over every searched field (see prefilterOverlap)
+  private indexGrams(e: any, idx: number): void {
+    const text = [e.name, e.name_normalized, e.aliasesFlat, e.mother_name, e.father_name, e.vessel_imo].filter(Boolean).join(' ')
+    for (const g of trigrams(text)) {
+      let list = this.gramIndex.get(g)
+      if (!list) this.gramIndex.set(g, (list = []))
+      list.push(idx)
+    }
+  }
+
   private buildIndex(): void {
     this.entityCache = this.db.getAllEntities()
-    const searchable = this.entityCache.map(e => ({
-      ...e,
-      aliasesFlat: Array.isArray(e.aliases) ? e.aliases.join(' ') : ''
-    }))
-    this.fuseIndex = new Fuse(searchable, FUSE_OPTIONS)
+    const searchable = this.entityCache.map(SanctionsService.toSearchable)
+    // Fuse keeps (and Fuse.add pushes onto) the array it is given: hand it a copy so its slots
+    // and `searchable`'s stay one-to-one when patchIndex appends to both
+    this.fuseIndex = new Fuse([...searchable], FUSE_OPTIONS)
     this.searchable = searchable
-    // Inverted trigram index over every searched field (see prefilterOverlap)
-    const gramIndex = new Map<string, number[]>()
-    searchable.forEach((e, idx) => {
-      const text = [e.name, e.name_normalized, e.aliasesFlat, e.mother_name, e.father_name, e.vessel_imo].filter(Boolean).join(' ')
-      for (const g of trigrams(text)) {
-        let list = gramIndex.get(g)
-        if (!list) gramIndex.set(g, (list = []))
-        list.push(idx)
-      }
-    })
-    this.gramIndex = gramIndex
+    this.dead = new Set()
+    this.gramIndex = new Map()
+    searchable.forEach((e, idx) => this.indexGrams(e, idx))
     this.gramCounts = new Uint16Array(searchable.length)
+  }
+
+  // A single SIC add/edit/delete used to rebuild the whole index (every list, ~seconds on the
+  // main process). Now: tombstone the old slot and append the new version; Fuse.add appends,
+  // so Fuse refIndex stays equal to the `searchable` slot. Full rebuild after many edits.
+  private patchIndex(id: number, replacement: SanctionsEntity | null): void {
+    if (!this.fuseIndex) { this.buildIndex(); return }
+    for (let i = 0; i < this.searchable.length; i++) {
+      if (this.searchable[i].id === id && !this.dead.has(i)) this.dead.add(i)
+    }
+    if (this.dead.size > 500) { this.buildIndex(); return }
+    this.entityCache = this.entityCache.filter(e => e.id !== id)
+    if (replacement) {
+      const idx = this.searchable.length
+      const doc = SanctionsService.toSearchable(replacement)
+      this.searchable.push(doc)
+      this.entityCache.push(replacement)
+      this.fuseIndex.add(doc)
+      this.indexGrams(doc, idx)
+      this.gramCounts = new Uint16Array(this.searchable.length)
+    }
   }
 
   // Fuse over the trigram candidates only; falls back to the full index when the query has no
   // usable trigrams or the candidates are most of the list anyway
   private fuzzyCandidatesSearch(query: string, minScore: number): FuseResult<any>[] {
     if (!this.fuseIndex) return []
-    if (!(minScore >= PREFILTER_MIN_SCORE)) return this.fuseIndex.search(query)
+    const full = () => {
+      const r = this.fuseIndex!.search(query)
+      return this.dead.size ? r.filter(x => !this.dead.has(x.refIndex)) : r
+    }
+    if (!(minScore >= PREFILTER_MIN_SCORE)) return full()
     const qGrams = trigrams(query)
-    if (qGrams.size === 0) return this.fuseIndex.search(query)
+    if (qGrams.size === 0) return full()
     const counts = this.gramCounts
     const touched: number[] = []
     for (const g of qGrams) {
@@ -146,9 +178,9 @@ export class SanctionsService {
       }
     }
     const need = Math.max(1, Math.ceil(qGrams.size * prefilterOverlap(minScore)))
-    const candidates = touched.filter(i => counts[i] >= need)
+    const candidates = touched.filter(i => counts[i] >= need && !this.dead.has(i))
     for (const i of touched) counts[i] = 0
-    if (candidates.length > this.searchable.length * PREFILTER_MAX_SHARE) return this.fuseIndex.search(query)
+    if (candidates.length > this.searchable.length * PREFILTER_MAX_SHARE) return full()
     if (candidates.length === 0) return []
     const sub = new Fuse(candidates.map(i => this.searchable[i]), FUSE_OPTIONS)
     return sub.search(query)
@@ -306,18 +338,18 @@ export class SanctionsService {
 
   addSicEntity(entity: Omit<SanctionsEntity, 'id'>): number {
     const id = this.db.insertSicEntity(entity)
-    this.buildIndex()
+    this.patchIndex(id, this.db.getSicEntity(id))
     return id
   }
 
   updateSicEntity(id: number, entity: Partial<SanctionsEntity>): void {
     this.db.updateSicEntity(id, entity)
-    this.buildIndex()
+    this.patchIndex(id, this.db.getSicEntity(id))
   }
 
   deleteSicEntity(id: number): void {
     this.db.deleteSicEntity(id)
-    this.buildIndex()
+    this.patchIndex(id, null)
   }
 
   importSicFromFile(filePath: string): { count: number } {

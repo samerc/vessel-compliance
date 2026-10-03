@@ -384,12 +384,14 @@ export default function Dashboard({
   }, [allAlerts, policyStats])
 
   const entityDocMissingCount = useMemo(() => {
+    // "entityId|docTypeId" of every filed document: one pass instead of a scan per entity
+    const filed = new Set<string>()
+    for (const d of entityDocs) if (d.filePath) filed.add(d.entityId + '|' + d.documentTypeId)
     let count = 0
     for (const e of entities) {
-      const applicable = entityDocTypes.filter(t => t.entityScope === 'both' || t.entityScope === e.type)
-      const docsForEntity = entityDocs.filter(d => d.entityId === e.id)
-      for (const t of applicable) {
-        if (!docsForEntity.some(d => d.documentTypeId === t.id && d.filePath)) count++
+      for (const t of entityDocTypes) {
+        if (t.entityScope !== 'both' && t.entityScope !== e.type) continue
+        if (!filed.has(e.id + '|' + t.id)) count++
       }
     }
     return count
@@ -1296,15 +1298,25 @@ function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperti
 
   const fleetRows = useMemo(() => {
     if (!fleets.length || !activeVessels.length) return []
+    const vesselCounts = new Map<string, number>()
+    const fleetOfVessel = new Map<string, string>()
+    for (const v of activeVessels) {
+      const fid = (v as any).fleetId as string | undefined
+      if (!fid) continue
+      vesselCounts.set(fid, (vesselCounts.get(fid) || 0) + 1)
+      fleetOfVessel.set(v.id, fid)
+    }
+    const alertCounts = new Map<string, number>()
+    for (const a of allAlerts) {
+      if (a.type !== 'missing' && a.type !== 'expired') continue
+      const fid = fleetOfVessel.get(a.vesselId)
+      if (fid) alertCounts.set(fid, (alertCounts.get(fid) || 0) + 1)
+    }
     return fleets.map(fleet => {
-      const fleetVessels = activeVessels.filter(v => (v as any).fleetId === fleet.id)
-      const vesselCount = fleetVessels.length
+      const vesselCount = vesselCounts.get(fleet.id) || 0
       if (vesselCount === 0) return null
-      const fleetAlerts = allAlerts.filter(a =>
-        fleetVessels.some(v => v.id === a.vesselId) && (a.type === 'missing' || a.type === 'expired')
-      )
       const total = vesselCount * docTypes.length
-      const compliance = total > 0 ? Math.round(((total - fleetAlerts.length) / total) * 100) : 100
+      const compliance = total > 0 ? Math.round(((total - (alertCounts.get(fleet.id) || 0)) / total) * 100) : 100
       return { name: fleet.name, vesselCount, compliance }
     }).filter(Boolean) as { name: string; vesselCount: number; compliance: number }[]
   }, [fleets, activeVessels, allAlerts, docTypes])

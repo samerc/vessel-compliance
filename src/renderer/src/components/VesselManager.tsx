@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
@@ -8,13 +8,17 @@ import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import VesselDetail from './VesselDetail'
 import SanctionsModal from './SanctionsModal'
 import { formatDateTime } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 
 import { ok } from '../utils/ipc'
+
+// Loaded on first open: VesselDetail pulls in the Excel/PDF export libraries, which kept them
+// in the startup bundle
+const VesselDetail = lazy(() => import('./VesselDetail'))
+
 // Simple debounce hook implementation if not available
 function useDebounceValue<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -495,7 +499,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
             ? () => { onNavigateBack(); setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false) }
             : () => { setSelectedVessel(null); setAppliedSection(undefined); setNavigatedExternally(false); setOpenInEditMode(false); loadData() }
         const backLabel = navigatedExternally && navigateBackLabel ? navigateBackLabel : 'Back to Vessels'
-        return <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} initialEditing={openInEditMode} onNavigateToQuotation={onNavigateToQuotation} />
+        return (
+            <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>}>
+                <VesselDetail vessel={selectedVessel} backLabel={backLabel} onBack={handleBack} initialSection={appliedSection} initialEditing={openInEditMode} onNavigateToQuotation={onNavigateToQuotation} />
+            </Suspense>
+        )
     }
 
     return (
