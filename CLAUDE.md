@@ -44,7 +44,10 @@ This is an Electron desktop application for maritime vessel compliance managemen
 ### Tech Stack
 - Electron + electron-vite + React 19 + TypeScript
 - MySQL via mysql2/promise (externalized from Vite bundling)
-- bcryptjs for password hashing, UUID for ID generation
+- bcryptjs for password hashing, Node `crypto.randomUUID` for ID generation (the `uuid` package was removed)
+- Electron 44 (Node 24). Vite stays on 7 (electron-vite 5 supports up to Vite 7), TypeScript on 5.9 and ESLint on 9 (typescript-eslint / eslint-plugin-react not yet compatible with newer)
+- **Dependency placement**: `dependencies` = only what the MAIN process `require`s at runtime from the installed app (mysql2, better-sqlite3, bcryptjs, jszip, xlsx-js-style, docx, pdf-lib, pdf-parse, mammoth, electron-log, electron-updater, @electron-toolkit/utils). electron-vite externalizes these, so they come from the installer's node_modules: upgrading one only reaches users with a FULL installer, never a hot-update. Renderer-only libs and anything bundled into main (react, tiptap, lucide, jspdf, dompurify, qrcode, flag-icons, fuse.js, xml2js, electron-store) belong in `devDependencies` - they ship inside `out/` (and so in hot-updates), and keeping them out of `dependencies` keeps the installer small
+- pdf-parse is pinned to 1.1.x: the defect parser depends on its exact line breaks; upgrading needs a before/after comparison on real survey PDFs
 - Vanilla CSS with glassmorphic design system and light/dark theme support
 - jsPDF + xlsx for report exports
 - Built-in sanctions screening via local SQLite (better-sqlite3) + Fuse.js fuzzy search

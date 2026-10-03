@@ -1,6 +1,5 @@
 import * as bcrypt from 'bcryptjs'
-import { v4 as uuidv4 } from 'uuid'
-import { randomBytes, createHash } from 'crypto'
+import { randomUUID as uuidv4, randomBytes, createHash } from 'crypto'
 import { db } from './mysql/adapter'
 import { User } from '../shared/types'
 import Store from 'electron-store'

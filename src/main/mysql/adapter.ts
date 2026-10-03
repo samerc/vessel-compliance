@@ -1,5 +1,5 @@
 import { createPool, Pool, PoolConnection } from 'mysql2/promise'
-import { v4 as uuidv4 } from 'uuid'
+import { randomUUID as uuidv4 } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig, EntityDocumentType, EntityDocument } from '../../shared/types'
@@ -3993,8 +3993,7 @@ export class MySQLAdapter {
 
     async createTcTemplate(t: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: Buffer | null; fileName?: string | null; makeDefault?: boolean }): Promise<string> {
         if (!this.pool) throw new Error('Not connected')
-        const { v4: uuid } = require('uuid')
-        const id = uuid()
+        const id = uuidv4()
         // First template of a type is automatically the default
         const existing = await this.getTcTemplatesByType(t.typeCode)
         const makeDefault = t.makeDefault || existing.length === 0
