@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, ChevronDown, Layers } from 'lucide-react'
 import { Quotation, CargoClause, CargoInstituteClause, CargoClauseSet, QuotationCargoClause, QuotationCargoCustomClause } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
+import { ok } from '../../utils/ipc'
 
 const SECTION_LABELS: Record<string, string> = {
     conditions: 'Conditions',
@@ -190,7 +191,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
             textOverride: c.cargoClauseId === cargoClauseId ? (textOverride || undefined) : (c.textOverride || undefined),
             amount: c.amount ?? null
         }))
-        await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
+        ok(await window.api.cargoSetQuotationClauses(quotation.id, section, newItems))
         setSelectedClauses(prev => prev.map(c => c.cargoClauseId === cargoClauseId ? { ...c, textOverride } : c))
     }
 
@@ -200,7 +201,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
             textOverride: c.textOverride || undefined,
             amount: c.cargoClauseId === cargoClauseId ? amount : (c.amount ?? null)
         }))
-        await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
+        ok(await window.api.cargoSetQuotationClauses(quotation.id, section, newItems))
         setSelectedClauses(prev => prev.map(c => c.cargoClauseId === cargoClauseId ? { ...c, amount } : c))
     }
 

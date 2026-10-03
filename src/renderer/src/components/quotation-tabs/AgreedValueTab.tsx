@@ -61,7 +61,7 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
         }
 
         // Auto-populate default texts on first load if no items exist
-        if (!defaultsApplied.current && safeItems.length === 0 && safeTexts.length > 0) {
+        if (!defaultsApplied.current && Array.isArray(existingItems) && safeItems.length === 0 && safeTexts.length > 0) {
             defaultsApplied.current = true
             const defaults = safeTexts.filter(t => t.defaultSelected)
             if (defaults.length > 0) {

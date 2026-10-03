@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { asArray } from '../utils/ipc'
 
 export default function UserManager() {
     const { resetPassword, user: currentUser, hasPermission } = useAuth()
@@ -105,7 +106,7 @@ export default function UserManager() {
     const loadUsers = async () => {
         try {
             const data = await window.api.getUsers()
-            setUsers(data)
+            setUsers(asArray(data))
 
             // Load groups for name mapping
             try {

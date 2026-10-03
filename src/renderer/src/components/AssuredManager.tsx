@@ -28,6 +28,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ConfirmationModal from './ConfirmationModal'
 import EntityEditPanel from './EntityEditPanel'
+import { ok } from '../utils/ipc'
 
 interface AssuredManagerProps {
   vessel: Vessel
@@ -150,7 +151,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
       // Auto-register role if it doesn't exist
       const roleExists = roles.some((r) => r.name.toLowerCase() === newRole.trim().toLowerCase())
       if (!roleExists) {
-        await window.api.addAssuredRole({ name: newRole.trim() })
+        ok(await window.api.addAssuredRole({ name: newRole.trim() }))
       }
 
       await window.api.addVesselAssured({
@@ -185,7 +186,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         (r) => r.name.toLowerCase() === editRoleValue.trim().toLowerCase()
       )
       if (!roleExists) {
-        await window.api.addAssuredRole({ name: editRoleValue.trim() })
+        ok(await window.api.addAssuredRole({ name: editRoleValue.trim() }))
       }
 
       await window.api.updateVesselAssuredRole(id, editRoleValue.trim())

@@ -23,6 +23,7 @@ import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { numberToWords } from '../utils/numberToWords'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
+import { ok } from '../utils/ipc'
 // formatDate not needed — blue cards use bcFormatDate, policies use polFormatDateUS
 
 // ==================== Blue Card Types ====================
@@ -1288,7 +1289,7 @@ async function capturePolicyExportSnapshotFromData(policyId: string, data: Polic
     signatureSnapshot,
     snapshotAt: new Date().toISOString()
   }
-  await window.api.policyUpdate(policyId, { exportSnapshot: JSON.stringify(snapshot) })
+  ok(await window.api.policyUpdate(policyId, { exportSnapshot: JSON.stringify(snapshot) }))
 }
 
 /** Public capture (used at signing) — loads current data, then freezes it. */
@@ -3359,7 +3360,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
 
   // Mark policy as exported
-  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
+  try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
 }
 
 /**
@@ -3414,7 +3415,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     const res = await window.api.convertDocxBufferToPdf({ docxData: Array.from(new Uint8Array(buffer)), fileName }) as any
     if (!res || res.error) throw new Error(res?.message || 'PDF conversion failed')
     polDownloadBlob(new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }), res.fileName)
-    try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
+    try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
     return
   }
 
@@ -3458,7 +3459,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
-  try { await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') }) } catch { /* non-critical */ }
+  try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
 }
 
 // ==================== Shared DA/CA Helpers ====================

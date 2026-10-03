@@ -2,6 +2,9 @@ import React from 'react'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
+  // 'page' = contained fallback inside the main area (sidebar and other pages keep working);
+  // 'app' (default) = full-screen fallback for the whole window
+  variant?: 'app' | 'page'
 }
 
 interface ErrorBoundaryState {
@@ -31,17 +34,19 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          height: '100vh',
+          height: this.props.variant === 'page' ? 'auto' : '100vh',
+          minHeight: this.props.variant === 'page' ? '50vh' : undefined,
           padding: '40px',
           textAlign: 'center',
           color: 'var(--text-primary)',
-          background: 'var(--bg-primary)'
+          background: this.props.variant === 'page' ? 'transparent' : 'var(--bg-dark)'
         }}>
           <div style={{
             width: '64px',
             height: '64px',
             borderRadius: '50%',
             background: 'rgba(255, 77, 77, 0.15)',
+            color: 'var(--danger)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -52,7 +57,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           </div>
           <h2 style={{ margin: '0 0 12px 0', fontSize: '1.4rem' }}>Something went wrong</h2>
           <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 0 8px 0' }}>
-            The application encountered an unexpected error.
+            {this.props.variant === 'page'
+              ? 'This page hit an unexpected error. You can try again or open another page from the menu.'
+              : 'The application encountered an unexpected error.'}
           </p>
           {this.state.error && (
             <p style={{

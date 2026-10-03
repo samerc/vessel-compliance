@@ -14,6 +14,7 @@ import { formatDateTime } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 
 
+import { ok } from '../utils/ipc'
 // Simple debounce hook implementation if not available
 function useDebounceValue<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -300,7 +301,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const handleCreateFleetAndAssign = async () => {
         if (!newFleetName.trim()) return
         try {
-            const created = await window.api.addFleet({ name: newFleetName.trim() })
+            const created = ok(await window.api.addFleet({ name: newFleetName.trim() }))
             setFleets(prev => [...prev, created])
             setNewFleetName('')
             setNewFleetInput(false)
@@ -596,7 +597,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault()
                                                             if (fleetComboNewName.trim()) {
-                                                                const newFleet = await window.api.addFleet({ name: fleetComboNewName.trim() })
+                                                                const newFleet = ok(await window.api.addFleet({ name: fleetComboNewName.trim() }))
                                                                 setFleets(prev => [...prev, newFleet])
                                                                 setNewVessel({ ...newVessel, fleetId: newFleet.id })
                                                                 setFleetComboOpen(null)
@@ -1021,7 +1022,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                                             style={{ flex: 1, padding: '4px 8px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
                                                                             onKeyDown={async e => {
                                                                                 if (e.key === 'Enter' && fleetComboNewName.trim()) {
-                                                                                    const newFleet = await window.api.addFleet({ name: fleetComboNewName.trim() })
+                                                                                    const newFleet = ok(await window.api.addFleet({ name: fleetComboNewName.trim() }))
                                                                                     setFleets(prev => [...prev, newFleet])
                                                                                     await handleUpdateFleet(v.id, newFleet.id)
                                                                                     setFleetComboOpen(null)

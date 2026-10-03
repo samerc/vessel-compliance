@@ -4005,22 +4005,30 @@ app.whenReady().then(() => {
     if (directTransition?.autoCreateRevision) {
       await db.createQuotationRevision(quotationId)
     }
-    await db.moveQuotationToStep(quotationId, toStepId, user.id, user.username, comment)
-    // Log activity
     const steps = await db.getWorkflowSteps()
     const toStep = steps.find(s => s.id === toStepId)
+    const toApproved = !!toStep && toStep.name.toLowerCase() === 'approved'
 
-    // Assign real quotation number when moving TO "Approved" step
+    // Moving TO "Approved": assign the real quotation number FIRST. If the registry write fails
+    // (e.g. the Excel file is open) the quotation must stay where it is, not sit in Approved
+    // with a draft number.
     let assignedRef: string | undefined
-    if (toStep && toStep.name.toLowerCase() === 'approved') {
+    if (toApproved) {
       try {
         assignedRef = await assignQuotationNumberViaRegistry(quotationId)
-        // Update quotation status to approved
-        await db.updateQuotation(quotationId, { status: 'approved' } as any)
       } catch (e: any) {
-        // If registry write fails, don't complete the move
-        return { success: false, message: e.message || 'Failed to assign quotation number' }
+        throw new Error(e?.message || 'Failed to assign quotation number')
       }
+    }
+    try {
+      await db.moveQuotationToStep(quotationId, toStepId, user.id, user.username, comment)
+      if (toApproved) await db.updateQuotation(quotationId, { status: 'approved' } as any)
+    } catch (e) {
+      // Step move failed after the number was assigned: give the number back
+      if (toApproved && assignedRef) {
+        try { await db.releaseQuotationNumber(quotationId) } catch { /* best effort */ }
+      }
+      throw e
     }
 
     // Get the current step info to check if we're moving FROM "Approved"

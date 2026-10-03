@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save, AlertTriangle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor, ConditionSurveyType } from '../../../shared/types'
@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
 import XLSX from 'xlsx-js-style'
+import { ok } from '../utils/ipc'
 
 interface ConditionSurveyManagerProps {
   vessel: Vessel
@@ -117,8 +118,25 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     setDefectCounts(counts)
   }
 
+  // One submit at a time: a double click must not create the survey (or surveyor) twice
+  const addingSurveyRef = useRef(false)
+  const [addingSurvey, setAddingSurvey] = useState(false)
   const handleAddSurvey = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (addingSurveyRef.current) return
+    addingSurveyRef.current = true
+    setAddingSurvey(true)
+    try {
+      await addSurveyNow()
+    } catch (err: any) {
+      showError(err?.message || 'Failed to add survey')
+    } finally {
+      addingSurveyRef.current = false
+      setAddingSurvey(false)
+    }
+  }
+
+  const addSurveyNow = async () => {
     if (!newDate || !newSurveyorId || !newType) return
 
     let surveyorId = newSurveyorId
@@ -220,7 +238,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }
 
   const handleEndorsementAnswer = async (surveyId: string, issued: boolean) => {
-    await window.api.updateConditionSurveyEndorsement(surveyId, issued)
+    ok(await window.api.updateConditionSurveyEndorsement(surveyId, issued))
     setEndorsementSurveyId(null)
     await loadData()
   }
@@ -495,7 +513,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 aria-label="Survey notes"
               />
             </div>
-            <button type="submit" className="btn-primary">
+            <button type="submit" className="btn-primary" disabled={addingSurvey}>
               Add Survey
             </button>
           </form>

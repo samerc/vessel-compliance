@@ -39,6 +39,7 @@ import SanctionsModal from './SanctionsModal'
 import { formatDateTime } from '../utils/dateUtils'
 import { CaseToggleBtn } from './CaseToggle'
 import { confirmDialog } from './DialogHost'
+import { ok } from '../utils/ipc'
 
 interface EntityEditPanelProps {
   /** The entity being edited (entity-level fields only — vessel-specific bits stay in the parent). */
@@ -479,7 +480,7 @@ export default function EntityEditPanel({
         })
         uboEntityId = created.id
       }
-      await window.api.addEntityUBO({ assuredEntityId: entity.id, uboEntityId })
+      ok(await window.api.addEntityUBO({ assuredEntityId: entity.id, uboEntityId }))
       setNewUBOName('')
       setNewUBOType('person')
       setNewUBOIdentifier('')

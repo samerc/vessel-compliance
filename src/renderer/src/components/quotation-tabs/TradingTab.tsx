@@ -3,9 +3,10 @@ import { Plus, X } from 'lucide-react'
 import { Quotation, QuotationExcludedCountry, QuotationVessel, PISectionTexts, TradingWarrantyTemplate, TradingCustomText } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
+import { asArray } from '../../utils/ipc'
 interface TradingIntro { id: string; quotationId: string; text: string; vesselScope: string[] | null; order: number }
 
-export default function TradingTab({ quotation, showSuccess, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
+export default function TradingTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [countries, setCountries] = useState<QuotationExcludedCountry[]>([])
     const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
     const [customTexts, setCustomTexts] = useState<TradingCustomText[]>([])
@@ -27,6 +28,9 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
             window.api.getQuotationVessels(quotation.id),
             window.api.tradingGetIntros(quotation.id)
         ])
+        // A failed load must stop here: treating it as "no countries" would re-seed the
+        // defaults over the quotation's real list
+        if (!Array.isArray(qc)) { showError((qc as any)?.message || 'Failed to load trading countries'); return }
         setQVessels(Array.isArray(qv) ? qv : [])
         setTradingIntros(Array.isArray(intros) ? intros : [])
         setCustomTexts(Array.isArray(custTexts) ? custTexts : [])
@@ -42,11 +46,11 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
         if (deduped.length < qc.length) {
             await window.api.setQuotationExcludedCountries(quotation.id, deduped.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
-            setCountries(refreshed)
+            setCountries(asArray(refreshed))
             return
         }
         setCountries(qc)
-        if (qc.length === 0 && masterCountries.length > 0 && !initRef.current) {
+        if (qc.length === 0 && Array.isArray(masterCountries) && masterCountries.length > 0 && !initRef.current) {
             initRef.current = true
             const typeCode = quotation.quotationTypeCode || 'P'
             // Filter master countries by exclude_types: null = all types, otherwise check type code
@@ -71,7 +75,7 @@ export default function TradingTab({ quotation, showSuccess, updateField, setQ, 
             }
             await window.api.setQuotationExcludedCountries(quotation.id, countriesToSet.map(c => ({ name: c.name, listType: c.listType })))
             const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
-            setCountries(refreshed)
+            setCountries(asArray(refreshed))
         }
     }
 

@@ -34,6 +34,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDateOrDash } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { ok } from '../utils/ipc'
 
 const statusColorsDark: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -362,11 +363,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     try {
       setShowNewMenu(false)
       const today = new Date().toISOString().split('T')[0]
-      const created = await window.api.addQuotation({
+      const created = ok(await window.api.addQuotation({
         quotationDate: today,
         quotationTypeId,
         status: 'draft'
-      })
+      }))
       showSuccess('Quotation created')
       onOpenQuotation(created)
     } catch (err: any) {
@@ -395,10 +396,10 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     try {
       if (deleteModal.deleteMode === 'all' && deleteModal.revisionCount > 1) {
         const groupId = deleteModal.quotation.revisionGroupId || deleteModal.quotation.id
-        await window.api.deleteQuotationGroup(groupId)
+        ok(await window.api.deleteQuotationGroup(groupId))
         showSuccess('All revisions deleted')
       } else {
-        await window.api.deleteQuotation(deleteModal.quotation.id)
+        ok(await window.api.deleteQuotation(deleteModal.quotation.id))
         showSuccess('Quotation deleted')
       }
       setDeleteModal(null)

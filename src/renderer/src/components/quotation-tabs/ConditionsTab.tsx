@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import { Quotation, PIClause, PIClauseSet, PIAdditionalClause, PIAdditionalClauseSet, PIWarranty, PIExclusion, QuotationPIAlternative, QuotationVessel } from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
+import { ok } from '../../utils/ipc'
 
 export default function ConditionsTab({ quotation, showSuccess, showError, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [subTab, setSubTab] = useState<'clauses' | 'additional'>('clauses')
@@ -181,10 +182,10 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
             // Per-alternative: remove existing clauses for this alt, then add new set
             const existingForAlt = clauseRows.filter(r => r.alternativeId === altId)
             for (const row of existingForAlt) {
-                await window.api.deleteQuotationClause(quotation.id, row.piClauseId, altId)
+                ok(await window.api.deleteQuotationClause(quotation.id, row.piClauseId, altId))
             }
             for (const cid of cs.clauseIds) {
-                await window.api.addQuotationClause(quotation.id, cid, altId)
+                ok(await window.api.addQuotationClause(quotation.id, cid, altId))
             }
             // Apply description overrides scoped to this alternative
             if (cs.descriptionOverrides) {
@@ -235,7 +236,7 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
         const selected = await window.api.getQuotationClauses(quotation.id)
         const row = (Array.isArray(selected) ? selected : []).find((r: any) => r.piClauseId === clauseId)
         if (row) {
-            await window.api.updateQuotationItemAlternativeId('quotation_clauses', row.id, altId)
+            ok(await window.api.updateQuotationItemAlternativeId('quotation_clauses', row.id, altId))
             setClauseAltIds(prev => ({ ...prev, [clauseId]: altId }))
         }
     }
@@ -254,7 +255,7 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
 
     const updateAdditionalClauseAltId = async (id: string, altId: string | null) => {
         try {
-            await window.api.updateQuotationItemAlternativeId('quotation_additional_clauses', id, altId)
+            ok(await window.api.updateQuotationItemAlternativeId('quotation_additional_clauses', id, altId))
             setAdditionalClauses(prev => prev.map(c => c.id === id ? { ...c, alternativeId: altId } : c))
         } catch { /* ignore */ }
     }

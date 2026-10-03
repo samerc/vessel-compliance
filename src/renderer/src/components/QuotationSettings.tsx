@@ -2920,7 +2920,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
 
     useEffect(() => { loadData() }, [])
     const loadData = async () => {
-        const data = await window.api.piGetSanctionsVersions()
+        const data = asArray<PISanctionsVersion>(await window.api.piGetSanctionsVersions())
         setVersions(data)
         const textMap: Record<string, string> = {}
         data.forEach((v: PISanctionsVersion) => { textMap[v.id] = v.text })
@@ -3041,6 +3041,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
 // ==================== Standard Texts Tab ====================
 
 import { getDefaultSectionOrder, SECTION_LABELS, DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
+import { asArray } from '../utils/ipc'
 
 // Fields remaining in Standard Texts tab (trading, conditions, LoL, subjectivities moved to their own tabs)
 const SECTION_TEXT_FIELDS: { key: keyof PISectionTexts; label: string; section: string; rows?: number }[] = [

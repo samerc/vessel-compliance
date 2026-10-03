@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers, Search, FileText } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
+import { ok } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 
 const STATIC_RULES = [
     { id: 'vessels_no_customer', name: 'Vessels without customer', description: 'Active vessels with no customer assigned' },
@@ -254,7 +256,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
     const toggleRuleEnabled = (ruleId: string) => {
         const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
         setRuleToggles(next)
-        window.api.setSetting('data_validation_rules', JSON.stringify(next))
+        window.api.setSetting('data_validation_rules', JSON.stringify(next)).then(ok)
     }
 
     const loadCustomRules = async () => {
@@ -272,7 +274,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
 
         try {
             if (editingRuleId) {
-                await window.api.validationRulesUpdate(editingRuleId, {
+                ok(await window.api.validationRulesUpdate(editingRuleId, {
                     name: ruleForm.name,
                     description: ruleForm.description || null,
                     entityType: ruleForm.entityType,
@@ -280,7 +282,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                     operator: ruleForm.operator,
                     value: operatorDef?.needsValue ? ruleForm.value : null,
                     severity: ruleForm.severity,
-                })
+                }))
                 showSuccess('Rule updated')
             } else {
                 await window.api.validationRulesAdd({
@@ -348,6 +350,34 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
             loadSanctionsData()
         } catch (error: any) {
             console.error('Failed to decide match:', error)
+            showError(error?.message || 'Failed to update the match')
+        }
+    }
+
+    // Bulk Clear / Sanction: confirm once, one call per result, ONE reload + summary toast.
+    // Guarded so a second click cannot start a parallel run over the same selection.
+    const bulkDecidingRef = useRef(false)
+    const [bulkDeciding, setBulkDeciding] = useState(false)
+    const handleBulkDecide = async (decision: 'sanctioned' | 'cleared') => {
+        if (bulkDecidingRef.current || selectedSanctions.size === 0) return
+        const n = selectedSanctions.size
+        const label = decision === 'cleared' ? 'Clear' : 'Sanction'
+        const confirmed = await confirmDialog(`${label} ${n} selected match${n === 1 ? '' : 'es'}? This updates each subject's sanctions status.`)
+        if (!confirmed) return
+        bulkDecidingRef.current = true
+        setBulkDeciding(true)
+        let failed = 0
+        try {
+            for (const id of selectedSanctions) {
+                try { ok(await window.api.complianceDecideResult(id, decision)) } catch { failed++ }
+            }
+            setSelectedSanctions(new Set())
+            if (failed === 0) showSuccess(`${n} match${n === 1 ? '' : 'es'} marked as ${decision}`)
+            else showError(`${n - failed} of ${n} updated — ${failed} failed`)
+            loadSanctionsData()
+        } finally {
+            bulkDecidingRef.current = false
+            setBulkDeciding(false)
         }
     }
 
@@ -1386,16 +1416,10 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                 {selectedSanctions.size > 0 && canReview && (
                                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{selectedSanctions.size} selected</span>
-                                        <button onClick={async () => {
-                                            for (const id of selectedSanctions) await handleDecideMatch(id, 'cleared')
-                                            setSelectedSanctions(new Set())
-                                        }} style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <button disabled={bulkDeciding} onClick={() => handleBulkDecide('cleared')} style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <CheckCircle size={13} /> Clear All
                                         </button>
-                                        <button onClick={async () => {
-                                            for (const id of selectedSanctions) await handleDecideMatch(id, 'sanctioned')
-                                            setSelectedSanctions(new Set())
-                                        }} style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <button disabled={bulkDeciding} onClick={() => handleBulkDecide('sanctioned')} style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <ShieldAlert size={13} /> Sanction All
                                         </button>
                                     </div>

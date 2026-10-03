@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Quotation } from '../../../../shared/types'
+import { asArray } from '../../utils/ipc'
 
 export default function InformationTab({ quotation, updateField, setQ, showSuccess }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [items, setItems] = useState<any[]>([])
     const [newText, setNewText] = useState('')
 
     useEffect(() => { loadData() }, [])
-    const loadData = async () => { setItems(await window.api.getQuotationInformation(quotation.id)) }
+    const loadData = async () => { setItems(asArray(await window.api.getQuotationInformation(quotation.id))) }
 
     const handleAdd = async () => {
         if (!newText.trim()) return

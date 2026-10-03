@@ -7,6 +7,7 @@ import { formatDateTime } from '../utils/dateUtils'
 import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { confirmDialog } from './DialogHost'
+import { ok } from '../utils/ipc'
 
 interface PolicyRenewalsProps {
     onNavigateToVessel?: (vesselId: string) => void
@@ -385,14 +386,14 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             const periodText = `12 months from ${inceptionDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`
 
             // Create quotation
-            const q = await window.api.addQuotation({
+            const q = ok(await window.api.addQuotation({
                 quotationTypeId: quotationType.id,
                 policyTypeId: row.policyTypeId,
                 isRenewal: true,
                 periodText,
                 quotationDate: new Date().toISOString().split('T')[0],
                 createdBy: user?.username
-            } as any)
+            } as any))
             if (!q || (q as any).error) throw new Error('Failed to create quotation')
 
             // Get vessels and flag states for populating vessel data
@@ -450,7 +451,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                         if (!entity) continue
                         // c/o role → set as broker
                         if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-                            if (!q.coName) await window.api.updateQuotation(q.id, { coName: entity.name } as any)
+                            if (!q.coName) ok(await window.api.updateQuotation(q.id, { coName: entity.name } as any))
                             continue
                         }
                         await window.api.addQuotationAssured({

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Layers, RefreshCw, Pencil, Check, X } from 'lucide-react'
 import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
+import { ok } from '../../utils/ipc'
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
@@ -118,7 +119,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     // c/o role → set as broker, not as an assured
                     if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
                         if (!quotation.coName) {
-                            await window.api.updateQuotation(quotation.id, { coName: entity.name } as any)
+                            ok(await window.api.updateQuotation(quotation.id, { coName: entity.name } as any))
                         }
                         continue
                     }
@@ -143,11 +144,11 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                         (p: any) => p.status === 'active' && p.policyTypeId === quotation.quotationTypeId && p.customerEntityId
                     )
                     if (matching) {
-                        await window.api.updateQuotation(quotation.id, {
+                        ok(await window.api.updateQuotation(quotation.id, {
                             customerEntityId: matching.customerEntityId,
                             customerType: matching.customerType,
                             coName: matching.customerName
-                        } as any)
+                        } as any))
                     }
                 } catch { /* non-critical */ }
             }
@@ -341,7 +342,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                         // c/o role → set as broker, not as an assured
                         if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
                             if (!quotation.coName) {
-                                await window.api.updateQuotation(quotation.id, { coName: entity.name } as any)
+                                ok(await window.api.updateQuotation(quotation.id, { coName: entity.name } as any))
                             }
                             continue
                         }
@@ -377,7 +378,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     }
                     if (customerCounts.size > 0) {
                         const [topId, top] = [...customerCounts.entries()].sort((a, b) => b[1].count - a[1].count)[0]
-                        await window.api.updateQuotation(quotation.id, { customerEntityId: topId, customerType: top.type, coName: top.name } as any)
+                        ok(await window.api.updateQuotation(quotation.id, { customerEntityId: topId, customerType: top.type, coName: top.name } as any))
                     }
                 } catch { /* non-critical */ }
             }
@@ -739,7 +740,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
                         <input type="checkbox" checked={quotation.anyOtherVessel || false}
                             onChange={e => {
-                                window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
+                                window.api.updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any).then(ok)
                                 setQ?.(p => ({ ...p, anyOtherVessel: e.target.checked }))
                             }} style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }} />
                         Any other vessel(s) to be agreed by Insurers in advance

@@ -4,6 +4,7 @@ import { Quotation, HullClause, HullClauseCondition, HullAdditionalCondition, Qu
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { ALT_COLORS } from './shared'
+import { ok } from '../../utils/ipc'
 
 function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLabel }: {
     clauses: HullClause[]
@@ -307,7 +308,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         window.api.hullSetQuotationHullAdditionalConditions(
             quotation.id,
             newA.map(c => ({ hullAdditionalConditionId: c.hullAdditionalConditionId, textOverride: c.textOverride, vesselScope: c.vesselScope, alternativeId: c.alternativeId, amount: c.amount, order: c.order }))
-        ).catch(() => {})
+        ).then(ok).catch(() => {})
         if (newC.length > 0) {
             window.api.hullReorderQuotationCustomConditions(quotation.id, newC.map(c => ({ id: c.id, order: c.order! }))).catch(() => {})
         }
@@ -381,14 +382,14 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                 // Assign defaults to the first alternative instead of null scope
                 const firstAlt = safeAlts[0]
                 try {
-                    await window.api.hullSetQuotationHullConditions(
+                    ok(await window.api.hullSetQuotationHullConditions(
                         quotation.id,
                         defaults.map((c: any) => ({
                             hullConditionId: c.id,
                             conditionSection: c.conditionSection || 'both',
                             alternativeId: firstAlt.id
                         }))
-                    )
+                    ))
                     const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                     setQConditions(Array.isArray(fresh) ? fresh : [])
                 } catch {}
@@ -403,10 +404,10 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             const defaults = safeAdd.filter(c => c.defaultSelected)
             if (defaults.length > 0) {
                 try {
-                    await window.api.hullSetQuotationHullAdditionalConditions(
+                    ok(await window.api.hullSetQuotationHullAdditionalConditions(
                         quotation.id,
                         defaults.map(c => ({ hullAdditionalConditionId: c.id }))
-                    )
+                    ))
                     const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
                     setQAdditional(Array.isArray(fresh) ? fresh : [])
                 } catch {}
@@ -461,7 +462,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                 alternativeId: newAlt.id
                             }))
                         ]
-                        await window.api.hullSetQuotationHullConditions(quotation.id, clonedConds)
+                        ok(await window.api.hullSetQuotationHullConditions(quotation.id, clonedConds))
                     }
                 }
             }
@@ -596,7 +597,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                         } as QuotationHullCondition))
                     ]
                     try {
-                        await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
+                        ok(await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave)))
                         const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                         setQConditions(Array.isArray(fresh) ? fresh : [])
                     } catch {}
@@ -696,14 +697,14 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
 
     const saveConditionOverrides = async () => {
         try {
-            await window.api.hullSetQuotationHullConditions(quotation.id, qConditions.map(mapCondForSave))
+            ok(await window.api.hullSetQuotationHullConditions(quotation.id, qConditions.map(mapCondForSave)))
         } catch {}
     }
 
     const updateConditionScope = async (condId: string, scope: string[] | null) => {
         const updated = qConditions.map(c => c.hullConditionId === condId ? { ...c, vesselScope: scope } : c)
         try {
-            await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
+            ok(await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave)))
             const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
             setQConditions(Array.isArray(fresh) ? fresh : [])
         } catch {}
@@ -758,7 +759,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
 
     const saveAdditionalOverrides = async () => {
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, qAdditional.map(mapAddForSave))
+            ok(await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, qAdditional.map(mapAddForSave)))
         } catch {}
     }
 
@@ -766,14 +767,14 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         const updated = qAdditional.map(c => c.hullAdditionalConditionId === addId ? { ...c, amount } : c)
         setQAdditional(updated)
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
+            ok(await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave)))
         } catch {}
     }
 
     const updateAdditionalScope = async (addId: string, scope: string[] | null) => {
         const updated = qAdditional.map(c => c.hullAdditionalConditionId === addId ? { ...c, vesselScope: scope } : c)
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave))
+            ok(await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, updated.map(mapAddForSave)))
             const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
             setQAdditional(Array.isArray(fresh) ? fresh : [])
         } catch {}
@@ -860,7 +861,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
         const sortedAddl = [...updatedAddl].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
         setQAdditional(sortedAddl)
         try {
-            await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, sortedAddl.map(mapAddForSave))
+            ok(await window.api.hullSetQuotationHullAdditionalConditions(quotation.id, sortedAddl.map(mapAddForSave)))
             if (customOrder.length > 0) await window.api.hullReorderQuotationCustomConditions(quotation.id, customOrder)
         } catch {}
     }
@@ -922,7 +923,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     conditionSection: c.conditionSection || 'both',
                     alternativeId: visibleAlternatives[0]?.id || null
                 }))]
-                await window.api.hullSetQuotationHullConditions(quotation.id, merged)
+                ok(await window.api.hullSetQuotationHullConditions(quotation.id, merged))
             }
             if (newAdds.length > 0) {
                 const merged = [...qAdditional.map(a => ({
@@ -1351,7 +1352,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                         vesselAmounts: null
                                     }))
                                     // Save ONLY alt-scoped conditions, dropping any orphaned null-scoped defaults
-                                    await window.api.hullSetQuotationHullConditions(quotation.id, newConds)
+                                    ok(await window.api.hullSetQuotationHullConditions(quotation.id, newConds))
                                     const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                                     setQConditions(Array.isArray(fresh) ? fresh : [])
                                 }

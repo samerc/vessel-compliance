@@ -34,6 +34,7 @@ import InsuredValueTab from './quotation-tabs/InsuredValueTab'
 import VoyageTab from './quotation-tabs/VoyageTab'
 import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
+import { ok } from '../utils/ipc'
 
 const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -128,6 +129,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const [lockedByName, setLockedByName] = useState<string | null>(null)
     const hasEdited = useRef(false)
     const { showSuccess, showError } = useToast()
+    const [approving, setApproving] = useState(false)
+    const approvingRef = useRef(false)
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
     const isLight = theme === 'light' || theme === 'aurora'
@@ -228,12 +231,15 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             window.api.piGetSanctionsVersions(),
             window.api.getQuotationVessels(quotation.id)
         ])
-        if (fullQ) {
+        if (fullQ && (fullQ as any).error) {
+            // Keep the list row we were opened with rather than replacing it with an error object
+            showError((fullQ as any).message || 'Failed to load the full quotation')
+        } else if (fullQ) {
             // Set war defaults on first load (non-refundable 25%)
             if (fullQ.quotationTypeCode === 'W' && !fullQ.nonRefundableType && !fullQ.premiumAmount) {
                 fullQ.nonRefundableType = 'percentage'
                 fullQ.nonRefundablePercent = 25
-                await window.api.updateQuotation(fullQ.id, { nonRefundableType: 'percentage', nonRefundablePercent: 25 } as any)
+                ok(await window.api.updateQuotation(fullQ.id, { nonRefundableType: 'percentage', nonRefundablePercent: 25 } as any))
             }
             setQ(fullQ)
             // Load revision history
@@ -265,8 +271,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         // policyTypes removed
         setVessels(Array.isArray(v) ? v : [])
         setQVessels(Array.isArray(qv) ? qv : [])
-        if (gt && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
-        setSanctionsVersions(sv)
+        if (gt && !(gt as any).error && Object.keys(gt).length > 0) setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
+        setSanctionsVersions(Array.isArray(sv) ? sv : [])
     }
 
     const getEffectiveText = (key: keyof PISectionTexts): string => {
@@ -470,7 +476,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         // Mark as exported if approved
         if (quotation.status === 'approved' || (quotation.referenceNumber && !quotation.referenceNumber.startsWith('DRAFT-'))) {
             try {
-                await window.api.updateQuotation(quotation.id, { status: 'exported' } as any)
+                ok(await window.api.updateQuotation(quotation.id, { status: 'exported' } as any))
                 setQ(prev => ({ ...prev, status: 'exported' }))
             } catch {}
         }
@@ -517,6 +523,10 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     }
 
     const handleApproveAndExport = async (format: 'pdf' | 'word') => {
+        // One approval at a time: a double click must not assign two registry numbers
+        if (approvingRef.current) return
+        approvingRef.current = true
+        setApproving(true)
         try {
             // First move to Approved step
             const steps = await window.api.workflowGetReachableSteps(q.id)
@@ -524,7 +534,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 (s: any) => s.name.toLowerCase() === 'approved'
             )
             if (approvedStep) {
-                await window.api.workflowMoveQuotation(q.id, approvedStep.id)
+                ok(await window.api.workflowMoveQuotation(q.id, approvedStep.id))
             } else {
                 // No Approved step reachable — just assign number directly
                 await window.api.workflowAssignQuotationNumber(q.id)
@@ -541,6 +551,9 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             }
         } catch (err: any) {
             showError(err.message || 'Failed to approve and export')
+        } finally {
+            approvingRef.current = false
+            setApproving(false)
         }
         setShowDraftExportModal(null)
     }
@@ -575,7 +588,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
     const updateField = async (field: string, value: any) => {
         if (isLocked || !canEdit) return
         try {
-            await window.api.updateQuotation(q.id, { [field]: value } as any)
+            ok(await window.api.updateQuotation(q.id, { [field]: value } as any))
             setQ(prev => ({ ...prev, [field]: value }))
             hasEdited.current = true
         } catch (err: any) {
@@ -618,7 +631,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
         try {
             if (piAlternatives.length === 2) {
                 // Remove both — exit alternatives mode
-                for (const alt of piAlternatives) await window.api.piDeleteQuotationAlternative(alt.id)
+                for (const alt of piAlternatives) ok(await window.api.piDeleteQuotationAlternative(alt.id))
                 setPiAlternatives([])
                 setSelectedPIAltId(null)
                 showSuccess('Alternatives removed')
@@ -652,7 +665,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                 try {
                     const vess = await window.api.getQuotationVessels(q.id)
                     if (!Array.isArray(vess) || vess.length === 0) {
-                        await window.api.deleteQuotation(q.id)
+                        ok(await window.api.deleteQuotation(q.id))
                     }
                 } catch { /* ignore */ }
             }
@@ -1016,7 +1029,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                             <button className="btn-secondary" onClick={() => setShowDraftExportModal(null)}>Cancel</button>
                             <button className="btn-secondary" onClick={() => handleExportAsDraft(showDraftExportModal)}>Export as Draft</button>
-                            {hasPermission('quotations:approve') && <button className="btn-primary" onClick={() => handleApproveAndExport(showDraftExportModal)}>Approve &amp; Export</button>}
+                            {hasPermission('quotations:approve') && <button className="btn-primary" disabled={approving} onClick={() => handleApproveAndExport(showDraftExportModal)}>{approving ? 'Approving…' : <>Approve &amp; Export</>}</button>}
                         </div>
                     </div>
                 </div>

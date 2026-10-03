@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, ChevronDown, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
 import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus, ConditionSurvey, Surveyor } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
+import { ok } from '../utils/ipc'
 
 interface WarrantyManagerProps {
   vesselId: string
@@ -199,7 +200,24 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setShowAddModal(true)
   }
 
+  // One save at a time (double click must not add the warranty twice)
+  const savingWarrantyRef = useRef(false)
+  const [savingWarranty, setSavingWarranty] = useState(false)
   const handleSaveWarranty = async () => {
+    if (savingWarrantyRef.current) return
+    savingWarrantyRef.current = true
+    setSavingWarranty(true)
+    try {
+      await saveWarrantyNow()
+    } catch (err: any) {
+      showError(err?.message || 'Failed to save warranty')
+    } finally {
+      savingWarrantyRef.current = false
+      setSavingWarranty(false)
+    }
+  }
+
+  const saveWarrantyNow = async () => {
     if (!formDescription.trim()) { showError('Description is required'); return }
     if (!formInceptionDate) { showError('Inception date is required'); return }
     if (formDeadlineType === 'days' && !formDeadlineDays) { showError('Deadline days is required'); return }
@@ -219,7 +237,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       }
 
       if (editingWarranty) {
-        await window.api.surveyWarrantyUpdate(editingWarranty.id, { ...payload, status: formStatus })
+        ok(await window.api.surveyWarrantyUpdate(editingWarranty.id, { ...payload, status: formStatus }))
         showSuccess('Warranty updated')
       } else {
         await window.api.surveyWarrantyCreate(payload)
@@ -280,10 +298,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         notes: undefined,
         createdBy: user?.username || 'System'
       })
-      await window.api.surveyWarrantyUpdate(convertWarranty.id, {
+      ok(await window.api.surveyWarrantyUpdate(convertWarranty.id, {
         conditionSurveyId: newSurvey.id,
         status: 'survey_done'
-      })
+      }))
       showSuccess('Survey created and linked to warranty')
       setConvertWarranty(null)
       loadWarranties()
@@ -318,10 +336,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const handleLinkSurvey = async (surveyId: string) => {
     if (!linkWarranty) return
     try {
-      await window.api.surveyWarrantyUpdate(linkWarranty.id, {
+      ok(await window.api.surveyWarrantyUpdate(linkWarranty.id, {
         conditionSurveyId: surveyId,
         status: 'survey_done'
-      })
+      }))
       showSuccess('Survey linked to warranty')
       setLinkWarranty(null)
       loadWarranties()
@@ -343,11 +361,11 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         )
         showSuccess('Warranty and linked survey completed')
       } else {
-        await window.api.surveyWarrantyUpdate(completeWarrantyId, {
+        ok(await window.api.surveyWarrantyUpdate(completeWarrantyId, {
           status: 'completed',
           completionNotes: completeNotes.trim() || null,
           completedAt: new Date().toISOString()
-        })
+        }))
         showSuccess('Warranty completed')
       }
       setCompleteWarrantyId(null)
@@ -855,7 +873,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
               <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleSaveWarranty} className="btn-primary">{editingWarranty ? 'Save Changes' : 'Add Warranty'}</button>
+              <button onClick={handleSaveWarranty} disabled={savingWarranty} className="btn-primary">{editingWarranty ? 'Save Changes' : 'Add Warranty'}</button>
             </div>
           </div>
         </div>

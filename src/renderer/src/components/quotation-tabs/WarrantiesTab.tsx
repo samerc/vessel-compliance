@@ -5,6 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, ALT_COLORS } from './shared'
+import { ok } from '../../utils/ipc'
 
 export default function WarrantiesTab({ quotation, showSuccess, showError, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const altStyle = (altId: string | null | undefined): React.CSSProperties => {
@@ -156,13 +157,13 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
         const rows = await window.api.getQuotationWarranties(quotation.id)
         const row = (Array.isArray(rows) ? rows : []).find((r: any) => r.piWarrantyId === piWarrantyId)
         if (row) {
-            await window.api.updateQuotationItemAlternativeId('quotation_warranties', row.id, altId)
+            ok(await window.api.updateQuotationItemAlternativeId('quotation_warranties', row.id, altId))
             setWarrantyAltIds(prev => ({ ...prev, [piWarrantyId]: altId }))
         }
     }
 
     const updateCustomWarrantyAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_custom_warranties', id, altId)
+        ok(await window.api.updateQuotationItemAlternativeId('quotation_custom_warranties', id, altId))
         setCustomWarranties(prev => prev.map(cw => cw.id === id ? { ...cw, alternativeId: altId } : cw))
     }
 
@@ -184,7 +185,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
     }
 
     const saveCustomEdit = async (id: string) => {
-        await window.api.updateQuotationCustomWarranty(id, { text: editCustomText })
+        ok(await window.api.updateQuotationCustomWarranty(id, { text: editCustomText }))
         setEditingCustomId(null)
         loadData()
     }
@@ -211,7 +212,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
     const confirmImport = async () => {
         let order = customWarranties.length
         for (const text of importedItems) {
-            await window.api.addQuotationCustomWarranty({ quotationId: quotation.id, text, order: order++ })
+            ok(await window.api.addQuotationCustomWarranty({ quotationId: quotation.id, text, order: order++ }))
         }
         showSuccess(`Imported ${importedItems.length} warranties`)
         setShowImportModal(false)

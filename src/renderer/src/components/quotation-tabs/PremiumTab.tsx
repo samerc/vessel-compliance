@@ -5,6 +5,7 @@ import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './shared'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { asArray, ok } from '../../utils/ipc'
 
 /** Parse periodText to extract number of months. Returns null if unparseable. */
 function parsePeriodMonths(text: string | undefined): number | null {
@@ -91,7 +92,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
         }
         setInstalments(insts)
     }
-    const loadVessels = async () => { setQVessels(await window.api.getQuotationVessels(quotation.id)) }
+    const loadVessels = async () => { setQVessels(asArray(await window.api.getQuotationVessels(quotation.id))) }
 
     const updateAlternativePremium = async (altId: string, amount: number | null) => {
         await window.api.hullUpdateQuotationAlternative(altId, { premiumAmount: amount })
@@ -103,7 +104,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
     }
 
     const updatePIAlternativePremium = async (altId: string, amount: number | null) => {
-        await window.api.piUpdateQuotationAlternative(altId, { premiumAmount: amount })
+        ok(await window.api.piUpdateQuotationAlternative(altId, { premiumAmount: amount }))
         setPiAlternatives(prev => prev.map(a => a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
     }
 

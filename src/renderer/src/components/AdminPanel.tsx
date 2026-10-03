@@ -8,6 +8,7 @@ const FileManager = lazy(() => import('./FileManager'))
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog } from './DialogHost'
+import { ok } from '../utils/ipc'
 
 // ── Section definitions ────────────────────────────────────────────────────────
 const GRANTABLE_SECTIONS = [
@@ -910,7 +911,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             // Apply new sequential orders starting at 1
             for (let i = 0; i < sorted.length; i++) {
                 const newOrderVal = i + 1
-                await window.api.updateDocumentType(sorted[i].id, { order: newOrderVal })
+                ok(await window.api.updateDocumentType(sorted[i].id, { order: newOrderVal }))
                 sorted[i].order = newOrderVal
             }
         }
@@ -1027,7 +1028,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
         // Persist to DB
         for (let i = 0; i < reordered.length; i++) {
-            await window.api.updateDocumentType(reordered[i].id, { order: i + 1 })
+            ok(await window.api.updateDocumentType(reordered[i].id, { order: i + 1 }))
         }
     }
 
@@ -1065,7 +1066,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
             showError('This role already exists')
             return
         }
-        await window.api.addAssuredRole({ name: newRole })
+        ok(await window.api.addAssuredRole({ name: newRole }))
         setNewRole('')
         await loadRoles()
     }
@@ -1123,7 +1124,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const saveDocEdit = async (id: string) => {
         if (!editDocName.trim()) return
-        await window.api.updateDocumentType(id, { name: editDocName, description: editDocDescription, policyTypeIds: editDocPolicyTypeIds })
+        ok(await window.api.updateDocumentType(id, { name: editDocName, description: editDocDescription, policyTypeIds: editDocPolicyTypeIds }))
         setEditingDocId(null)
         await loadDocTypes()
     }
@@ -1141,7 +1142,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     }
 
     const handleToggleDocRequired = async (doc: DocumentType) => {
-        await window.api.updateDocumentType(doc.id, { required: !doc.required })
+        ok(await window.api.updateDocumentType(doc.id, { required: !doc.required }))
         await loadDocTypes()
     }
 
@@ -1152,6 +1153,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     const loadFileTypeSettings = async () => {
         const settings = await window.api.fileTypesGetSettings()
+        if (!settings || (settings as any).error) { showError((settings as any)?.message || 'Failed to load file type settings'); return }
         setFileTypeSettings(settings)
     }
 
@@ -2677,6 +2679,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             setLoadingDbHealth(true)
                             try {
                                 const result = await window.api.getDatabaseHealth()
+                                if (!result || (result as any).error) throw new Error((result as any)?.message)
                                 setDbHealth(result)
                             } catch { showError('Failed to load database health') }
                             setLoadingDbHealth(false)

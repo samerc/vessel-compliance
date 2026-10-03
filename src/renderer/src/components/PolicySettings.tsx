@@ -33,6 +33,7 @@ import RichTextEditor from './RichTextEditor'
 import { SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import { BC_DEFAULTS } from '../services/PolicyExportService'
 import { sanitizeHtml } from '../utils/sanitize'
+import { ok } from '../utils/ipc'
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -246,7 +247,7 @@ function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
 
   const handleChange = async (pt: number) => {
     setFontSize(pt)
-    await window.api.setSetting('policy_font_size', String(pt))
+    ok(await window.api.setSetting('policy_font_size', String(pt)))
     showSuccess(`Font size set to ${pt}pt`)
   }
 
@@ -302,7 +303,7 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
 
   const save = async (updated: string[]) => {
     setTimezones(updated)
-    await window.api.setSetting('policy_timezones', JSON.stringify(updated))
+    ok(await window.api.setSetting('policy_timezones', JSON.stringify(updated)))
     showSuccess('Timezones saved')
   }
 
@@ -383,7 +384,7 @@ function BaseCurrencyTab({ showSuccess }: { showSuccess: (msg: string) => void }
 
   const handleSave = async () => {
     const val = currency.toUpperCase().trim()
-    await window.api.setSetting('base_currency', val)
+    ok(await window.api.setSetting('base_currency', val))
     showSuccess(`Base currency set to ${val}`)
   }
 
@@ -431,10 +432,10 @@ function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }) 
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, footerText }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, footerText })))
       showSuccess('Footer text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ footerText }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ footerText })))
       showSuccess('Footer text saved')
     }
   }
@@ -484,10 +485,10 @@ function HeaderTitlesTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, headerTitles }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, headerTitles })))
       showSuccess('Header titles saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ headerTitles }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ headerTitles })))
       showSuccess('Header titles saved')
     }
   }
@@ -703,7 +704,7 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
   }, [])
 
   const handleSave = async () => {
-    await window.api.setSetting('policy_cancel_replace_templates', JSON.stringify(templates))
+    ok(await window.api.setSetting('policy_cancel_replace_templates', JSON.stringify(templates)))
     showSuccess('Cancel & Replace templates saved')
   }
 
@@ -770,10 +771,10 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText, premiumPaymentTime }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ ...existing, premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText, premiumPaymentTime })))
       showSuccess('Premium intro text saved')
     } catch {
-      await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText, premiumPaymentTime }))
+      ok(await window.api.setSetting('policyExportSettings', JSON.stringify({ premiumIntroText, premiumIntroSingleText, debitAdviceIntroText: daIntroText, debitAdviceIntroSingleText: daIntroSingleText, creditAdviceCommissionText: caCommText, creditAdviceCommissionSingleText: caCommSingleText, outstandingPremiumDefaultText: outstandingText, fullPremiumLossDefaultText: fullPremiumLossText, premiumPaymentTime })))
       showSuccess('Premium intro text saved')
     }
   }
@@ -932,7 +933,7 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
     const keys = Object.keys(values)
     await Promise.all(keys.map(async (key) => {
       try {
-        await window.api.setSetting(key, values[key])
+        ok(await window.api.setSetting(key, values[key]))
       } catch { /* ignore */ }
     }))
     showSuccess('Blue card texts saved')
@@ -1087,7 +1088,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
     setBusy(true)
     try {
       if (editing.id) { await window.api.tcUpdate(editing.id, { name: editing.name, contentHtml: editing.html }) }
-      else { await window.api.tcCreate({ typeCode, name: editing.name || 'T&C', kind: 'html', contentHtml: editing.html }) }
+      else { ok(await window.api.tcCreate({ typeCode, name: editing.name || 'T&C', kind: 'html', contentHtml: editing.html })) }
       showSuccess('T&C template saved'); setEditing(null); await load(typeCode)
     } catch (err: any) { showError(err.message || 'Save failed') } finally { setBusy(false) }
   }
@@ -1227,7 +1228,7 @@ function RichTextSettingTab({ settingKey, label, description, showSuccess }: { s
   }, [settingKey])
 
   const handleSave = async () => {
-    await window.api.setSetting(settingKey, value)
+    ok(await window.api.setSetting(settingKey, value))
     showSuccess(`${label} saved`)
   }
 
@@ -1436,8 +1437,8 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
   }, [])
 
   const handleSave = async () => {
-    await window.api.setSetting('qr_verification_url', url)
-    await window.api.setSetting('qr_default_enabled', defaultEnabled ? 'true' : 'false')
+    ok(await window.api.setSetting('qr_verification_url', url))
+    ok(await window.api.setSetting('qr_default_enabled', defaultEnabled ? 'true' : 'false'))
     showSuccess('QR verification settings saved')
   }
 
@@ -1676,10 +1677,10 @@ function DeclarationSettingsTab({ showSuccess }: { showSuccess: (m: string) => v
       const raw = await window.api.getSetting('declaration_settings')
       const existing = raw ? JSON.parse(raw) : {}
       existing[year] = { umr, amlinRef, riskCode }
-      await window.api.setSetting('declaration_settings', JSON.stringify(existing))
+      ok(await window.api.setSetting('declaration_settings', JSON.stringify(existing)))
       showSuccess(`Declaration settings saved for ${year}`)
     } catch {
-      await window.api.setSetting('declaration_settings', JSON.stringify({ [year]: { umr, amlinRef, riskCode } }))
+      ok(await window.api.setSetting('declaration_settings', JSON.stringify({ [year]: { umr, amlinRef, riskCode } })))
       showSuccess(`Declaration settings saved for ${year}`)
     }
   }
@@ -1763,7 +1764,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
 
   async function saveClosingText() {
     try {
-      await window.api.setSetting('endorsement_closing_text', closingText)
+      ok(await window.api.setSetting('endorsement_closing_text', closingText))
       showSuccess('Closing text saved')
     } catch { showError('Failed to save') }
   }

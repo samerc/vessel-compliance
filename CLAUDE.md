@@ -645,6 +645,7 @@ MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) cau
 - **Affected tables**: `pi_warranty_set_items`, `quotation_custom_warranties`, `quotation_agreed_value_items`, `quotation_hull_conditions`, `quotation_hull_additional_conditions`
 - **Defense layers**: (1) `schema.sql` execution wrapped with `SET FOREIGN_KEY_CHECKS=0/1`, (2) migration CREATE TABLE blocks wrapped, (3) CRUD methods (`addPIWarrantySet`, `updatePIWarrantySet`, `addQuotationCustomWarranty`, `setQuotationHullConditions`, `setQuotationHullAdditionalConditions`, `setQuotationAgreedValueItems`) wrapped with FK_CHECKS=0/1 in try/finally
 - **`safeHandle` error pattern**: IPC handlers using `safeHandle` return `{ error: true, message }` on failure instead of throwing. Components must guard with `Array.isArray()` checks on all IPC results used in setState, and check `result.error` on single-object returns.
+- **Failed mutations reject** (`src/preload/ipcErrorPolicy.ts`): the preload turns `{ error: true }` from a MUTATION channel (add/update/delete/set/... verbs) into a rejected promise, so a failed save never reaches the success toast. Reads still resolve with the error value. `LEGACY_ERROR_VALUE_CHANNELS` keep the old contract because some caller branches on `.error`; any other caller of those wraps the result in `ok()` from `utils/ipc.ts`. Use `asArray()` for list loads. Uncaught rejections become an error toast (ToastContext `unhandledrejection` listener). Each page sits in its own `ErrorBoundary` (keyed by tab).
 
 ### Vessel Detail Navigation
 

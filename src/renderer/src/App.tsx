@@ -747,6 +747,8 @@ function App(): React.JSX.Element {
               ))}
             </nav>
           )}
+          {/* Per-page boundary: a crash on one page stays on that page; switching tab resets it */}
+          <ErrorBoundary key={activeTab} variant="page">
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => setActiveTab(tab as any)} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
@@ -861,6 +863,7 @@ function App(): React.JSX.Element {
               onCancel={() => { setPolicySetupQuotationId(null); setActiveTab('quotations') }}
             />
           </Suspense>}
+          </ErrorBoundary>
         </main>
         <UpdateNotification />
         <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={handleSearchNavigate} />

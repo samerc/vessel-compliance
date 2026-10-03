@@ -1,5 +1,6 @@
 import type { ReportSettings } from '../../../shared/types'
 
+import { ok } from '../utils/ipc'
 export const REPORT_SETTINGS_DEFAULTS: ReportSettings = {
   companyName: 'Al Bahriah Insurance & Reinsurance SAL',
   companySubtitle: '',
@@ -51,12 +52,15 @@ let cache: ReportSettings | null = null
 export async function getReportSettings(): Promise<ReportSettings> {
   if (cache) return cache
   const data = await window.api.reportSettingsGet()
+  // A failed load returns defaults for this export but is NOT cached (so the next export
+  // retries) — and the error object's fields must never be merged into the settings
+  if (!data || (data as any).error) return { ...REPORT_SETTINGS_DEFAULTS }
   cache = { ...REPORT_SETTINGS_DEFAULTS, ...data }
   return cache
 }
 
 export async function saveReportSettings(settings: ReportSettings): Promise<void> {
-  await window.api.reportSettingsSet(settings)
+  ok(await window.api.reportSettingsSet(settings))
   cache = { ...settings }
 }
 

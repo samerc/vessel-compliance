@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { Plus, X, Copy, ChevronDown, ChevronRight, Settings, CheckCircle, FileSpreadsheet, Save, History, Trash2, RotateCcw, Eye } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateLong } from '../utils/dateUtils'
+import { asArray } from '../utils/ipc'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ export default function WarBreachCalculator() {
 
   const loadHistory = useCallback(async () => {
     const records = await window.api.warBreachGetAll()
-    setHistoryRecords(records)
+    setHistoryRecords(asArray(records))
   }, [])
 
   useEffect(() => {

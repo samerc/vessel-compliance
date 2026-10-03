@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
+import { ok } from '../utils/ipc'
 
 interface SicEntry {
     id: number
@@ -292,7 +293,7 @@ export default function SanctionsSearch() {
     const deleteTemplate = async (idx: number) => {
         const updated = remarkTemplates.filter((_, i) => i !== idx)
         try {
-            await (window.api as any).sicSetRemarkTemplates(updated)
+            ok(await (window.api as any).sicSetRemarkTemplates(updated))
             setRemarkTemplates(updated)
             if (editingTemplateIdx === idx) {
                 setEditingTemplateIdx(null)

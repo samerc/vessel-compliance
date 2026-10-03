@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, X, Pencil, Save, Search, Download
 import { Quotation, PISubjectivity, QuotationSubjectivity, QuotationVessel, DocumentType, Entity } from '../../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import VesselScopeChips from '../VesselScopeChips'
+import { ok } from '../../utils/ipc'
 
 export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; isLight: boolean }) {
     const [items, setItems] = useState<QuotationSubjectivity[]>([])
@@ -139,7 +140,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     setItems(withScopes)
                     for (const s of withScopes) {
                         if (scopes[s.id] !== undefined) {
-                            await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] })
+                            ok(await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] }))
                         }
                     }
                     setScopeAutoDetected(true)
@@ -190,7 +191,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
         // Save the new order
         for (let i = 0; i < safeItems.length; i++) {
             if (safeItems[i].order !== i) {
-                await window.api.updateQuotationSubjectivity(safeItems[i].id, { order: i })
+                ok(await window.api.updateQuotationSubjectivity(safeItems[i].id, { order: i }))
             }
         }
         setItems(safeItems.map((s, i) => ({ ...s, order: i })))
@@ -198,7 +199,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
 
     const handleUpdate = async () => {
         if (!editingId || !editText.trim()) return
-        await window.api.updateQuotationSubjectivity(editingId, { text: editText.trim() })
+        ok(await window.api.updateQuotationSubjectivity(editingId, { text: editText.trim() }))
         setEditingId(null)
         loadData()
     }
@@ -215,13 +216,13 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
         ;[arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]]
         setItems(arr)
         for (let i = 0; i < arr.length; i++) {
-            await window.api.updateQuotationSubjectivity(arr[i].id, { order: i })
+            ok(await window.api.updateQuotationSubjectivity(arr[i].id, { order: i }))
         }
     }
 
     const updateSubjectivityScope = async (id: string, scope: string[] | null) => {
         setItems(prev => prev.map(s => s.id === id ? { ...s, vesselScope: scope } : s))
-        await window.api.updateQuotationSubjectivity(id, { vesselScope: scope })
+        ok(await window.api.updateQuotationSubjectivity(id, { vesselScope: scope }))
     }
 
     const autoSetSubjectivityScopes = async (
@@ -394,7 +395,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     onChange={e => {
                         const v = Math.max(0, parseInt(e.target.value) || 0)
                         setSubjectivityDays(v)
-                        window.api.updateQuotation(quotation.id, { subjectivityDays: v } as any).catch(() => {})
+                        window.api.updateQuotation(quotation.id, { subjectivityDays: v } as any).then(ok).catch(() => {})
                     }}
                     style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'center' }}
                 />

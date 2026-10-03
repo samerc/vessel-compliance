@@ -1,4 +1,20 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { contextBridge, ipcRenderer as electronIpc, webUtils } from 'electron'
+import { throwsOnError } from './ipcErrorPolicy'
+
+// Thin wrapper over Electron's ipcRenderer: a failed MUTATION ({ error: true, message } from
+// safeHandle) rejects instead of resolving, so callers never report a failed save as success.
+// Reads and legacy channels resolve with the error value as before (see ipcErrorPolicy.ts).
+const ipcRenderer = {
+  invoke: async (channel: string, ...args: any[]): Promise<any> => {
+    const result = await electronIpc.invoke(channel, ...args)
+    if (result && typeof result === 'object' && (result as any).error === true && throwsOnError(channel)) {
+      throw new Error((result as any).message || 'The operation failed')
+    }
+    return result
+  },
+  on: electronIpc.on.bind(electronIpc),
+  removeListener: electronIpc.removeListener.bind(electronIpc)
+}
 
 // Custom APIs for renderer
 const api = {

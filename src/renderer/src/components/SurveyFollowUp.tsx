@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateOrDash } from '../utils/dateUtils'
+import { ok } from '../utils/ipc'
 
 interface SurveyFollowUpProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -160,7 +161,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
     for (const id of selectedIds) {
       const w = warranties.find(ww => ww.id === id)
       if (w && w.status === 'pending') {
-        await window.api.surveyWarrantyUpdate(id, { status: 'survey_done' })
+        ok(await window.api.surveyWarrantyUpdate(id, { status: 'survey_done' }))
       }
     }
     setSelectedIds(new Set()); setSelectMode(false); loadData()
@@ -170,7 +171,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
     for (const id of selectedIds) {
       const w = warranties.find(ww => ww.id === id)
       if (w && (w.status === 'pending' || w.status === 'survey_done')) {
-        await window.api.surveyWarrantyUpdate(id, { status: 'completed' })
+        ok(await window.api.surveyWarrantyUpdate(id, { status: 'completed' }))
       }
     }
     setSelectedIds(new Set()); setSelectMode(false); loadData()
@@ -237,11 +238,11 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const handleComplete = async () => {
     if (!completeFor) return
     try {
-      await window.api.surveyWarrantyUpdate(completeFor.id, {
+      ok(await window.api.surveyWarrantyUpdate(completeFor.id, {
         status: 'completed',
         completionNotes: completeNotes.trim() || null,
         completedAt: new Date().toISOString()
-      })
+      }))
       showSuccess('Warranty completed')
       setCompleteFor(null)
       setCompleteNotes('')

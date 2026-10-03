@@ -4,6 +4,7 @@ import { Quotation, QuotationSubLimit, QuotationVessel, QuotationPIAlternative, 
 import RichTextEditor from '../RichTextEditor'
 import { ALT_COLORS, MoneyInput } from './shared'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { asArray, ok } from '../../utils/ipc'
 
 export default function LiabilityTab({ quotation, updateField, setQ, showSuccess, getEffectiveText }: { quotation: Quotation; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; showSuccess: (m: string) => void; showError: (m: string) => void; getEffectiveText: (key: keyof PISectionTexts) => string }) {
     const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
@@ -23,7 +24,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             window.api.piGetSubLimitTemplates(),
             window.api.getQuotationVessels(quotation.id)
         ])
-        setSubLimits(sl)
+        setSubLimits(asArray(sl))
         setTemplates(Array.isArray(tmpl) ? tmpl : [])
         setQVessels(Array.isArray(qv) ? qv : [])
         if (quotation.quotationTypeCode === 'P') {
@@ -97,13 +98,13 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                                     const val = e.target.value
                                     setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolCurrency: val } : a))
                                 }}
-                                onBlur={e => window.api.piUpdateQuotationAlternative(alt.id, { lolCurrency: e.target.value || undefined })}
+                                onBlur={e => window.api.piUpdateQuotationAlternative(alt.id, { lolCurrency: e.target.value || undefined }).then(ok)}
                                 style={{ width: '60px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'center' }}
                             />
                             <MoneyInput
                                 value={alt.lolAmount}
                                 onChange={val => setPiAlts(prev => prev.map(a => a.id === alt.id ? { ...a, lolAmount: val } : a))}
-                                onBlur={val => window.api.piUpdateQuotationAlternative(alt.id, { lolAmount: val ?? null })}
+                                onBlur={val => window.api.piUpdateQuotationAlternative(alt.id, { lolAmount: val ?? null }).then(ok)}
                                 placeholder="LOL Amount"
                                 style={{ flex: 1, maxWidth: '200px', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}
                             />

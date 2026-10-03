@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Vessel } from '../../../shared/types'
 import { formatDate } from '../utils/dateUtils'
+import { ok } from '../utils/ipc'
 
 interface VesselQuotationsViewProps {
   vessel: Vessel
@@ -134,7 +135,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
             const entity = allEntities.find((e: any) => e.id === va.entityId)
             if (!entity) continue
             if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-              if (!q.coName) await window.api.updateQuotation(q.id, { coName: entity.name } as any)
+              if (!q.coName) ok(await window.api.updateQuotation(q.id, { coName: entity.name } as any))
               continue
             }
             await window.api.addQuotationAssured({

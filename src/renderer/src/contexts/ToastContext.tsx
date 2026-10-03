@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
@@ -40,6 +40,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showSuccess = useCallback((message: string) => {
     showToast(message, 'success')
+  }, [showToast])
+
+  // Last line of defence: any promise rejection nobody handled (e.g. a failed save whose
+  // caller has no catch) becomes an error toast instead of failing silently. Repeats of the
+  // same message within 3 s are collapsed so a failing loop does not flood the screen.
+  const lastUnhandled = useRef<{ msg: string; at: number }>({ msg: '', at: 0 })
+  useEffect(() => {
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      const reason: any = e.reason
+      const msg = (reason && (reason.message || (typeof reason === 'string' ? reason : ''))) || 'An unexpected error occurred'
+      console.error('[unhandled rejection]', reason)
+      const now = Date.now()
+      if (lastUnhandled.current.msg === msg && now - lastUnhandled.current.at < 3000) return
+      lastUnhandled.current = { msg, at: now }
+      showToast(msg, 'error')
+    }
+    window.addEventListener('unhandledrejection', onUnhandled)
+    return () => window.removeEventListener('unhandledrejection', onUnhandled)
   }, [showToast])
 
   const dismissToast = (id: string) => {

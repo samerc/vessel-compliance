@@ -35,7 +35,7 @@ export default function WarConditionsTab({ quotation, showError }: {
         setOverrides(ov)
 
         // Auto-apply defaults on first load
-        if (!defaultsApplied.current && safeExisting.length === 0 && safeConds.length > 0) {
+        if (!defaultsApplied.current && Array.isArray(existing) && safeExisting.length === 0 && safeConds.length > 0) {
             defaultsApplied.current = true
             const defaults = safeConds.filter(c => c.defaultSelected)
             if (defaults.length > 0) {

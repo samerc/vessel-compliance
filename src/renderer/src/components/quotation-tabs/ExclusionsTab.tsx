@@ -4,6 +4,7 @@ import { Quotation, PIClause, PIExclusion, QuotationCustomExclusion, QuotationPI
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
+import { ok } from '../../utils/ipc'
 
 export default function ExclusionsTab({ quotation, showSuccess, piAlternatives = [] }: { quotation: Quotation; showSuccess: (m: string) => void; showError: (m: string) => void; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
@@ -157,7 +158,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
         if (wantAll) {
             const keep = rows.find((r: any) => !r.alternativeId) || rows[0]
             for (const r of rows) if (r.id !== keep?.id) await window.api.deleteQuotationExclusion(r.id)
-            if (keep && keep.alternativeId) await window.api.updateQuotationItemAlternativeId('quotation_exclusions', keep.id, null)
+            if (keep && keep.alternativeId) ok(await window.api.updateQuotationItemAlternativeId('quotation_exclusions', keep.id, null))
             if (!keep) await window.api.addQuotationExclusion(quotation.id, piExclusionId, null)
         } else {
             const want = new Set(target)
@@ -172,7 +173,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
     }
 
     const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId)
+        ok(await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId))
         setCustomExclusions(prev => prev.map(ce => ce.id === id ? { ...ce, alternativeId: altId } : ce))
     }
 
@@ -212,7 +213,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
             .filter(l => l.length > 0)
         if (lines.length === 0) return
         for (let i = 0; i < lines.length; i++) {
-            await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: lines[i], order: customExclusions.length + i })
+            ok(await window.api.addQuotationCustomExclusion({ quotationId: quotation.id, text: lines[i], order: customExclusions.length + i }))
         }
         showSuccess(`Imported ${lines.length} custom exclusions`)
         setImportText(''); setShowImportModal(false)

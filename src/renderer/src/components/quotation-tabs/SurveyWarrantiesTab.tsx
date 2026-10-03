@@ -4,6 +4,7 @@ import { Quotation, SurveyWarrantyTemplate, SurveyWarrantyTemplateSet, Quotation
 import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
 import VesselScopeChips from '../VesselScopeChips'
+import { ok } from '../../utils/ipc'
 
 const DEADLINE_PRESETS = [
     'prior inception',
@@ -73,11 +74,11 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                 if (!tmpl) continue
                 // Skip if already added
                 if (items.some(i => i.templateId === tid)) continue
-                await window.api.quotationSurveyWarrantyAdd({
+                ok(await window.api.quotationSurveyWarrantyAdd({
                     quotationId: quotation.id,
                     templateId: tmpl.id,
                     text: tmpl.text
-                })
+                }))
             }
             showSuccess(`Applied set "${set.name}"`)
             loadData()

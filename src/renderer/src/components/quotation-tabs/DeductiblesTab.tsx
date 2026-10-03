@@ -4,6 +4,7 @@ import { Quotation, PIDeductible, PITextDeductible, QuotationDeductible, Quotati
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, ALT_COLORS, PickerDropdown, MoneyInput } from './shared'
+import { ok } from '../../utils/ipc'
 
 export default function DeductiblesTab({ quotation, showSuccess, updateField, setQ, getEffectiveText, piAlternatives = [], selectedPIAltId = null }: { quotation: Quotation; showSuccess: (m: string) => void; showError?: (m: string) => void; isLight?: boolean; updateField: (f: string, v: any) => void; setQ: (fn: (p: Quotation) => Quotation) => void; getEffectiveText: (key: keyof PISectionTexts) => string; piAlternatives?: QuotationPIAlternative[]; selectedPIAltId?: string | null }) {
     const altStyle = (altId: string | null | undefined): React.CSSProperties => {
@@ -49,8 +50,9 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
         setMasterTextDeds(safeMtd)
         setQVessels(Array.isArray(qv) ? qv : [])
 
-        // Auto-include default text deductibles on first load
-        if (!defaultsApplied.current && safeTd.length === 0 && safeMtd.length > 0) {
+        // Auto-include default text deductibles on first load — only when the quotation's list
+        // really loaded empty (a failed load must not re-seed duplicates over existing rows)
+        if (!defaultsApplied.current && Array.isArray(td) && safeTd.length === 0 && safeMtd.length > 0) {
             defaultsApplied.current = true
             const defaults = safeMtd.filter(t => t.defaultIncluded)
             for (let i = 0; i < defaults.length; i++) {
@@ -177,12 +179,12 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
     }
 
     const updateDeductibleAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_deductibles', id, altId)
+        ok(await window.api.updateQuotationItemAlternativeId('quotation_deductibles', id, altId))
         setDeductibles(prev => prev.map(d => d.id === id ? { ...d, alternativeId: altId } : d))
     }
 
     const updateTextDeductibleAltId = async (id: string, altId: string | null) => {
-        await window.api.updateQuotationItemAlternativeId('quotation_text_deductibles', id, altId)
+        ok(await window.api.updateQuotationItemAlternativeId('quotation_text_deductibles', id, altId))
         setTextDeds(prev => prev.map(d => d.id === id ? { ...d, alternativeId: altId } : d))
     }
 

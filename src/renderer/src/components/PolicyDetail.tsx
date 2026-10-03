@@ -52,6 +52,7 @@ import EndorsementManager from './EndorsementManager'
 import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
+import { ok } from '../utils/ipc'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -438,7 +439,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy) return
     setSaving(true)
     try {
-      await window.api.policyUpdate(policyId, {
+      ok(await window.api.policyUpdate(policyId, {
         inceptionDate: editInception,
         inceptionTime: editInceptionTime,
         expiryDate: editExpiry,
@@ -452,7 +453,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         // Editing invalidates the frozen export snapshot so the next export re-freezes
         // with the change (exports are otherwise identical on re-export).
         exportSnapshot: null
-      })
+      }))
       await window.api.policySetInstalments(policyId, editInstalments)
       await window.api.policySetAddresses(policyId, editAddresses.map(a => ({
         entityId: a.entityId,
@@ -774,14 +775,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       return
     }
     try {
-      const created = await window.api.addFlagState({
+      const created = ok(await window.api.addFlagState({
         name: newFlagForm.name.trim(),
         iso3Code: newFlagForm.iso3.trim().toUpperCase(),
         ratifiedBunker: newFlagForm.ratBunker,
         ratifiedWreck: newFlagForm.ratWreck,
         authorityName: newFlagForm.authName.trim() || null,
         authorityAddress: newFlagForm.authAddr.trim() || null
-      } as any)
+      } as any))
       setFlagStates((prev) => [...prev, created])
       setBcForm((f) => ({
         ...f,
@@ -1488,7 +1489,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                           setConfirmation(prev => ({ ...prev, show: false }))
                           setRenewing(true)
                           try {
-                            const result = await window.api.policyRenew(policyId)
+                            const result = ok(await window.api.policyRenew(policyId))
                             if (result?.quotationId) { showSuccess('Renewal quotation created'); onNavigateToQuotation?.(result.quotationId) }
                             else showError('Failed to create renewal')
                           } catch (err: any) { showError(err.message || 'Failed') }
@@ -2006,7 +2007,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                           // Update the policy to reference the new quotation revision + new alt ID
                           const updateFields: Record<string, any> = { quotationId: revId }
                           if (newSelectedAltId) updateFields.selectedAlternativeId = newSelectedAltId
-                          await window.api.policyUpdate(policy.id, updateFields)
+                          ok(await window.api.policyUpdate(policy.id, updateFields))
                           showSuccess('Quotation revision created. Navigating to editor...')
                           onNavigateToQuotation(revId, { policyId: policy.id, policyNumber: policy.policyNumber || '' })
                         } else {

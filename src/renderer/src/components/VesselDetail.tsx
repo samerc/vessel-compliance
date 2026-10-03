@@ -19,6 +19,7 @@ import ConfirmationModal from './ConfirmationModal'
 import RemapFilePathsModal from './RemapFilePathsModal'
 import VesselQuotationsView from './VesselQuotationsView'
 import ReceiptManager from './ReceiptManager'
+import { ok } from '../utils/ipc'
 
 interface VesselDetailProps {
     vessel: Vessel
@@ -510,12 +511,12 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
     const handleAddFlag = async () => {
         if (!newFlagName.trim() || !newFlagIso3.trim()) return
         try {
-            const created = await window.api.addFlagState({
+            const created = ok(await window.api.addFlagState({
                 name: newFlagName.trim(),
                 iso3Code: newFlagIso3.trim().toUpperCase(),
                 address: newFlagAddress.trim() || undefined,
                 email: newFlagEmail.trim() || undefined
-            })
+            }))
             setFlagStates(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
             setSelectedFlagStateId(created.id)
             vessel.flagStateId = created.id
@@ -2660,14 +2661,14 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
         try {
             const typeChars = characteristics.filter(c => c.policyTypeId === formTypeId)
             if (editingPolicyId) {
-                await window.api.updateVesselDynamicPolicy(editingPolicyId, {
+                ok(await window.api.updateVesselDynamicPolicy(editingPolicyId, {
                     policyNumber: formNumber, conditionId: formConditionId || undefined,
                     status: formStatus, currency: formCurrency,
                     brokerEntityId: formBrokerId || undefined,
                     customerEntityId: formBrokerId || undefined,
                     customerType: formCustomerType || undefined,
                     notes: formNotes
-                })
+                }))
                 const vals = typeChars.map(c => ({
                     characteristicId: c.id,
                     valueText: c.fieldType === 'text' || c.fieldType === 'select' ? (formValues[c.id] || '') : undefined,
@@ -2675,7 +2676,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     valueDate: c.fieldType === 'date' ? (formValues[c.id] || undefined) : undefined,
                     valueBoolean: c.fieldType === 'boolean' ? (formValues[c.id] || false) : undefined
                 }))
-                await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals)
+                ok(await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals))
                 showSuccess('Policy updated')
             } else {
                 const newId = await window.api.addVesselDynamicPolicy({
@@ -2743,7 +2744,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                     }
 
                     if (shouldExpire) {
-                        await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' })
+                        ok(await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' }))
                     }
 
                     // 2. Roll every policy date forward by exactly 1 calendar year.
@@ -2804,7 +2805,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                 valueBoolean: v.valueBoolean
                             }
                         })
-                        await window.api.setVesselDynamicPolicyValues(newId, newVals)
+                        ok(await window.api.setVesselDynamicPolicyValues(newId, newVals))
                     }
 
                     // 4. Reload and notify

@@ -146,6 +146,7 @@ export default function DynamicAddressBook() {
         vesselStatus,
       }
       const data = await window.api.queryDAB(criteria)
+      if (!Array.isArray(data)) throw new Error((data as any)?.message || 'Failed to query address book')
       setResults(data)
     } catch (err: any) {
       showError(err.message || 'Failed to query address book')
