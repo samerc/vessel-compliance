@@ -21,9 +21,19 @@ if (app.isPackaged) {
     const hotApp = join(HOT_UPDATE_DIR, 'out', 'main', 'index.js')
     const hotVersion = join(HOT_UPDATE_DIR, 'version.json')
 
+    // A hot-update built for an OLDER app version must not override a newer full installer
+    // (it would run old code against the new Electron and node_modules)
+    const olderThanInstalled = (v: unknown): boolean => {
+      const a = String(v || '0').split('.').map(n => parseInt(n, 10) || 0)
+      const b = app.getVersion().split('.').map(n => parseInt(n, 10) || 0)
+      for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0)
+      return false
+    }
+
     if (existsSync(hotApp) && existsSync(hotVersion)) {
       // Validate the version file is readable JSON
-      JSON.parse(readFileSync(hotVersion, 'utf-8'))
+      const info = JSON.parse(readFileSync(hotVersion, 'utf-8'))
+      if (olderThanInstalled(info.version)) throw new Error('hot-update cache is older than the installed app')
 
       // Ensure externalized modules (mysql2) resolve from the ASAR node_modules
       const asarNodeModules = join(app.getAppPath(), 'node_modules')

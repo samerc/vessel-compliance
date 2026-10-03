@@ -70,6 +70,14 @@ function httpsGet(url: string, headers: Record<string, string> = {}): Promise<Bu
   })
 }
 
+/** True when a hot-update was built for an older app version than the installed one */
+function olderThanInstalled(version: unknown): boolean {
+  const a = String(version || '0').split('.').map(n => parseInt(n, 10) || 0)
+  const b = app.getVersion().split('.').map(n => parseInt(n, 10) || 0)
+  for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0)
+  return false
+}
+
 class HotUpdateService {
   private checkInterval: ReturnType<typeof setInterval> | null = null
 
@@ -149,7 +157,7 @@ class HotUpdateService {
       const remote = await this.getRemoteVersion()
       if (remote) {
         availableBuild = remote.buildNumber
-        updateReady = remote.buildNumber > currentBuild
+        updateReady = remote.buildNumber > currentBuild && !olderThanInstalled(remote.version)
       }
     } catch { /* offline */ }
 
@@ -188,6 +196,10 @@ class HotUpdateService {
       const localBuild = localVersion?.buildNumber ?? 0
 
       if (remoteVersion.buildNumber <= localBuild) {
+        return { updated: false }
+      }
+      // Built for an older installer: the bootstrap would ignore it, so don't download it
+      if (olderThanInstalled(remoteVersion.version)) {
         return { updated: false }
       }
 
@@ -268,7 +280,7 @@ class HotUpdateService {
         const remote = await this.getRemoteVersion()
         const local = this.getLocalVersion()
         const localBuild = local?.buildNumber ?? 0
-        if (remote && remote.buildNumber > localBuild) {
+        if (remote && remote.buildNumber > localBuild && !olderThanInstalled(remote.version)) {
           onUpdateAvailable(remote)
         }
       } catch { /* silent */ }
