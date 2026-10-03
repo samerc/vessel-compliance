@@ -195,7 +195,7 @@ interface BlueCardFormData {
 const statusColors: Record<string, { bg: string; text: string }> = {
   active: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
   expired: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
-  cancelled: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
+  cancelled: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
   inactive: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' }
 }
 
@@ -1088,7 +1088,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
   const cardStyle: React.CSSProperties = {
     background: isLight ? '#ffffff' : 'var(--bg-card)',
-    border: '1px solid var(--glass-border)',
+    border: '1px solid var(--glass-border-color)',
     borderRadius: '12px',
     padding: '20px',
     marginBottom: '16px'
@@ -1100,7 +1100,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     gap: '10px',
     marginBottom: '16px',
     paddingBottom: '12px',
-    borderBottom: '1px solid var(--glass-border)'
+    borderBottom: '1px solid var(--glass-border-color)'
   }
 
   const cardTitleStyle: React.CSSProperties = {
@@ -1470,7 +1470,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   top: (actionsMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
                   right: window.innerWidth - (actionsMenuRef.current?.getBoundingClientRect().right || 0),
                   zIndex: 9999,
-                  background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                  background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                   borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                 }}>
                   {/* Revision & Renew */}
@@ -1616,7 +1616,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             display: 'flex',
             gap: '4px',
             marginBottom: '20px',
-            borderBottom: '1px solid var(--glass-border)',
+            borderBottom: '1px solid var(--glass-border-color)',
             paddingBottom: '0'
           }}>
             {([
@@ -1658,7 +1658,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
 
               {/* Vessel info (read-only) */}
-              <div style={{ marginBottom: '20px', padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+              <div style={{ marginBottom: '20px', padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{policy.vesselName || '-'}</span>
                   {policy.imoNumber && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>IMO {policy.imoNumber}</span>}
@@ -1783,7 +1783,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {editAddresses.map((addr, idx) => (
-                  <div key={idx} style={{ padding: '14px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', position: 'relative' }}>
+                  <div key={idx} style={{ padding: '14px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)', position: 'relative' }}>
                     <button
                       onClick={() => removeAddress(idx)}
                       style={{ position: 'absolute', top: '8px', right: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}
@@ -2035,7 +2035,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {/* Warranties */}
                   {(coverageWarranties.length > 0 || coverageCustomWarranties.length > 0) && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.warranties ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, warranties: !prev.warranties }))}
@@ -2049,12 +2049,12 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.warranties && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageWarranties.map((w: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {w.text || w.name || `Warranty ${i + 1}`}
                             </div>
                           ))}
                           {coverageCustomWarranties.map((cw: any, i: number) => (
-                            <div key={`cw-${i}`} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)', fontStyle: 'italic' }}>
+                            <div key={`cw-${i}`} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)', fontStyle: 'italic' }}>
                               {cw.text || `Custom Warranty ${i + 1}`}
                             </div>
                           ))}
@@ -2065,7 +2065,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Deductibles */}
                   {coverageDeductibles.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.deductibles ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, deductibles: !prev.deductibles }))}
@@ -2079,7 +2079,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.deductibles && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageDeductibles.map((d: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {d.text || d.name || `Deductible ${i + 1}`}
                             </div>
                           ))}
@@ -2090,7 +2090,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Exclusions */}
                   {coverageExclusions.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.exclusions ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, exclusions: !prev.exclusions }))}
@@ -2104,7 +2104,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.exclusions && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageExclusions.map((ex: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {ex.text || ex.name || `Exclusion ${i + 1}`}
                             </div>
                           ))}
@@ -2115,7 +2115,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Clauses */}
                   {coverageClauses.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.clauses ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, clauses: !prev.clauses }))}
@@ -2129,7 +2129,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.clauses && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageClauses.map((c: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {c.text || c.name || c.code || `Clause ${i + 1}`}
                             </div>
                           ))}
@@ -2140,7 +2140,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Subjectivities */}
                   {coverageSubjectivities.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.subjectivities ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, subjectivities: !prev.subjectivities }))}
@@ -2154,7 +2154,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.subjectivities && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageSubjectivities.map((s: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {s.text || s.name || `Subjectivity ${i + 1}`}
                             </div>
                           ))}
@@ -2165,7 +2165,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* LOL Alternatives */}
                   {coverageLolOptions.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.lolOptions ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, lolOptions: !prev.lolOptions }))}
@@ -2179,7 +2179,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.lolOptions && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {coverageLolOptions.map((opt: any, i: number) => (
-                            <div key={opt.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div key={opt.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)', display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <span style={{ fontWeight: 600 }}>{opt.label || `Alternative ${i + 1}`}</span>
                               <span>{opt.currency || 'USD'} {Number(opt.amount || 0).toLocaleString()}</span>
                               {opt.premiumAmount != null && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Premium: {Number(opt.premiumAmount).toLocaleString()}</span>}
@@ -2193,7 +2193,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Custom Sections */}
                   {coverageCustomSections.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.customSections ? '10px' : 0 }}
                         onClick={() => setCoverageExpanded(prev => ({ ...prev, customSections: !prev.customSections }))}
@@ -2207,7 +2207,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       {coverageExpanded.customSections && (
                         <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {coverageCustomSections.map((cs: any, i: number) => (
-                            <div key={cs.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border)' }}>
+                            <div key={cs.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
                               {cs.title && <div style={{ fontWeight: 600, marginBottom: '2px' }}>{cs.title}</div>}
                               {cs.text && <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{cs.text}</div>}
                             </div>
@@ -2219,7 +2219,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* War Excess Info */}
                   {quotationData?.warExcessEnabled && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)', border: '1px solid var(--glass-border-color)' }}>
                       <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '8px' }}>War P&I Excess</div>
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {quotationData.warSection1Text && <div>Section 1: {quotationData.warSection1Text}</div>}
@@ -2246,7 +2246,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             padding: '14px 20px',
             marginTop: '16px',
             background: isLight ? '#ffffff' : '#1a1d28',
-            border: '1px solid var(--glass-border)',
+            border: '1px solid var(--glass-border-color)',
             borderRadius: '12px',
             display: 'flex',
             justifyContent: 'flex-end',
@@ -2590,7 +2590,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   padding: '12px 16px',
                   borderRadius: '8px',
                   background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--glass-border)'
+                  border: '1px solid var(--glass-border-color)'
                 }}
               >
                 <div
@@ -2984,7 +2984,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               width: '560px',
               maxHeight: '85vh',
               overflowY: 'auto',
-              border: '1px solid var(--glass-border)'
+              border: '1px solid var(--glass-border-color)'
             }}
           >
             {/* Modal header */}
@@ -3242,7 +3242,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   padding: '12px',
                   borderRadius: '8px',
                   background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--glass-border)'
+                  border: '1px solid var(--glass-border-color)'
                 }}
               >
                 <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>
@@ -3544,7 +3544,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       {showDeclarationModal && declarationFields && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDeclarationModal(false)} />
-          <div style={{ position: 'relative', width: '700px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '14px', padding: '28px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)' }}>
+          <div style={{ position: 'relative', width: '700px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '14px', padding: '28px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '1.1rem' }}>War Declaration</h2>
               <button onClick={() => setShowDeclarationModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
@@ -3570,7 +3570,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   </div>
                   {fieldRow('Reinsured', 'reinsured')}
                   {fieldRow('Assured', 'assuredText', 3)}
-                  <div style={{ borderTop: '1px solid var(--glass-border)', margin: '16px 0', paddingTop: '12px' }}>
+                  <div style={{ borderTop: '1px solid var(--glass-border-color)', margin: '16px 0', paddingTop: '12px' }}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Vessel</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                       {fieldRow('Name', 'vesselName')}
@@ -3584,7 +3584,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     </div>
                     {fieldRow('Class', 'vesselClass')}
                   </div>
-                  <div style={{ borderTop: '1px solid var(--glass-border)', margin: '16px 0', paddingTop: '12px' }}>
+                  <div style={{ borderTop: '1px solid var(--glass-border-color)', margin: '16px 0', paddingTop: '12px' }}>
                     {fieldRow('Period From', 'periodFrom')}
                     {fieldRow('Period To', 'periodTo')}
                   </div>
@@ -3675,7 +3675,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <div style={{
                 position: 'relative', width: '520px', maxHeight: '85vh', overflowY: 'auto',
                 borderRadius: '14px', padding: '24px',
-                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)'
+                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>Cancel Policy</h3>
@@ -3695,7 +3695,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     <button key={m} onClick={() => setCancelMode(m as any)}
                       style={{
                         flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
-                        border: cancelMode === m ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                        border: cancelMode === m ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                         background: cancelMode === m ? 'rgba(0,170,200,0.08)' : 'transparent',
                         color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
                         cursor: 'pointer'
@@ -3741,7 +3741,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 {returnPremium > 0 && (
                   <div style={{
                     background: isLight ? '#f8f9fc' : '#161829',
-                    border: '1px solid var(--glass-border)', borderRadius: '8px',
+                    border: '1px solid var(--glass-border-color)', borderRadius: '8px',
                     padding: '14px', marginBottom: '16px'
                   }}>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
@@ -3758,7 +3758,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       </div>
                     )}
                     {returnInstalments.length > 0 && (
-                      <div style={{ marginTop: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '8px' }}>
+                      <div style={{ marginTop: '8px', borderTop: '1px solid var(--glass-border-color)', paddingTop: '8px' }}>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Instalments to return:</div>
                         {returnInstalments.map((inst, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '2px' }}>
@@ -3786,7 +3786,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowCancelModal(false)}
-                    style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                    style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', border: '1px solid var(--glass-border-color)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
                     Close
                   </button>
                   <button onClick={async () => {
@@ -3845,7 +3845,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', maxWidth: '360px'
           }}>
             <div style={{
-              width: '36px', height: '36px', border: '3px solid var(--glass-border)',
+              width: '36px', height: '36px', border: '3px solid var(--glass-border-color)',
               borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 16px',
               animation: 'spin 1s linear infinite'
             }} />

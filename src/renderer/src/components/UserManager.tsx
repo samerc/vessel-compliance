@@ -716,7 +716,7 @@ export default function UserManager() {
                     onClick={closeGroupsModal}
                 >
                     <div
-                        style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border)' }}
+                        style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--glass-border-color)' }}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Modal Header */}
@@ -803,7 +803,7 @@ export default function UserManager() {
                                             position: 'absolute', right: 0, top: '100%', marginTop: '4px',
                                             width: '340px', maxHeight: '300px', overflowY: 'auto',
                                             background: isLight ? '#ffffff' : '#1a1d28',
-                                            border: '1px solid var(--glass-border)', borderRadius: '10px',
+                                            border: '1px solid var(--glass-border-color)', borderRadius: '10px',
                                             boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 10
                                         }}>
                                             <div style={{ padding: '8px', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, background: isLight ? '#ffffff' : '#1a1d28' }}>

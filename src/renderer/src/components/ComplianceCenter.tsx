@@ -800,7 +800,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 <span style={{
                                                     padding: '3px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
                                                     background: alert.severity === 'critical' ? 'rgba(255,77,77,0.15)' : alert.severity === 'high' ? 'rgba(255,120,77,0.15)' : 'rgba(255,204,0,0.12)',
-                                                    color: alert.severity === 'critical' ? '#ff4d4d' : alert.severity === 'high' ? '#ff784d' : '#e6a800'
+                                                    color: alert.severity === 'critical' ? 'var(--danger)' : alert.severity === 'high' ? '#ff784d' : '#e6a800'
                                                 }}>
                                                     {alert.severity}
                                                 </span>
@@ -863,7 +863,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 <span style={{
                                                     padding: '3px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700,
                                                     background: isExpired ? 'rgba(255,77,77,0.15)' : absDays <= 30 ? 'rgba(255,165,0,0.15)' : 'rgba(255,204,0,0.1)',
-                                                    color: isExpired ? '#ff4d4d' : absDays <= 30 ? '#ffa500' : '#e6a800'
+                                                    color: isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'
                                                 }}>
                                                     {isExpired ? `${absDays}d overdue` : absDays === 0 ? 'Today' : `${absDays}d left`}
                                                 </span>
@@ -931,7 +931,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                 title="Validation Rules Settings"
                                 style={{
                                     background: showRuleSettings ? 'rgba(0,210,255,0.1)' : 'transparent',
-                                    border: showRuleSettings ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                    border: showRuleSettings ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                                     borderRadius: '6px', cursor: 'pointer', padding: '7px 10px',
                                     display: 'flex', alignItems: 'center', gap: '6px',
                                     color: showRuleSettings ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -957,7 +957,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                         <div style={{
                             marginBottom: '16px', padding: '16px 20px', borderRadius: '10px',
                             background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
-                            border: '1px solid var(--glass-border)'
+                            border: '1px solid var(--glass-border-color)'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                 <Settings size={16} color="var(--accent-primary)" />
@@ -973,7 +973,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                 padding: '8px 12px', borderRadius: '8px',
                                                 background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
-                                                border: '1px solid var(--glass-border)',
+                                                border: '1px solid var(--glass-border-color)',
                                                 opacity: enabled ? 1 : 0.5
                                             }}
                                         >
@@ -1107,7 +1107,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                         style={{
                                                             padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600',
                                                             background: ruleForm.severity === s.key ? s.color + '22' : 'transparent',
-                                                            border: ruleForm.severity === s.key ? `2px solid ${s.color}` : '1px solid var(--glass-border)',
+                                                            border: ruleForm.severity === s.key ? `2px solid ${s.color}` : '1px solid var(--glass-border-color)',
                                                             color: ruleForm.severity === s.key ? s.color : 'var(--text-secondary)',
                                                             cursor: 'pointer', textTransform: 'capitalize'
                                                         }}
@@ -1155,7 +1155,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                 padding: '8px 12px', borderRadius: '8px',
                                                 background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
-                                                border: '1px solid var(--glass-border)',
+                                                border: '1px solid var(--glass-border-color)',
                                                 opacity: rule.isEnabled ? 1 : 0.5
                                             }}
                                         >
@@ -1472,7 +1472,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 <td style={{ padding: '14px 16px' }}>
                                                     <span style={{
                                                         fontWeight: '600',
-                                                        color: Number(result.matchScore) >= 90 ? '#ff4d4d' : Number(result.matchScore) >= 80 ? '#ffc107' : 'var(--text-secondary)'
+                                                        color: Number(result.matchScore) >= 90 ? 'var(--danger)' : Number(result.matchScore) >= 80 ? '#ffc107' : 'var(--text-secondary)'
                                                     }}>
                                                         {Number(result.matchScore || 0).toFixed(0)}%
                                                     </span>
@@ -1590,8 +1590,8 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 fontWeight: '600',
                                                 background: log.status === 'completed' ? 'rgba(0, 255, 136, 0.1)' :
                                                     log.status === 'failed' ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 210, 255, 0.1)',
-                                                color: log.status === 'completed' ? '#00ff88' :
-                                                    log.status === 'failed' ? '#ff4d4d' : '#00d2ff',
+                                                color: log.status === 'completed' ? 'var(--success)' :
+                                                    log.status === 'failed' ? 'var(--danger)' : '#00d2ff',
                                                 textTransform: 'uppercase'
                                             }}>
                                                 {log.status}

@@ -513,7 +513,7 @@ export default function EndorsementManager({
     fontSize: '0.75rem',
     fontWeight: 600 as const,
     cursor: 'pointer' as const,
-    border: active ? '1.5px solid var(--accent-primary)' : '1.5px solid var(--glass-border)',
+    border: active ? '1.5px solid var(--accent-primary)' : '1.5px solid var(--glass-border-color)',
     background: active ? 'rgba(0,170,200,0.1)' : 'transparent',
     color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
     transition: 'all 0.15s'
@@ -588,7 +588,7 @@ export default function EndorsementManager({
       {isEditing && (
         <div style={{
           background: isLight ? '#f8f9fc' : '#161829',
-          border: '1px solid var(--glass-border)',
+          border: '1px solid var(--glass-border-color)',
           borderRadius: '10px',
           padding: '20px',
           marginBottom: '16px'
@@ -724,7 +724,7 @@ export default function EndorsementManager({
             const sectionTemplates = templates.filter(t => t.sectionKey === s.sectionKey || t.sectionKey === 'general')
             return (
               <div key={s.sectionKey} style={{
-                border: '1px solid var(--glass-border)',
+                border: '1px solid var(--glass-border-color)',
                 borderRadius: '8px',
                 marginBottom: '8px',
                 overflow: 'hidden'
@@ -805,7 +805,7 @@ export default function EndorsementManager({
           })}
 
           {/* Instalments */}
-          <div style={{ marginTop: '16px', borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }}>
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--glass-border-color)', paddingTop: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <label style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}
                 onClick={() => setShowInstalments(!showInstalments)}>
@@ -815,7 +815,7 @@ export default function EndorsementManager({
               {!showInstalments && (
                 <button onClick={prefillInstalments} style={{
                   fontSize: '0.7rem', padding: '2px 8px', borderRadius: '6px',
-                  border: '1px solid var(--glass-border)', background: 'transparent',
+                  border: '1px solid var(--glass-border-color)', background: 'transparent',
                   color: 'var(--text-secondary)', cursor: 'pointer'
                 }}>Pre-fill from policy</button>
               )}
@@ -849,14 +849,14 @@ export default function EndorsementManager({
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={addInstalment} style={{
                     fontSize: '0.75rem', padding: '4px 10px', borderRadius: '6px',
-                    border: '1px solid var(--glass-border)', background: 'transparent',
+                    border: '1px solid var(--glass-border-color)', background: 'transparent',
                     color: 'var(--text-secondary)', cursor: 'pointer'
                   }}>
                     <Plus size={12} style={{ verticalAlign: 'middle' }} /> Add
                   </button>
                   <button onClick={prefillInstalments} style={{
                     fontSize: '0.75rem', padding: '4px 10px', borderRadius: '6px',
-                    border: '1px solid var(--glass-border)', background: 'transparent',
+                    border: '1px solid var(--glass-border-color)', background: 'transparent',
                     color: 'var(--text-secondary)', cursor: 'pointer'
                   }}>Pre-fill from policy</button>
                 </div>
@@ -869,7 +869,7 @@ export default function EndorsementManager({
             <button onClick={() => { setIsEditing(false); setEditState(EMPTY_EDIT) }}
               style={{
                 padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem',
-                border: '1px solid var(--glass-border)', background: 'transparent',
+                border: '1px solid var(--glass-border-color)', background: 'transparent',
                 color: 'var(--text-primary)', cursor: 'pointer'
               }}>Cancel</button>
             <button onClick={handleSave} disabled={saving}
@@ -896,7 +896,7 @@ export default function EndorsementManager({
             <div key={end.id} style={{
               display: 'flex', alignItems: 'center', gap: '12px',
               padding: '10px 14px',
-              borderBottom: '1px solid var(--glass-border)',
+              borderBottom: '1px solid var(--glass-border-color)',
               fontSize: '0.85rem'
             }}>
               <span style={{ fontWeight: 700, minWidth: '50px', color: 'var(--text-primary)' }}>

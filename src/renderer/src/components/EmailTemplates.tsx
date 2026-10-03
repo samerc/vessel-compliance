@@ -268,7 +268,7 @@ export default function EmailTemplates(): React.JSX.Element {
           width: '300px',
           flexShrink: 0,
           background: isLight ? '#f4f6fb' : '#14172a',
-          border: '1px solid var(--glass-border)',
+          border: '1px solid var(--glass-border-color)',
           borderRadius: '12px',
           overflow: 'hidden',
           display: 'flex',
@@ -277,7 +277,7 @@ export default function EmailTemplates(): React.JSX.Element {
           {/* List header */}
           <div style={{
             padding: '12px 14px',
-            borderBottom: '1px solid var(--glass-border)',
+            borderBottom: '1px solid var(--glass-border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between'
@@ -385,7 +385,7 @@ export default function EmailTemplates(): React.JSX.Element {
         <div style={{
           flex: 1,
           background: isLight ? '#f4f6fb' : '#14172a',
-          border: '1px solid var(--glass-border)',
+          border: '1px solid var(--glass-border-color)',
           borderRadius: '12px',
           overflow: 'hidden',
           display: 'flex',
@@ -409,7 +409,7 @@ export default function EmailTemplates(): React.JSX.Element {
               {/* Editor header */}
               <div style={{
                 padding: '14px 18px',
-                borderBottom: '1px solid var(--glass-border)',
+                borderBottom: '1px solid var(--glass-border-color)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'

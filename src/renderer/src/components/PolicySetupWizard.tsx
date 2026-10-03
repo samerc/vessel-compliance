@@ -733,7 +733,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       {/* Progress Bar */}
       <div style={{
         background: cardBg, borderRadius: '14px', padding: '24px 32px',
-        border: '1px solid var(--glass-border)', marginBottom: '24px'
+        border: '1px solid var(--glass-border-color)', marginBottom: '24px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {steps.map((step, idx) => {
@@ -788,7 +788,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       {/* Step Content */}
       <div style={{
         background: cardBg, borderRadius: '14px', padding: '28px',
-        border: '1px solid var(--glass-border)', marginBottom: '24px',
+        border: '1px solid var(--glass-border-color)', marginBottom: '24px',
         minHeight: '200px'
       }}>
         {currentStep === 0 && (
@@ -1286,7 +1286,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         const totalPay = rows.reduce((s, r) => s + r.pay, 0)
         const cols = hasDiscount ? '1.2fr 1fr 1fr' : '1.2fr 1fr'
         return (
-          <div style={{ marginBottom: '20px', border: '1px solid var(--glass-border)', borderRadius: '10px', overflow: 'hidden', maxWidth: '540px' }}>
+          <div style={{ marginBottom: '20px', border: '1px solid var(--glass-border-color)', borderRadius: '10px', overflow: 'hidden', maxWidth: '540px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', background: 'rgba(0,170,200,0.06)', ...labelUpper, marginBottom: 0 }}>
               <span>Premium</span>
               {hasDiscount && <span style={{ textAlign: 'right' }}>Technical</span>}
@@ -1299,7 +1299,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
                 <span style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(hasDiscount ? r.pay : r.tech)}</span>
               </div>
             ))}
-            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,170,200,0.04)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border-color)', background: 'rgba(0,170,200,0.04)' }}>
               <span style={{ fontWeight: 700 }}>Total</span>
               {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(totalTech)}</span>}
               <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>{fmt(hasDiscount ? totalPay : totalTech)}</span>
@@ -1404,7 +1404,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
       </>)}
 
       {/* Outstanding premium notice — toggle + editable text (overrides the quotation for this policy) */}
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem', marginBottom: data.outstandingPremiumEnabled ? '8px' : 0 }}>
           <input type="checkbox" checked={data.outstandingPremiumEnabled} onChange={e => onUpdate({ outstandingPremiumEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
           Show outstanding-premium notice on the policy
@@ -1579,7 +1579,7 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
       </div>
 
       {/* Section order — override the policy-settings default for this policy */}
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
         <label style={labelStyle}>Section Order</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button type="button" onClick={onEditSectionOrder} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.82rem' }}>

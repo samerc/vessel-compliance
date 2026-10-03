@@ -221,7 +221,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
                 top: rect ? rect.bottom + 4 : 0,
                 right: rect ? window.innerWidth - rect.right : 0,
                 background: isLight ? '#fff' : '#1e222a',
-                border: '1px solid var(--glass-border)', borderRadius: '10px',
+                border: '1px solid var(--glass-border-color)', borderRadius: '10px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)', zIndex: 9999,
                 minWidth: '180px', padding: '6px'
               }}>
@@ -287,7 +287,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
             title="Refresh"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '7px', borderRadius: '8px', border: '1px solid var(--glass-border)',
+              padding: '7px', borderRadius: '8px', border: '1px solid var(--glass-border-color)',
               background: 'transparent', color: 'var(--text-secondary)',
               cursor: 'pointer'
             }}

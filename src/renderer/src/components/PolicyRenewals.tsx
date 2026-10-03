@@ -1054,7 +1054,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                             fontSize: '0.8rem',
                             fontWeight: policyTypeFilter === 'all' ? 600 : 400,
                             cursor: 'pointer',
-                            border: policyTypeFilter === 'all' ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                            border: policyTypeFilter === 'all' ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                             background: policyTypeFilter === 'all' ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
                             color: policyTypeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
                             transition: 'all 0.15s',
@@ -1072,7 +1072,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                 fontSize: '0.8rem',
                                 fontWeight: policyTypeFilter === pt.id ? 600 : 400,
                                 cursor: 'pointer',
-                                border: policyTypeFilter === pt.id ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                border: policyTypeFilter === pt.id ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                                 background: policyTypeFilter === pt.id ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
                                 color: policyTypeFilter === pt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                 transition: 'all 0.15s',
@@ -1318,7 +1318,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                         style={{
                             position: 'fixed', top: renewMenuPos.top, right: renewMenuPos.right,
                             background: isLight ? '#ffffff' : '#1a1d28',
-                            border: '1px solid var(--glass-border)',
+                            border: '1px solid var(--glass-border-color)',
                             borderRadius: '8px', padding: '4px', minWidth: '200px', zIndex: 9999,
                             boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                         }}

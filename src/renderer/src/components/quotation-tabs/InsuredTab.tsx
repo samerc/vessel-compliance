@@ -191,7 +191,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                     style={{ width: '100%', border: '1px solid var(--input-border)' }}
                 />
                 {showCoDropdown && coFiltered.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '200px', overflowY: 'auto' }}>
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '200px', overflowY: 'auto' }}>
                         {coFiltered.map(e => (
                             <div
                                 key={e.id}
@@ -266,7 +266,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                         style={{ width: '100%', border: '1px solid var(--input-border)' }}
                     />
                     {showEntityDropdown && entityFiltered.length > 0 && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '220px', overflowY: 'auto', marginTop: '2px' }}>
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '6px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxHeight: '220px', overflowY: 'auto', marginTop: '2px' }}>
                             {entityFiltered.map(e => (
                                 <div
                                     key={e.id}

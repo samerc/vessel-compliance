@@ -741,7 +741,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                     maxHeight: '200px',
                                     overflowY: 'auto',
                                     background: isLight ? '#ffffff' : '#1e222a',
-                                    border: '1px solid var(--glass-border)',
+                                    border: '1px solid var(--glass-border-color)',
                                     borderRadius: '8px',
                                     boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
                                     zIndex: 100
@@ -763,7 +763,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                             {f.name}
                                         </div>
                                     ))}
-                                    <div style={{ borderTop: '1px solid var(--glass-border)', marginTop: '4px', paddingTop: '4px' }}>
+                                    <div style={{ borderTop: '1px solid var(--glass-border-color)', marginTop: '4px', paddingTop: '4px' }}>
                                         {newFleetInput ? (
                                             <div style={{ display: 'flex', gap: '4px', padding: '4px' }}>
                                                 <input value={newFleetName} onChange={e => setNewFleetName(e.target.value)} placeholder="Fleet name" autoFocus

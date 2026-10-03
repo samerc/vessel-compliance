@@ -158,7 +158,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                 marginBottom: '16px',
                                 borderRadius: '12px',
                                 background: 'var(--glass-bg)',
-                                border: '1px solid var(--glass-border)',
+                                border: '1px solid var(--glass-border-color)',
                                 overflow: 'hidden',
                                 transition: 'all 0.2s ease'
                             }}
@@ -208,7 +208,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                 <div style={{
                                     padding: '0 20px 20px 20px',
                                     fontSize: '0.9rem',
-                                    borderTop: '1px solid var(--glass-border)',
+                                    borderTop: '1px solid var(--glass-border-color)',
                                     marginTop: '0'
                                 }}>
                                     <div style={{ paddingTop: '16px' }}>

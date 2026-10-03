@@ -63,11 +63,14 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
             zIndex: 1100,
             backdropFilter: 'blur(4px)'
         }}>
-            <div className="glass-card fade-in" style={{
+            <div className="fade-in" style={{
                 width: '100%',
                 maxWidth: '450px',
                 padding: '32px',
                 position: 'relative',
+                background: 'var(--bg-primary)',
+                borderRadius: '16px',
+                boxShadow: 'var(--shadow-lg)',
                 border: '1px solid var(--accent-primary)'
             }}>
                 <button

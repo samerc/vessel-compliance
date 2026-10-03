@@ -781,7 +781,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
             <div style={{
                 position: 'absolute', bottom: '100%', left: 0, zIndex: 200,
                 background: isLight ? '#ffffff' : '#1a1d28',
-                border: '1px solid var(--glass-border)', borderRadius: '6px',
+                border: '1px solid var(--glass-border-color)', borderRadius: '6px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)', maxHeight: '150px',
                 overflowY: 'auto', minWidth: '160px'
             }}>
@@ -1048,7 +1048,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <button
                                         onClick={() => setShowAddFlagModal(true)}
                                         title="Add new flag state"
-                                        style={{ background: 'none', border: '1px solid var(--glass-border)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}
+                                        style={{ background: 'none', border: '1px solid var(--glass-border-color)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}
                                     >
                                         <Plus size={14} />
                                     </button>
@@ -1185,7 +1185,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         right: 0,
                                         marginTop: '4px',
                                         background: isLight ? '#ffffff' : '#1e222a',
-                                        border: '1px solid var(--glass-border)',
+                                        border: '1px solid var(--glass-border-color)',
                                         borderRadius: '8px',
                                         boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
                                         zIndex: 100,
@@ -1203,7 +1203,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
-                                                borderBottom: '1px solid var(--glass-border)',
+                                                borderBottom: '1px solid var(--glass-border-color)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -1223,7 +1223,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
-                                                borderBottom: '1px solid var(--glass-border)',
+                                                borderBottom: '1px solid var(--glass-border-color)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -1243,7 +1243,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
-                                                borderTop: '1px solid var(--glass-border)',
+                                                borderTop: '1px solid var(--glass-border-color)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -1263,7 +1263,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
-                                                borderTop: '1px solid var(--glass-border)',
+                                                borderTop: '1px solid var(--glass-border-color)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -1381,7 +1381,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 gap: '8px',
                                                 background: 'transparent',
                                                 border: 'none',
-                                                borderTop: '1px solid var(--glass-border)',
+                                                borderTop: '1px solid var(--glass-border-color)',
                                                 color: 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.85rem'
@@ -1478,7 +1478,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 gap: '6px',
                                 padding: '6px 12px',
                                 background: 'var(--bg-card)',
-                                border: '1px solid var(--glass-border)',
+                                border: '1px solid var(--glass-border-color)',
                                 borderRadius: '8px',
                                 color: 'var(--text-secondary)',
                                 fontSize: '0.8rem',
@@ -1502,7 +1502,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 gap: '6px',
                                 padding: '6px 12px',
                                 background: 'var(--bg-card)',
-                                border: '1px solid var(--glass-border)',
+                                border: '1px solid var(--glass-border-color)',
                                 borderRadius: '8px',
                                 color: 'var(--text-secondary)',
                                 fontSize: '0.8rem',
@@ -2128,7 +2128,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))} />
                     <div style={{
                         position: 'relative', width: '480px', borderRadius: '14px', padding: '24px',
-                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)'
+                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)'
                     }}>
                         <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>Issue Endorsement?</h3>
                         <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
@@ -2167,7 +2167,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <button onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))}
                                 style={{
                                     padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem',
-                                    border: '1px solid var(--glass-border)', background: 'transparent',
+                                    border: '1px solid var(--glass-border-color)', background: 'transparent',
                                     color: 'var(--text-primary)', cursor: 'pointer'
                                 }}>Skip</button>
                             <button onClick={async () => {
@@ -2228,7 +2228,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     <div style={{
                         background: isLight ? '#ffffff' : '#1e222a',
                         borderRadius: '16px', padding: '24px', width: '420px', maxWidth: '90vw',
-                        border: '1px solid var(--glass-border)',
+                        border: '1px solid var(--glass-border-color)',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
                     }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ marginBottom: '16px' }}>Add Flag State</h3>
@@ -2243,7 +2243,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                         const country = countryNameToIso3.find(c => c.iso3 === iso3)
                                         setNewFlagName(country ? country.name : '')
                                     }}
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                                     autoFocus
                                 >
                                     <option value="">Select a country...</option>
@@ -2258,7 +2258,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     value={newFlagAddress}
                                     onChange={e => setNewFlagAddress(e.target.value)}
                                     placeholder="Optional"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                                 />
                             </div>
                             <div>
@@ -2267,7 +2267,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     value={newFlagEmail}
                                     onChange={e => setNewFlagEmail(e.target.value)}
                                     placeholder="Optional"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                                 />
                             </div>
                         </div>
@@ -2295,7 +2295,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                     <div style={{
                         background: isLight ? '#ffffff' : '#1e222a',
                         borderRadius: '16px', padding: '24px', width: '400px', maxWidth: '90vw',
-                        border: '1px solid var(--glass-border)'
+                        border: '1px solid var(--glass-border-color)'
                     }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ marginBottom: '16px' }}>Assign Policy Types</h3>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
@@ -2393,7 +2393,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 
                                     {/* Replies */}
                                     {(vesselRepliesMap.get(n.id) || []).map(reply => (
-                                        <div key={reply.id} style={{ marginLeft: '24px', marginTop: '6px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px 12px', borderLeft: '2px solid var(--glass-border)' }}>
+                                        <div key={reply.id} style={{ marginLeft: '24px', marginTop: '6px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px 12px', borderLeft: '2px solid var(--glass-border-color)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                                                 <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
                                                     {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
@@ -3529,7 +3529,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                     style={{
                         padding: '4px 12px',
                         borderRadius: '14px',
-                        border: typeFilter === 'all' ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                        border: typeFilter === 'all' ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                         background: typeFilter === 'all' ? 'rgba(0,210,255,0.12)' : 'transparent',
                         color: typeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
                         fontSize: '0.78rem',
@@ -3553,7 +3553,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                             style={{
                                 padding: '4px 12px',
                                 borderRadius: '14px',
-                                border: isActive ? `1.5px solid ${meta.color}` : '1px solid var(--glass-border)',
+                                border: isActive ? `1.5px solid ${meta.color}` : '1px solid var(--glass-border-color)',
                                 background: isActive ? `${meta.color}18` : 'transparent',
                                 color: isActive ? meta.color : 'var(--text-secondary)',
                                 fontSize: '0.78rem',
@@ -3643,7 +3643,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                                 background: isLight ? '#f4f6fb' : '#14172a',
                                 padding: '4px 12px',
                                 borderRadius: '8px',
-                                border: '1px solid var(--glass-border)'
+                                border: '1px solid var(--glass-border-color)'
                             }}>
                                 {group.label}
                             </span>

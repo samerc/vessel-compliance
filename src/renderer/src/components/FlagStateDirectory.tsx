@@ -439,7 +439,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
               width: '400px',
               flexShrink: 0,
               background: isLight ? '#f4f6fb' : '#14172a',
-              border: '1px solid var(--glass-border)',
+              border: '1px solid var(--glass-border-color)',
               borderRadius: '12px',
               maxHeight: 'calc(100vh - 280px)',
               overflowY: 'auto',
@@ -678,7 +678,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       {/* Add/Edit Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '520px', maxWidth: '90vw', border: '1px solid var(--glass-border)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '520px', maxWidth: '90vw', border: '1px solid var(--glass-border-color)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
             {/* Modal header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>

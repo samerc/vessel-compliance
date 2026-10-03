@@ -568,7 +568,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', margin: '-24px', overflow: 'hidden' }}>
 
             {/* Page header */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--glass-border-color)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                 <SlidersHorizontal size={20} color="var(--accent-primary)" />
                 <div style={{ flex: 1 }}>
                     <h1 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '700' }}>Vessel Filter</h1>
@@ -768,11 +768,11 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
                     {/* Toolbar */}
-                    <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--glass-border)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                    <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--glass-border-color)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                         <button
                             onClick={() => setPanelCollapsed(!panelCollapsed)}
                             title={panelCollapsed ? 'Show filters' : 'Hide filters'}
-                            style={{ background: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '5px 9px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}
+                            style={{ background: 'transparent', border: '1px solid var(--glass-border-color)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '5px 9px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}
                         >
                             {panelCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
                             {panelCollapsed && activeFilterCount > 0 && (

@@ -3,10 +3,12 @@
 
   /* Colors */
   --bg-dark: #0f1218;
+  --bg-primary: #1a1d28; /* solid surface: dropdowns, popovers, modal bodies */
   --bg-sidebar: rgba(0, 0, 0, 0.4);
   --bg-card: rgba(255, 255, 255, 0.05);
   --bg-card-hover: rgba(255, 255, 255, 0.08);
   --accent-primary: #00d2ff;
+  --accent-primary-rgb: 0, 210, 255;
   --accent-secondary: #3a7bd5;
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.6);
@@ -24,20 +26,26 @@
   /* Effects */
   --glass-blur: blur(16px);
   --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+  --glass-border-color: rgba(255, 255, 255, 0.1);
   --shadow-lg: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .light {
   --bg-dark: #f0f2f5;
+  --bg-primary: #ffffff;
+  --danger: #c00000; /* #ff4d4d / #00ff88 are unreadable on white */
+  --success: #008c46;
   --bg-sidebar: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.7);
   --bg-card-hover: rgba(255, 255, 255, 0.9);
   --accent-primary: #1a73e8;
+  --accent-primary-rgb: 26, 115, 232;
   --accent-secondary: #0d47a1;
   --text-primary: #1c1e21;
   --text-secondary: #606770;
   --glass-border: 1px solid rgba(0, 0, 0, 0.1);
+  --glass-border-color: rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   --input-bg: #ffffff;
@@ -49,10 +57,12 @@
 
 .aurora {
   --bg-dark: #f8f7fc;
+  --bg-primary: #ffffff;
   --bg-sidebar: rgba(255, 255, 255, 0.85);
   --bg-card: rgba(255, 255, 255, 0.65);
   --bg-card-hover: rgba(255, 255, 255, 0.85);
   --accent-primary: #7c6cef;
+  --accent-primary-rgb: 124, 108, 239;
   --accent-secondary: #6358d4;
   --text-primary: #1a1a2e;
   --text-secondary: #6b6b8a;
@@ -68,15 +78,18 @@
 
   --glass-blur: blur(20px);
   --glass-border: 1px solid rgba(124, 108, 239, 0.12);
+  --glass-border-color: rgba(124, 108, 239, 0.12);
   --shadow-lg: 0 4px 24px rgba(124, 108, 239, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .premium {
   --bg-dark: #0e1420;
+  --bg-primary: #1a1d28;
   --bg-sidebar: rgba(255, 255, 255, 0.04);
   --bg-card: rgba(255, 255, 255, 0.06);
   --bg-card-hover: rgba(255, 255, 255, 0.10);
   --accent-primary: #64b5f6;
+  --accent-primary-rgb: 100, 181, 246;
   --accent-secondary: #42a5f5;
   --text-primary: #e2e8f0;
   --text-secondary: rgba(226, 232, 240, 0.55);
@@ -92,6 +105,7 @@
 
   --glass-blur: blur(28px);
   --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-border-color: rgba(255, 255, 255, 0.08);
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -102,6 +116,12 @@
 }
 
 body {
+  /* Aliases used by some components (resolved here, where the theme class lives) */
+  --accent: var(--accent-primary);
+  --glass-bg: var(--bg-card);
+  --bg-secondary: var(--bg-card);
+  --border-color: var(--glass-border-color);
+  --bg-input: var(--input-bg);
   font-family: var(--font-family);
   background-color: var(--bg-dark);
   background-image:

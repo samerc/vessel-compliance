@@ -305,9 +305,9 @@ function App(): React.JSX.Element {
   const userInitials = user?.username ? user.username.slice(0, 2).toUpperCase() : '??'
   const sc = sidebarCollapsed
 
-  const menuBg = theme === 'light' ? '#ffffff' : '#1e1e28'
-  const menuBorder = theme === 'light' ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
-  const menuShadow = theme === 'light' ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
+  const menuBg = isLight ? '#ffffff' : '#1e1e28'
+  const menuBorder = isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
+  const menuShadow = isLight ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
 
   const navItem = (tab: typeof activeTab, icon: React.ReactNode, label: string) => (
     <NavItem
@@ -418,7 +418,7 @@ function App(): React.JSX.Element {
                 onClick={(e) => { e.stopPropagation(); setActiveTab('notifications') }}
                 style={{
                   position: 'relative',
-                  background: activeTab === 'notifications' ? (theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') : 'transparent',
+                  background: activeTab === 'notifications' ? (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') : 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   color: activeTab === 'notifications' ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -468,10 +468,10 @@ function App(): React.JSX.Element {
                 boxShadow: menuShadow, zIndex: 200, overflow: 'hidden',
                 minWidth: '160px',
               }}>
-                <button onClick={() => { setShowProfile(true); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
+                <button onClick={() => { setShowProfile(true); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--glass-border-color)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
                   <KeyRound size={14} /> Change Password
                 </button>
-                <div style={{ borderBottom: '1px solid var(--glass-border)', padding: '6px 14px' }}>
+                <div style={{ borderBottom: '1px solid var(--glass-border-color)', padding: '6px 14px' }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Table Density</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {(['compact', 'normal', 'spacious'] as const).map((d) => (
@@ -502,7 +502,7 @@ function App(): React.JSX.Element {
                     ))}
                   </div>
                 </div>
-                <div style={{ borderBottom: '1px solid var(--glass-border)', padding: '6px 14px' }}>
+                <div style={{ borderBottom: '1px solid var(--glass-border-color)', padding: '6px 14px' }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Theme</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {([
@@ -686,7 +686,7 @@ function App(): React.JSX.Element {
             <button
               onClick={toggleSidebar}
               title={sc ? 'Expand sidebar' : 'Collapse sidebar'}
-              style={{ background: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', opacity: 0.6 }}
+              style={{ background: 'transparent', border: '1px solid var(--glass-border-color)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', opacity: 0.6 }}
               className="hover-effect"
             >
               {sc ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
@@ -805,7 +805,7 @@ function App(): React.JSX.Element {
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Insurance policy documents</p>
                 </div>
                 {hasPermission('admin:settings') && (
-                  <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border)' }}>
+                  <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border-color)' }}>
                     <button
                       onClick={() => setPolicyView('list')}
                       style={{

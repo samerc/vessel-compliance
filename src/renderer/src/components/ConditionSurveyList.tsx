@@ -572,7 +572,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                             gap: '6px',
                             padding: '6px 14px',
                             borderRadius: '6px',
-                            border: '1px solid var(--glass-border)',
+                            border: '1px solid var(--glass-border-color)',
                             background: 'var(--glass-bg)',
                             color: 'var(--accent-primary)',
                             cursor: 'pointer',

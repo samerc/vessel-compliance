@@ -164,7 +164,7 @@ export default function SanctionsSearch() {
         if (!score) return 'var(--text-secondary)'
         if (score >= 0.9) return '#ff6b6b'
         if (score >= 0.7) return '#ffc107'
-        return '#00ff88'
+        return 'var(--success)'
     }
 
     // SIC handlers
@@ -392,7 +392,7 @@ export default function SanctionsSearch() {
             </div>
 
             {/* Tab bar */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0' }}>
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border-color)', paddingBottom: '0' }}>
                 {[
                     { key: 'search' as const, label: 'Search', icon: <Search size={15} /> },
                     { key: 'sic' as const, label: 'SIC List', icon: <Users size={15} /> },
@@ -679,7 +679,7 @@ export default function SanctionsSearch() {
                         {expandedId === match.id && (
                             <div style={{
                                 padding: '0 24px 24px',
-                                borderTop: '1px solid var(--glass-border)',
+                                borderTop: '1px solid var(--glass-border-color)',
                                 background: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)'
                             }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '20px' }}>
@@ -788,7 +788,7 @@ export default function SanctionsSearch() {
                                 </thead>
                                 <tbody>
                                     {filteredSic.map(entry => (
-                                        <tr key={entry.id} style={{ borderTop: '1px solid var(--glass-border)' }}>
+                                        <tr key={entry.id} style={{ borderTop: '1px solid var(--glass-border-color)' }}>
                                             <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
                                                 {entry.name}
                                                 {entry.aliases && entry.aliases.length > 0 && (
@@ -857,7 +857,7 @@ export default function SanctionsSearch() {
                         width: '560px',
                         maxHeight: '85vh',
                         overflowY: 'auto',
-                        border: '1px solid var(--glass-border)'
+                        border: '1px solid var(--glass-border-color)'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{editingSic ? 'Edit SIC Entry' : 'Add SIC Entry'}</h2>
@@ -998,7 +998,7 @@ export default function SanctionsSearch() {
                         width: '620px',
                         maxHeight: '85vh',
                         overflowY: 'auto',
-                        border: '1px solid var(--glass-border)'
+                        border: '1px solid var(--glass-border-color)'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Remark Templates</h2>
@@ -1017,7 +1017,7 @@ export default function SanctionsSearch() {
                             {remarkTemplates.map((t, idx) => (
                                 <div key={idx} style={{
                                     padding: '12px 14px', borderRadius: '10px',
-                                    border: editingTemplateIdx === idx ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                    border: editingTemplateIdx === idx ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                                     background: editingTemplateIdx === idx ? (isLight ? 'rgba(0,170,200,0.04)' : 'rgba(0,170,200,0.06)') : 'transparent'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1047,7 +1047,7 @@ export default function SanctionsSearch() {
                         </div>
 
                         {/* Add / Edit form */}
-                        <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+                        <div style={{ borderTop: '1px solid var(--glass-border-color)', paddingTop: '16px' }}>
                             <h4 style={{ margin: '0 0 12px', fontSize: '0.82rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                 {editingTemplateIdx !== null ? 'Edit Template' : 'Add Template'}
                             </h4>

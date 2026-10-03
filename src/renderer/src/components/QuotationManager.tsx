@@ -63,7 +63,7 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
                     <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <FileText size={28} /> Quotations
                     </h1>
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border-color)' }}>
                         <button
                             onClick={() => setView('list')}
                             style={{

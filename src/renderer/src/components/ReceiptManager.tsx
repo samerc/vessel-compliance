@@ -120,8 +120,8 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
     }
   }
 
-  const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--glass-border)', whiteSpace: 'nowrap' }
-  const td: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem', borderBottom: '1px solid var(--glass-border)' }
+  const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--glass-border-color)', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem', borderBottom: '1px solid var(--glass-border-color)' }
 
   return (
     <div style={{ padding: embedded ? 0 : '32px', maxWidth: embedded ? undefined : '1400px', margin: embedded ? undefined : '0 auto' }}>
@@ -518,7 +518,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
                       <div style={{ padding: '10px 14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No vessels found</div>
                     ) : filteredVessels.map(v => (
                       <div key={v.id} onMouseDown={() => selectVessel(v)}
-                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', gap: '8px', borderBottom: '1px solid var(--glass-border)' }}
+                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', gap: '8px', borderBottom: '1px solid var(--glass-border-color)' }}
                         onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <span>{v.name}{!v.isActive && <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}> (inactive)</span>}</span>
@@ -727,4 +727,4 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
 }
 
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '40px 20px', overflowY: 'auto' }
-const modalWrap: React.CSSProperties = { borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '640px', border: '1px solid var(--glass-border)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }
+const modalWrap: React.CSSProperties = { borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '640px', border: '1px solid var(--glass-border-color)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }

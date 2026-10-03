@@ -45,7 +45,7 @@ const PAGE_SIZE = 25
 const statusColors: Record<string, { bg: string; text: string }> = {
     active: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
     expired: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
-    cancelled: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
+    cancelled: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
     inactive: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
     superseded: { bg: 'rgba(150, 150, 150, 0.15)', text: '#888' }
 }

@@ -756,7 +756,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
               width: '440px',
               flexShrink: 0,
               background: isLight ? '#f4f6fb' : '#14172a',
-              border: '1px solid var(--glass-border)',
+              border: '1px solid var(--glass-border-color)',
               borderLeft: 'none',
               borderRadius: '0 12px 12px 0',
               maxHeight: 'calc(100vh - 280px)',

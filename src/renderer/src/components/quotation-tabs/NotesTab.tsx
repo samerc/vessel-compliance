@@ -111,7 +111,7 @@ export default function NotesTab({ quotation, showSuccess, isLight }: { quotatio
                 bottom: '100%',
                 left: 0,
                 background: isLight ? '#ffffff' : '#1a1d28',
-                border: '1px solid var(--glass-border)',
+                border: '1px solid var(--glass-border-color)',
                 borderRadius: '6px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 zIndex: 100,

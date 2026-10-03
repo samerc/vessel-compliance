@@ -123,7 +123,7 @@ export default function QuotationSettings() {
                         style={{
                             padding: '8px 14px',
                             borderRadius: '8px',
-                            border: activeTab === t.id ? `1px solid ${catColor}` : '1px solid var(--glass-border)',
+                            border: activeTab === t.id ? `1px solid ${catColor}` : '1px solid var(--glass-border-color)',
                             background: activeTab === t.id ? `${catColor}1f` : 'transparent',
                             color: activeTab === t.id ? catColor : 'var(--text-secondary)',
                             cursor: 'pointer',
@@ -654,7 +654,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                 )}
 
                 {showSetForm && (
-                    <div style={{ padding: '16px', borderRadius: '10px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                    <div style={{ padding: '16px', borderRadius: '10px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
                         <input type="text" value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name (e.g., Standard Cover, Restricted Cover)" style={{ width: '100%', marginBottom: '12px' }} />
                         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Select which clauses to include in this set:</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
@@ -668,7 +668,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                     }}
                                     style={{
                                         padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer',
-                                        border: setClauseIds.has(c.id) ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                        border: setClauseIds.has(c.id) ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                                         background: setClauseIds.has(c.id) ? 'rgba(0, 210, 255, 0.15)' : 'transparent',
                                         color: setClauseIds.has(c.id) ? 'var(--accent-primary)' : 'var(--text-secondary)'
                                     }}
@@ -895,7 +895,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Tags let you categorize warranties into groups (e.g. "Cargo", "Navigation"). Tagged warranties appear under their own tab in the quotation editor.</p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                     {tags.map(tag => (
-                        <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--glass-border)', fontSize: '0.8rem' }}>
+                        <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--glass-border-color)', fontSize: '0.8rem' }}>
                             {editingTagId === tag.id ? (
                                 <>
                                     <input value={editTagName} onChange={e => setEditTagName(e.target.value)} style={{ width: '80px', fontSize: '0.8rem', padding: '2px 4px' }} onKeyDown={e => e.key === 'Enter' && handleSaveTag(tag.id)} />
@@ -947,7 +947,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                 )}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {warrantySets.map(ws => (
-                        <div key={ws.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border)', fontSize: '0.82rem' }}>
+                        <div key={ws.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', fontSize: '0.82rem' }}>
                             <span>{ws.name}</span>
                             <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>({(ws.warrantyIds || []).length})</span>
                             {ws.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
@@ -1944,17 +1944,17 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                             value={customName}
                             onChange={e => setCustomName(e.target.value)}
                             placeholder="Enter custom country name..."
-                            style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
+                            style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border-color)' }}
                         />
                     ) : (
-                        <select value={newIso3} onChange={e => setNewIso3(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                        <select value={newIso3} onChange={e => setNewIso3(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border-color)' }}>
                             <option value="">Select a country...</option>
                             {countryNameToIso3.filter(c => !countries.some(ec => ec.iso3Code === c.iso3)).map(c => (
                                 <option key={c.iso3} value={c.iso3}>{c.name} ({c.iso3})</option>
                             ))}
                         </select>
                     )}
-                    <select value={newListType} onChange={e => setNewListType(e.target.value as any)} style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}>
+                    <select value={newListType} onChange={e => setNewListType(e.target.value as any)} style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--glass-border-color)' }}>
                         <option value="excluded">Excluded</option>
                         <option value="ddq">DDQ Required</option>
                     </select>
@@ -2102,7 +2102,7 @@ function DefaultExcludedCountriesPerType({ countries, showSuccess, showError }: 
                                 onClick={() => setActiveType(tc.code)}
                                 style={{
                                     padding: '6px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: activeType === tc.code ? 600 : 400,
-                                    border: activeType === tc.code ? `1px solid ${tc.color}` : '1px solid var(--glass-border)',
+                                    border: activeType === tc.code ? `1px solid ${tc.color}` : '1px solid var(--glass-border-color)',
                                     background: activeType === tc.code ? `${tc.color}1f` : 'transparent',
                                     color: activeType === tc.code ? tc.color : 'var(--text-secondary)',
                                     cursor: 'pointer'
@@ -2797,7 +2797,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const inputStyle = { padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.82rem' }
     const chipStyle = (selected: boolean) => ({
         padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer',
-        border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+        border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
         background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         fontWeight: selected ? 600 : 400
@@ -2977,7 +2977,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
         await window.api.piReorderSanctionsVersions(arr.map(v => v.id))
     }
 
-    const inputStyle = { padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.82rem' }
+    const inputStyle = { padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.82rem' }
 
     return (
         <div>
@@ -3281,7 +3281,7 @@ function InstalmentDefaultsTab({ showSuccess }: TabProps) {
                                         type="number"
                                         value={days[idx] ?? 0}
                                         onChange={e => updateDay(count, idx, Number(e.target.value))}
-                                        style={{ width: '70px', fontSize: '0.82rem', padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
+                                        style={{ width: '70px', fontSize: '0.82rem', padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }}
                                     />
                                     <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>days</span>
                                 </div>
@@ -4512,7 +4512,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                     <div style={{
                         marginTop: '16px', padding: '16px',
                         background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                        borderRadius: '8px', border: '1px solid var(--glass-border-color)'
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -4628,7 +4628,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                     <div style={{
                         marginTop: '16px', padding: '16px',
                         background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                        borderRadius: '8px', border: '1px solid var(--glass-border-color)'
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -4824,7 +4824,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                     <div key={t.id} style={{
                         display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 12px', marginBottom: '4px',
                         background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
-                        borderRadius: '8px', border: '1px solid var(--glass-border)'
+                        borderRadius: '8px', border: '1px solid var(--glass-border-color)'
                     }}>
                         {!readOnly && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
@@ -4894,7 +4894,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                 <div key={s.id} style={{
                     padding: '10px 12px', marginBottom: '6px',
                     background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
-                    borderRadius: '8px', border: '1px solid var(--glass-border)'
+                    borderRadius: '8px', border: '1px solid var(--glass-border-color)'
                 }}>
                     {editSetId === s.id ? (
                         <div>
@@ -4942,7 +4942,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                 </button>
             )}
             {!readOnly && addingSet && (
-                <div style={{ marginTop: '8px', padding: '12px', background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                <div style={{ marginTop: '8px', padding: '12px', background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--glass-border-color)' }}>
                     <input
                         value={setName}
                         onChange={e => setSetName(e.target.value)}

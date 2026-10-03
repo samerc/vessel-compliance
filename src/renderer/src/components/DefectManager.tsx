@@ -999,7 +999,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       {/* Reopen modal with optional reason */}
       {reopenModalDefect && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '420px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '420px', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>Reopen Defect #{reopenModalDefect.defectNumber}</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>This will clear the closure data and set the defect back to OPEN.</p>
             <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '6px', color: 'var(--text-primary)' }}>Reason (optional)</label>
@@ -1333,7 +1333,7 @@ function CloseDefectModal({ defect, closureNotes, onClosureNotesChange, onClose,
 
   return (
     <div role="presentation" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 99999 }}>
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="close-defect-title" className="glass-card" style={{ padding: '30px', width: '500px', maxWidth: '90%', background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="close-defect-title" style={{ padding: '30px', width: '500px', maxWidth: '90%', background: 'var(--bg-primary)', border: '1px solid var(--glass-border-color)', borderRadius: '12px', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
         <h3 id="close-defect-title" style={{ marginTop: 0, color: 'var(--text-primary)' }}>Close Defect #{defect.defectNumber}</h3>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>Add optional closure notes:</p>
         <textarea

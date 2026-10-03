@@ -297,7 +297,7 @@ export default function AssuredReport() {
             <button key={mode} onClick={() => { setFilterMode(mode); setSelectedFleetId(''); setSelectedVesselIds(new Set()); setVesselSearch(''); setFleetSearch('') }}
               style={{
                 padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer',
-                border: filterMode === mode ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                border: filterMode === mode ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                 background: filterMode === mode ? 'rgba(0,210,255,0.08)' : 'transparent',
                 color: filterMode === mode ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: filterMode === mode ? 600 : 400,
@@ -317,7 +317,7 @@ export default function AssuredReport() {
               onFocus={() => setFleetDropdownOpen(true)} onBlur={() => setTimeout(() => setFleetDropdownOpen(false), 150)}
               placeholder="Search fleets..." style={{ width: '100%' }} />
             {fleetDropdownOpen && filteredFleetOptions.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
                 {filteredFleetOptions.map(f => (
                   <div key={f.id} onMouseDown={() => { setSelectedFleetId(f.id); setFleetSearch(f.name); setFleetDropdownOpen(false) }}
                     style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', fontWeight: selectedFleetId === f.id ? 600 : 400, color: selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
@@ -350,7 +350,7 @@ export default function AssuredReport() {
                 onFocus={() => { if (vesselSearch) setVesselDropdownOpen(true) }} onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 150)}
                 placeholder="Search and select vessels..." style={{ width: '100%' }} />
               {vesselDropdownOpen && filteredVesselOptions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
                   {filteredVesselOptions.map(v => (
                     <div key={v.id} onMouseDown={() => { setSelectedVesselIds(prev => new Set(prev).add(v.id)); setVesselSearch(''); setVesselDropdownOpen(false) }}
                       style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}

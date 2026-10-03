@@ -171,7 +171,7 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                         {availableTemplates.map(t => (
                             <button key={t.id} onClick={() => addFromTemplate(t)} style={{
                                 textAlign: 'left', padding: '6px 10px', borderRadius: '6px',
-                                border: '1px solid var(--glass-border)', cursor: 'pointer',
+                                border: '1px solid var(--glass-border-color)', cursor: 'pointer',
                                 background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
                                 color: 'var(--text-primary)', fontSize: '0.82rem', lineHeight: 1.4
                             }}>
@@ -209,7 +209,7 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                     <div key={item.id} style={{
                         padding: '12px', marginBottom: '6px',
                         background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
-                        borderRadius: '8px', border: '1px solid var(--glass-border)',
+                        borderRadius: '8px', border: '1px solid var(--glass-border-color)',
                         borderLeft: item.customText ? '3px solid #ffb020' : '3px solid #00aac8'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

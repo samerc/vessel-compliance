@@ -325,7 +325,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                   return next
                 })}
                 title={expandedDesc.has(id) ? 'Hide description' : 'Show description'}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '3px', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.68rem', cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '3px', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--glass-border-color)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.68rem', cursor: 'pointer' }}
               >
                 <Info size={10} />
                 {expandedDesc.has(id) ? 'Hide info' : 'Info'}

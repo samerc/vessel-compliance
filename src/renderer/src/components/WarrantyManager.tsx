@@ -472,7 +472,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const modalCard: React.CSSProperties = {
     background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px',
     padding: '24px', width: '480px', maxWidth: '92vw',
-    border: '1px solid var(--glass-border)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+    border: '1px solid var(--glass-border-color)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
     maxHeight: '85vh', overflowY: 'auto'
   }
 
@@ -1090,7 +1090,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
                       padding: '10px 12px', marginBottom: '8px', borderRadius: '8px',
-                      border: '1px solid var(--glass-border)',
+                      border: '1px solid var(--glass-border-color)',
                       background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)'
                     }}
                   >

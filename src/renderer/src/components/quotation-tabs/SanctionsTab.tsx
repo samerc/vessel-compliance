@@ -41,7 +41,7 @@ export default function SanctionsTab({ quotation, updateField, setQ, sanctionsVe
                     <select
                         value={quotation.sanctionsClauseVersion || ''}
                         onChange={e => handleVersionChange(e.target.value)}
-                        style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.85rem', minWidth: '250px' }}
+                        style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', fontSize: '0.85rem', minWidth: '250px' }}
                     >
                         <option value="">Select a version...</option>
                         {sanctionsVersions.map(v => (

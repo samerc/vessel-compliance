@@ -1657,7 +1657,7 @@ export default function FleetAnalytics() {
                 {ageProfile.map(b => (
                   <div key={b.label} style={{
                     padding: '12px 16px', borderRadius: '8px',
-                    border: '1px solid var(--glass-border)',
+                    border: '1px solid var(--glass-border-color)',
                     background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
                     minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
                   }}>
@@ -1687,7 +1687,7 @@ export default function FleetAnalytics() {
                 {tonnageProfile.map(b => (
                   <div key={b.label} style={{
                     padding: '12px 16px', borderRadius: '8px',
-                    border: '1px solid var(--glass-border)',
+                    border: '1px solid var(--glass-border-color)',
                     background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
                     minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
                   }}>

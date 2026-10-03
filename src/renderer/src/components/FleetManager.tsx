@@ -974,7 +974,7 @@ export default function FleetManager() {
                 width: 380,
                 flexShrink: 0,
                 background: isLight ? '#f4f6fb' : '#14172a',
-                border: '1px solid var(--glass-border)',
+                border: '1px solid var(--glass-border-color)',
                 borderRadius: '12px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -986,7 +986,7 @@ export default function FleetManager() {
               <div
                 style={{
                   padding: '14px 16px',
-                  borderBottom: '1px solid var(--glass-border)',
+                  borderBottom: '1px solid var(--glass-border-color)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1132,7 +1132,7 @@ export default function FleetManager() {
                     fontWeight: 600,
                     color: 'var(--text-secondary)',
                     letterSpacing: '0.07em',
-                    borderBottom: '1px solid var(--glass-border)',
+                    borderBottom: '1px solid var(--glass-border-color)',
                   }}
                 >
                   VESSELS IN FLEET
@@ -1227,7 +1227,7 @@ export default function FleetManager() {
 
                 {/* Add vessels section */}
                 {canManageFleets && (
-                <div style={{ borderTop: '1px solid var(--glass-border)' }}>
+                <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
                   <button
                     onClick={() => {
                       setAddOpen(v => !v)
@@ -1258,9 +1258,9 @@ export default function FleetManager() {
                   </button>
 
                   {addOpen && (
-                    <div style={{ borderTop: '1px solid var(--glass-border)' }}>
+                    <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
                       {/* Search */}
-                      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--glass-border)' }}>
+                      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--glass-border-color)' }}>
                         <div style={{ position: 'relative' }}>
                           <Search
                             style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)' }}
@@ -1362,7 +1362,7 @@ export default function FleetManager() {
                         <div
                           style={{
                             padding: '10px 12px',
-                            borderTop: '1px solid var(--glass-border)',
+                            borderTop: '1px solid var(--glass-border-color)',
                             display: 'flex',
                             gap: '8px',
                           }}
@@ -1396,7 +1396,7 @@ export default function FleetManager() {
                             }}
                             style={{
                               background: 'transparent',
-                              border: '1px solid var(--glass-border)',
+                              border: '1px solid var(--glass-border-color)',
                               cursor: 'pointer',
                               color: 'var(--text-secondary)',
                               padding: '7px 10px',

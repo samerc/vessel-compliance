@@ -374,7 +374,7 @@ export default function ConditionSurveyReport() {
                 fontSize: '0.82rem',
                 cursor: 'pointer',
                 border:
-                  statusFilter === f.key ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                  statusFilter === f.key ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                 background: statusFilter === f.key ? 'rgba(0,210,255,0.08)' : 'transparent',
                 color: statusFilter === f.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: statusFilter === f.key ? 600 : 400

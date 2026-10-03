@@ -174,7 +174,7 @@ export default function PolicySettings() {
             style={{
               padding: '8px 14px',
               borderRadius: '8px',
-              border: activeTab === t.id ? `1px solid ${catColor}` : '1px solid var(--glass-border)',
+              border: activeTab === t.id ? `1px solid ${catColor}` : '1px solid var(--glass-border-color)',
               background: activeTab === t.id ? `${catColor}1f` : 'transparent',
               color: activeTab === t.id ? catColor : 'var(--text-secondary)',
               cursor: 'pointer',
@@ -958,7 +958,7 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
         marginBottom: '24px',
         padding: '16px',
         borderRadius: '10px',
-        border: '1px solid var(--glass-border)',
+        border: '1px solid var(--glass-border-color)',
         background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
       }}>
         <h5 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', color: 'var(--accent-primary)' }}>
@@ -991,7 +991,7 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
           marginBottom: '24px',
           padding: '16px',
           borderRadius: '10px',
-          border: '1px solid var(--glass-border)',
+          border: '1px solid var(--glass-border-color)',
           borderLeft: `3px solid ${section.color}`,
           background: isLight ? '#f8f9fc' : 'rgba(255,255,255,0.03)'
         }}>
@@ -1136,7 +1136,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
           {templates.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No T&C templates for {TC_TYPE_LABELS[typeCode]} yet.</p>}
           {templates.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)', border: t.isDefault ? `1.5px solid ${typeColor(typeCode)}` : '1px solid var(--glass-border)' }}>
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)', border: t.isDefault ? `1.5px solid ${typeColor(typeCode)}` : '1px solid var(--glass-border-color)' }}>
               <button type="button" onClick={() => setDefault(t.id)} title={t.isDefault ? 'Default template' : 'Set as default'} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: t.isDefault ? '#ffb020' : 'var(--text-secondary)' }}>
                 <Star size={16} fill={t.isDefault ? '#ffb020' : 'none'} />
               </button>
@@ -1161,7 +1161,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
       </div>
 
       {/* T&C footer config */}
-      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
         <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '10px' }}>T&C Footer</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '520px' }}>
           <div>
@@ -1182,7 +1182,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
       {/* Rich-text editor modal */}
       {editing && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '20px', width: '760px', maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border)' }}>
+          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '20px', width: '760px', maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>{editing.id ? 'Edit' : 'New'} T&C — {TC_TYPE_LABELS[typeCode]}</h3>
               <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
@@ -1351,7 +1351,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
               padding: '12px 16px',
               background: isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)',
               borderRadius: '10px',
-              border: '1px solid var(--glass-border)'
+              border: '1px solid var(--glass-border-color)'
             }}>
               <div style={{
                 width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
@@ -1383,7 +1383,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
                   justifyContent: 'center',
                   background: isLight ? '#ffffff' : 'rgba(255,255,255,0.06)',
                   borderRadius: '8px',
-                  border: '1px solid var(--glass-border)',
+                  border: '1px solid var(--glass-border-color)',
                   overflow: 'hidden'
                 }}>
                   <img src={preview} alt="Signature" style={{ maxWidth: '140px', maxHeight: '54px', objectFit: 'contain' }} />
@@ -1824,7 +1824,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
       </div>
 
       {/* Trigger Fields */}
-      <div style={{ marginBottom: '24px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+      <div style={{ marginBottom: '24px', borderTop: '1px solid var(--glass-border-color)', paddingTop: '16px' }}>
         <h4 style={{ fontSize: '0.85rem', marginBottom: '8px' }}>Endorsement Trigger Fields</h4>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
           When these vessel fields change, the app will prompt the user to issue an endorsement.
@@ -1842,7 +1842,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
       </div>
 
       {/* Templates */}
-      <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '16px' }}>
+      <div style={{ borderTop: '1px solid var(--glass-border-color)', paddingTop: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <h4 style={{ fontSize: '0.85rem', margin: 0 }}>Endorsement Templates</h4>
           {!addingTemplate && (
@@ -1856,7 +1856,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
         </p>
 
         {addingTemplate && (
-          <div style={{ background: isLight ? '#f8f9fc' : '#161829', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '14px', marginBottom: '12px' }}>
+          <div style={{ background: isLight ? '#f8f9fc' : '#161829', border: '1px solid var(--glass-border-color)', borderRadius: '8px', padding: '14px', marginBottom: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
               <input value={newTmplName} onChange={e => setNewTmplName(e.target.value)} placeholder="Template name" style={inputStyle} />
               <select value={newTmplSection} onChange={e => setNewTmplSection(e.target.value)} style={inputStyle}>
@@ -1872,7 +1872,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
         )}
 
         {templates.map(t => (
-          <div key={t.id} style={{ borderBottom: '1px solid var(--glass-border)', padding: '10px 0' }}>
+          <div key={t.id} style={{ borderBottom: '1px solid var(--glass-border-color)', padding: '10px 0' }}>
             {editingTmpl === t.id ? (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>

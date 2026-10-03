@@ -45,7 +45,7 @@ export default function Reports() {
                 border:
                   activeTab === tab.id
                     ? '2px solid var(--accent-primary)'
-                    : '1px solid var(--glass-border)',
+                    : '1px solid var(--glass-border-color)',
                 background:
                   activeTab === tab.id
                     ? 'rgba(var(--accent-primary-rgb, 0,210,255),0.08)'

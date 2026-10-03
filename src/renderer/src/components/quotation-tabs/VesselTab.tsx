@@ -446,7 +446,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             </div>
 
             {showAddForm && (
-                <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)', marginBottom: '20px', background: 'rgba(0,210,255,0.03)' }}>
+                <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border-color)', marginBottom: '20px', background: 'rgba(0,210,255,0.03)' }}>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                         <button onClick={() => setAddMode('existing')} className={addMode === 'existing' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>From Registry</button>
                         <button onClick={() => { setAddMode('fleet'); loadFleets() }} className={addMode === 'fleet' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '5px' }}><Layers size={13} /> Add Fleet</button>
@@ -463,7 +463,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
                                 />
                             </div>
-                            <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--glass-border-color)' }}>
                                 {(() => {
                                     const q = fleetSearch.toLowerCase()
                                     const filtered = availableFleets.filter(f => f.name.toLowerCase().includes(q))
@@ -506,7 +506,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                     const q = vesselSearch.toLowerCase()
                                     const filtered = q ? availableVessels.filter(v => v.name.toLowerCase().includes(q) || v.imoNumber.toLowerCase().includes(q)) : availableVessels
                                     return filtered.length > 0 ? (
-                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '220px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '8px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '220px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '8px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                                             {filtered.slice(0, 20).map(v => (
                                                 <div key={v.id} onClick={() => { setSelectedVesselId(v.id); setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`); setVesselDropdownOpen(false) }}
                                                     style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', transition: 'background 0.15s' }}

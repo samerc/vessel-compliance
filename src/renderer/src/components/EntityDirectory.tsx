@@ -2027,7 +2027,7 @@ export default function EntityDirectory({
               padding: '32px',
               width: '480px',
               maxWidth: '90vw',
-              border: '1px solid var(--glass-border)'
+              border: '1px solid var(--glass-border-color)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2255,7 +2255,7 @@ export default function EntityDirectory({
               maxWidth: '90vw',
               maxHeight: '80vh',
               overflow: 'auto',
-              border: '1px solid var(--glass-border)'
+              border: '1px solid var(--glass-border-color)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2409,7 +2409,7 @@ export default function EntityDirectory({
                         marginTop: '4px',
                         maxHeight: '200px',
                         overflowY: 'auto',
-                        border: '1px solid var(--glass-border)',
+                        border: '1px solid var(--glass-border-color)',
                         borderRadius: '8px',
                         background: isLight ? '#fff' : '#1e222a'
                       }}

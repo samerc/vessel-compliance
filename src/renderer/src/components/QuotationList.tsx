@@ -41,7 +41,7 @@ const statusColorsDark: Record<string, { bg: string; text: string }> = {
   sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
   approved: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
   exported: { bg: 'rgba(0, 170, 200, 0.15)', text: '#00aac8' },
-  rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
+  rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
   converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
 const statusColorsLight: Record<string, { bg: string; text: string }> = {
@@ -1199,7 +1199,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             {showNewMenu && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNewMenu(false)} />
-                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '10px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
                   {quotationTypes.map(qt => (
                     <button key={qt.id} onClick={() => handleCreate(qt.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect">
                       <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '20px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(0,170,200,0.12)', color: isLight ? '#007a91' : '#00aac8' }}>{qt.code}</span>
@@ -1688,7 +1688,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                     <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowAddToGroup(false)} />
                     <div style={{
                       position: 'absolute', top: '100%', left: 0, marginTop: '4px',
-                      background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                      background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                       borderRadius: '10px', padding: '6px', zIndex: 100, minWidth: '200px',
                       boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                     }}>

@@ -404,13 +404,13 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         maxHeight: '70vh',
                         display: 'flex',
                         flexDirection: 'column',
-                        border: '1px solid var(--glass-border)',
+                        border: '1px solid var(--glass-border-color)',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
                     }}>
                         {/* Header */}
                         <div style={{
                             padding: '20px 24px 16px',
-                            borderBottom: '1px solid var(--glass-border)',
+                            borderBottom: '1px solid var(--glass-border-color)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -446,7 +446,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         {/* Search */}
                         <div style={{
                             padding: '12px 24px',
-                            borderBottom: '1px solid var(--glass-border)',
+                            borderBottom: '1px solid var(--glass-border-color)',
                             flexShrink: 0
                         }}>
                             <div style={{
@@ -564,7 +564,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                         {/* Footer */}
                         <div style={{
                             padding: '16px 24px',
-                            borderTop: '1px solid var(--glass-border)',
+                            borderTop: '1px solid var(--glass-border-color)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',

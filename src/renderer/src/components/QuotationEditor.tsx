@@ -40,7 +40,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
     sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
     approved: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
-    rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: '#ff4d4d' },
+    rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
     converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
 }
 
@@ -886,7 +886,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                 <History size={13} /> {workflowLog.length}
                             </button>
                             {showWorkflowLog && (
-                                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, marginTop: '4px', padding: '10px', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--glass-border)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.4)', minWidth: '280px', maxHeight: '200px', overflowY: 'auto' }}>
+                                <div style={{ position: 'absolute', top: '100%', right: 0, zIndex: 200, marginTop: '4px', padding: '10px', background: isLight ? '#ffffff' : '#1e222a', border: '1px solid var(--glass-border-color)', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.4)', minWidth: '280px', maxHeight: '200px', overflowY: 'auto' }}>
                                     <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Workflow History</div>
                                     {workflowLog.map(entry => (
                                         <div key={entry.id} style={{ fontSize: '0.75rem', padding: '4px 0', borderBottom: '1px solid var(--table-border)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -919,7 +919,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowRevisionHistory(false)} />
                                     <div style={{
                                         position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 100,
-                                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                                         borderRadius: '10px', padding: '6px', minWidth: '260px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                     }}>
                                         {revisions.map(rev => (
@@ -980,7 +980,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     top: (actionsRef.current?.getBoundingClientRect().bottom || 0) + 4,
                                     right: window.innerWidth - (actionsRef.current?.getBoundingClientRect().right || 0),
                                     zIndex: 9999,
-                                    background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                    background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
                                     {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export</button>}
@@ -1001,7 +1001,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             {/* Step comment modal */}
             {showStepCommentModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '400px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '400px', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ margin: '0 0 16px', fontSize: '1rem' }}>Move to {reachableSteps.find(s => s.id === showStepCommentModal)?.name}</h3>
                         <textarea
                             value={stepComment}
@@ -1021,7 +1021,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             {/* Draft export confirmation modal */}
             {showDraftExportModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '440px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '440px', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                         <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Quotation Not Approved</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 20px', lineHeight: 1.5 }}>
                             This quotation still has a draft reference number. Would you like to approve it first to assign an official number?
@@ -1038,7 +1038,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             {/* Export validation warnings modal */}
             {exportWarnings && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }} onClick={() => setExportWarnings(null)}>
-                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '460px', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '460px', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                             <div style={{ background: 'rgba(255, 180, 32, 0.12)', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <AlertTriangle size={22} color="#ffb020" />
@@ -1238,7 +1238,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
                     marginBottom: '8px', borderRadius: '10px',
                     background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)',
-                    border: '1px solid var(--glass-border)', flexWrap: 'wrap'
+                    border: '1px solid var(--glass-border-color)', flexWrap: 'wrap'
                 }}>
                     {piAlternatives.length === 0 ? (
                         <>
@@ -1459,7 +1459,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '520px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '520px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Copy from Quotation</h3>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
@@ -1489,7 +1489,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
                         {showDropdown && (
                             <div style={{
                                 position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 10,
-                                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border)',
+                                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                                 borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', maxHeight: '280px', overflowY: 'auto'
                             }}>
                                 <div style={{ padding: '8px', position: 'sticky', top: 0, background: isLight ? '#ffffff' : '#1a1d28', zIndex: 1 }}>

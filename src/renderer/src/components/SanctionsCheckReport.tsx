@@ -148,7 +148,7 @@ export default function SanctionsCheckReport() {
             <div style={{
               position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
               maxHeight: '260px', overflowY: 'auto', borderRadius: '8px',
-              border: '1px solid var(--glass-border)', background: isLight ? '#ffffff' : '#1a1d28',
+              border: '1px solid var(--glass-border-color)', background: isLight ? '#ffffff' : '#1a1d28',
               boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
             }}>
               {entityMatches.map(e => (

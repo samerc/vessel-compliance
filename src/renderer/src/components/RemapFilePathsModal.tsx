@@ -273,7 +273,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                                     }}
                                     style={{
                                         padding: '8px 12px', borderRadius: 8,
-                                        border: `1px solid var(--glass-border)`,
+                                        border: `1px solid var(--glass-border-color)`,
                                         background: 'var(--bg-card)', color: 'var(--text-secondary)',
                                         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                                         fontSize: '0.8rem', whiteSpace: 'nowrap'

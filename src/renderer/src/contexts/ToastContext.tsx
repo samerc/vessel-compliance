@@ -76,9 +76,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const getStyles = (type: ToastType) => {
     switch (type) {
       case 'success':
-        return { background: 'rgba(0, 255, 136, 0.15)', border: '1px solid rgba(0, 255, 136, 0.3)', color: '#00ff88' }
+        return { background: 'rgba(0, 255, 136, 0.15)', border: '1px solid rgba(0, 255, 136, 0.3)', color: 'var(--success)' }
       case 'error':
-        return { background: 'rgba(255, 77, 77, 0.15)', border: '1px solid rgba(255, 77, 77, 0.3)', color: '#ff4d4d' }
+        return { background: 'rgba(255, 77, 77, 0.15)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)' }
       case 'warning':
         return { background: 'rgba(255, 193, 7, 0.15)', border: '1px solid rgba(255, 193, 7, 0.3)', color: '#ffc107' }
       default:

@@ -1344,8 +1344,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     return (
         <div className="fade-in" style={{ display: 'flex', height: 'calc(100vh - 60px)', margin: '-24px', overflow: 'hidden' }}>
             {/* ── Left sidebar ── */}
-            <aside style={{ width: '220px', flexShrink: 0, background: 'var(--bg-sidebar)', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-                <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--glass-border)' }}>
+            <aside style={{ width: '220px', flexShrink: 0, background: 'var(--bg-sidebar)', borderRight: '1px solid var(--glass-border-color)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--glass-border-color)' }}>
                     <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>Settings</div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{isAdmin ? 'Administrator' : 'User'}</div>
                 </div>
@@ -1758,7 +1758,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                     <button onClick={() => saveEdtEdit(edt.id)} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Save</button>
-                                                    <button onClick={() => setEditingEdtId(null)} style={{ padding: '4px 12px', fontSize: '0.8rem', background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                                                    <button onClick={() => setEditingEdtId(null)} style={{ padding: '4px 12px', fontSize: '0.8rem', background: 'transparent', border: '1px solid var(--glass-border-color)', color: 'var(--text-secondary)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -2217,7 +2217,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     </div>
 
                     {/* Per-report intro / end text */}
-                    <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginBottom: '20px' }}>
+                    <div style={{ borderTop: '1px solid var(--glass-border-color)', paddingTop: '20px', marginBottom: '20px' }}>
                         <h4 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Report Texts</h4>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 16px' }}>
                             Optional intro and end text added to specific report exports. Leave blank to omit. Separate paragraphs with a new line.
@@ -2638,7 +2638,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 {/* Restore confirmation modal */}
                 {showRestoreConfirm && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => setShowRestoreConfirm(false)}>
-                        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '90%', border: '1px solid var(--glass-border)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '90%', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                                 <AlertTriangle size={24} color="var(--danger)" />
                                 <h3 style={{ margin: 0 }}>Confirm Restore</h3>
@@ -2696,7 +2696,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     <>
                         {/* KPI cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
-                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border-color)' }}>
                                 <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Status</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <div style={{
@@ -2709,15 +2709,15 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     </span>
                                 </div>
                             </div>
-                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border-color)' }}>
                                 <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Version</div>
                                 <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.version || 'N/A'}</div>
                             </div>
-                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border-color)' }}>
                                 <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Database Size</div>
                                 <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.databaseSize}</div>
                             </div>
-                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ padding: '16px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--glass-border-color)' }}>
                                 <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Tables</div>
                                 <div style={{ fontWeight: 600, fontSize: '1rem' }}>{dbHealth.tableCount}</div>
                             </div>
@@ -2767,7 +2767,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 )}
 
                 {/* Divider */}
-                <div style={{ borderTop: '1px solid var(--glass-border)', margin: '24px 0' }} />
+                <div style={{ borderTop: '1px solid var(--glass-border-color)', margin: '24px 0' }} />
 
                 {/* Connection configuration */}
                 <h4 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}>

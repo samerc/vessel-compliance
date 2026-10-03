@@ -695,7 +695,7 @@ The audit loop in `updateVessel` has two special normalizations:
 Used across EntityDirectory, SurveyorDirectory, FleetManager (fleet view), and VesselHistoryView. Canonical pattern for list-detail pages:
 
 - **Full-width table** on the left (`flex: 1`), selected row highlighted with `rgba(0,210,255,0.06)` background
-- **Slide-in panel** on the right (fixed width, e.g. 380–400px): `background: isLight ? '#f4f6fb' : '#14172a'`, `border: '1px solid var(--glass-border)'`, `borderRadius: 12px`, `maxHeight: 'calc(100vh - 280px)'`, `overflowY: auto`
+- **Slide-in panel** on the right (fixed width, e.g. 380–400px): `background: isLight ? '#f4f6fb' : '#14172a'`, `border: '1px solid var(--glass-border-color)'`, `borderRadius: 12px`, `maxHeight: 'calc(100vh - 280px)'`, `overflowY: auto`
 - Panel header: gradient icon circle (40–44px, borderRadius 10), bold title, secondary subtitle, close X button
 - Clicking a table row opens the panel; clicking another row switches the panel content
 - Panel content is always derived from already-loaded data (no extra API calls on row click)
@@ -752,6 +752,8 @@ Bootstrap + overlay architecture for code-only deployments without full installe
 - **Danger color**: always `color: 'var(--danger)'` — never hardcode `#ff4d4d`, `#c00`, or `red`
 - **Modal background**: `isLight ? '#ffffff' : '#1a1d28'` — never use `glass-card` class or `var(--bg-sidebar)` for modals
 - **Input borders**: use `var(--input-border)` (color-only token), NOT `var(--glass-border)` (full border shorthand) for form controls
+- **Glass borders**: `var(--glass-border)` is a FULL shorthand (`1px solid rgba(...)`) - use it alone (`border: 'var(--glass-border)'`). For a custom width use the color-only `var(--glass-border-color)` (`'2px solid var(--glass-border-color)'`). `'1px solid var(--glass-border)'` is invalid CSS and the border silently disappears.
+- **Solid surfaces**: `var(--bg-primary)` is the solid per-theme surface for dropdowns/popovers/modal bodies. `--danger`/`--success` are darker in light mode - prefer them over hardcoded hex. CSS vars do NOT work in lucide `color=` props or with hex-alpha suffixes (`color + '22'`).
 - **No native dialogs**: NEVER use `window.confirm`/`alert`/`prompt` — in Electron they steal keyboard focus and leave inputs "stuck". Use the promise-based in-app replacements from `src/renderer/src/components/DialogHost.tsx`: `confirmDialog(msg)`, `alertDialog(msg)`, `promptDialog(msg)`. `<DialogHost />` is mounted once in `main.tsx`.
 
 ## Database Setup

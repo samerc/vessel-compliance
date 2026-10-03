@@ -320,7 +320,7 @@ export default function ActivityLog() {
             <button
               onClick={handleExportPDF}
               style={{
-                background: 'transparent', border: '1px solid var(--glass-border)',
+                background: 'transparent', border: '1px solid var(--glass-border-color)',
                 borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
                 color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
                 fontSize: '0.8rem',
@@ -333,7 +333,7 @@ export default function ActivityLog() {
             <button
               onClick={handleExportExcel}
               style={{
-                background: 'transparent', border: '1px solid var(--glass-border)',
+                background: 'transparent', border: '1px solid var(--glass-border-color)',
                 borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
                 color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
                 fontSize: '0.8rem',
@@ -346,7 +346,7 @@ export default function ActivityLog() {
             <button
               onClick={() => { loadData(); loadFilters() }}
               style={{
-                background: 'transparent', border: '1px solid var(--glass-border)',
+                background: 'transparent', border: '1px solid var(--glass-border-color)',
                 borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
                 color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
                 fontSize: '0.8rem',
@@ -365,7 +365,7 @@ export default function ActivityLog() {
         display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center',
         padding: '12px 16px', marginBottom: '16px', borderRadius: '8px',
         background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-        border: '1px solid var(--glass-border)',
+        border: '1px solid var(--glass-border-color)',
       }}>
         <Filter size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
 
@@ -415,7 +415,7 @@ export default function ActivityLog() {
           <button
             onClick={handleReset}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border)',
+              background: 'transparent', border: '1px solid var(--glass-border-color)',
               borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
               color: 'var(--text-secondary)', fontSize: '0.78rem',
             }}
@@ -572,7 +572,7 @@ export default function ActivityLog() {
             onClick={() => setPage(1)}
             disabled={page === 1}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border)',
+              background: 'transparent', border: '1px solid var(--glass-border-color)',
               borderRadius: '6px', padding: '5px 8px', cursor: page === 1 ? 'default' : 'pointer',
               color: 'var(--text-secondary)', opacity: page === 1 ? 0.4 : 1,
             }}
@@ -584,7 +584,7 @@ export default function ActivityLog() {
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border)',
+              background: 'transparent', border: '1px solid var(--glass-border-color)',
               borderRadius: '6px', padding: '5px 8px', cursor: page === 1 ? 'default' : 'pointer',
               color: 'var(--text-secondary)', opacity: page === 1 ? 0.4 : 1,
             }}
@@ -599,7 +599,7 @@ export default function ActivityLog() {
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border)',
+              background: 'transparent', border: '1px solid var(--glass-border-color)',
               borderRadius: '6px', padding: '5px 8px', cursor: page === totalPages ? 'default' : 'pointer',
               color: 'var(--text-secondary)', opacity: page === totalPages ? 0.4 : 1,
             }}
@@ -611,7 +611,7 @@ export default function ActivityLog() {
             onClick={() => setPage(totalPages)}
             disabled={page === totalPages}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border)',
+              background: 'transparent', border: '1px solid var(--glass-border-color)',
               borderRadius: '6px', padding: '5px 8px', cursor: page === totalPages ? 'default' : 'pointer',
               color: 'var(--text-secondary)', opacity: page === totalPages ? 0.4 : 1,
             }}
