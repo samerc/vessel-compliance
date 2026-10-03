@@ -684,7 +684,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             </button>
                           )}
                           {canManage && (
-                            <button
+                            <button title="Edit" aria-label="Edit"
                               onClick={(e) => { e.stopPropagation(); handleEditSurvey(survey) }}
                               className="btn-secondary"
                               style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}

@@ -325,7 +325,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                             autoFocus
                             aria-label="Search vessels to add"
                         />
-                        <button
+                        <button title="Close" aria-label="Close"
                             onClick={() => { setShowQuickAdd(false); setQuickAddSearch('') }}
                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
                         >
@@ -429,7 +429,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                     {zipSelectedIds.size} / {exportMode === 'zip' ? activeVessels.length : vessels.length}
                                 </span>
                             </div>
-                            <button
+                            <button title="Close" aria-label="Close"
                                 onClick={() => setShowZipModal(false)}
                                 style={{
                                     background: 'transparent',

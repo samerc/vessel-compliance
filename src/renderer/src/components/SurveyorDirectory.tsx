@@ -429,9 +429,9 @@ export default function SurveyorDirectory() {
               </div>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                 <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(1)} style={{ padding: '4px 6px' }}><ChevronsLeft size={13} /></button>
-                <button className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '4px 6px' }}><ChevronLeft size={13} /></button>
+                <button title="Previous" aria-label="Previous" className="btn-secondary" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '4px 6px' }}><ChevronLeft size={13} /></button>
                 <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>{page}/{totalPages}</span>
-                <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '4px 6px' }}><ChevronRight size={13} /></button>
+                <button title="Next" aria-label="Next" className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} style={{ padding: '4px 6px' }}><ChevronRight size={13} /></button>
                 <button className="btn-secondary" disabled={page === totalPages} onClick={() => setPage(totalPages)} style={{ padding: '4px 6px' }}><ChevronsRight size={13} /></button>
                 <select value={limit} onChange={e => setLimit(Number(e.target.value))} style={{ marginLeft: '8px', padding: '3px 6px', fontSize: '0.82rem' }}>
                   <option value="10">10</option>
@@ -460,7 +460,7 @@ export default function SurveyorDirectory() {
                     <Globe size={12} color="var(--accent-primary)" />{selectedSurveyor.country}
                   </div>
                 </div>
-                <button onClick={() => setSelectedSurveyor(null)} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                <button title="Close" aria-label="Close" onClick={() => setSelectedSurveyor(null)} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
                   <X size={16} />
                 </button>
               </div>
@@ -495,7 +495,7 @@ export default function SurveyorDirectory() {
                   <button onClick={() => openEditModal(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <Edit size={13} /> Edit
                   </button>
-                  <button onClick={() => handleDelete(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
+                  <button title="Delete" aria-label="Delete" onClick={() => handleDelete(selectedSurveyor)} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--danger)' }}>
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -636,7 +636,7 @@ export default function SurveyorDirectory() {
                 </div>
                 <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{editingId ? 'Edit Surveyor' : 'Add Surveyor'}</h3>
               </div>
-              <button onClick={closeModal} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={closeModal} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>

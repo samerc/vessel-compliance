@@ -269,7 +269,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
             }}
           />
           {query && (
-            <button
+            <button title="Close" aria-label="Close"
               onClick={() => {
                 setQuery('')
                 setResults(null)

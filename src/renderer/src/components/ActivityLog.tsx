@@ -580,7 +580,7 @@ export default function ActivityLog() {
           >
             <ChevronsLeft size={14} />
           </button>
-          <button
+          <button title="Previous" aria-label="Previous"
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
@@ -595,7 +595,7 @@ export default function ActivityLog() {
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', padding: '0 8px' }}>
             Page {page} of {totalPages}
           </span>
-          <button
+          <button title="Next" aria-label="Next"
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             style={{

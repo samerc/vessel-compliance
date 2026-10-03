@@ -784,7 +784,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           <div style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
-              <button onClick={() => setLogReminderFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setLogReminderFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
               {logReminderFor.vesselName} — {logReminderFor.description}
@@ -829,7 +829,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
-              <button onClick={() => setWaiveFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setWaiveFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
               {waiveFor.vesselName} — {waiveFor.description}
@@ -857,7 +857,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
-              <button onClick={() => setCompleteFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setCompleteFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
               {completeFor.vesselName} — {completeFor.description}

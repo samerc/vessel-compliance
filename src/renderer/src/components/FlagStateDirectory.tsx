@@ -463,7 +463,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                   {selectedFlag.displayName && <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>{selectedFlag.displayName}</div>}
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 600 }}>{selectedFlag.iso3Code}</div>
                 </div>
-                <button onClick={() => { setSelectedFlag(null); setPanelPorts([]) }} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                <button title="Close" aria-label="Close" onClick={() => { setSelectedFlag(null); setPanelPorts([]) }} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
                   <X size={16} />
                 </button>
               </div>
@@ -688,7 +688,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                 </div>
                 <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{modalEditId ? 'Edit Flag State' : 'Add Flag State'}</h3>
               </div>
-              <button onClick={closeModal} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={closeModal} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>

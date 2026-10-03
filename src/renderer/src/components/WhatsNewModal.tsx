@@ -130,7 +130,7 @@ export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModa
         position: 'relative',
       }}>
         {/* Close */}
-        <button
+        <button title="Close" aria-label="Close"
           onClick={onClose}
           style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
         >

@@ -1125,7 +1125,7 @@ export default function EntityEditPanel({
                   </span>
                   {canManage && (
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
+                      <button title="Edit" aria-label="Edit"
                         onClick={() => startEditAddress(addr)}
                         style={{
                           background: 'none',
@@ -1137,7 +1137,7 @@ export default function EntityEditPanel({
                       >
                         <Pencil size={12} />
                       </button>
-                      <button
+                      <button title="Delete" aria-label="Delete"
                         onClick={() => handleDeleteAddress(addr.id)}
                         style={{
                           background: 'none',

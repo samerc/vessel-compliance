@@ -974,7 +974,7 @@ export default function WarBreachCalculator() {
                   <h2 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: '700' }}>{cvn || 'No Cover Note'}</h2>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Saved {date}</p>
                 </div>
-                <button onClick={() => setViewingRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                <button title="Close" aria-label="Close" onClick={() => setViewingRecord(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                   <X size={20} />
                 </button>
               </div>

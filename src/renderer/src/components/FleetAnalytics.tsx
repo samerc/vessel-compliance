@@ -1227,7 +1227,7 @@ export default function FleetAnalytics() {
               >
                 Save
               </button>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => { setShowPresetInput(false); setPresetNameInput('') }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
               >
@@ -1848,7 +1848,7 @@ export default function FleetAnalytics() {
               marginBottom: '20px',
             }}>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Export Analytics</h3>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setExportModalOpen(false)}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',

@@ -192,7 +192,7 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                                 placeholder="Insured value"
                                 style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
                             />
-                            <button onClick={async () => { await window.api.hullDeleteAgreedValueOption(opt.id); setValueOptions(prev => prev.filter(o => o.id !== opt.id)) }}
+                            <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.hullDeleteAgreedValueOption(opt.id); setValueOptions(prev => prev.filter(o => o.id !== opt.id)) }}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
                                 <Trash2 size={14} />
                             </button>
@@ -507,8 +507,8 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                         <div key={it.id || idx} style={{ marginBottom: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', background: it.hullTextId ? 'transparent' : 'rgba(160,100,255,0.04)' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '4px' }}>
-                                    <button onClick={() => moveItem(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => moveItem(idx, 'down')} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <button title="Move up" aria-label="Move up" onClick={() => moveItem(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                    <button title="Move down" aria-label="Move down" onClick={() => moveItem(idx, 'down')} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                 </div>
                                 <textarea
                                     value={it.text}
@@ -517,7 +517,7 @@ export default function AgreedValueTab({ quotation, updateField, setQ, showError
                                     rows={2}
                                     style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', resize: 'vertical', minHeight: '40px', fontFamily: 'inherit' }}
                                 />
-                                <button onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
+                                <button title="Remove" aria-label="Remove" onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
                                     <X size={16} />
                                 </button>
                             </div>

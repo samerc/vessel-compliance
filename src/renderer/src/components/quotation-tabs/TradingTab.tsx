@@ -350,7 +350,7 @@ export default function TradingTab({ quotation, showSuccess, showError, updateFi
                     {excluded.map(c => (
                         <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--table-border)', marginBottom: '4px' }}>
                             <span style={{ flex: 1, fontSize: '0.83rem' }}>{c.name}</span>
-                            <button onClick={() => removeCountry(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                            <button title="Remove" aria-label="Remove" onClick={() => removeCountry(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
                         </div>
                     ))}
                 </div>
@@ -359,7 +359,7 @@ export default function TradingTab({ quotation, showSuccess, showError, updateFi
                     {ddq.map(c => (
                         <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--table-border)', marginBottom: '4px' }}>
                             <span style={{ flex: 1, fontSize: '0.83rem' }}>{c.name}</span>
-                            <button onClick={() => removeCountry(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                            <button title="Remove" aria-label="Remove" onClick={() => removeCountry(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
                         </div>
                     ))}
                 </div>

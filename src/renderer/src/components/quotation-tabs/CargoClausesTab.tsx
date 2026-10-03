@@ -309,7 +309,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
                                         {def?.code && <strong style={{ marginRight: '6px' }}>{def.code}</strong>}
                                         {def?.title || sc.title || 'Unknown'}
                                     </span>
-                                    <button onClick={() => { if (def) toggleClause(def) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}>
+                                    <button title="Delete" aria-label="Delete" onClick={() => { if (def) toggleClause(def) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}>
                                         <Trash2 size={13} />
                                     </button>
                                 </div>
@@ -360,7 +360,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
                                 {cc.text}
                             </div>
                         )}
-                        <button onClick={() => deleteCustom(cc.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', marginTop: '4px' }}>
+                        <button title="Delete" aria-label="Delete" onClick={() => deleteCustom(cc.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', marginTop: '4px' }}>
                             <Trash2 size={14} />
                         </button>
                     </div>
@@ -371,7 +371,7 @@ export default function CargoClausesTab({ quotation, section, updateField, showS
                         onChange={e => setNewCustomText(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addCustom() } }}
                         style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit' }} />
-                    <button onClick={addCustom} disabled={!newCustomText.trim()} className="btn-primary"
+                    <button title="Add" aria-label="Add" onClick={addCustom} disabled={!newCustomText.trim()} className="btn-primary"
                         style={{ padding: '6px 12px', fontSize: '0.78rem', marginTop: '2px' }}>
                         <Plus size={14} />
                     </button>

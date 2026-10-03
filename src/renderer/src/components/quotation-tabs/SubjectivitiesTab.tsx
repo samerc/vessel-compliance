@@ -447,8 +447,8 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                         {editingId === item.id ? (
                             <div style={{ flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <input value={editText} onChange={e => setEditText(e.target.value)} style={{ ...inputStyle, flex: 1 }} onKeyDown={e => { if (e.key === 'Enter') handleUpdate(); if (e.key === 'Escape') setEditingId(null) }} autoFocus />
-                                <button onClick={handleUpdate} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={12} /></button>
-                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><X size={12} /></button>
+                                <button title="Save" aria-label="Save" onClick={handleUpdate} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={12} /></button>
+                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><X size={12} /></button>
                             </div>
                         ) : (
                             <>
@@ -458,10 +458,10 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                                     {item.isCustom && <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '6px' }}>(custom)</span>}
                                     {scopeAutoDetected && item.vesselScope && item.vesselScope.length > 0 && <span style={{ fontSize: '0.68rem', color: '#44cc88', marginLeft: '4px' }}>(scope auto-detected)</span>}
                                 </span>
-                                <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(item.id); setEditText(item.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={14} /></button>
-                                <button onClick={() => handleDelete(item.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(item.id); setEditText(item.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDelete(item.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                             </>
                         )}
                     </div>

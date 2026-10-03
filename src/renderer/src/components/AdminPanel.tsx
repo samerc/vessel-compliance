@@ -1785,8 +1785,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     </td>
                                     <td style={{ padding: '20px 16px', textAlign: 'right' }}>
                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                            <button onClick={() => { setEditingEdtId(edt.id); setEditEdtName(edt.name); setEditEdtDescription(edt.description || ''); setEditEdtScope(edt.entityScope); setEditEdtRequired(edt.isRequired) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }}><Edit3 size={18} /></button>
-                                            <button onClick={() => handleDeleteEntityDocType(edt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                                            <button title="Edit" aria-label="Edit" onClick={() => { setEditingEdtId(edt.id); setEditEdtName(edt.name); setEditEdtDescription(edt.description || ''); setEditEdtScope(edt.entityScope); setEditEdtRequired(edt.isRequired) }} style={{ background: 'transparent', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }}><Edit3 size={18} /></button>
+                                            <button title="Delete" aria-label="Delete" onClick={() => handleDeleteEntityDocType(edt.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -3062,7 +3062,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                                 <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
                                                                 <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{c.fieldType}</span>
                                                                 {c.isRequired && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>req</span>}
-                                                                <button onClick={() => handleDeleteCharacteristic(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
+                                                                <button title="Remove" aria-label="Remove" onClick={() => handleDeleteCharacteristic(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -3083,7 +3083,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                         {ptConditions.map(c => (
                                                             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px', background: 'rgba(128,128,128,0.05)', border: '1px solid var(--table-border)' }}>
                                                                 <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
-                                                                <button onClick={() => handleDeleteCondition(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
+                                                                <button title="Remove" aria-label="Remove" onClick={() => handleDeleteCondition(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -3341,8 +3341,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     ) : (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                <button onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, -1) }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
-                                                <button onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, 1) }} disabled={idx === notifGroups.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === notifGroups.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+                                                <button title="Move up" aria-label="Move up" onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, -1) }} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+                                                <button title="Move down" aria-label="Move down" onClick={e => { e.stopPropagation(); handleReorderNotifGroup(idx, 1) }} disabled={idx === notifGroups.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === notifGroups.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
                                             </div>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{g.name}</div>
@@ -3352,8 +3352,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                     <span>{g.subscriptionCount ?? 0} subscription{(g.subscriptionCount ?? 0) !== 1 ? 's' : ''}</span>
                                                 </div>
                                             </div>
-                                            <button onClick={e => { e.stopPropagation(); setEditingNotifGroupId(g.id); setEditNotifGroupName(g.name); setEditNotifGroupDesc(g.description || '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Edit3 size={14} /></button>
-                                            <button onClick={e => { e.stopPropagation(); handleDeleteNotifGroup(g.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                            <button title="Edit" aria-label="Edit" onClick={e => { e.stopPropagation(); setEditingNotifGroupId(g.id); setEditNotifGroupName(g.name); setEditNotifGroupDesc(g.description || '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Edit3 size={14} /></button>
+                                            <button title="Delete" aria-label="Delete" onClick={e => { e.stopPropagation(); handleDeleteNotifGroup(g.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                                         </div>
                                     )}
                                 </div>

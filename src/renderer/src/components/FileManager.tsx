@@ -962,7 +962,7 @@ export default function FileManager() {
               <ExternalLink size={14} />
               Open in Explorer
             </button>
-            <button
+            <button title="Refresh" aria-label="Refresh"
               className="btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px' }}
               onClick={handleRefresh}

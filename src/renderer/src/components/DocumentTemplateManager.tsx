@@ -333,7 +333,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   </div>
                   {canManage && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <button
+                      <button title="Move up" aria-label="Move up"
                         onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'up') }}
                         disabled={i === 0}
                         style={{
@@ -347,7 +347,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       >
                         <ChevronUp size={14} />
                       </button>
-                      <button
+                      <button title="Move down" aria-label="Move down"
                         onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'down') }}
                         disabled={i === filteredTemplates.length - 1}
                         style={{
@@ -587,7 +587,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Plus size={20} /> New Template
               </h2>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setShowCreate(false)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
@@ -794,7 +794,7 @@ function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuc
               : <><Copy size={20} /> Copy Text</>
             }
           </h2>
-          <button
+          <button title="Close" aria-label="Close"
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
           >

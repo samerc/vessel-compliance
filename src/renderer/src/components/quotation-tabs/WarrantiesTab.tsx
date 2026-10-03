@@ -569,19 +569,19 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                                         {editingCustomId === cw.id ? (
                                                             <>
                                                                 <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '32px', resize: 'vertical', fontSize: '0.78rem', padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
-                                                                <button onClick={() => saveCustomEdit(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}><Save size={12} /></button>
-                                                                <button onClick={() => setEditingCustomId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                                                                <button title="Save" aria-label="Save" onClick={() => saveCustomEdit(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}><Save size={12} /></button>
+                                                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingCustomId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-                                                                    <button onClick={() => moveCustom(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
-                                                                    <button onClick={() => moveCustom(i, 'down')} disabled={i === customWarranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === customWarranties.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
+                                                                    <button title="Move up" aria-label="Move up" onClick={() => moveCustom(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
+                                                                    <button title="Move down" aria-label="Move down" onClick={() => moveCustom(i, 'down')} disabled={i === customWarranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === customWarranties.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
                                                                 </div>
                                                                 <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{cw.text}</span>
                                                                 <span style={{ fontSize: '0.58rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', alignSelf: 'center' }}>Custom</span>
-                                                                <button onClick={() => { setEditingCustomId(cw.id); setEditCustomText(cw.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
-                                                                <button onClick={() => deleteCustom(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }}><Trash2 size={10} /></button>
+                                                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingCustomId(cw.id); setEditCustomText(cw.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
+                                                                <button title="Delete" aria-label="Delete" onClick={() => deleteCustom(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }}><Trash2 size={10} /></button>
                                                             </>
                                                         )}
                                                     </div>
@@ -673,7 +673,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                     <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--table-border)', marginBottom: '3px', fontSize: '0.8rem' }}>
                                         <span style={{ color: 'var(--text-secondary)', minWidth: '20px' }}>{i + 1}.</span>
                                         <span style={{ flex: 1 }}>{item}</span>
-                                        <button onClick={() => setImportedItems(prev => prev.filter((_, j) => j !== i))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={12} /></button>
+                                        <button title="Remove" aria-label="Remove" onClick={() => setImportedItems(prev => prev.filter((_, j) => j !== i))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={12} /></button>
                                     </div>
                                 ))}
                             </div>

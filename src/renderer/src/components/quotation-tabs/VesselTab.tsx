@@ -675,8 +675,8 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                     <div key={qv.id} style={{ padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--table-border)', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                         {qVessels.length > 1 && !isEditing && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
-                                <button onClick={() => handleMoveVessel(qv.id, 'up')} disabled={qVessels.indexOf(qv) === 0} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMoveVessel(qv.id, 'down')} disabled={qVessels.indexOf(qv) === qVessels.length - 1} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMoveVessel(qv.id, 'up')} disabled={qVessels.indexOf(qv) === 0} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMoveVessel(qv.id, 'down')} disabled={qVessels.indexOf(qv) === qVessels.length - 1} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                             </div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0,210,255,0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>

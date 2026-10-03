@@ -917,7 +917,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 <GitCompareArrows size={22} color="var(--accent-primary)" />
                                 Vessel Comparison
                             </h2>
-                            <button onClick={() => { setShowCompare(false); setCompareData(null) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                            <button title="Close" aria-label="Close" onClick={() => { setShowCompare(false); setCompareData(null) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
                                 <X size={20} />
                             </button>
                         </div>

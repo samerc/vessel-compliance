@@ -385,8 +385,8 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                         <tr key={t.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                             <td style={{ padding: '10px 12px' }}>
                                 <div style={{ display: 'flex', gap: '2px' }}>
-                                    <button onClick={() => moveType(i, -1)} disabled={i === 0} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => moveType(i, 1)} disabled={i === types.length - 1} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === types.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <button title="Move up" aria-label="Move up" onClick={() => moveType(i, -1)} disabled={i === 0} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                    <button title="Move down" aria-label="Move down" onClick={() => moveType(i, 1)} disabled={i === types.length - 1} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === types.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                 </div>
                             </td>
                             <td style={{ padding: '10px 12px' }}>
@@ -412,13 +412,13 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                                 <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                                     {editId === t.id ? (
                                         <>
-                                            <button onClick={() => handleSave(t.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={13} /></button>
-                                            <button onClick={() => setEditId(null)} className="btn-secondary" style={{ padding: '4px 8px' }}><X size={13} /></button>
+                                            <button title="Save" aria-label="Save" onClick={() => handleSave(t.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={13} /></button>
+                                            <button title="Cancel" aria-label="Cancel" onClick={() => setEditId(null)} className="btn-secondary" style={{ padding: '4px 8px' }}><X size={13} /></button>
                                         </>
                                     ) : (
                                         <>
-                                            <button onClick={() => { setEditId(t.id); setEditName(t.name); setEditCode(t.code) }} className="btn-secondary" style={{ padding: '4px 8px' }}><Pencil size={13} /></button>
-                                            <button onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}><Trash2 size={13} /></button>
+                                            <button title="Edit" aria-label="Edit" onClick={() => { setEditId(t.id); setEditName(t.name); setEditCode(t.code) }} className="btn-secondary" style={{ padding: '4px 8px' }}><Pencil size={13} /></button>
+                                            <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}><Trash2 size={13} /></button>
                                         </>
                                     )}
                                 </div>
@@ -591,8 +591,8 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                             <td style={{ padding: '6px 8px', textAlign: 'center' }}><input type="checkbox" checked={editCargo} onChange={e => setEditCargo(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} /></td>
                                             <td style={{ padding: '6px 8px', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                                                    <button onClick={() => saveEdit(c.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={12} /></button>
-                                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><X size={12} /></button>
+                                                    <button title="Save" aria-label="Save" onClick={() => saveEdit(c.id)} className="btn-primary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Save size={12} /></button>
+                                                    <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><X size={12} /></button>
                                                 </div>
                                             </td>
                                         </>
@@ -606,10 +606,10 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                             </td>
                                             <td style={{ padding: '8px', textAlign: 'right' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '2px', alignItems: 'center' }}>
-                                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                                    <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                                    <button onClick={() => startEdit(c)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                                    <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                                    <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                                    <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                                    <button title="Edit" aria-label="Edit" onClick={() => startEdit(c)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                                    <button title="Delete" aria-label="Delete" onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                                 </div>
                                             </td>
                                         </>
@@ -646,8 +646,8 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                         <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>(* = has custom description)</span>
                                     )}
                                 </span>
-                                <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDeleteSet(s.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         ))}
                     </div>
@@ -899,21 +899,21 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                             {editingTagId === tag.id ? (
                                 <>
                                     <input value={editTagName} onChange={e => setEditTagName(e.target.value)} style={{ width: '80px', fontSize: '0.8rem', padding: '2px 4px' }} onKeyDown={e => e.key === 'Enter' && handleSaveTag(tag.id)} />
-                                    <button onClick={() => handleSaveTag(tag.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0' }}><Save size={12} /></button>
-                                    <button onClick={() => setEditingTagId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><X size={12} /></button>
+                                    <button title="Save" aria-label="Save" onClick={() => handleSaveTag(tag.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0' }}><Save size={12} /></button>
+                                    <button title="Cancel" aria-label="Cancel" onClick={() => setEditingTagId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><X size={12} /></button>
                                 </>
                             ) : (
                                 <>
                                     <span>{tag.name}</span>
-                                    <button onClick={() => { setEditingTagId(tag.id); setEditTagName(tag.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={10} /></button>
-                                    <button onClick={async () => { await window.api.piDeleteWarrantyTag(tag.id); showSuccess('Tag deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={10} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingTagId(tag.id); setEditTagName(tag.name) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={10} /></button>
+                                    <button title="Remove" aria-label="Remove" onClick={async () => { await window.api.piDeleteWarrantyTag(tag.id); showSuccess('Tag deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={10} /></button>
                                 </>
                             )}
                         </div>
                     ))}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag..." style={{ width: '100px', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '12px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} onKeyDown={e => e.key === 'Enter' && handleAddTag()} />
-                        <button onClick={handleAddTag} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.75rem', borderRadius: '10px' }}><Plus size={12} /></button>
+                        <button title="Add" aria-label="Add" onClick={handleAddTag} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.75rem', borderRadius: '10px' }}><Plus size={12} /></button>
                     </div>
                 </div>
             </section>
@@ -951,8 +951,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                             <span>{ws.name}</span>
                             <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>({(ws.warrantyIds || []).length})</span>
                             {ws.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864' }}>Default</span>}
-                            <button onClick={() => { setShowSetForm(true); setEditingSetId(ws.id); setSetName(ws.name); setSetWarrantyIds(new Set(ws.warrantyIds || [])); setSetDefaultSelected(!!ws.defaultSelected) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={12} /></button>
-                            <button onClick={async () => { await window.api.piDeleteWarrantySet(ws.id); showSuccess('Set deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><Trash2 size={12} /></button>
+                            <button title="Edit" aria-label="Edit" onClick={() => { setShowSetForm(true); setEditingSetId(ws.id); setSetName(ws.name); setSetWarrantyIds(new Set(ws.warrantyIds || [])); setSetDefaultSelected(!!ws.defaultSelected) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0' }}><Pencil size={12} /></button>
+                            <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteWarrantySet(ws.id); showSuccess('Set deleted'); loadData() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><Trash2 size={12} /></button>
                         </div>
                     ))}
                     {warrantySets.length === 0 && !showSetForm && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No sets created yet.</span>}
@@ -1093,8 +1093,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                 </div>
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
                                     <span style={{ cursor: 'grab', color: 'var(--text-secondary)', opacity: 0.4, fontSize: '0.8rem', padding: '0 4px' }} title="Drag to reorder">⠿</span>
-                                    <button onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'all') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                    <button onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(w.id); setEditText(w.text); setEditDefaultSelected(w.defaultSelected); setEditCargoRelated(w.isCargoRelated); setEditTagIds(w.tagIds || []); setEditTypeScope(w.typeScope || 'all') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteWarranty(w.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
                         )}
@@ -1108,7 +1108,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                     <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 style={{ fontSize: '1rem' }}>Import Warranties</h3>
-                            <button onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+                            <button title="Close" aria-label="Close" onClick={() => setShowImport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>Paste warranties below (one per line). Bullet points, dashes, and leading symbols will be stripped automatically.</p>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '10px', padding: '8px 12px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)' }}>
@@ -1275,10 +1275,10 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(d.id); setEditTitle(d.title || ''); setEditCode(d.letterCode || ''); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteDeductible(d.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(d.id); setEditTitle(d.title || ''); setEditCode(d.letterCode || ''); setEditDesc(d.description); setEditHasSecondary(d.hasSecondary); setEditSecDesc(d.secondaryDescription || '') }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteDeductible(d.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
@@ -1322,10 +1322,10 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                                 {td.defaultIncluded && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 200, 100, 0.15)', color: '#00c864', marginTop: '4px', display: 'inline-block' }}>Default</span>}
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => handleTextMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleTextMove(i, 'down')} disabled={i === textDeds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === textDeds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingTextId(td.id); setEditTextTitle(td.title || ''); setEditTextDedText(td.text); setEditTextDefault(td.defaultIncluded) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteTextDeductible(td.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleTextMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleTextMove(i, 'down')} disabled={i === textDeds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === textDeds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingTextId(td.id); setEditTextTitle(td.title || ''); setEditTextDedText(td.text); setEditTextDefault(td.defaultIncluded) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteTextDeductible(td.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
@@ -1536,10 +1536,10 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === exclusions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === exclusions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(ex.id); setEditText(ex.text); setEditCargoRelated(ex.isCargoRelated); setEditVesselTypeIds(ex.vesselTypeIds || []) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteExclusion(ex.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === exclusions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === exclusions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(ex.id); setEditText(ex.text); setEditCargoRelated(ex.isCargoRelated); setEditVesselTypeIds(ex.vesselTypeIds || []) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteExclusion(ex.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
@@ -1551,7 +1551,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
                     <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '500px', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h3 style={{ margin: 0, fontSize: '1rem' }}>Import Exclusions</h3>
-                            <button onClick={() => setShowImport(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+                            <button title="Close" aria-label="Close" onClick={() => setShowImport(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
                         </div>
                         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Paste exclusions (one per line). Bullets, dashes, and numbering will be stripped.</p>
                         <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste exclusions here..." style={{ width: '100%', minHeight: '200px', resize: 'vertical', marginBottom: '12px' }} />
@@ -1622,10 +1622,10 @@ function SubLimitsTab({ showSuccess }: TabProps) {
                                 {t.textTemplate}
                             </div>
                             <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === templates.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => { setEditingId(t.id); setEditTemplate(t.textTemplate); setEditCurrency(t.defaultCurrency) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                <button onClick={async () => { await window.api.piDeleteSubLimitTemplate(t.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === templates.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(t.id); setEditTemplate(t.textTemplate); setEditCurrency(t.defaultCurrency) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteSubLimitTemplate(t.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                             </div>
                         </>
                     )}
@@ -1748,10 +1748,10 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                         <input type="checkbox" checked={!!c.defaultSelected} onChange={async () => { await window.api.piToggleAdditionalClauseDefault(c.id, !c.defaultSelected); loadData() }} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
                                         Default
                                     </label>
-                                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                    <button onClick={async () => { await window.api.piDeleteAdditionalClause(c.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                    <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                    <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text) }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteAdditionalClause(c.id); showSuccess('Deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </>
                         )}
@@ -1787,8 +1787,8 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                             if (!c) return null
                                             return (
                                                 <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.07)', marginBottom: '3px' }}>
-                                                    <button onClick={() => moveSetClause(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={13} /></button>
-                                                    <button onClick={() => moveSetClause(idx, 'down')} disabled={idx === editSetOrder.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === editSetOrder.length - 1 ? 0.3 : 1 }}><ChevronDown size={13} /></button>
+                                                    <button title="Move up" aria-label="Move up" onClick={() => moveSetClause(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={13} /></button>
+                                                    <button title="Move down" aria-label="Move down" onClick={() => moveSetClause(idx, 'down')} disabled={idx === editSetOrder.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === editSetOrder.length - 1 ? 0.3 : 1 }}><ChevronDown size={13} /></button>
                                                     {c.title && <span style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)' }}>{c.title}</span>}
                                                     {c.code && <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.78rem', color: 'var(--accent-primary)', minWidth: '80px' }}>{c.code}</span>}
                                                     <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{c.text.substring(0, 70)}{c.text.length > 70 ? '…' : ''}</span>
@@ -1839,7 +1839,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                     </div>
                                 </div>
                                 <button onClick={() => startEditSet(s)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Pencil size={12} /> Edit</button>
-                                <button onClick={async () => { await window.api.piDeleteAdditionalClauseSet(s.id); showSuccess('Set deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteAdditionalClauseSet(s.id); showSuccess('Set deleted'); loadData() }} className="btn-secondary" style={{ padding: '4px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                             </div>
                         )}
                     </div>
@@ -1981,7 +1981,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                                 ))}
                             </div>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to DDQ list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>DDQ</button>
-                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                            <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
                     ))}
                 </section>
@@ -2004,7 +2004,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
                                 ))}
                             </div>
                             <button onClick={() => handleToggleType(c.id, c.listType)} className="btn-secondary" title="Move to Excluded list" style={{ padding: '3px 6px', fontSize: '0.68rem' }}>Excl.</button>
-                            <button onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                            <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.piDeleteTradingExcludedCountry(c.id); showSuccess('Removed'); loadData() }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                         </div>
                     ))}
                 </section>
@@ -2409,10 +2409,10 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                <button onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
-                                <button onClick={() => move(idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
-                                <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
-                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => move(idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                             </div>
                         </div>
                     )}
@@ -2520,16 +2520,16 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => move(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => move(idx, 1)} disabled={idx === items.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                             </div>
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>{t.name}</div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxHeight: '40px', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(t.text) }} />
                             </div>
                             <div style={{ display: 'flex', gap: '6px' }}>
-                                <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={14} /></button>
-                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                             </div>
                         </div>
                     )}
@@ -2704,10 +2704,10 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                    <button onClick={() => move(templates, idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => move(templates, idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
-                                    <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                    <button title="Move up" aria-label="Move up" onClick={() => move(templates, idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronUp size={14} /></button>
+                                    <button title="Move down" aria-label="Move down" onClick={() => move(templates, idx, 1)} disabled={idx === templates.length - 1} style={{ background: 'none', border: 'none', cursor: idx === templates.length - 1 ? 'default' : 'pointer', opacity: idx === templates.length - 1 ? 0.3 : 1, padding: '2px', color: 'var(--text-secondary)' }}><ChevronDown size={14} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => startEdit(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}><Pencil size={14} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                 </div>
                             </div>
                         )}
@@ -2874,10 +2874,10 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{s.text}</span>
                                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                                        <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
-                                        <button onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
-                                        <button onClick={() => startEdit(s)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                        <button onClick={async () => { if (await confirmDialog('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                        <button title="Move up" aria-label="Move up" onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
+                                        <button title="Move down" aria-label="Move down" onClick={() => handleMove(idx, 1)} disabled={idx === items.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
+                                        <button title="Edit" aria-label="Edit" onClick={() => startEdit(s)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
+                                        <button title="Delete" aria-label="Delete" onClick={async () => { if (await confirmDialog('Delete this subjectivity?')) { await window.api.deletePISubjectivity(s.id); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -3014,10 +3014,10 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
                                 <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{v.name}</span>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--table-header-bg)', padding: '2px 6px', borderRadius: '4px' }}>{v.key}</span>
                                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                                    <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
-                                    <button onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
-                                    <button onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
-                                    <button onClick={async () => { if (await confirmDialog(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                                    <button title="Move up" aria-label="Move up" onClick={() => handleMove(idx, -1)} disabled={idx === 0} className="btn-secondary" style={{ padding: '3px' }}><ChevronUp size={14} /></button>
+                                    <button title="Move down" aria-label="Move down" onClick={() => handleMove(idx, 1)} disabled={idx === versions.length - 1} className="btn-secondary" style={{ padding: '3px' }}><ChevronDown size={14} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => startEdit(v)} className="btn-secondary" style={{ padding: '3px' }}><Pencil size={14} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={async () => { if (await confirmDialog(`Delete "${v.name}"?`)) { await window.api.piDeleteSanctionsVersion(v.id); setFormResetKey(k => k + 1); showSuccess('Deleted'); loadData() } }} className="btn-secondary" style={{ padding: '3px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                                 </div>
                             </div>
                         )}
@@ -3360,8 +3360,8 @@ function SectionOrderTab({ showSuccess }: TabProps) {
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '22px' }}>{i + 1}.</span>
                         <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>{SECTION_LABELS[key] || key}</span>
                         <div style={{ display: 'flex', gap: '2px' }}>
-                            <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
-                            <button onClick={() => handleMove(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+                            <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                            <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
                         </div>
                     </div>
                 ))}
@@ -3443,8 +3443,8 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
             {texts.map((t, i) => (
                 <div key={t.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                        <button onClick={() => handleMove(i, 'down')} disabled={i === texts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === texts.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === texts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === texts.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                     </div>
                     <div style={{ flex: 1 }}>
                         {editingId === t.id ? (
@@ -3454,8 +3454,8 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
                                     <option value="hm">Hull</option>
                                     <option value="iv">IV</option>
                                 </select>
-                                <button onClick={() => { handleSaveEdit(t.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
-                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                <button title="Save" aria-label="Save" onClick={() => { handleSaveEdit(t.id) }} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                             </div>
                         ) : (
                             <span style={{ fontSize: '0.82rem' }}>{t.text}</span>
@@ -3465,8 +3465,8 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={t.defaultSelected} onChange={() => handleToggleDefault(t.id, t.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                     </label>
-                    <button onClick={() => { setEditingId(t.id); setEditText(t.text); setEditSection(t.section || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                    <button onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(t.id); setEditText(t.text); setEditSection(t.section || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                 </div>
             ))}
         </section>
@@ -3651,8 +3651,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                         display: 'flex', alignItems: 'center', gap: '10px'
                     }} onClick={() => setSelectedClauseId(c.id)}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }} onClick={e => e.stopPropagation()}>
-                            <button onClick={() => handleMoveClause(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                            <button onClick={() => handleMoveClause(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                            <button title="Move up" aria-label="Move up" onClick={() => handleMoveClause(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                            <button title="Move down" aria-label="Move down" onClick={() => handleMoveClause(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                         </div>
                         {editingId === c.id ? (
                             <div style={{ flex: 1 }} onClick={e => e.stopPropagation()}>
@@ -3663,8 +3663,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                         <option value="hm">Hull</option>
                                         <option value="iv">IV</option>
                                     </select>
-                                    <button onClick={handleSaveClause} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
-                                    <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                    <button title="Save" aria-label="Save" onClick={handleSaveClause} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                    <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                                 </div>
                                 <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Wording" rows={2} style={{ width: '100%', fontSize: '0.82rem', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)', resize: 'vertical' }} />
                             </div>
@@ -3676,8 +3676,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                     <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap', background: c.conditionSection === 'iv' ? '#6464ff22' : '#ff64c822', color: c.conditionSection === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${c.conditionSection === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{c.conditionSection === 'iv' ? 'IV' : 'Hull'}</span>
                                     <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '4px' }}>
                                         <button onClick={() => handleDuplicateClause(c)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }} title="Duplicate clause with conditions"><Copy size={12} /></button>
-                                        <button onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || ''); setEditClauseSection(c.conditionSection || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                        <button onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                        <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(c.id); setEditCode(c.code); setEditName(c.name); setEditDesc(c.description || ''); setEditClauseSection(c.conditionSection || 'hm') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                        <button title="Delete" aria-label="Delete" onClick={() => handleDeleteClause(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                     </div>
                                 </div>
                                 {c.description && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>{c.description}</p>}
@@ -3709,8 +3709,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                     {conditions.map((cond, i) => (
                         <div key={cond.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button onClick={() => handleMoveCondition(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
-                                <button onClick={() => handleMoveCondition(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMoveCondition(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMoveCondition(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
                             </div>
                             {editCondId === cond.id ? (
                                 <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -3720,8 +3720,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                         <input type="checkbox" checked={editCondHasAmount} onChange={e => setEditCondHasAmount(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} /> Amount
                                     </label>
                                     {editCondHasAmount && <input type="text" value={editCondPlaceholder} onChange={e => setEditCondPlaceholder(e.target.value)} placeholder="{placeholder}" style={{ width: '130px', fontSize: '0.78rem', padding: '4px 6px' }} />}
-                                    <button onClick={handleSaveCondition} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
-                                    <button onClick={() => setEditCondId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                    <button title="Save" aria-label="Save" onClick={handleSaveCondition} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                    <button title="Cancel" aria-label="Cancel" onClick={() => setEditCondId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                                 </div>
                             ) : (
                                 <>
@@ -3731,8 +3731,8 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                         <input type="checkbox" checked={cond.defaultSelected} onChange={() => handleToggleCondDefault(cond.id, cond.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                                     </label>
-                                    <button onClick={() => { setEditCondId(cond.id); setEditCondNum(cond.conditionNumber); setEditCondText(cond.text); setEditCondHasAmount(!!cond.hasAmount); setEditCondPlaceholder(cond.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                                    <button onClick={() => handleDeleteCondition(cond.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditCondId(cond.id); setEditCondNum(cond.conditionNumber); setEditCondText(cond.text); setEditCondHasAmount(!!cond.hasAmount); setEditCondPlaceholder(cond.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={() => handleDeleteCondition(cond.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </>
                             )}
                         </div>
@@ -3891,8 +3891,8 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                             <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                         </label>
-                        <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
-                        <button onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                        <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditText(c.text); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}><Pencil size={12} /></button>
+                        <button title="Delete" aria-label="Delete" onClick={() => handleDelete(c.id)} className="btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                     </div>
                     {/* Body: text or edit form */}
                     <div style={{ padding: '10px 14px 10px 42px' }}>
@@ -4040,15 +4040,15 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
             {conditions.map((c, i) => (
                 <div key={c.id} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                        <button onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === conditions.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === conditions.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                     </div>
                     <div style={{ flex: 1 }}>
                         {editingId === c.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                                 <textarea value={editText} onChange={e => setEditText(e.target.value)} style={{ flex: 1, minHeight: '50px', fontSize: '0.82rem', padding: '6px' }} />
-                                <button onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
-                                <button onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
+                                <button title="Save" aria-label="Save" onClick={() => handleSaveEdit(c.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><Save size={12} /></button>
+                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}><X size={12} /></button>
                             </div>
                         ) : (
                             <span style={{ fontSize: '0.82rem' }}>{c.text}</span>
@@ -4057,8 +4057,8 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input type="checkbox" checked={c.defaultSelected} onChange={() => handleToggleDefault(c.id, c.defaultSelected)} style={{ accentColor: 'var(--accent-primary)' }} /> Default
                     </label>
-                    <button onClick={() => { setEditingId(c.id); setEditText(c.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
-                    <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(c.id); setEditText(c.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                 </div>
             ))}
             {conditions.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No war conditions yet.</p>}
@@ -4428,8 +4428,8 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                             <tr key={step.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
                                 <td style={tdStyle}>
                                     <div style={{ display: 'flex', gap: '2px' }}>
-                                        <button onClick={() => moveStep(i, -1)} disabled={i === 0} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                        <button onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                        <button title="Move up" aria-label="Move up" onClick={() => moveStep(i, -1)} disabled={i === 0} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                        <button title="Move down" aria-label="Move down" onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} className="btn-secondary" style={{ padding: '2px 6px', opacity: i === steps.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                                     </div>
                                 </td>
                                 <td style={tdStyle}>
@@ -4483,19 +4483,19 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                                     <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                                         {editingStep === step.id ? (
                                             <>
-                                                <button onClick={() => handleUpdateStep(step.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                                                <button title="Save" aria-label="Save" onClick={() => handleUpdateStep(step.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
                                                     <Save size={13} />
                                                 </button>
-                                                <button onClick={() => setEditingStep(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingStep(null)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
                                                     <X size={13} />
                                                 </button>
                                             </>
                                         ) : (
                                             <>
-                                                <button onClick={() => startEdit(step)} className="btn-secondary" style={{ padding: '4px 8px' }}>
+                                                <button title="Edit" aria-label="Edit" onClick={() => startEdit(step)} className="btn-secondary" style={{ padding: '4px 8px' }}>
                                                     <Pencil size={13} />
                                                 </button>
-                                                <button onClick={() => handleDeleteStep(step.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
+                                                <button title="Delete" aria-label="Delete" onClick={() => handleDeleteStep(step.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
                                                     <Trash2 size={13} />
                                                 </button>
                                             </>
@@ -4606,7 +4606,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                                         {t.autoCreateRevision ? <Check size={16} style={{ color: '#22c55e' }} /> : <X size={16} style={{ color: 'var(--text-secondary)', opacity: 0.3 }} />}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                        <button onClick={() => handleDeleteTransition(t.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
+                                        <button title="Delete" aria-label="Delete" onClick={() => handleDeleteTransition(t.id)} className="btn-secondary" style={{ padding: '4px 8px', color: 'var(--danger)' }}>
                                             <Trash2 size={13} />
                                         </button>
                                     </td>
@@ -4828,8 +4828,8 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                     }}>
                         {!readOnly && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                                <button disabled={idx === 0} onClick={() => handleReorder(idx, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === 0 ? 'default' : 'pointer', padding: '1px', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button disabled={idx === templates.length - 1} onClick={() => handleReorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === templates.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Move up" aria-label="Move up" disabled={idx === 0} onClick={() => handleReorder(idx, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === 0 ? 'default' : 'pointer', padding: '1px', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" disabled={idx === templates.length - 1} onClick={() => handleReorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === templates.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === templates.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                             </div>
                         )}
                         <div style={{ flex: 1 }}>
@@ -4838,8 +4838,8 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                                     <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title (optional)" style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                         <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={2} style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }} />
-                                        <button onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
-                                        <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
+                                        <button title="Save" aria-label="Save" onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
+                                        <button title="Cancel" aria-label="Cancel" onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
                                     </div>
                                 </div>
                             ) : (
@@ -4861,8 +4861,8 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                         </div>
                         {!readOnly && editId !== t.id && (
                             <div style={{ display: 'flex', gap: '4px' }}>
-                                <button onClick={() => { setEditId(t.id); setEditText(t.text); setEditTitle(t.title || '') }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
-                                <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditId(t.id); setEditText(t.text); setEditTitle(t.title || '') }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                             </div>
                         )}
                     </div>
@@ -4927,8 +4927,8 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                             </div>
                             {!readOnly && (
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                    <button onClick={() => { setEditSetId(s.id); setSetName(s.name); setSetTemplateIds(s.templateIds) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
-                                    <button onClick={() => handleDeleteSet(s.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditSetId(s.id); setSetName(s.name); setSetTemplateIds(s.templateIds) }} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><Pencil size={14} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={() => handleDeleteSet(s.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
                                 </div>
                             )}
                         </div>
@@ -5045,8 +5045,8 @@ function CargoClauseSetsManager({ section, sectionLabel, showSuccess, showError,
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{s.name}</span>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>{(s.clauseIds || []).length} clause{(s.clauseIds || []).length !== 1 ? 's' : ''}</span>
                                     </div>
-                                    <button onClick={() => startEdit(s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Pencil size={14} /></button>
-                                    <button onClick={() => remove(s.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => startEdit(s)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><Pencil size={14} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={() => remove(s.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                                 </div>
                             )}
                         </div>
@@ -5292,8 +5292,8 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                         background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <button onClick={() => handleIcMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                            <button onClick={() => handleIcMove(i, 'down')} disabled={i === instituteClauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === instituteClauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                            <button title="Move up" aria-label="Move up" onClick={() => handleIcMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                            <button title="Move down" aria-label="Move down" onClick={() => handleIcMove(i, 'down')} disabled={i === instituteClauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === instituteClauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                         </div>
                         <div style={{ flex: 1 }}>
                             {icEditingId === c.id ? (
@@ -5325,8 +5325,8 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                         >
                             {c.active === false ? 'OFF' : 'ON'}
                         </button>
-                        <button onClick={() => { setIcEditingId(c.id); setIcEditName(c.name || ''); setIcEditCode(c.code || ''); setIcEditDesc(c.description || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
-                        <button onClick={() => handleIcDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                        <button title="Edit" aria-label="Edit" onClick={() => { setIcEditingId(c.id); setIcEditName(c.name || ''); setIcEditCode(c.code || ''); setIcEditDesc(c.description || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                        <button title="Delete" aria-label="Delete" onClick={() => handleIcDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                     </div>
                 ))}
                 {instituteClauses.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No institute clauses yet. Add ICC A, ICC B, or ICC C above.</p>}
@@ -5408,8 +5408,8 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                     background: c.active === false ? 'rgba(255,0,0,0.03)' : 'transparent'
                 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                        <button onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                        <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                        <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === clauses.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === clauses.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                     </div>
                     <div style={{ flex: 1 }}>
                         {editingId === c.id ? (
@@ -5450,8 +5450,8 @@ function CargoClausesTab({ section, sectionLabel, showSuccess, showError }: TabP
                     >
                         {c.active === false ? 'OFF' : 'ON'}
                     </button>
-                    <button onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text || ''); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
-                    <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingId(c.id); setEditTitle(c.title || ''); setEditCode(c.code || ''); setEditText(c.text || ''); setEditHasAmount(!!c.hasAmount); setEditAmountPlaceholder(c.amountPlaceholder || '') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)' }}><Pencil size={14} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={() => handleDelete(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                 </div>
             ))}
             {clauses.length === 0 && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>No {section === 'conditions' ? 'additional conditions' : sectionLabel.toLowerCase() + ' clauses'} yet. Click &quot;Add&quot; to create one.</p>}

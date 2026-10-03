@@ -204,7 +204,7 @@ export default function RemapFilePathsModal({ vesselId, vesselName, entityId, en
                             {vesselName} — {entries.length} file{entries.length !== 1 ? 's' : ''} with paths
                         </div>
                     </div>
-                    <button
+                    <button title="Close" aria-label="Close"
                         onClick={onClose}
                         style={{
                             background: 'none', border: 'none', cursor: 'pointer',

@@ -1124,7 +1124,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <input type="text" value={newFilterName} onChange={e => setNewFilterName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCurrentFilter(); if (e.key === 'Escape') { setShowSaveFilterInput(false); setNewFilterName('') } }} placeholder="View name..." style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', width: '140px' }} autoFocus />
             <button onClick={saveCurrentFilter} className="btn-primary" style={{ padding: '5px 8px', fontSize: '0.75rem' }} disabled={!newFilterName.trim()}>Save</button>
-            <button onClick={() => { setShowSaveFilterInput(false); setNewFilterName('') }} className="btn-secondary" style={{ padding: '5px' }}><X size={12} /></button>
+            <button title="Cancel" aria-label="Cancel" onClick={() => { setShowSaveFilterInput(false); setNewFilterName('') }} className="btn-secondary" style={{ padding: '5px' }}><X size={12} /></button>
           </div>
         )}
       </div>
@@ -1187,9 +1187,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           {isSearchActive && <span style={{ position: 'absolute', right: loading ? '30px' : '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>ALL</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
-          <button onClick={() => navigateMonth(-1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronLeft size={16} /></button>
+          <button title="Previous" aria-label="Previous" onClick={() => navigateMonth(-1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronLeft size={16} /></button>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '180px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
-          <button onClick={() => navigateMonth(1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronRight size={16} /></button>
+          <button title="Next" aria-label="Next" onClick={() => navigateMonth(1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronRight size={16} /></button>
           <button onClick={goToToday} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>Today</button>
         </div>
         <button onClick={loadData} className="btn-secondary" style={{ padding: '7px', flexShrink: 0 }} title="Refresh"><RotateCw size={16} /></button>
@@ -1805,7 +1805,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Manage Groups</span>
-            <button onClick={() => setShowGroupManager(false)} className="btn-secondary" style={{ padding: '4px' }}>
+            <button title="Close" aria-label="Close" onClick={() => setShowGroupManager(false)} className="btn-secondary" style={{ padding: '4px' }}>
               <X size={14} />
             </button>
           </div>
@@ -1872,7 +1872,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                         style={{ width: '28px', height: '28px', padding: '2px', borderRadius: '4px', border: '1px solid var(--input-border)', cursor: 'pointer' }}
                       />
                       <button onClick={() => handleUpdateGroup(g.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Save</button>
-                      <button onClick={() => setEditingGroup(null)} className="btn-secondary" style={{ padding: '4px 6px' }}><X size={12} /></button>
+                      <button title="Cancel" aria-label="Cancel" onClick={() => setEditingGroup(null)} className="btn-secondary" style={{ padding: '4px 6px' }}><X size={12} /></button>
                     </>
                   ) : (
                     <>
@@ -2096,7 +2096,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             >
               First
             </button>
-            <button
+            <button title="Previous" aria-label="Previous"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="btn-secondary"
@@ -2107,7 +2107,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             <span style={{ padding: '0 8px', fontWeight: 600 }}>
               {page + 1} / {totalPages}
             </span>
-            <button
+            <button title="Next" aria-label="Next"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className="btn-secondary"

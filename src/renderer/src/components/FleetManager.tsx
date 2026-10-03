@@ -706,7 +706,7 @@ export default function FleetManager() {
                   <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
                     Create
                   </button>
-                  <button
+                  <button title="Close" aria-label="Close"
                     type="button"
                     onClick={() => {
                       setShowAddForm(false)
@@ -1035,7 +1035,7 @@ export default function FleetManager() {
                         <Trash2 size={14} />
                       </button>
                     )}
-                    <button
+                    <button title="Close" aria-label="Close"
                       onClick={() => setPanelFleet(null)}
                       style={{
                         background: 'transparent',

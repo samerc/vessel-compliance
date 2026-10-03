@@ -862,7 +862,7 @@ export default function SanctionsSearch() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{editingSic ? 'Edit SIC Entry' : 'Add SIC Entry'}</h2>
-                            <button onClick={() => setShowSicModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                            <button title="Close" aria-label="Close" onClick={() => setShowSicModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                                 <X size={20} />
                             </button>
                         </div>
@@ -936,7 +936,7 @@ export default function SanctionsSearch() {
                                                 display: 'flex', alignItems: 'center', gap: '4px'
                                             }}>
                                                 {a}
-                                                <button onClick={() => removeAlias(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 0, lineHeight: 1 }}>
+                                                <button title="Remove" aria-label="Remove" onClick={() => removeAlias(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 0, lineHeight: 1 }}>
                                                     <X size={12} />
                                                 </button>
                                             </span>
@@ -1003,7 +1003,7 @@ export default function SanctionsSearch() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Remark Templates</h2>
-                            <button onClick={() => setShowTemplateManager(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                            <button title="Close" aria-label="Close" onClick={() => setShowTemplateManager(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                                 <X size={20} />
                             </button>
                         </div>

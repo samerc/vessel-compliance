@@ -670,7 +670,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
             style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
           />
           <button type="submit" className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Add</button>
-          <button type="button" onClick={() => { setShowAddCustom(false); setNewCustomName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: '8px' }}><X size={16} /></button>
+          <button title="Cancel" aria-label="Cancel" type="button" onClick={() => { setShowAddCustom(false); setNewCustomName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: '8px' }}><X size={16} /></button>
         </form>
       ) : (
         <button

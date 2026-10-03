@@ -1584,7 +1584,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                                 rows={2}
                                                 style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }}
                                             />
-                                            <button
+                                            <button title="Delete" aria-label="Delete"
                                                 onClick={() => deleteCustomCondition(item.key)}
                                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
                                             ><Trash2 size={14} /></button>

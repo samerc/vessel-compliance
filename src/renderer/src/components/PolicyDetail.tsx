@@ -2987,7 +2987,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     ? 'Reissue Blue Card'
                     : 'Issue New Blue Card'}
               </h3>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setBcModalOpen(false)}
                 style={{
                   background: 'transparent',
@@ -3522,7 +3522,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           <div style={{ position: 'relative', width: '700px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '14px', padding: '28px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '1.1rem' }}>War Declaration</h2>
-              <button onClick={() => setShowDeclarationModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setShowDeclarationModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             {(() => {
               const f = declarationFields
@@ -3654,7 +3654,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>Cancel Policy</h3>
-                  <button onClick={() => setShowCancelModal(false)}
+                  <button title="Cancel" aria-label="Cancel" onClick={() => setShowCancelModal(false)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                     <X size={18} />
                   </button>

@@ -183,7 +183,7 @@ export default function NotesTab({ quotation, showSuccess, isLight }: { quotatio
                         <div style={{ padding: '14px', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                                 <input type="text" defaultValue={note.title} onBlur={e => handleUpdate(note.id, { title: e.target.value })} style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }} />
-                                <button onClick={async () => { if (!(await confirmDialog('Delete this note and its replies?'))) return; await window.api.deleteQuotationNote(note.id); showSuccess('Note deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { if (!(await confirmDialog('Delete this note and its replies?'))) return; await window.api.deleteQuotationNote(note.id); showSuccess('Note deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                             </div>
                             <textarea defaultValue={note.content} onBlur={e => handleUpdate(note.id, { content: e.target.value })} style={{ width: '100%', minHeight: '60px', resize: 'vertical', fontSize: '0.85rem' }} />
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
@@ -210,7 +210,7 @@ export default function NotesTab({ quotation, showSuccess, isLight }: { quotatio
                                                 {reply.authorUsername && <span style={{ fontWeight: 600 }}>{reply.authorUsername}</span>}
                                                 {reply.createdAt && <span style={{ marginLeft: '6px' }}>{formatTime(reply.createdAt)}</span>}
                                             </div>
-                                            <button onClick={async () => { if (!(await confirmDialog('Delete this reply?'))) return; await window.api.deleteQuotationNote(reply.id); showSuccess('Reply deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
+                                            <button title="Delete" aria-label="Delete" onClick={async () => { if (!(await confirmDialog('Delete this reply?'))) return; await window.api.deleteQuotationNote(reply.id); showSuccess('Reply deleted'); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
                                         </div>
                                         <div style={{ lineHeight: 1.5 }}>{highlightMentions(reply.content)}</div>
                                     </div>

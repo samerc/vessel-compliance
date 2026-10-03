@@ -483,7 +483,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                             className="btn-secondary"
                             style={{ padding: '5px 8px', fontSize: '0.78rem' }}
                         >First</button>
-                        <button
+                        <button title="Previous" aria-label="Previous"
                             onClick={() => setPage(p => Math.max(0, p - 1))}
                             disabled={page === 0}
                             className="btn-secondary"
@@ -492,7 +492,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                         <span style={{ padding: '0 8px', fontWeight: 600 }}>
                             {page + 1} / {totalPages}
                         </span>
-                        <button
+                        <button title="Next" aria-label="Next"
                             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                             disabled={page >= totalPages - 1}
                             className="btn-secondary"

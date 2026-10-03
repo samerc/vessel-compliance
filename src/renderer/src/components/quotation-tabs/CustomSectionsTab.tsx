@@ -122,8 +122,8 @@ export default function CustomSectionsTab({ quotation, showSuccess, showError, i
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <button onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
-                                <button onClick={() => handleMove(i, 'down')} disabled={i === sections.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === sections.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === sections.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === sections.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
                             </div>
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '4px' }}>{section.title}</div>
@@ -136,8 +136,8 @@ export default function CustomSectionsTab({ quotation, showSuccess, showError, i
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '4px' }}>
-                                <button onClick={() => startEdit(section)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={15} /></button>
-                                <button onClick={() => handleDelete(section.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={15} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => startEdit(section)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}><Pencil size={15} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => handleDelete(section.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={15} /></button>
                             </div>
                         </div>
                     )}

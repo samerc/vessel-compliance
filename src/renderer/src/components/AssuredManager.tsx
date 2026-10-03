@@ -829,7 +829,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                   <Pencil size={12} /> Edit
                 </button>
               )}
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setSelectedAssuredId(null)}
                 style={{
                   background: 'transparent',
@@ -888,7 +888,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                       <Save size={14} />
                     )}
                   </button>
-                  <button
+                  <button title="Close" aria-label="Close"
                     onClick={() => setEditingVesselAssuredId(null)}
                     className="btn-secondary"
                     style={{ padding: '6px 8px' }}

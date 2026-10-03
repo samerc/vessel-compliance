@@ -804,7 +804,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={modalCard} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>{editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Cancel" aria-label="Cancel" onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
@@ -885,7 +885,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ ...modalCard, width: '440px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Convert to Survey</h3>
-              <button onClick={() => setConvertWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setConvertWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               Creates a new condition survey and links it to “{convertWarranty.description}”.
@@ -938,7 +938,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
-              <button onClick={() => setReminderWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setReminderWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
@@ -980,7 +980,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
-              <button onClick={() => setWaiveWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setWaiveWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <div>
               <label style={labelStyle}>Waiver Reason *</label>
@@ -1014,7 +1014,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
-              <button onClick={() => setCompleteWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setCompleteWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <div>
               <label style={labelStyle}>Completion Notes (optional)</label>
@@ -1047,7 +1047,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <div style={{ ...modalCard, width: '560px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Link to Survey</h3>
-              <button onClick={() => setLinkWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Close" aria-label="Close" onClick={() => setLinkWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               Pick an existing survey on file for this vessel to link to: <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>

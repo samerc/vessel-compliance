@@ -271,7 +271,7 @@ export function UpdateNotification(): React.ReactElement | null {
                         boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
                         position: 'relative'
                     }}>
-                        <button
+                        <button title="Close" aria-label="Close"
                             onClick={() => setShowPreview(false)}
                             style={{ position: 'absolute', top: '14px', right: '14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
                         >

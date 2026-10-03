@@ -337,8 +337,8 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                                 <GripVertical size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0, opacity: 0.5, marginTop: '2px' }} />
                                 <span style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>{ce.text}</span>
                                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
-                                    <button onClick={() => { setEditingCustomId(ce.id); setEditCustomText(ce.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)' }}><Pencil size={12} /></button>
-                                    <button onClick={() => deleteCustom(ce.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                                    <button title="Edit" aria-label="Edit" onClick={() => { setEditingCustomId(ce.id); setEditCustomText(ce.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)' }}><Pencil size={12} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={() => deleteCustom(ce.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}><Trash2 size={12} /></button>
                                 </div>
                             </div>
                         )}
@@ -363,7 +363,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                     <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', width: '500px', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h3 style={{ margin: 0, fontSize: '1rem' }}>Import Custom Exclusions</h3>
-                            <button onClick={() => setShowImportModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+                            <button title="Close" aria-label="Close" onClick={() => setShowImportModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
                         </div>
                         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>Paste exclusions (one per line). Bullets, dashes, and numbering will be stripped.</p>
                         <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste exclusions here..." style={{ width: '100%', minHeight: '200px', resize: 'vertical', marginBottom: '12px' }} />

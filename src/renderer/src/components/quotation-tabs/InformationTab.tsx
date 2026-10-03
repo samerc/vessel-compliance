@@ -34,7 +34,7 @@ export default function InformationTab({ quotation, updateField, setQ, showSucce
             {items.map(item => (
                 <div key={item.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{item.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationInformation(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationInformation(item.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>

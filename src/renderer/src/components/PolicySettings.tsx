@@ -354,12 +354,12 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
             background: idx === 0 ? 'rgba(0,170,200,0.06)' : 'transparent'
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
-              <button onClick={() => handleMove(idx, 1)} disabled={idx === timezones.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === timezones.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
+              <button title="Move up" aria-label="Move up" onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
+              <button title="Move down" aria-label="Move down" onClick={() => handleMove(idx, 1)} disabled={idx === timezones.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === timezones.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
             </div>
             <span style={{ flex: 1, fontSize: '0.9rem' }}>{tz}</span>
             {idx === 0 && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', fontWeight: 600 }}>DEFAULT</span>}
-            <button onClick={() => handleRemove(tz)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+            <button title="Delete" aria-label="Delete" onClick={() => handleRemove(tz)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
           </div>
         ))}
       </div>
@@ -1187,7 +1187,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
           <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '20px', width: '760px', maxWidth: '94vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>{editing.id ? 'Edit' : 'New'} T&C — {TC_TYPE_LABELS[typeCode]}</h3>
-              <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button title="Cancel" aria-label="Cancel" onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
             </div>
             <input type="text" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Template name (e.g. Standard P&I T&C)" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.88rem', marginBottom: '10px', boxSizing: 'border-box' }} />
             <div style={{ flex: 1, overflowY: 'auto', minHeight: '260px' }}>
@@ -1404,7 +1404,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
                   {sig ? 'Replace' : 'Upload'}
                 </button>
                 {sig && (
-                  <button
+                  <button title="Delete" aria-label="Delete"
                     className="btn-secondary"
                     style={{ padding: '6px 10px', fontSize: '0.78rem', color: 'var(--danger)' }}
                     onClick={() => handleDelete(u.id)}
@@ -1626,7 +1626,7 @@ function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: 
                     <input type="number" step="0.01" value={eg.rates[pt.id] ?? ''} onChange={e => handleOverrideChange(eg.entityId, pt.id, e.target.value)} onBlur={e => handleOverrideChange(eg.entityId, pt.id, e.target.value)} style={{ width: '60px', padding: '3px 6px', textAlign: 'right', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} placeholder={String(defaults[pt.id] || 0)} />
                   </td>
                 ))}
-                <td style={{ padding: '6px 4px', textAlign: 'center' }}><button onClick={() => handleDeleteCustomer(eg.entityId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button></td>
+                <td style={{ padding: '6px 4px', textAlign: 'center' }}><button title="Delete" aria-label="Delete" onClick={() => handleDeleteCustomer(eg.entityId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button></td>
               </tr>
             ))}
           </tbody>
@@ -1899,11 +1899,11 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
                   {sectionOptions.find(o => o.key === t.sectionKey)?.label || t.sectionKey}
                 </span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                  <button onClick={() => { setEditingTmpl(t.id); setEditTmplName(t.name); setEditTmplSection(t.sectionKey); setEditTmplContent(t.content) }}
+                  <button title="Edit" aria-label="Edit" onClick={() => { setEditingTmpl(t.id); setEditTmplName(t.name); setEditTmplSection(t.sectionKey); setEditTmplContent(t.content) }}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                     <Edit3 size={14} />
                   </button>
-                  <button onClick={() => deleteTemplate(t.id)}
+                  <button title="Delete" aria-label="Delete" onClick={() => deleteTemplate(t.id)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}>
                     <Trash2 size={14} />
                   </button>
@@ -1995,8 +1995,8 @@ function PolicySectionOrderTab({ showSuccess, showError, isLight }: { showSucces
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: '22px' }}>{i + 1}.</span>
               <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>{SECTION_LABELS[k] || k}</span>
               <div style={{ display: 'flex', gap: '2px' }}>
-                <button onClick={() => move(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
-                <button onClick={() => move(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
+                <button title="Move up" aria-label="Move up" onClick={() => move(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={16} /></button>
+                <button title="Move down" aria-label="Move down" onClick={() => move(i, 'down')} disabled={i === order.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', opacity: i === order.length - 1 ? 0.3 : 1 }}><ChevronDown size={16} /></button>
               </div>
             </div>
           ))}

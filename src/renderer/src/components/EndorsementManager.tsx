@@ -757,16 +757,16 @@ export default function EndorsementManager({
                       }}>
                       {s.isFullWidth ? 'FULL' : '2-COL'}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); moveSection(editState.sections.indexOf(s), -1) }}
+                    <button title="Move up" aria-label="Move up" onClick={e => { e.stopPropagation(); moveSection(editState.sections.indexOf(s), -1) }}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>
                       <ArrowUp size={13} />
                     </button>
-                    <button onClick={e => { e.stopPropagation(); moveSection(editState.sections.indexOf(s), 1) }}
+                    <button title="Move down" aria-label="Move down" onClick={e => { e.stopPropagation(); moveSection(editState.sections.indexOf(s), 1) }}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}>
                       <ArrowDown size={13} />
                     </button>
                     {isCustom && (
-                      <button onClick={e => { e.stopPropagation(); removeSection(s.sectionKey) }}
+                      <button title="Remove" aria-label="Remove" onClick={e => { e.stopPropagation(); removeSection(s.sectionKey) }}
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}>
                         <X size={13} />
                       </button>
@@ -835,7 +835,7 @@ export default function EndorsementManager({
                         ...prev,
                         instalments: prev.instalments.map((x, j) => j === i ? { ...x, commissionAmount: s } : x)
                       }))} placeholder="Commission" style={{ ...inputStyle, fontSize: '0.78rem' }} />
-                    <button onClick={() => removeInstalment(i)}
+                    <button title="Remove" aria-label="Remove" onClick={() => removeInstalment(i)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}>
                       <X size={14} />
                     </button>

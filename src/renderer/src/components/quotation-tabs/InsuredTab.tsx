@@ -159,9 +159,9 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                 <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
                 {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
                 <div style={{ display: 'flex', gap: '2px' }}>
-                    <button onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                    <button onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                    <button onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
+                    <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                    <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={() => handleDeleteAssured(a.id)} className="btn-secondary" style={{ padding: '4px', color: 'var(--danger)' }}><Trash2 size={14} /></button>
                 </div>
             </div>
         )
@@ -221,7 +221,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                             <input value={g.name} onChange={e => setGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, name: e.target.value } : gg))}
                                 onBlur={e => window.api.updateQuotationAssuredGroup(g.id, { name: e.target.value })}
                                 style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }} />
-                            <button onClick={async () => { if (!(await confirmDialog('Delete this group?'))) return; await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
+                            <button title="Delete" aria-label="Delete" onClick={async () => { if (!(await confirmDialog('Delete this group?'))) return; await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                         </div>
                     ))}
@@ -230,7 +230,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                             onKeyDown={e => { if (e.key === 'Enter' && newGroupName.trim()) { handleAddGroup() } }}
                             placeholder="Add group..."
                             style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
-                        <button onClick={() => handleAddGroup()} disabled={!newGroupName.trim()} className="btn-secondary"
+                        <button title="Add" aria-label="Add" onClick={() => handleAddGroup()} disabled={!newGroupName.trim()} className="btn-secondary"
                             style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Plus size={12} />
                         </button>
@@ -295,7 +295,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                             autoFocus
                         />
                         <button onClick={handleCreateRole} className="btn-primary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>Save</button>
-                        <button onClick={() => { setShowNewRoleInput(false); setNewRoleName('') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={14} /></button>
+                        <button title="Cancel" aria-label="Cancel" onClick={() => { setShowNewRoleInput(false); setNewRoleName('') }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}><X size={14} /></button>
                     </div>
                 ) : (
                     <select

@@ -473,7 +473,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ReceiptIcon size={22} /> {editing ? 'Edit Receipt' : 'New Receipt'}
           </h2>
-          <button onClick={onClose} style={iconBtn}><X size={20} /></button>
+          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}><X size={20} /></button>
         </div>
 
         <div style={{ display: 'grid', gap: '16px' }}>
@@ -706,7 +706,7 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
       <div style={{ ...modalWrap, background: modalBg, maxWidth: '420px' }} onMouseDown={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
           <h2 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px' }}><Settings size={20} /> Receipt Settings</h2>
-          <button onClick={onClose} style={iconBtn}><X size={20} /></button>
+          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}><X size={20} /></button>
         </div>
         <div style={{ display: 'grid', gap: '16px' }}>
           <div>

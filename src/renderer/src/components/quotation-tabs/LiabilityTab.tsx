@@ -156,7 +156,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
                                         placeholder="—"
                                         style={{ width: '120px', fontSize: '0.85rem', textAlign: 'right' }}
                                     />
-                                    <button onClick={async () => {
+                                    <button title="Delete" aria-label="Delete" onClick={async () => {
                                         await window.api.lolDeleteOption(opt.id)
                                         // If only one remains after delete, remove it too and restore to primary LOL
                                         const remaining = lolOptions.filter(o => o.id !== opt.id)
@@ -309,7 +309,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             {subLimits.map(sl => (
                 <div key={sl.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ flex: 1, fontSize: '0.85rem' }}>{sl.currency} {sl.amount.toLocaleString()} — {sl.text}</span>
-                    <button onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                    <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationSubLimit(sl.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                 </div>
             ))}
         </div>

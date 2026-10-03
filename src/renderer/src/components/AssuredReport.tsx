@@ -340,7 +340,7 @@ export default function AssuredReport() {
                 {selectedVesselNames.map(v => (
                   <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px 3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.25)' }}>
                     {v.name}
-                    <button onClick={() => setSelectedVesselIds(prev => { const n = new Set(prev); n.delete(v.id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0 2px', display: 'flex' }}><X size={12} /></button>
+                    <button title="Remove" aria-label="Remove" onClick={() => setSelectedVesselIds(prev => { const n = new Set(prev); n.delete(v.id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0 2px', display: 'flex' }}><X size={12} /></button>
                   </span>
                 ))}
               </div>

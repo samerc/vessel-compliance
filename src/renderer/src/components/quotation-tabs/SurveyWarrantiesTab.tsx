@@ -224,8 +224,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                                             autoFocus
                                             onKeyDown={e => { if (e.key === 'Escape') setEditingId(null) }}
                                         />
-                                        <button onClick={() => { updateItem(item.id, item.customText ? { customText: editText } : { text: editText }); setEditingId(null) }} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}><Save size={14} /></button>
-                                        <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={14} /></button>
+                                        <button title="Save" aria-label="Save" onClick={() => { updateItem(item.id, item.customText ? { customText: editText } : { text: editText }); setEditingId(null) }} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}><Save size={14} /></button>
+                                        <button title="Cancel" aria-label="Cancel" onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={14} /></button>
                                     </div>
                                 ) : (
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
@@ -333,9 +333,9 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginLeft: '8px' }}>
-                                <button disabled={idx === 0} onClick={() => reorder(idx, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === 0 ? 'default' : 'pointer', padding: '1px', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                <button disabled={idx === items.length - 1} onClick={() => reorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === items.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                <button onClick={() => deleteItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '1px', marginTop: '4px' }}><Trash2 size={14} /></button>
+                                <button title="Move up" aria-label="Move up" disabled={idx === 0} onClick={() => reorder(idx, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === 0 ? 'default' : 'pointer', padding: '1px', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
+                                <button title="Move down" aria-label="Move down" disabled={idx === items.length - 1} onClick={() => reorder(idx, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: idx === items.length - 1 ? 'default' : 'pointer', padding: '1px', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={() => deleteItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '1px', marginTop: '4px' }}><Trash2 size={14} /></button>
                             </div>
                         </div>
                         <div style={{ paddingLeft: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

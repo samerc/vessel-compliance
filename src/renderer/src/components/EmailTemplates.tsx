@@ -351,7 +351,7 @@ export default function EmailTemplates(): React.JSX.Element {
                   </div>
                   {canManage && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
-                      <button
+                      <button title="Move up" aria-label="Move up"
                         onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'up') }}
                         disabled={idx === 0}
                         style={{
@@ -361,7 +361,7 @@ export default function EmailTemplates(): React.JSX.Element {
                       >
                         <ChevronUp size={12} />
                       </button>
-                      <button
+                      <button title="Move down" aria-label="Move down"
                         onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'down') }}
                         disabled={idx === filteredTemplates.length - 1}
                         style={{

@@ -965,9 +965,9 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                         <span style={{ fontSize: '0.78rem' }}>%</span>
                                     </div>
                                 )}
-                                <button onClick={() => move(-1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1, padding: '2px' }}><ChevronUp size={16} /></button>
-                                <button onClick={() => move(1)} disabled={idx === discounts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === discounts.length - 1 ? 0.3 : 1, padding: '2px' }}><ChevronDown size={16} /></button>
-                                <button onClick={async () => { await window.api.quotationDiscountDelete(d.id); setDiscounts(prev => prev.filter(x => x.id !== d.id)) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={16} /></button>
+                                <button title="Move up" aria-label="Move up" onClick={() => move(-1)} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1, padding: '2px' }}><ChevronUp size={16} /></button>
+                                <button title="Move down" aria-label="Move down" onClick={() => move(1)} disabled={idx === discounts.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', opacity: idx === discounts.length - 1 ? 0.3 : 1, padding: '2px' }}><ChevronDown size={16} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.quotationDiscountDelete(d.id); setDiscounts(prev => prev.filter(x => x.id !== d.id)) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={16} /></button>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Placement:</span>

@@ -379,7 +379,7 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
                                         {code && <span style={{ fontWeight: 700, marginRight: '6px', color: 'var(--text-primary)' }}>{code}</span>}
                                         {text}
                                     </span>
-                                    <button onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
+                                    <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationAdditionalClause(ac.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px', flexShrink: 0 }}><Trash2 size={14} /></button>
                                 </div>
                                 <div style={{ paddingLeft: '30px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <VesselScopeChips vessels={qVessels} vesselScope={ac.vesselScope} onChange={scope => updateAdditionalClauseScope(ac.id, scope)} />

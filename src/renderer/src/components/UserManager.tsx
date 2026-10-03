@@ -555,8 +555,8 @@ export default function UserManager() {
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                                                 <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveUser(user.id); if (e.key === 'Escape') setEditingUserId(null) }} autoFocus placeholder="Username" style={{ padding: '3px 8px', fontSize: '0.85rem', width: '140px' }} />
-                                                                <button onClick={() => handleSaveUser(user.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '2px' }}><Save size={14} /></button>
-                                                                <button onClick={() => setEditingUserId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><X size={14} /></button>
+                                                                <button title="Save" aria-label="Save" onClick={() => handleSaveUser(user.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--success)', padding: '2px' }}><Save size={14} /></button>
+                                                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingUserId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><X size={14} /></button>
                                                             </div>
                                                             <input type="text" value={editFullName} onChange={e => setEditFullName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSaveUser(user.id); if (e.key === 'Escape') setEditingUserId(null) }} placeholder="Full Name (optional)" style={{ padding: '3px 8px', fontSize: '0.78rem', width: '200px' }} />
                                                         </div>
@@ -737,7 +737,7 @@ export default function UserManager() {
                                     </span>
                                 </p>
                             </div>
-                            <button onClick={closeGroupsModal} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
+                            <button title="Close" aria-label="Close" onClick={closeGroupsModal} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}>
                                 <X size={20} />
                             </button>
                         </div>

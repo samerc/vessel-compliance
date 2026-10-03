@@ -1030,7 +1030,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                   <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Export PDF</h3>
                   <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Select which defect notes to include</p>
                 </div>
-                <button onClick={() => setShowPdfModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
+                <button title="Close" aria-label="Close" onClick={() => setShowPdfModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
                   <X size={18} />
                 </button>
               </div>

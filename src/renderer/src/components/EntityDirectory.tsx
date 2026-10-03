@@ -1568,7 +1568,7 @@ export default function EntityDirectory({
                 >
                   <ChevronsLeft size={13} />
                 </button>
-                <button
+                <button title="Previous" aria-label="Previous"
                   className="btn-secondary"
                   disabled={page === 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -1579,7 +1579,7 @@ export default function EntityDirectory({
                 <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>
                   {page}/{totalPages}
                 </span>
-                <button
+                <button title="Next" aria-label="Next"
                   className="btn-secondary"
                   disabled={page === totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -1681,7 +1681,7 @@ export default function EntityDirectory({
                     {selectedEntity.type}
                   </span>
                 </div>
-                <button
+                <button title="Close" aria-label="Close"
                   onClick={() => setSelectedEntity(null)}
                   style={{
                     padding: '4px',
@@ -1757,7 +1757,7 @@ export default function EntityDirectory({
                   <Merge size={13} /> Merge
                 </button>
                 {hasPermission('entities:delete') && (
-                  <button
+                  <button title="Delete" aria-label="Delete"
                     onClick={() => handleDeleteEntity(selectedEntity)}
                     className="btn-secondary"
                     style={{
@@ -2040,7 +2040,7 @@ export default function EntityDirectory({
               }}
             >
               <h3 style={{ fontSize: '1.3rem' }}>Create Entity</h3>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setShowCreateModal(false)}
                 className="btn-secondary"
                 style={{ padding: '6px' }}
@@ -2270,7 +2270,7 @@ export default function EntityDirectory({
               <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Merge size={20} /> Merge Entities
               </h3>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setShowMergeModal(false)}
                 className="btn-secondary"
                 style={{ padding: '6px' }}
@@ -2577,7 +2577,7 @@ export default function EntityDirectory({
                   Entities with similar names based on Jaro-Winkler similarity
                 </p>
               </div>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setShowDuplicatesModal(false)}
                 style={{
                   background: 'none',

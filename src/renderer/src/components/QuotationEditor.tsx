@@ -1462,7 +1462,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
             <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '14px', padding: '24px', width: '520px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid var(--glass-border-color)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Copy from Quotation</h3>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+                    <button title="Close" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
                 </div>
 
                 {/* Source quotation selector */}

@@ -213,8 +213,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                     {/* Row 1: reorder + title + amounts + actions */}
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column' }}>
-                            <button onClick={() => moveDeductible(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={12} /></button>
-                            <button onClick={() => moveDeductible(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={12} /></button>
+                            <button title="Move up" aria-label="Move up" onClick={() => moveDeductible(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={12} /></button>
+                            <button title="Move down" aria-label="Move down" onClick={() => moveDeductible(i, 'down')} disabled={i === deductibles.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === deductibles.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={12} /></button>
                         </div>
                         {d.title && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{d.title}</span>}
                         <input type="text" defaultValue={d.currency} onBlur={e => handleUpdate(d.id, { currency: e.target.value })} style={{ width: '60px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
@@ -227,8 +227,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                         )}
                         {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
                         <div style={{ flex: 1 }} />
-                        <button onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
-                        <button onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
+                        <button title="Edit" aria-label="Edit" onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
+                        <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>
                     </div>
                     {/* Row 2: previous amounts (compact, secondary) */}
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingLeft: '24px', marginBottom: '4px' }}>
@@ -335,8 +335,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                 <div key={td.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', ...altStyle(td.alternativeId) }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                         <div style={{ display: 'flex', gap: '1px', flexDirection: 'column', flexShrink: 0 }}>
-                            <button onClick={() => moveTextDed(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
-                            <button onClick={() => moveTextDed(i, 'down')} disabled={i === textDeds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === textDeds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
+                            <button title="Move up" aria-label="Move up" onClick={() => moveTextDed(i, 'up')} disabled={i === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === 0 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronUp size={10} /></button>
+                            <button title="Move down" aria-label="Move down" onClick={() => moveTextDed(i, 'down')} disabled={i === textDeds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === textDeds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
                         </div>
                         {editingTextId === td.id ? (
                             <>
@@ -344,8 +344,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                     <input type="text" value={editTextTitle} onChange={e => setEditTextTitle(e.target.value)} placeholder="Title" style={{ fontSize: '0.82rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                                     <textarea value={editTextContent} onChange={e => setEditTextContent(e.target.value)} placeholder="Text content" style={{ minHeight: '50px', resize: 'vertical', fontSize: '0.82rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                                 </div>
-                                <button onClick={async () => { await window.api.updateQuotationTextDeductible(td.id, { title: editTextTitle, text: editTextContent }); setEditingTextId(null); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}><Save size={12} /></button>
-                                <button onClick={() => setEditingTextId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
+                                <button title="Save" aria-label="Save" onClick={async () => { await window.api.updateQuotationTextDeductible(td.id, { title: editTextTitle, text: editTextContent }); setEditingTextId(null); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '2px' }}><Save size={12} /></button>
+                                <button title="Cancel" aria-label="Cancel" onClick={() => setEditingTextId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
                             </>
                         ) : (
                             <>
@@ -353,8 +353,8 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                     {td.title && <div style={{ fontSize: '0.83rem', fontWeight: 600 }}>{td.title}</div>}
                                     {td.text && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{td.text}</div>}
                                 </div>
-                                <button onClick={() => { setEditingTextId(td.id); setEditTextTitle(td.title || ''); setEditTextContent(td.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
-                                <button onClick={async () => { await window.api.deleteQuotationTextDeductible(td.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
+                                <button title="Edit" aria-label="Edit" onClick={() => { setEditingTextId(td.id); setEditTextTitle(td.title || ''); setEditTextContent(td.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
+                                <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationTextDeductible(td.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={12} /></button>
                             </>
                         )}
                     </div>

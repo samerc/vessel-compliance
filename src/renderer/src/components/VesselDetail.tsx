@@ -866,7 +866,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 onKeyDown={e => { if (e.key === 'Enter') handleAddVesselType(); if (e.key === 'Escape') setShowAddVesselType(false) }}
                                                 style={{ padding: '4px 8px', borderRadius: '4px', width: '120px', fontSize: '0.85rem' }} />
                                             <button onClick={handleAddVesselType} disabled={!newVesselTypeName.trim()} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.78rem' }}>Add</button>
-                                            <button onClick={() => { setShowAddVesselType(false); setNewVesselTypeName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={14} /></button>
+                                            <button title="Cancel" aria-label="Cancel" onClick={() => { setShowAddVesselType(false); setNewVesselTypeName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={14} /></button>
                                         </div>
                                     ) : (
                                         <>
@@ -2342,7 +2342,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     {vessel.name}
                                 </p>
                             </div>
-                            <button onClick={() => setShowNotesModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                            <button title="Close" aria-label="Close" onClick={() => setShowNotesModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
                                 <X size={18} />
                             </button>
                         </div>
@@ -3135,7 +3135,7 @@ function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, s
                     <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <FileText size={18} /> Generate from Template
                     </h3>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    <button title="Close" aria-label="Close" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                         <X size={18} />
                     </button>
                 </div>

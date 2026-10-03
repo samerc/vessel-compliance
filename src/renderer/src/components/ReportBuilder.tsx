@@ -1810,7 +1810,7 @@ export default function ReportBuilder() {
               <h3 style={{ fontSize: '1.1rem', fontWeight: '600', margin: 0 }}>
                 {editingReportId ? 'Update Report' : 'Save Report'}
               </h3>
-              <button
+              <button title="Close" aria-label="Close"
                 onClick={() => setSaveModalOpen(false)}
                 style={{
                   background: 'none',

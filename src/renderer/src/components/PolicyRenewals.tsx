@@ -1018,15 +1018,15 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                     <>
                                         <input type="color" value={editStatusColor} onChange={e => setEditStatusColor(e.target.value)} style={{ width: '36px', height: '32px', padding: '2px', borderRadius: '4px', border: '1px solid var(--input-border)', cursor: 'pointer' }} />
                                         <input type="text" value={editStatusName} onChange={e => setEditStatusName(e.target.value)} style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
-                                        <button onClick={() => handleSaveEditStatus(st.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981', display: 'flex' }}><Check size={16} /></button>
-                                        <button onClick={() => setEditingStatusId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}><X size={16} /></button>
+                                        <button title="Confirm" aria-label="Confirm" onClick={() => handleSaveEditStatus(st.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981', display: 'flex' }}><Check size={16} /></button>
+                                        <button title="Cancel" aria-label="Cancel" onClick={() => setEditingStatusId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}><X size={16} /></button>
                                     </>
                                 ) : (
                                     <>
                                         <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: st.color, flexShrink: 0, border: '2px solid rgba(255,255,255,0.15)' }} />
                                         <span style={{ flex: 1, fontSize: '0.9rem' }}>{st.name}</span>
-                                        <button onClick={() => { setEditingStatusId(st.id); setEditStatusName(st.name); setEditStatusColor(st.color) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}><Edit3 size={14} /></button>
-                                        <button onClick={() => handleDeleteStatus(st.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex' }}><Trash2 size={14} /></button>
+                                        <button title="Edit" aria-label="Edit" onClick={() => { setEditingStatusId(st.id); setEditStatusName(st.name); setEditStatusColor(st.color) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}><Edit3 size={14} /></button>
+                                        <button title="Delete" aria-label="Delete" onClick={() => handleDeleteStatus(st.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex' }}><Trash2 size={14} /></button>
                                     </>
                                 )}
                             </div>
@@ -1367,7 +1367,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                     Notes are linked to this policy number and will not carry over on renewal.
                                 </p>
                             </div>
-                            <button onClick={() => setNotesModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
+                            <button title="Close" aria-label="Close" onClick={() => setNotesModal(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
                                 <X size={18} />
                             </button>
                         </div>
