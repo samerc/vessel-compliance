@@ -3,7 +3,7 @@ import { Calendar, Download, ChevronLeft, ChevronRight, Eye, ChevronUp, ChevronD
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { formatDateTime } from '../utils/dateUtils'
+import { formatDate, formatDateTime } from '../utils/dateUtils'
 import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { confirmDialog } from './DialogHost'
@@ -716,7 +716,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             )}
             {rnVisSet.has('policyType') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.policyTypeName}</td>}
             {rnVisSet.has('policyNo') && <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyNumber || '-'}</td>}
-            {rnVisSet.has('endDate') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.endDate || '-'}</td>}
+            {rnVisSet.has('endDate') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{formatDate(r.endDate) || r.endDate || '-'}</td>}
             {rnVisSet.has('premium') && <td style={{ padding: '8px 12px', color: 'var(--text-primary)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', fontSize: '0.82rem' }}>{formatPremium(r.premium, r.currency)}</td>}
             {rnVisSet.has('days') && (
             <td style={{ padding: '8px 12px', textAlign: 'right' }}>

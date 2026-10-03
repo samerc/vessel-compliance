@@ -53,6 +53,7 @@ import { countDays, calcProRataPremium, distributeInstalments } from '../utils/p
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
 import { ok } from '../utils/ipc'
+import { MoneyInput } from './quotation-tabs/shared'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -750,7 +751,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     return {
       on: overlaps,
       text: overlaps
-        ? `This certificate cancels and replaces certificate ${source.cardNumber} issued on ${source.issuedDate || 'N/A'}.`
+        ? `This certificate cancels and replaces certificate ${source.cardNumber} issued on ${formatDate(source.issuedDate) || source.issuedDate || 'N/A'}.`
         : ''
     }
   }
@@ -1846,33 +1847,19 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '20px' }}>
                 <div>
                   <label style={labelStyle}>Premium Amount</label>
-                  <input
-                    type="number"
-                    value={editPremium || ''}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value) || 0
+                  <MoneyInput value={editPremium} onChange={v => {
+                      const val = v || 0
                       setEditPremium(val)
                       setEditInstalments(prev => recalcInstalments(val, editCommission, prev))
-                    }}
-                    step="0.01"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-                  />
+                    }} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
                 </div>
                 <div>
                   <label style={labelStyle}>Commission %</label>
-                  <input
-                    type="number"
-                    value={editCommission || ''}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value) || 0
+                  <MoneyInput value={editCommission} onChange={v => {
+                      const val = v || 0
                       setEditCommission(val)
                       setEditInstalments(prev => recalcInstalments(editPremium, val, prev))
-                    }}
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-                  />
+                    }} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
                 </div>
                 <div>
                   <label style={labelStyle}>Bank</label>
@@ -1930,22 +1917,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                             />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <input
-                              type="number"
-                              value={inst.premiumAmount || ''}
-                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, premiumAmount: parseFloat(e.target.value) || 0 } : r))}
-                              step="0.01"
-                              style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }}
-                            />
+                            <MoneyInput value={inst.premiumAmount} onChange={val => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, premiumAmount: val || 0 } : r))} style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }} />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <input
-                              type="number"
-                              value={inst.commissionAmount || ''}
-                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, commissionAmount: parseFloat(e.target.value) || 0 } : r))}
-                              step="0.01"
-                              style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }}
-                            />
+                            <MoneyInput value={inst.commissionAmount} onChange={val => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, commissionAmount: val || 0 } : r))} style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }} />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
                             <input type="checkbox" checked={inst.isNonRefundable} onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, isNonRefundable: e.target.checked } : r))} />

@@ -3769,7 +3769,8 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
 
     const formatDate = (d: string | null) => {
         if (!d) return '—'
-        try { return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) } catch { return d }
+        const dt = new Date(d)
+        return isNaN(dt.getTime()) ? d : dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     }
 
     const sourceColors: Record<string, string> = { OFAC: '#00aac8', EU: '#6464ff', UK: '#e8590c', UN: '#44cc88', ISF: '#ffb020', SIC: '#ffd43b' }
@@ -3826,7 +3827,7 @@ function SanctionsDataSection({ showSuccess, showError }: { showSuccess: (m: str
                                 {src.release_date && (
                                     <div style={{ gridColumn: '1 / -1' }}>
                                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Release Date</div>
-                                        <div style={{ fontWeight: 600 }}>{src.release_date}</div>
+                                        <div style={{ fontWeight: 600 }}>{formatDate(src.release_date)}</div>
                                     </div>
                                 )}
                             </div>

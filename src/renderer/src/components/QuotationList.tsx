@@ -35,6 +35,7 @@ import { formatDateOrDash } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { ok } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 
 const statusColorsDark: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
@@ -677,6 +678,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   }
 
   const handleDeleteGroup = async (id: string) => {
+    if (!(await confirmDialog('Delete this group? The quotations in it are kept.'))) return
     try {
       await window.api.quotationGroupDelete(id)
       setQGroups(prev => prev.filter(g => g.id !== id))

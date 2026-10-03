@@ -6,6 +6,8 @@ import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAltern
 import { computePayablePremium, splitInstalments, addMonthsISO, round2, vesselTechnical, PremiumContext, PremiumLolOption } from '../../../shared/premium'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
+import { formatDate } from '../utils/dateUtils'
+import { MoneyInput } from './quotation-tabs/shared'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -1211,12 +1213,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
                 return (
                   <div key={vid} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderBottom: '1px solid var(--table-border)' }}>
                     <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase' }}>{qv?.name || qv?.vesselLabel || vid}</span>
-                    <input
-                      type="number"
-                      value={data.vesselPremiums[vid] ?? ''}
-                      onChange={e => onUpdateVesselPremium(vid, parseFloat(e.target.value) || 0)}
-                      style={{ ...inputStyle, width: '140px', flex: 'none', textAlign: 'right', padding: '5px 8px' }}
-                    />
+                    <MoneyInput value={data.vesselPremiums[vid]} onChange={val => onUpdateVesselPremium(vid, val || 0)} style={{ ...inputStyle, width: '140px', flex: 'none', textAlign: 'right', padding: '5px 8px' }} showZero />
                   </div>
                 )
               })}
@@ -1233,21 +1230,15 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         <div>
           <div style={labelUpper}>Payable Premium</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
-            <input
-              type="number"
-              value={data.totalPremium}
-              onChange={e => {
-                const val = parseFloat(e.target.value) || 0
+            <MoneyInput value={data.totalPremium} onChange={v => {
+                const val = v || 0
                 const only = data.selectedVesselIds[0]
                 onUpdate({
                   totalPremium: val,
                   instalmentAmounts: splitInstalments(val, data.instalmentDates.length),
                   ...(only ? { vesselPremiums: { [only]: val } } : {})
                 })
-              }}
-              style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
-              placeholder="Premium amount"
-            />
+              }} placeholder="Premium amount" style={{ ...inputStyle, flex: 1, textAlign: 'right' }} />
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation?.premiumCurrency || 'USD'}</span>
           </div>
           <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
@@ -1960,7 +1951,7 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
           {editLink(1)}
         </div>
         <div style={{ fontSize: '0.88rem' }}>
-          <strong>{data.inceptionDate}</strong> {data.inceptionTime} &rarr; <strong>{data.expiryDate}</strong> {data.expiryTime}
+          <strong>{formatDate(data.inceptionDate) || data.inceptionDate}</strong> {data.inceptionTime} &rarr; <strong>{formatDate(data.expiryDate) || data.expiryDate}</strong> {data.expiryTime}
           <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>({data.timezone})</span>
         </div>
       </div>

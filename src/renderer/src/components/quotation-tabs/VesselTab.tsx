@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Layers, RefreshCw, Pencil, Check, X } from 'lucide-react'
 import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
 import { ok } from '../../utils/ipc'
+import { confirmDialog } from '../DialogHost'
 
 const EMPTY_NEW_VESSEL = { name: '', imoNumber: '', builtYear: '', rebuiltYear: '', grossTonnage: '', flag: '', vesselType: '', classification: '', callSign: '' }
 
@@ -189,6 +190,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
     }
 
     const handleDelete = async (id: string) => {
+        if (!(await confirmDialog('Remove this vessel from the quotation? Its premium and vessel-specific items are removed too.'))) return
         await window.api.deleteQuotationVessel(id)
         showSuccess('Vessel removed')
         loadData()

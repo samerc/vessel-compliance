@@ -20,7 +20,7 @@ export function parseMoney(str: string): number | undefined {
 }
 
 /** Number input that shows commas when not focused, raw number while editing */
-export function MoneyInput({ value, placeholder, onChange, onBlur, style, className, showZero }: {
+export function MoneyInput({ value, placeholder, onChange, onBlur, style, className, showZero, disabled, title, 'aria-label': ariaLabel }: {
     value: number | undefined | null
     placeholder?: string
     onChange: (val: number | undefined) => void
@@ -30,6 +30,9 @@ export function MoneyInput({ value, placeholder, onChange, onBlur, style, classN
     /** Render a stored 0 as a visible "0" instead of blank — lets a pinned zero be told apart
      *  from an empty field (which falls back to a default amount). */
     showZero?: boolean
+    disabled?: boolean
+    title?: string
+    'aria-label'?: string
 }) {
     const [editing, setEditing] = useState(false)
     const [raw, setRaw] = useState('')
@@ -41,12 +44,25 @@ export function MoneyInput({ value, placeholder, onChange, onBlur, style, classN
             className={className}
             value={displayVal}
             placeholder={placeholder}
+            disabled={disabled}
+            title={title}
+            aria-label={ariaLabel}
+            inputMode="decimal"
             onFocus={() => { setEditing(true); setRaw(value != null && value !== 0 ? String(value) : zeroStr) }}
             onChange={e => { const v = e.target.value.replace(/[^0-9.,\-]/g, ''); setRaw(v); onChange(parseMoney(v)) }}
             onBlur={() => { setEditing(false); const parsed = parseMoney(raw); onBlur?.(parsed) }}
             style={style}
         />
     )
+}
+
+/** MoneyInput for fields kept as strings in state (calculators, draft forms) */
+export function StrMoneyInput({ value, onChange, ...rest }: Omit<React.ComponentProps<typeof MoneyInput>, 'value' | 'onChange' | 'onBlur' | 'showZero'> & {
+    value: string | number | undefined | null
+    onChange: (val: string) => void
+}) {
+    const n = value === '' || value == null ? undefined : parseMoney(String(value))
+    return <MoneyInput {...rest} value={n} showZero onChange={v => onChange(v != null ? String(v) : '')} />
 }
 
 export function AlternativeScopeChips({ alternatives, currentAltId, onChangeAltId }: { alternatives: QuotationPIAlternative[]; currentAltId: string | null; onChangeAltId: (altId: string | null) => void }) {

@@ -11,6 +11,8 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   Receipt as ReceiptIcon, Plus, FileDown, Trash2, Pencil, Search, X, Settings, Ship
 } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
+import { StrMoneyInput } from './quotation-tabs/shared'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'CHF', 'JPY', 'LBP']
 
@@ -187,7 +189,7 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
               ) : filtered.map(r => (
                 <tr key={r.id}>
                   <td style={{ ...td, fontFamily: 'monospace', fontWeight: 600 }}>{r.receiptNumber}</td>
-                  <td style={td}>{r.receiptDate}</td>
+                  <td style={td}>{formatDate(r.receiptDate) || r.receiptDate}</td>
                   {!vesselId && <td style={td}>{r.vesselName || '—'}</td>}
                   <td style={td}>{r.payerName}</td>
                   <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.78rem' }}>
@@ -535,7 +537,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
             <div>
               <label style={label}>Amount</label>
-              <input style={input} type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+              <StrMoneyInput value={amount} onChange={s => setAmount(s)} placeholder="0.00" style={input} />
             </div>
             <div>
               <label style={label}>Currency</label>

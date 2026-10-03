@@ -5,6 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { ALT_COLORS } from './shared'
 import { ok } from '../../utils/ipc'
+import { confirmDialog } from '../DialogHost'
 
 function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLabel }: {
     clauses: HullClause[]
@@ -549,6 +550,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
             const sharedCount = alternatives.filter(a => !a.vesselScopeId).length
             if (sharedCount <= 1) return
         }
+        if (!(await confirmDialog('Remove this alternative and its conditions and premium?'))) return
         try {
             await window.api.hullDeleteQuotationAlternative(altId)
             const updated = alternatives.filter(a => a.id !== altId)
@@ -793,6 +795,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
     }
 
     const deleteCustomCondition = async (id: string) => {
+        if (!(await confirmDialog('Delete this custom condition?'))) return
         try {
             await window.api.hullDeleteQuotationCustomCondition(id)
             setCustomConditions(prev => prev.filter(c => c.id !== id))

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
+import { StrMoneyInput } from './quotation-tabs/shared'
 
 export default function TLORateCalculator() {
   const [currentValue, setCurrentValue] = useState('')
@@ -59,43 +60,19 @@ export default function TLORateCalculator() {
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Current Vessel Value
           </label>
-          <input
-            type="number"
-            value={currentValue}
-            onChange={e => setCurrentValue(e.target.value)}
-            placeholder="e.g. 5,000,000"
-            style={{ width: '100%' }}
-            min="0"
-            step="any"
-          />
+          <StrMoneyInput value={currentValue} onChange={s => setCurrentValue(s)} placeholder="e.g. 5,000,000" style={{ width: '100%' }} />
         </div>
         <div>
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Current Premium
           </label>
-          <input
-            type="number"
-            value={premium}
-            onChange={e => setPremium(e.target.value)}
-            placeholder="e.g. 25,000"
-            style={{ width: '100%' }}
-            min="0"
-            step="any"
-          />
+          <StrMoneyInput value={premium} onChange={s => setPremium(s)} placeholder="e.g. 25,000" style={{ width: '100%' }} />
         </div>
         <div>
           <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             New Vessel Value
           </label>
-          <input
-            type="number"
-            value={newValue}
-            onChange={e => setNewValue(e.target.value)}
-            placeholder="e.g. 6,000,000"
-            style={{ width: '100%' }}
-            min="0"
-            step="any"
-          />
+          <StrMoneyInput value={newValue} onChange={s => setNewValue(s)} placeholder="e.g. 6,000,000" style={{ width: '100%' }} />
         </div>
       </div>
 

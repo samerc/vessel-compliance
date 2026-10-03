@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { RotateCcw, Copy, Check } from 'lucide-react'
 import { countDays, calcProRataPremium } from '../utils/premiumCalc'
 import type { InstalmentRow } from '../utils/premiumCalc'
+import { StrMoneyInput } from './quotation-tabs/shared'
 
 // ── Number to words ────────────────────────────────────────────────────────────
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -158,16 +159,7 @@ export default function PremiumCalculator() {
             <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Annual Premium
             </label>
-            <input
-              type="number"
-              value={annualPremium}
-              onChange={e => setAnnualPremium(e.target.value)}
-              placeholder="e.g. 10000"
-              min="0"
-              step="0.01"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
-              aria-label="Annual premium amount"
-            />
+            <StrMoneyInput value={annualPremium} onChange={s => setAnnualPremium(s)} placeholder="e.g. 10000" style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} aria-label="Annual premium amount" />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>

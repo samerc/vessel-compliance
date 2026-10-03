@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
 import { Quotation, AssuredRole, Entity, QuotationAssured, QuotationAssuredGroup, QuotationVessel, Vessel } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
+import { confirmDialog } from '../DialogHost'
 
 export default function InsuredTab({ quotation, vessels: _vessels = [], showSuccess, showError, updateField }: { quotation: Quotation; vessels?: Vessel[]; showSuccess: (m: string) => void; showError: (m: string) => void; updateField: (f: string, v: any) => void }) {
     void _vessels
@@ -73,6 +74,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
     }
 
     const handleDeleteAssured = async (id: string) => {
+        if (!(await confirmDialog('Remove this assured from the quotation?'))) return
         await window.api.deleteQuotationAssured(id)
         showSuccess('Assured removed')
         loadData()
@@ -219,7 +221,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                             <input value={g.name} onChange={e => setGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, name: e.target.value } : gg))}
                                 onBlur={e => window.api.updateQuotationAssuredGroup(g.id, { name: e.target.value })}
                                 style={{ flex: 1, padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase' }} />
-                            <button onClick={async () => { await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
+                            <button onClick={async () => { if (!(await confirmDialog('Delete this group?'))) return; await window.api.deleteQuotationAssuredGroup(g.id); showSuccess('Group deleted'); loadData() }}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                         </div>
                     ))}

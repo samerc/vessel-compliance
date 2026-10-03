@@ -1,4 +1,5 @@
 import { Quotation } from '../../../../shared/types'
+import { MoneyInput } from './shared'
 
 export default function InsuredValueTab({ quotation, updateField, setQ }: {
     quotation: Quotation
@@ -18,11 +19,7 @@ export default function InsuredValueTab({ quotation, updateField, setQ }: {
                 </div>
                 <div style={{ flex: 3 }}>
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Amount</label>
-                    <input type="number" value={quotation.insuredValueAmount ?? ''}
-                        onChange={e => setQ(prev => ({ ...prev, insuredValueAmount: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                        onBlur={e => updateField('insuredValueAmount', e.target.value ? parseFloat(e.target.value) : null)}
-                        placeholder="0.00"
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.88rem' }} />
+                    <MoneyInput value={quotation.insuredValueAmount} onChange={val => setQ(prev => ({ ...prev, insuredValueAmount: val }))} onBlur={val => updateField('insuredValueAmount', val ?? null)} placeholder="0.00" style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.88rem' }} showZero />
                 </div>
             </div>
             <div>

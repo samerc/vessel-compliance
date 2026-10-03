@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { Quotation, QuotationSubLimit, QuotationVessel, QuotationPIAlternative, PISectionTexts } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
-import { ALT_COLORS, MoneyInput } from './shared'
+import { ALT_COLORS, MoneyInput, StrMoneyInput } from './shared'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { asArray, ok } from '../../utils/ipc'
 
@@ -303,7 +303,7 @@ export default function LiabilityTab({ quotation, updateField, setQ, showSuccess
             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input type="text" value={newText} onChange={e => setNewText(e.target.value)} placeholder="Sub-limit description..." style={{ flex: 1, minWidth: '200px' }} />
                 <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} style={{ width: '70px' }} placeholder="USD" />
-                <input type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="Amount" style={{ width: '140px' }} />
+                <StrMoneyInput value={newAmount} onChange={s => setNewAmount(s)} placeholder="Amount" style={{ width: '140px' }} />
                 <button onClick={handleAddSubLimit} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} /> Add</button>
             </div>
             {subLimits.map(sl => (

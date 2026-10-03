@@ -15,6 +15,7 @@ import type {
 } from '../../../shared/types'
 import { ENDORSEMENT_PRESET_SECTIONS } from '../../../shared/types'
 import { countDays, calcProRataPremium, distributeInstalments as distributeInstalmentsFn } from '../utils/premiumCalc'
+import { StrMoneyInput } from './quotation-tabs/shared'
 
 interface EndorsementManagerProps {
   policyDocId: string
@@ -627,9 +628,8 @@ export default function EndorsementManager({
                 {editState.isProRata ? 'Annual Premium (p.a.)' : 'Premium Amount'}
               </label>
               {editState.isProRata ? (
-                <input type="number" value={editState.annualPremium} placeholder="0.00"
-                  onChange={e => {
-                    const annual = e.target.value
+                <StrMoneyInput value={editState.annualPremium} onChange={s => {
+                    const annual = s
                     setEditState(prev => {
                       const updated = { ...prev, annualPremium: annual }
                       if (annual && policyData) {
@@ -638,12 +638,9 @@ export default function EndorsementManager({
                       }
                       return updated
                     })
-                  }}
-                  style={inputStyle} />
+                  }} placeholder="0.00" style={inputStyle} />
               ) : (
-                <input type="number" value={editState.premiumAmount} placeholder="0.00"
-                  onChange={e => setEditState(prev => ({ ...prev, premiumAmount: e.target.value }))}
-                  style={inputStyle} />
+                <StrMoneyInput value={editState.premiumAmount} onChange={s => setEditState(prev => ({ ...prev, premiumAmount: s }))} placeholder="0.00" style={inputStyle} />
               )}
             </div>
             <div>
@@ -830,16 +827,14 @@ export default function EndorsementManager({
                         ...prev,
                         instalments: prev.instalments.map((x, j) => j === i ? { ...x, dueDate: e.target.value } : x)
                       }))} style={{ ...inputStyle, fontSize: '0.78rem' }} />
-                    <input type="number" value={inst.premiumAmount} placeholder="Premium"
-                      onChange={e => setEditState(prev => ({
+                    <StrMoneyInput value={inst.premiumAmount} onChange={s => setEditState(prev => ({
                         ...prev,
-                        instalments: prev.instalments.map((x, j) => j === i ? { ...x, premiumAmount: e.target.value } : x)
-                      }))} style={{ ...inputStyle, fontSize: '0.78rem' }} />
-                    <input type="number" value={inst.commissionAmount} placeholder="Commission"
-                      onChange={e => setEditState(prev => ({
+                        instalments: prev.instalments.map((x, j) => j === i ? { ...x, premiumAmount: s } : x)
+                      }))} placeholder="Premium" style={{ ...inputStyle, fontSize: '0.78rem' }} />
+                    <StrMoneyInput value={inst.commissionAmount} onChange={s => setEditState(prev => ({
                         ...prev,
-                        instalments: prev.instalments.map((x, j) => j === i ? { ...x, commissionAmount: e.target.value } : x)
-                      }))} style={{ ...inputStyle, fontSize: '0.78rem' }} />
+                        instalments: prev.instalments.map((x, j) => j === i ? { ...x, commissionAmount: s } : x)
+                      }))} placeholder="Commission" style={{ ...inputStyle, fontSize: '0.78rem' }} />
                     <button onClick={() => removeInstalment(i)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}>
                       <X size={14} />

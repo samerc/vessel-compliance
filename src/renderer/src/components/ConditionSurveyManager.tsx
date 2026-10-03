@@ -8,6 +8,7 @@ import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
 import XLSX from 'xlsx-js-style'
 import { ok } from '../utils/ipc'
+import { formatDate } from '../utils/dateUtils'
 
 interface ConditionSurveyManagerProps {
   vessel: Vessel
@@ -569,7 +570,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                           {survey.surveyType}
                         </span>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                          {survey.surveyDate}
+                          {formatDate(survey.surveyDate) || survey.surveyDate}
                         </span>
                         {survey.reference && (
                           <span style={{

@@ -34,6 +34,7 @@ import { SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConst
 import { BC_DEFAULTS } from '../services/PolicyExportService'
 import { sanitizeHtml } from '../utils/sanitize'
 import { ok } from '../utils/ipc'
+import { confirmDialog } from './DialogHost'
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -557,6 +558,7 @@ function BanksTab({ showSuccess, showError }: { showSuccess: (msg: string) => vo
   }
 
   const handleDelete = async (id: string) => {
+    if (!(await confirmDialog('Delete this bank? Policies that use it will no longer show its details.'))) return
     try {
       await window.api.bankDelete(id)
       await loadBanks()
@@ -1094,7 +1096,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
   }
 
   const setDefault = async (id: string) => { try { await window.api.tcSetDefault(id); await load(typeCode) } catch (err: any) { showError(err.message || 'Failed') } }
-  const remove = async (id: string) => { try { await window.api.tcDeleteById(id); showSuccess('Template deleted'); await load(typeCode) } catch (err: any) { showError(err.message || 'Delete failed') } }
+  const remove = async (id: string) => { if (!(await confirmDialog('Delete this T&C template?'))) return; try { await window.api.tcDeleteById(id); showSuccess('Template deleted'); await load(typeCode) } catch (err: any) { showError(err.message || 'Delete failed') } }
 
   const openEdit = async (t: any) => {
     if (t.kind !== 'html') return
@@ -1319,6 +1321,7 @@ function SignaturesTab({ showSuccess, showError, isLight }: { showSuccess: (msg:
   }
 
   const handleDelete = async (userId: string) => {
+    if (!(await confirmDialog('Delete this signature?'))) return
     try {
       await window.api.signatureDeleteForUser(userId)
       showSuccess('Signature deleted')
@@ -1568,6 +1571,7 @@ function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: 
   }
 
   const handleDeleteCustomer = async (entityId: string) => {
+    if (!(await confirmDialog('Remove all commission overrides for this customer?'))) return
     try {
       for (const pt of policyTypes) await window.api.commissionDeleteOverride(entityId, pt.id)
       showSuccess('Customer override removed')
@@ -1797,6 +1801,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
   }
 
   async function deleteTemplate(id: string) {
+    if (!(await confirmDialog('Delete this endorsement template?'))) return
     try {
       await window.api.endorsementDeleteTemplate(id)
       showSuccess('Template deleted')

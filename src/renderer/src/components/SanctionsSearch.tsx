@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
 import { ok } from '../utils/ipc'
+import { formatDate } from '../utils/dateUtils'
 
 interface SicEntry {
     id: number
@@ -801,7 +802,7 @@ export default function SanctionsSearch() {
                                             <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{entry.mother_name || '—'}</td>
                                             <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{entry.nationality || '—'}</td>
                                             <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{entry.date_of_birth || '—'}</td>
-                                            <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{entry.listed_date || '—'}</td>
+                                            <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{formatDate(entry.listed_date) || entry.listed_date || '—'}</td>
                                             <td style={{ padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.source_id || '—'}</td>
                                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                                                 {canEditSic && <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>

@@ -5,6 +5,7 @@ import { Plus, X, Copy, ChevronDown, ChevronRight, Settings, CheckCircle, FileSp
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 import { asArray } from '../utils/ipc'
+import { StrMoneyInput } from './quotation-tabs/shared'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -679,7 +680,7 @@ export default function WarBreachCalculator() {
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={labelStyle}>Sum Insured (USD)</label>
-                    <input style={{ ...cellInput, textAlign: 'right' }} type="number" placeholder="0" value={v.sumInsured} onChange={e => updateVessel(v.id, 'sumInsured', e.target.value)} min="0" step="any" />
+                    <StrMoneyInput value={v.sumInsured} onChange={s => updateVessel(v.id, 'sumInsured', s)} placeholder="0" style={{ ...cellInput, textAlign: 'right' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Rate %</label>

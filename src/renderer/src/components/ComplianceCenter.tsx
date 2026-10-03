@@ -858,7 +858,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                             <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vesselName}</td>
                                             <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{alert.policyTypeName}</td>
                                             <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{alert.policyNumber || '-'}</td>
-                                            <td style={{ padding: '12px 16px', color: isExpired ? 'var(--danger)' : '#e6a800', fontSize: '0.85rem' }}>{alert.endDate || '-'}</td>
+                                            <td style={{ padding: '12px 16px', color: isExpired ? 'var(--danger)' : '#e6a800', fontSize: '0.85rem' }}>{formatDate(alert.endDate) || alert.endDate || '-'}</td>
                                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                 <span style={{
                                                     padding: '3px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700,
