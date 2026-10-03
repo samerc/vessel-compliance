@@ -3462,7 +3462,8 @@ app.whenReady().then(() => {
   safeHandle('quotation:getLock', (event, id) => { requireSession(event); return db.getQuotationLock(id) })
   safeHandle('db:addQuotation', async (event, q) => {
     const user = await requirePermission(event, 'quotations:create')
-    const result = await db.addQuotation(q)
+    // Creator is always the logged-in user's ID (callers used to send the username)
+    const result = await db.addQuotation({ ...q, createdBy: user.id })
     db.logActivity({
       userId: user.id,
       username: user.username,

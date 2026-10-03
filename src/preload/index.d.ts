@@ -624,7 +624,7 @@ export interface Api {
     sortField?: string
     sortDir?: 'asc' | 'desc'
   }) => Promise<{ rows: any[]; total: number; stats: { byStatus: Record<string, number>; byType: { code: string; name: string; count: number }[]; total: number } }>
-  quotationGetCreators: () => Promise<string[]>
+  quotationGetCreators: () => Promise<{ id: string; name: string }[]>
   quotationGetSavedFilters: () => Promise<{ id: string; name: string; filters: any; order: number }[]>
   quotationSaveFilter: (name: string, filters: any) => Promise<{ id: string; name: string; filters: any }>
   quotationDeleteFilter: (id: string) => Promise<void>

@@ -146,7 +146,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([])
-  const [creators, setCreators] = useState<string[]>([])
+  const [creators, setCreators] = useState<{ id: string; name: string }[]>([])
   const [showSaveFilterInput, setShowSaveFilterInput] = useState(false)
   const [newFilterName, setNewFilterName] = useState('')
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
@@ -1260,7 +1260,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {creators.length > 1 && (
           <select value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem', padding: '4px 8px' }}>
             <option value="all">All Users</option>
-            {creators.map(c => <option key={c} value={c}>{c}</option>)}
+            {creators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
         {/* Compact total */}
@@ -1528,8 +1528,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         >
           <option value="all">All Users</option>
           {creators.map((c) => (
-            <option key={c} value={c}>
-              {c}
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
           ))}
         </select>

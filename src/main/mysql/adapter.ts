@@ -2567,6 +2567,15 @@ export class MySQLAdapter {
                 if (!qColNames.includes('export_snapshot')) await this.pool.query('ALTER TABLE quotations ADD COLUMN export_snapshot MEDIUMTEXT NULL')
                 if (!qColNames.includes('created_by')) await this.pool.query('ALTER TABLE quotations ADD COLUMN created_by VARCHAR(36) NULL')
             }
+            // Older create paths stored the USERNAME in quotations.created_by, newer ones the user ID,
+            // so the creator filter listed the same person twice (once as a raw ID). Normalise to IDs.
+            try {
+                await this.pool.query(
+                    `UPDATE quotations q JOIN users u ON q.created_by = u.username
+                     SET q.created_by = u.id, q.updated_at = q.updated_at
+                     WHERE q.created_by <> u.id`
+                )
+            } catch (e) { console.warn('[migration] quotations.created_by normalise:', (e as Error).message) }
 
             // Seed default workflow steps if table is empty
             {
@@ -8435,10 +8444,11 @@ export class MySQLAdapter {
 
         if (params.search) {
             conditions.push(
-                `(q.reference_number LIKE ? OR q.co_name LIKE ? OR q.title LIKE ? OR q.created_by LIKE ? OR qv_agg.vessel_name LIKE ?)`
+                `(q.reference_number LIKE ? OR q.co_name LIKE ? OR q.title LIKE ? OR q.created_by LIKE ?
+                  OR q.created_by IN (SELECT id FROM users WHERE username LIKE ? OR full_name LIKE ?) OR qv_agg.vessel_name LIKE ?)`
             )
             const s = `%${params.search}%`
-            values.push(s, s, s, s, s)
+            values.push(s, s, s, s, s, s, s)
         }
         if (params.status && params.status !== 'all') {
             conditions.push('q.status = ?')
@@ -8449,8 +8459,9 @@ export class MySQLAdapter {
             values.push(params.typeCode)
         }
         if (params.createdBy && params.createdBy !== 'all') {
-            conditions.push('q.created_by = ?')
-            values.push(params.createdBy)
+            // value is a user ID; a username still matches (saved filters from before the ID change)
+            conditions.push('(q.created_by = ? OR q.created_by IN (SELECT id FROM users WHERE username = ?))')
+            values.push(params.createdBy, params.createdBy)
         }
         if (params.dateFrom) {
             conditions.push('q.quotation_date >= ?')
@@ -8577,12 +8588,17 @@ export class MySQLAdapter {
         }
     }
 
-    async getQuotationCreators(): Promise<string[]> {
+    async getQuotationCreators(): Promise<{ id: string; name: string }[]> {
         if (!this.pool) return []
+        // created_by holds a user ID (or, on rows the migration could not match, a legacy username)
         const [rows] = await this.pool.query(
-            'SELECT DISTINCT created_by FROM quotations WHERE created_by IS NOT NULL ORDER BY created_by'
+            `SELECT c.created_by AS id, COALESCE(NULLIF(u.full_name, ''), u.username, c.created_by) AS name
+             FROM (SELECT DISTINCT created_by FROM quotations WHERE created_by IS NOT NULL AND created_by <> '') c
+             LEFT JOIN users u ON u.id = c.created_by OR u.username = c.created_by
+             ORDER BY name`
         )
-        return (rows as any[]).map((r: any) => r.created_by)
+        const seen = new Set<string>()
+        return (rows as any[]).filter(r => !seen.has(r.id) && seen.add(r.id)).map(r => ({ id: r.id, name: r.name }))
     }
 
     async getQuotationSavedFilters(userId: string): Promise<any[]> {
