@@ -1394,7 +1394,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     </>
                                 )}
                             </div>
-                            {hasPermission('vessels:delete') && (
+                            {user?.role === 'admin' && (
                                 <button
                                     type="button"
                                     onClick={handleDeleteVessel}

@@ -90,6 +90,12 @@ async function assignQuotationNumberViaRegistry(quotationId: string): Promise<st
     return db.assignQuotationNumber(quotationId)
   }
 
+  // Registry serials come from the Excel file (read last serial, append row): serialise across
+  // users so two approvals cannot take the same number
+  return db.withNamedLock('vc_quotation_registry', () => assignRegistryNumberLocked(quotationId, registryPath))
+}
+
+async function assignRegistryNumberLocked(quotationId: string, registryPath: string): Promise<string> {
   const resolvedPath = resolveFilePath(registryPath)
 
   // Load quotation data for registry entry
@@ -742,7 +748,7 @@ app.whenReady().then(() => {
     const normalizeExtensions = (exts: string[]) => {
       return exts.map(ext => {
         ext = ext.toLowerCase().trim()
-        return ext.startsWith('.') ? ext : `.${ext} `
+        return ext.startsWith('.') ? ext : `.${ext}`
       })
     }
 
@@ -1243,7 +1249,9 @@ app.whenReady().then(() => {
   })
   safeHandle('db:getVesselNameHistory', (event, vesselId) => { requireSession(event); return db.getVesselNameHistory(vesselId) })
   safeHandle('db:deleteVessel', async (event, id) => {
-    const user = await requirePermission(event, 'vessels:delete')
+    // Deleting a vessel is restricted to administrators (role), not just the vessels:delete permission
+    const user = requireSession(event)
+    if (user.role !== 'admin') throw new Error('Only an administrator can delete a vessel')
     const [vRows] = await (db as any).pool.query('SELECT name FROM vessels WHERE id = ?', [id])
     const vessel = (vRows as any[])[0]
     const vesselName = vessel?.name || id

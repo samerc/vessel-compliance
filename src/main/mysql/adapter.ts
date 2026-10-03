@@ -1,4 +1,4 @@
-import { createPool, Pool } from 'mysql2/promise'
+import { createPool, Pool, PoolConnection } from 'mysql2/promise'
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
@@ -7,6 +7,13 @@ import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
+
+// Parse a JSON column without letting ONE corrupt row break a whole list/load.
+function safeJson<T>(raw: unknown, fallback: T): T {
+    if (raw == null || raw === '') return fallback
+    if (typeof raw !== 'string') return raw as T
+    try { return JSON.parse(raw) as T } catch { return fallback }
+}
 
 // Content columns copied verbatim when a quotation is revised, duplicated or renewed.
 // One list for all three so a new quotation column cannot be forgotten in one of them.
@@ -83,6 +90,10 @@ export class MySQLAdapter {
                 queueLimit: 0,
                 dateStrings: true,
                 connectTimeout: 10000,
+                // Remote (VPN) users: keep idle sockets alive so NAT/firewalls do not silently drop
+                // them (the next query would otherwise fail with "connection lost")
+                enableKeepAlive: true,
+                keepAliveInitialDelay: 30000,
                 charset: 'UTF8MB4_UNICODE_CI'
             })
 
@@ -117,6 +128,91 @@ export class MySQLAdapter {
         }
     }
 
+    // FOREIGN_KEY_CHECKS is a SESSION variable, but this.pool spreads statements over up to 10
+    // connections: a bare "SET FOREIGN_KEY_CHECKS=0" + writes + "=1" on the pool can land on
+    // three different connections (so the writes may still be checked) and can return a
+    // connection to the pool with checks left OFF for unrelated later writes.
+    // fkOff() pins ONE connection: checks off, run the block's statements on it, then done()
+    // turns checks back on and releases it (a connection that cannot be reset is destroyed,
+    // never returned to the pool). Always call done() in a finally.
+    private async fkOff(): Promise<{
+        query: PoolConnection['query']
+        execute: PoolConnection['execute']
+        done: () => Promise<void>
+    }> {
+        if (!this.pool) throw new Error('DB not connected')
+        const conn = await this.pool.getConnection()
+        try {
+            await conn.query('SET FOREIGN_KEY_CHECKS=0')
+        } catch (e) {
+            conn.release()
+            throw e
+        }
+        let finished = false
+        return {
+            query: conn.query.bind(conn) as PoolConnection['query'],
+            execute: conn.execute.bind(conn) as PoolConnection['execute'],
+            done: async () => {
+                if (finished) return
+                finished = true
+                try {
+                    await conn.query('SET FOREIGN_KEY_CHECKS=1')
+                    conn.release()
+                } catch {
+                    try { conn.destroy() } catch { /* already gone */ }
+                }
+            }
+        }
+    }
+
+    // Serialise a critical section across ALL app instances (every user's app talks to the same
+    // database): numbering is read-max/counter-then-write, so two simultaneous approvals,
+    // signatures or receipts could otherwise get the same number.
+    async withNamedLock<T>(name: string, fn: () => Promise<T>, timeoutSec = 20): Promise<T> {
+        if (!this.pool) throw new Error('DB not connected')
+        const conn = await this.pool.getConnection()
+        try {
+            const [r] = await conn.query('SELECT GET_LOCK(?, ?) AS got', [name, timeoutSec])
+            if (Number((r as any[])[0]?.got) !== 1) {
+                throw new Error('Another user is assigning a number right now. Please try again in a moment.')
+            }
+            try {
+                return await fn()
+            } finally {
+                try { await conn.query('SELECT RELEASE_LOCK(?)', [name]) } catch { /* lock dies with the session */ }
+            }
+        } finally {
+            conn.release()
+        }
+    }
+
+    // Startup migrations must be idempotent AND cheap: an ALTER ... MODIFY / CONVERT rebuilds the
+    // table, so these run only when the schema actually differs from what is wanted.
+    private async modifyColumnIfChanged(table: string, column: string, want: { type: string; nullable: boolean }, sql: string): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query(
+            'SELECT COLUMN_TYPE AS t, IS_NULLABLE AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+            [table, column]
+        )
+        const col = (rows as any[])[0]
+        if (!col) return
+        const sameType = String(col.t).toLowerCase() === want.type.toLowerCase()
+        const sameNull = (String(col.n).toUpperCase() === 'YES') === want.nullable
+        if (sameType && sameNull) return
+        await this.pool.query(sql)
+    }
+
+    private async convertTableIfNeeded(table: string, runner?: { query: (sql: string, values?: any) => Promise<any> }): Promise<void> {
+        if (!this.pool) return
+        const [rows] = await this.pool.query(
+            'SELECT TABLE_COLLATION AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+            [table]
+        )
+        const coll = (rows as any[])[0]?.c
+        if (!coll || coll === 'utf8mb4_unicode_ci') return
+        await (runner || this.pool).query(`ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+    }
+
     async initSchema(): Promise<void> {
         if (!this.pool) throw new Error('Not connected')
 
@@ -130,8 +226,11 @@ export class MySQLAdapter {
             try {
                 const [[dbRow]] = await this.pool.query('SELECT DATABASE() as name') as any
                 if (dbRow?.name) {
+                    // COLLATE is required: without it MariaDB 11 picks utf8mb4_uca1400_ai_ci as
+                    // the default, so every new table got the wrong collation (the root cause
+                    // of the FK errno 150 / collation-normalization churn)
                     await this.pool.query(
-                        `ALTER DATABASE \`${dbRow.name}\` CHARACTER SET utf8mb4`
+                        `ALTER DATABASE \`${dbRow.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
                     )
                 }
             } catch (e) {
@@ -140,13 +239,18 @@ export class MySQLAdapter {
 
             const statements = schemaSql.split(';').filter((s: string) => s.trim())
 
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-            for (const statement of statements) {
-                if (statement.trim()) {
-                    await this.pool.query(statement)
+            {
+                const fk = await this.fkOff()
+                try {
+                    for (const statement of statements) {
+                        if (statement.trim()) {
+                            await fk.query(statement)
+                        }
+                    }
+                } finally {
+                    await fk.done()
                 }
             }
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
 
             // Migration: Normalize all existing tables to utf8mb4_unicode_ci.
             // Multi-pass (up to 5 rounds) so that FK-parent tables converted in
@@ -184,6 +288,7 @@ export class MySQLAdapter {
                         JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
                             ON rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
                             AND rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
+                            AND rc.TABLE_NAME = kcu.TABLE_NAME
                         WHERE kcu.TABLE_SCHEMA = DATABASE()
                         AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
                         ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
@@ -629,15 +734,17 @@ export class MySQLAdapter {
             if ((qStoCol as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN section_texts_override MEDIUMTEXT NULL')
             } else {
-                // Always ensure MEDIUMTEXT (upgrade from TEXT if needed)
-                await this.pool.query('ALTER TABLE quotations MODIFY COLUMN section_texts_override MEDIUMTEXT NULL')
+                // Ensure MEDIUMTEXT (upgrade from TEXT if needed) — only when it is not already
+                await this.modifyColumnIfChanged('quotations', 'section_texts_override', { type: 'mediumtext', nullable: true },
+                    'ALTER TABLE quotations MODIFY COLUMN section_texts_override MEDIUMTEXT NULL')
             }
             const [qSanOvCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'sanctions_text_override'")
             if ((qSanOvCol as any[]).length === 0) {
                 await this.pool.query('ALTER TABLE quotations ADD COLUMN sanctions_text_override TEXT NULL')
             }
             // Widen sanctions_clause_version for custom version keys
-            await this.pool.query('ALTER TABLE quotations MODIFY COLUMN sanctions_clause_version VARCHAR(50) DEFAULT \'standard\'').catch(() => {})
+            await this.modifyColumnIfChanged('quotations', 'sanctions_clause_version', { type: 'varchar(50)', nullable: true },
+                'ALTER TABLE quotations MODIFY COLUMN sanctions_clause_version VARCHAR(50) DEFAULT \'standard\'').catch(() => {})
 
             // Migration: Add non_refundable fields to quotation_instalments
             const [qiNrCol] = await this.pool.query("SHOW COLUMNS FROM quotation_instalments LIKE 'non_refundable'")
@@ -1201,10 +1308,10 @@ export class MySQLAdapter {
 
             // Migration: widen type_scope columns to support comma-separated multi-type values
             try {
-                await this.pool.query("ALTER TABLE pi_warranties MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
-                await this.pool.query("ALTER TABLE pi_warranty_tags MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
-                await this.pool.query("ALTER TABLE pi_subjectivities MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
-                await this.pool.query("ALTER TABLE pi_warranty_sets MODIFY COLUMN type_scope VARCHAR(50) DEFAULT NULL")
+                await this.modifyColumnIfChanged('pi_warranties', 'type_scope', { type: 'varchar(50)', nullable: true }, "ALTER TABLE pi_warranties MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.modifyColumnIfChanged('pi_warranty_tags', 'type_scope', { type: 'varchar(50)', nullable: true }, "ALTER TABLE pi_warranty_tags MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.modifyColumnIfChanged('pi_subjectivities', 'type_scope', { type: 'varchar(50)', nullable: true }, "ALTER TABLE pi_subjectivities MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'")
+                await this.modifyColumnIfChanged('pi_warranty_sets', 'type_scope', { type: 'varchar(50)', nullable: true }, "ALTER TABLE pi_warranty_sets MODIFY COLUMN type_scope VARCHAR(50) DEFAULT NULL")
             } catch {}
 
             // Migration: war excess fields on quotations + quotation_vessels
@@ -1299,7 +1406,7 @@ export class MySQLAdapter {
                     INDEX idx_sw_status (status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranties CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.convertTableIfNeeded('survey_warranties')
                 // Add columns that may be missing from older table versions
                 const [swColCsi] = await this.pool.query("SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'")
                 if ((swColCsi as any[]).length === 0) {
@@ -1350,7 +1457,7 @@ export class MySQLAdapter {
                     INDEX idx_swr_next (next_reminder_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE survey_warranty_reminders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.convertTableIfNeeded('survey_warranty_reminders')
                 // Migration: add reference column if missing
                 const [swrCols] = await this.pool.query("SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'")
                 if ((swrCols as any[]).length === 0) {
@@ -1374,7 +1481,7 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE classification_societies CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.convertTableIfNeeded('classification_societies')
             }
 
             // Migration: Create vessel_classifications table if it doesn't exist
@@ -1388,7 +1495,7 @@ export class MySQLAdapter {
                     INDEX idx_vc_cs (classification_society_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
             } else {
-                await this.pool.query(`ALTER TABLE vessel_classifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+                await this.convertTableIfNeeded('vessel_classifications')
             }
 
             // Migration: Create war_breach_records table
@@ -1470,9 +1577,9 @@ export class MySQLAdapter {
             {
                 const [dt] = await this.pool.query("SHOW TABLES LIKE 'quotation_discounts'")
                 if ((dt as any[]).length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    const fk = await this.fkOff()
                     try {
-                        await this.pool.query(`CREATE TABLE quotation_discounts (
+                        await fk.query(`CREATE TABLE quotation_discounts (
                             id VARCHAR(36) PRIMARY KEY,
                             quotation_id VARCHAR(36) NOT NULL,
                             label VARCHAR(255) NULL,
@@ -1487,7 +1594,7 @@ export class MySQLAdapter {
                             FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                     } finally {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        await fk.done()
                     }
                 } else {
                     // Migration: discount can be merged into an existing section instead of its own
@@ -1502,9 +1609,9 @@ export class MySQLAdapter {
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_hull_alt_vessel_premiums'")
                 if ((t as any[]).length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    const fk = await this.fkOff()
                     try {
-                        await this.pool.query(`CREATE TABLE quotation_hull_alt_vessel_premiums (
+                        await fk.query(`CREATE TABLE quotation_hull_alt_vessel_premiums (
                             id VARCHAR(36) PRIMARY KEY,
                             alternative_id VARCHAR(36) NOT NULL,
                             quotation_vessel_id VARCHAR(36) NOT NULL,
@@ -1514,7 +1621,7 @@ export class MySQLAdapter {
                             FOREIGN KEY (alternative_id) REFERENCES quotation_hull_alternatives(id) ON DELETE CASCADE
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                     } finally {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        await fk.done()
                     }
                 }
             }
@@ -1523,35 +1630,49 @@ export class MySQLAdapter {
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'") as any[]
                 if (t.length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                    await this.pool.query(`CREATE TABLE pi_warranty_sets (
-                        id VARCHAR(36) PRIMARY KEY,
-                        name VARCHAR(255) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    {
+                        const fk = await this.fkOff()
+                        try {
+                            await fk.query(`CREATE TABLE pi_warranty_sets (
+                                id VARCHAR(36) PRIMARY KEY,
+                                name VARCHAR(255) NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        } finally {
+                            await fk.done()
+                        }
+                    }
                 }
                 const [t2] = await this.pool.query("SHOW TABLES LIKE 'pi_warranty_set_items'") as any[]
                 if (t2.length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                    await this.pool.query(`CREATE TABLE pi_warranty_set_items (
-                        id VARCHAR(36) PRIMARY KEY,
-                        set_id VARCHAR(36) NOT NULL,
-                        warranty_id VARCHAR(36) NOT NULL,
-                        FOREIGN KEY (set_id) REFERENCES pi_warranty_sets(id) ON DELETE CASCADE,
-                        FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    {
+                        const fk = await this.fkOff()
+                        try {
+                            await fk.query(`CREATE TABLE pi_warranty_set_items (
+                                id VARCHAR(36) PRIMARY KEY,
+                                set_id VARCHAR(36) NOT NULL,
+                                warranty_id VARCHAR(36) NOT NULL,
+                                FOREIGN KEY (set_id) REFERENCES pi_warranty_sets(id) ON DELETE CASCADE,
+                                FOREIGN KEY (warranty_id) REFERENCES pi_warranties(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        } finally {
+                            await fk.done()
+                        }
+                    }
                 } else {
                     // Fix collation mismatch on existing table
                     try {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                        await this.pool.query('ALTER TABLE pi_warranty_set_items CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
-                        await this.pool.query('ALTER TABLE pi_warranty_sets CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        {
+                            const fk = await this.fkOff()
+                            try {
+                                await this.convertTableIfNeeded('pi_warranty_set_items', fk)
+                                await this.convertTableIfNeeded('pi_warranty_sets', fk)
+                            } finally {
+                                await fk.done()
+                            }
+                        }
                     } catch (e) {
                         console.error('Migration warning: collation fix for warranty set tables:', e)
-                        try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
                     }
                 }
             }
@@ -1560,15 +1681,20 @@ export class MySQLAdapter {
             {
                 const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_custom_warranties'") as any[]
                 if (t.length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                    await this.pool.query(`CREATE TABLE quotation_custom_warranties (
-                        id VARCHAR(36) PRIMARY KEY,
-                        quotation_id VARCHAR(36) NOT NULL,
-                        text TEXT NOT NULL,
-                        order_index INT DEFAULT 0,
-                        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    {
+                        const fk = await this.fkOff()
+                        try {
+                            await fk.query(`CREATE TABLE quotation_custom_warranties (
+                                id VARCHAR(36) PRIMARY KEY,
+                                quotation_id VARCHAR(36) NOT NULL,
+                                text TEXT NOT NULL,
+                                order_index INT DEFAULT 0,
+                                FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        } finally {
+                            await fk.done()
+                        }
+                    }
                 }
             }
 
@@ -1652,19 +1778,24 @@ export class MySQLAdapter {
             {
                 const [piSubjTable] = await this.pool.query("SHOW TABLES LIKE 'pi_subjectivities'") as any[]
                 if (piSubjTable.length === 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_subjectivities (
-                        id VARCHAR(36) PRIMARY KEY,
-                        text TEXT NOT NULL,
-                        order_index INT DEFAULT 0
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_subjectivity_doc_types (
-                        id VARCHAR(36) PRIMARY KEY,
-                        subjectivity_id VARCHAR(36) NOT NULL,
-                        doc_type_id VARCHAR(36) NOT NULL,
-                        FOREIGN KEY (subjectivity_id) REFERENCES pi_subjectivities(id) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    {
+                        const fk = await this.fkOff()
+                        try {
+                            await fk.query(`CREATE TABLE IF NOT EXISTS pi_subjectivities (
+                                id VARCHAR(36) PRIMARY KEY,
+                                text TEXT NOT NULL,
+                                order_index INT DEFAULT 0
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                            await fk.query(`CREATE TABLE IF NOT EXISTS pi_subjectivity_doc_types (
+                                id VARCHAR(36) PRIMARY KEY,
+                                subjectivity_id VARCHAR(36) NOT NULL,
+                                doc_type_id VARCHAR(36) NOT NULL,
+                                FOREIGN KEY (subjectivity_id) REFERENCES pi_subjectivities(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        } finally {
+                            await fk.done()
+                        }
+                    }
                 }
             }
 
@@ -1708,9 +1839,9 @@ export class MySQLAdapter {
                 if (soCol.length === 0) {
                     await this.pool.query('ALTER TABLE quotations ADD COLUMN section_order TEXT DEFAULT NULL')
                 }
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_custom_sections (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS quotation_custom_sections (
                         id VARCHAR(36) PRIMARY KEY,
                         quotation_id VARCHAR(36) NOT NULL,
                         title VARCHAR(255) NOT NULL,
@@ -1718,7 +1849,7 @@ export class MySQLAdapter {
                         order_index INT DEFAULT 0
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
             }
 
@@ -1728,14 +1859,14 @@ export class MySQLAdapter {
                 if (exCols.length === 0) {
                     await this.pool.query('ALTER TABLE pi_exclusions ADD COLUMN is_cargo_related BOOLEAN DEFAULT FALSE AFTER text')
                 }
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS pi_exclusion_vessel_type_map (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS pi_exclusion_vessel_type_map (
                         exclusion_id VARCHAR(36) NOT NULL,
                         vessel_type_id VARCHAR(36) NOT NULL,
                         PRIMARY KEY (exclusion_id, vessel_type_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_custom_exclusions (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS quotation_custom_exclusions (
                         id VARCHAR(36) PRIMARY KEY,
                         quotation_id VARCHAR(36) NOT NULL,
                         text TEXT NOT NULL,
@@ -1743,15 +1874,15 @@ export class MySQLAdapter {
                         vessel_scope TEXT DEFAULT NULL
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
             }
 
             // Migration: quotation_types table + quotation_type_id on quotations
             {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_types (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS quotation_types (
                         id VARCHAR(36) PRIMARY KEY,
                         name VARCHAR(100) NOT NULL,
                         code VARCHAR(10) NOT NULL,
@@ -1759,7 +1890,7 @@ export class MySQLAdapter {
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
                 // Seed default quotation types if table is empty
                 const [qtRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_types') as any[]
@@ -1848,27 +1979,31 @@ export class MySQLAdapter {
             // during migration blocks above (must run after all CREATE/ALTER Table statements).
             // Each table is converted independently so one failure never blocks the rest.
             try {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                const [mismatchedFinal] = await this.pool.query(`
-                    SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_SCHEMA = DATABASE()
-                    AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
-                    AND TABLE_TYPE = 'BASE TABLE'
-                    ORDER BY TABLE_NAME ASC
-                `) as any[]
-                for (const row of (mismatchedFinal as any[])) {
+                {
+                    const fk = await this.fkOff()
                     try {
-                        await this.pool.query(
-                            `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-                        )
-                    } catch (tableErr) {
-                        console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                        const [mismatchedFinal] = await fk.query(`
+                            SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                            WHERE TABLE_SCHEMA = DATABASE()
+                            AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
+                            AND TABLE_TYPE = 'BASE TABLE'
+                            ORDER BY TABLE_NAME ASC
+                        `) as any[]
+                        for (const row of (mismatchedFinal as any[])) {
+                            try {
+                                await fk.query(
+                                    `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+                                )
+                            } catch (tableErr) {
+                                console.error(`Migration warning: failed to convert table ${row.TABLE_NAME}:`, tableErr)
+                            }
+                        }
+                    } finally {
+                        await fk.done()
                     }
                 }
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
             } catch (e) {
                 console.error('Migration error (final collation normalization):', e)
-                try { await this.pool.query('SET FOREIGN_KEY_CHECKS=1') } catch { /* ignore */ }
             }
 
             // Migration: add ncb/upcc discount type and amount columns
@@ -1910,68 +2045,73 @@ export class MySQLAdapter {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                {
+                    const fk = await this.fkOff()
+                    try {
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_agreed_value_items (
-                    id VARCHAR(36) PRIMARY KEY,
-                    quotation_id VARCHAR(36) NOT NULL,
-                    hull_text_id VARCHAR(36) DEFAULT NULL,
-                    text TEXT NOT NULL,
-                    order_index INT DEFAULT 0,
-                    vessel_scope TEXT DEFAULT NULL,
-                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS quotation_agreed_value_items (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            hull_text_id VARCHAR(36) DEFAULT NULL,
+                            text TEXT NOT NULL,
+                            order_index INT DEFAULT 0,
+                            vessel_scope TEXT DEFAULT NULL,
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS hull_clauses (
-                    id VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    code VARCHAR(50) NOT NULL,
-                    description TEXT,
-                    order_index INT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS hull_clauses (
+                            id VARCHAR(36) PRIMARY KEY,
+                            name VARCHAR(255) NOT NULL,
+                            code VARCHAR(50) NOT NULL,
+                            description TEXT,
+                            order_index INT DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS hull_clause_conditions (
-                    id VARCHAR(36) PRIMARY KEY,
-                    hull_clause_id VARCHAR(36) NOT NULL,
-                    condition_number VARCHAR(20) NOT NULL,
-                    text TEXT NOT NULL,
-                    default_selected BOOLEAN DEFAULT FALSE,
-                    order_index INT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (hull_clause_id) REFERENCES hull_clauses(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS hull_clause_conditions (
+                            id VARCHAR(36) PRIMARY KEY,
+                            hull_clause_id VARCHAR(36) NOT NULL,
+                            condition_number VARCHAR(20) NOT NULL,
+                            text TEXT NOT NULL,
+                            default_selected BOOLEAN DEFAULT FALSE,
+                            order_index INT DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (hull_clause_id) REFERENCES hull_clauses(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS hull_additional_conditions (
-                    id VARCHAR(36) PRIMARY KEY,
-                    title VARCHAR(255) NULL,
-                    text TEXT NOT NULL,
-                    default_selected BOOLEAN DEFAULT FALSE,
-                    order_index INT DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS hull_additional_conditions (
+                            id VARCHAR(36) PRIMARY KEY,
+                            title VARCHAR(255) NULL,
+                            text TEXT NOT NULL,
+                            default_selected BOOLEAN DEFAULT FALSE,
+                            order_index INT DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_conditions (
-                    id VARCHAR(36) PRIMARY KEY,
-                    quotation_id VARCHAR(36) NOT NULL,
-                    hull_condition_id VARCHAR(36) NOT NULL,
-                    text_override TEXT DEFAULT NULL,
-                    order_index INT DEFAULT 0,
-                    vessel_scope TEXT DEFAULT NULL,
-                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS quotation_hull_conditions (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            hull_condition_id VARCHAR(36) NOT NULL,
+                            text_override TEXT DEFAULT NULL,
+                            order_index INT DEFAULT 0,
+                            vessel_scope TEXT DEFAULT NULL,
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_additional_conditions (
-                    id VARCHAR(36) PRIMARY KEY,
-                    quotation_id VARCHAR(36) NOT NULL,
-                    hull_additional_condition_id VARCHAR(36) NOT NULL,
-                    text_override TEXT DEFAULT NULL,
-                    order_index INT DEFAULT 0,
-                    vessel_scope TEXT DEFAULT NULL,
-                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                        await fk.query(`CREATE TABLE IF NOT EXISTS quotation_hull_additional_conditions (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            hull_additional_condition_id VARCHAR(36) NOT NULL,
+                            text_override TEXT DEFAULT NULL,
+                            order_index INT DEFAULT 0,
+                            vessel_scope TEXT DEFAULT NULL,
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    } finally {
+                        await fk.done()
+                    }
+                }
 
                 // Migration: Add title column to hull_additional_conditions
                 const [hacTitleCol] = await this.pool.query("SHOW COLUMNS FROM hull_additional_conditions LIKE 'title'")
@@ -2090,9 +2230,9 @@ export class MySQLAdapter {
 
             // Migration: Hull alternatives table + alternative_id columns
             {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS quotation_hull_alternatives (
                         id VARCHAR(36) PRIMARY KEY,
                         quotation_id VARCHAR(36) NOT NULL,
                         hull_clause_id VARCHAR(36) NOT NULL,
@@ -2102,7 +2242,7 @@ export class MySQLAdapter {
                         FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
                 const [altCol1] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_conditions LIKE 'alternative_id'") as any[]
                 if ((altCol1 as any[]).length === 0) {
@@ -2120,16 +2260,16 @@ export class MySQLAdapter {
                     WHERE q.hull_clause_id IS NOT NULL AND qha.id IS NULL
                 `) as any[]
                 if ((existingHull as any[]).length > 0) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    const fk = await this.fkOff()
                     try {
                 for (const q of existingHull as any[]) {
                     const altId = uuidv4()
-                    await this.pool.execute(
+                    await fk.execute(
                         'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, premium_amount, order_index) VALUES (?, ?, ?, ?, 0)',
                         [altId, q.id, q.hull_clause_id, q.premium_amount ?? null]
                     )
                     // Link existing H&M conditions to this alternative
-                    await this.pool.execute(
+                    await fk.execute(
                         `UPDATE quotation_hull_conditions qhc
                          SET qhc.alternative_id = ?
                          WHERE qhc.quotation_id = ?
@@ -2141,7 +2281,7 @@ export class MySQLAdapter {
                         [altId, q.id, q.hull_clause_id]
                     )
                     // Link existing additional conditions to this alternative where applicable
-                    await this.pool.execute(
+                    await fk.execute(
                         `UPDATE quotation_hull_additional_conditions qhac
                          SET qhac.alternative_id = ?
                          WHERE qhac.quotation_id = ?
@@ -2155,7 +2295,7 @@ export class MySQLAdapter {
                     )
                 }
                     } finally {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        await fk.done()
                     }
                 }
             }
@@ -2170,24 +2310,29 @@ export class MySQLAdapter {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_war_conditions (
-                    id VARCHAR(36) PRIMARY KEY,
-                    quotation_id VARCHAR(36) NOT NULL,
-                    war_condition_id VARCHAR(36) NOT NULL,
-                    text_override TEXT DEFAULT NULL,
-                    order_index INT DEFAULT 0,
-                    vessel_scope TEXT DEFAULT NULL,
-                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                {
+                    const fk = await this.fkOff()
+                    try {
+                        await fk.query(`CREATE TABLE IF NOT EXISTS quotation_war_conditions (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            war_condition_id VARCHAR(36) NOT NULL,
+                            text_override TEXT DEFAULT NULL,
+                            order_index INT DEFAULT 0,
+                            vessel_scope TEXT DEFAULT NULL,
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    } finally {
+                        await fk.done()
+                    }
+                }
             }
 
             // Migration: P&I alternatives
             {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_pi_alternatives (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS quotation_pi_alternatives (
                         id VARCHAR(36) PRIMARY KEY,
                         quotation_id VARCHAR(36) NOT NULL,
                         label VARCHAR(255) DEFAULT NULL,
@@ -2196,7 +2341,7 @@ export class MySQLAdapter {
                         FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
 
                 // Add alternative_id to P&I junction tables
@@ -2239,9 +2384,9 @@ export class MySQLAdapter {
             // --- Entity Addresses + vessel_assureds.address_id ---
             {
                 // Ensure entity_addresses table exists (migration fallback)
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS entity_addresses (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS entity_addresses (
                         id VARCHAR(36) PRIMARY KEY,
                         entity_id VARCHAR(36) NOT NULL,
                         label VARCHAR(255) NOT NULL,
@@ -2254,7 +2399,7 @@ export class MySQLAdapter {
                         FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
                 const [addrCols] = await this.pool.query(
                     "SHOW COLUMNS FROM vessel_assureds LIKE 'address_id'"
@@ -2268,29 +2413,29 @@ export class MySQLAdapter {
 
             // --- RBAC: user_groups, group_permissions, user_group_members, user_permission_overrides ---
             {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                const fk = await this.fkOff()
                 try {
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_groups (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS user_groups (
                         id VARCHAR(36) PRIMARY KEY,
                         name VARCHAR(255) NOT NULL,
                         description TEXT,
                         is_system BOOLEAN DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS group_permissions (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS group_permissions (
                         group_id VARCHAR(36) NOT NULL,
                         permission_key VARCHAR(100) NOT NULL,
                         PRIMARY KEY (group_id, permission_key),
                         FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_group_members (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS user_group_members (
                         user_id VARCHAR(36) NOT NULL,
                         group_id VARCHAR(36) NOT NULL,
                         PRIMARY KEY (user_id, group_id),
                         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                         FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                    await this.pool.query(`CREATE TABLE IF NOT EXISTS user_permission_overrides (
+                    await fk.query(`CREATE TABLE IF NOT EXISTS user_permission_overrides (
                         user_id VARCHAR(36) NOT NULL,
                         permission_key VARCHAR(100) NOT NULL,
                         granted BOOLEAN NOT NULL DEFAULT TRUE,
@@ -2298,7 +2443,7 @@ export class MySQLAdapter {
                         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
                 } finally {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                    await fk.done()
                 }
 
                 // Seed system groups if missing
@@ -2306,20 +2451,20 @@ export class MySQLAdapter {
                 if ((existingGroups as any[]).length === 0) {
                     const adminGroupId = uuidv4()
                     const userGroupId = uuidv4()
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    const fk = await this.fkOff()
                     try {
-                        await this.pool.execute(
+                        await fk.execute(
                             "INSERT INTO user_groups (id, name, description, is_system) VALUES (?, 'Administrator', 'Full access to all features', TRUE)",
                             [adminGroupId]
                         )
-                        await this.pool.execute(
+                        await fk.execute(
                             "INSERT INTO user_groups (id, name, description, is_system) VALUES (?, 'User', 'Basic read access', TRUE)",
                             [userGroupId]
                         )
                         // Administrator group gets all permissions
                         const { ALL_PERMISSION_KEYS } = await import('../../shared/types')
                         for (const key of ALL_PERMISSION_KEYS) {
-                            await this.pool.execute(
+                            await fk.execute(
                                 'INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)',
                                 [adminGroupId, key]
                             )
@@ -2327,22 +2472,22 @@ export class MySQLAdapter {
                         // User group gets view-only permissions
                         const viewPerms = ALL_PERMISSION_KEYS.filter((k: string) => k.endsWith(':view'))
                         for (const key of viewPerms) {
-                            await this.pool.execute(
+                            await fk.execute(
                                 'INSERT IGNORE INTO group_permissions (group_id, permission_key) VALUES (?, ?)',
                                 [userGroupId, key]
                             )
                         }
                         // Assign existing admin users to Administrator group, others to User group
-                        const [allUsers] = await this.pool.query('SELECT id, role FROM users')
+                        const [allUsers] = await fk.query('SELECT id, role FROM users')
                         for (const u of allUsers as any[]) {
                             const gid = u.role === 'admin' ? adminGroupId : userGroupId
-                            await this.pool.execute(
+                            await fk.execute(
                                 'INSERT IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)',
                                 [u.id, gid]
                             )
                         }
                     } finally {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        await fk.done()
                     }
                 }
             }
@@ -2722,21 +2867,25 @@ export class MySQLAdapter {
 
             // Recent Items table
             try {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS = 0')
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS user_recent_items (
-                    id VARCHAR(36) PRIMARY KEY,
-                    user_id VARCHAR(36) NOT NULL,
-                    item_type VARCHAR(50) NOT NULL,
-                    item_id VARCHAR(36) NOT NULL,
-                    item_label VARCHAR(255) NOT NULL,
-                    item_sublabel VARCHAR(255) DEFAULT NULL,
-                    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_uri_user (user_id),
-                    UNIQUE KEY uk_uri_user_item (user_id, item_type, item_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                await this.pool.query('SET FOREIGN_KEY_CHECKS = 1')
+                {
+                    const fk = await this.fkOff()
+                    try {
+                        await fk.query(`CREATE TABLE IF NOT EXISTS user_recent_items (
+                            id VARCHAR(36) PRIMARY KEY,
+                            user_id VARCHAR(36) NOT NULL,
+                            item_type VARCHAR(50) NOT NULL,
+                            item_id VARCHAR(36) NOT NULL,
+                            item_label VARCHAR(255) NOT NULL,
+                            item_sublabel VARCHAR(255) DEFAULT NULL,
+                            viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_uri_user (user_id),
+                            UNIQUE KEY uk_uri_user_item (user_id, item_type, item_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    } finally {
+                        await fk.done()
+                    }
+                }
             } catch (e) {
-                try { await this.pool.query('SET FOREIGN_KEY_CHECKS = 1') } catch {}
                 console.error('user_recent_items migration:', e)
             }
 
@@ -2753,6 +2902,26 @@ export class MySQLAdapter {
                 // Sessions live 30 days
                 await this.pool.query('DELETE FROM user_sessions WHERE created_at < (NOW() - INTERVAL 30 DAY)')
             } catch (e) { console.error('user_sessions migration:', e) }
+
+            // Backstop for numbering: real policy and receipt numbers must be unique. Added only
+            // when the data has no duplicates already (otherwise logged, never blocks startup).
+            // (Policy revisions share the policy number, so the key is number + revision.)
+            for (const u of [
+                { table: 'policy_documents', columns: ['policy_number', 'revision_number'], index: 'uq_pd_policy_number_rev' },
+                { table: 'receipts', columns: ['receipt_number'], index: 'uq_receipts_number' }
+            ]) {
+                try {
+                    const [hasIdx] = await this.pool.query(`SHOW INDEX FROM \`${u.table}\` WHERE Key_name = ?`, [u.index]) as any[]
+                    if ((hasIdx as any[]).length > 0) continue
+                    const colList = u.columns.map(c => `\`${c}\``).join(', ')
+                    const [dups] = await this.pool.query(`SELECT ${colList} FROM \`${u.table}\` GROUP BY ${colList} HAVING COUNT(*) > 1 LIMIT 5`) as any[]
+                    if ((dups as any[]).length > 0) {
+                        console.warn(`[migration] ${u.table} (${u.columns.join(', ')}) has duplicates, UNIQUE index not added:`, dups)
+                        continue
+                    }
+                    await this.pool.query(`ALTER TABLE \`${u.table}\` ADD UNIQUE INDEX \`${u.index}\` (${colList})`)
+                } catch (e) { console.error(`unique index ${u.index}:`, e) }
+            }
 
             // Dashboard onboarded column
             try {
@@ -2818,8 +2987,8 @@ export class MySQLAdapter {
 
             // Make file_name and file_data nullable for rich-text-only templates
             try {
-                await this.pool.query('ALTER TABLE document_templates MODIFY COLUMN file_name VARCHAR(255) DEFAULT NULL')
-                await this.pool.query('ALTER TABLE document_templates MODIFY COLUMN file_data LONGBLOB DEFAULT NULL')
+                await this.modifyColumnIfChanged('document_templates', 'file_name', { type: 'varchar(255)', nullable: true }, 'ALTER TABLE document_templates MODIFY COLUMN file_name VARCHAR(255) DEFAULT NULL')
+                await this.modifyColumnIfChanged('document_templates', 'file_data', { type: 'longblob', nullable: true }, 'ALTER TABLE document_templates MODIFY COLUMN file_data LONGBLOB DEFAULT NULL')
             } catch (e) { console.error('document_templates nullable file migration:', e) }
 
             // Migration: vessel_scope_id on quotation_hull_alternatives for per-vessel hull clauses
@@ -2866,16 +3035,21 @@ export class MySQLAdapter {
 
             // Migration: quotation_trading_intros table for per-vessel trading warranty intro text
             try {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
-                await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_trading_intros (
-                    id VARCHAR(36) PRIMARY KEY,
-                    quotation_id VARCHAR(36) NOT NULL,
-                    text TEXT NOT NULL,
-                    vessel_scope TEXT DEFAULT NULL,
-                    order_index INT DEFAULT 0,
-                    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                {
+                    const fk = await this.fkOff()
+                    try {
+                        await fk.query(`CREATE TABLE IF NOT EXISTS quotation_trading_intros (
+                            id VARCHAR(36) PRIMARY KEY,
+                            quotation_id VARCHAR(36) NOT NULL,
+                            text TEXT NOT NULL,
+                            vessel_scope TEXT DEFAULT NULL,
+                            order_index INT DEFAULT 0,
+                            FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                    } finally {
+                        await fk.done()
+                    }
+                }
             } catch {}
 
             // Migration: reopen_reason on survey_defects
@@ -2912,11 +3086,11 @@ export class MySQLAdapter {
                 const [hciCol] = await this.pool.query("SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'") as any[]
                 const colInfo = (hciCol as any[])[0]
                 if (colInfo && (colInfo.Null === 'NO' || colInfo.NULL === 'NO' || colInfo.null === 'NO')) {
-                    await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+                    const fk = await this.fkOff()
                     try {
-                        await this.pool.query("ALTER TABLE quotation_hull_alternatives MODIFY COLUMN hull_clause_id VARCHAR(36) DEFAULT NULL")
+                        await fk.query("ALTER TABLE quotation_hull_alternatives MODIFY COLUMN hull_clause_id VARCHAR(36) DEFAULT NULL")
                     } finally {
-                        await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                        await fk.done()
                     }
                 }
             } catch {}
@@ -2999,11 +3173,12 @@ export class MySQLAdapter {
                 if (!tcColNames.includes('name')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN name VARCHAR(255) NULL")
                 if (!tcColNames.includes('kind')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN kind VARCHAR(10) NOT NULL DEFAULT 'docx'")
                 if (!tcColNames.includes('content_html')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN content_html MEDIUMTEXT NULL")
-                if (!tcColNames.includes('is_default')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0")
+                const addedIsDefault = !tcColNames.includes('is_default')
+                if (addedIsDefault) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0")
                 if (!tcColNames.includes('order_index')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN order_index INT NOT NULL DEFAULT 0")
                 if (!tcColNames.includes('updated_at')) await this.pool.query("ALTER TABLE policy_tc_templates ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP")
                 // file_data must be nullable for html templates
-                try { await this.pool.query("ALTER TABLE policy_tc_templates MODIFY COLUMN file_data LONGBLOB NULL") } catch { /* already nullable */ }
+                try { await this.modifyColumnIfChanged('policy_tc_templates', 'file_data', { type: 'longblob', nullable: true }, "ALTER TABLE policy_tc_templates MODIFY COLUMN file_data LONGBLOB NULL") } catch { /* already nullable */ }
                 // Drop the one-per-type UNIQUE index so multiple named templates per type are allowed
                 try {
                     const [idx] = await this.pool.query("SHOW INDEX FROM policy_tc_templates WHERE Key_name = 'idx_tc_type'") as any[]
@@ -3011,7 +3186,9 @@ export class MySQLAdapter {
                 } catch { /* index already gone */ }
                 // Backfill legacy rows: they were DOCX, one per type → mark as default docx templates
                 await this.pool.query("UPDATE policy_tc_templates SET kind = 'docx' WHERE kind IS NULL OR kind = ''")
-                await this.pool.query("UPDATE policy_tc_templates SET is_default = 1 WHERE is_default = 0 AND kind = 'docx'")
+                // One-time backfill when the column is first added (legacy single DOCX per type =
+                // default). Running it every launch re-defaulted templates the user had un-set.
+                if (addedIsDefault) await this.pool.query("UPDATE policy_tc_templates SET is_default = 1 WHERE is_default = 0 AND kind = 'docx'")
                 await this.pool.query("UPDATE policy_tc_templates SET name = file_name WHERE (name IS NULL OR name = '') AND file_name IS NOT NULL")
             } catch (e) { console.error('policy_tc_templates extend migration:', e) }
 
@@ -4240,35 +4417,116 @@ export class MySQLAdapter {
         return rows as any[]
     }
 
-    async deleteVessel(id: string): Promise<void> {
-        if (!this.pool) return
+    // Columns that make an entity "in use" beyond vessel_assureds. Discovered from the schema
+    // (any *entity_id column) so new link columns are covered automatically. Excluded: the
+    // entity's own child rows and polymorphic log tables.
+    private async entityReferenceColumns(): Promise<{ table: string; column: string }[]> {
+        if (!this.pool) return []
+        const [rows] = await this.pool.query(`
+            SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME LIKE '%entity\\_id'
+        `)
+        const ownOrPolymorphic = new Set([
+            'vessel_assureds.entity_id', 'entity_addresses.entity_id', 'entity_documents.entity_id',
+            'entity_commission_overrides.entity_id', 'entity_ubos.assured_entity_id',
+            'activity_log.entity_id', 'compliance_check_results.entity_id'
+        ])
+        const cols = (rows as any[])
+            .map(r => ({ table: String(r.t), column: String(r.c) }))
+            .filter(r => !ownOrPolymorphic.has(`${r.table}.${r.column}`) && /^[a-z0-9_]+$/i.test(r.table) && /^[a-z0-9_]+$/i.test(r.column))
+        cols.push({ table: 'vessels', column: 'customer_id' }) // legacy customer link
+        return cols
+    }
 
-        // 1. Get associated entity IDs before deletion
-        const [assureds]: any[] = await this.pool.execute(
-            'SELECT entity_id as entityId FROM vessel_assureds WHERE vessel_id = ?',
-            [id]
-        )
-        const entityIds = assureds.map((a: any) => a.entityId)
+    async deleteVessel(id: string): Promise<{ deletedEntities: number; keptEntities: number }> {
+        if (!this.pool) throw new Error('DB not connected')
 
-        // 2. Delete the vessel (cascades to vessel_documents, vessel_assureds)
-        await this.pool.execute('DELETE FROM vessels WHERE id = ?', [id])
-
-        // 3. Delete compliance results for this vessel
-        await this.pool.execute('DELETE FROM compliance_check_results WHERE entity_type = "vessel" AND entity_id = ?', [id])
-
-        // 4. Clean up orphaned entities
-        for (const entityId of entityIds) {
-            const [others]: any[] = await this.pool.execute(
-                'SELECT id FROM vessel_assureds WHERE entity_id = ?',
-                [entityId]
-            )
-            if (others.length === 0) {
-                // Not linked to any other vessel, delete the entity (cascades to entity_ubos)
-                await this.pool.execute('DELETE FROM entities WHERE id = ?', [entityId])
-                // Also delete compliance results for this entity
-                await this.pool.execute('DELETE FROM compliance_check_results WHERE entity_type = "entity" AND entity_id = ?', [entityId])
-            }
+        // Insurance records must keep their vessel: a vessel with policies is deactivated, not deleted
+        const [polRows] = await this.pool.query('SELECT COUNT(*) AS n FROM policy_documents WHERE vessel_id = ?', [id])
+        const policyCount = Number((polRows as any[])[0]?.n || 0)
+        if (policyCount > 0) {
+            throw new Error(`This vessel has ${policyCount} polic${policyCount === 1 ? 'y' : 'ies'} and cannot be deleted. Deactivate it instead.`)
         }
+
+        const refCols = await this.entityReferenceColumns()
+        const conn = await this.pool.getConnection()
+        let deletedEntities = 0
+        let keptEntities = 0
+        try {
+            await conn.beginTransaction()
+            // 1. Entities assured on this vessel (before the cascade removes the links)
+            const [assureds]: any[] = await conn.execute(
+                'SELECT DISTINCT entity_id AS entityId FROM vessel_assureds WHERE vessel_id = ?',
+                [id]
+            )
+            const entityIds: string[] = assureds.map((a: any) => a.entityId).filter(Boolean)
+
+            // 2. Delete the vessel's own data explicitly. These tables have NO foreign key to
+            //    vessels in deployed databases, so nothing cascades: without this every delete
+            //    left assureds, documents, surveys, defects, policies and notes behind (and the
+            //    stale vessel_assureds rows kept "orphan" entities alive).
+            const run = async (sql: string, params: any[]) => {
+                try { await conn.query(sql, params) } catch (e: any) {
+                    // Older schemas may lack a table/column — skip those, fail on anything else
+                    if (e?.code !== 'ER_NO_SUCH_TABLE' && e?.code !== 'ER_BAD_FIELD_ERROR') throw e
+                }
+            }
+            // grandchildren first
+            await run(`DELETE da FROM defect_attachments da JOIN survey_defects sd ON sd.id = da.defect_id
+                       JOIN condition_surveys cs ON cs.id = sd.survey_id WHERE cs.vessel_id = ?`, [id])
+            await run('DELETE sd FROM survey_defects sd JOIN condition_surveys cs ON cs.id = sd.survey_id WHERE cs.vessel_id = ?', [id])
+            await run('DELETE sa FROM survey_attachments sa JOIN condition_surveys cs ON cs.id = sa.survey_id WHERE cs.vessel_id = ?', [id])
+            await run('DELETE r FROM survey_warranty_reminders r JOIN survey_warranties w ON w.id = r.warranty_id WHERE w.vessel_id = ?', [id])
+            await run('DELETE v FROM vessel_policy_values v JOIN vessel_dynamic_policies p ON p.id = v.policy_id WHERE p.vessel_id = ?', [id])
+            await run('DELETE n FROM policy_renewal_notes n JOIN vessel_dynamic_policies p ON p.id = n.policy_id WHERE p.vessel_id = ?', [id])
+            // the vessel's own rows
+            const ownTables = ['survey_warranties', 'condition_surveys', 'vessel_assureds', 'vessel_audit_log',
+                'vessel_classifications', 'vessel_custom_doc_types', 'vessel_documents', 'vessel_dynamic_policies',
+                'vessel_insurance_policies', 'vessel_name_history', 'vessel_notes', 'vessel_policies']
+            for (const t of ownTables) await run(`DELETE FROM \`${t}\` WHERE vessel_id = ?`, [id])
+            await run("DELETE FROM user_recent_items WHERE item_type = 'vessel' AND item_id = ?", [id])
+            // Records owned by something else keep their snapshot (name, IMO) but lose the link:
+            // quotations, quotation vessels, receipts — and any future table with a vessel_id
+            const [vTables] = await conn.query(`SELECT TABLE_NAME AS t FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'vessel_id' AND IS_NULLABLE = 'YES'`)
+            const skip = new Set([...ownTables, 'policy_documents'])
+            for (const r of vTables as any[]) {
+                const t = String(r.t)
+                if (skip.has(t) || !/^[a-z0-9_]+$/i.test(t)) continue
+                await run(`UPDATE \`${t}\` SET vessel_id = NULL WHERE vessel_id = ?`, [id])
+            }
+            await conn.execute('DELETE FROM vessels WHERE id = ?', [id])
+
+            // 3. Compliance results for this vessel
+            await conn.execute("DELETE FROM compliance_check_results WHERE entity_type = 'vessel' AND entity_id = ?", [id])
+
+            // 4. Remove an entity only when NOTHING else uses it: no other vessel, and no policy,
+            //    quotation, blue card, receipt, UBO-of-another-company or sanctions-report link.
+            //    (Previously any entity without another vessel was deleted, wiping brokers,
+            //    customers and UBOs that were still referenced elsewhere.)
+            for (const entityId of entityIds) {
+                const [others]: any[] = await conn.execute('SELECT 1 FROM vessel_assureds WHERE entity_id = ? LIMIT 1', [entityId])
+                let inUse = others.length > 0
+                for (const rc of refCols) {
+                    if (inUse) break
+                    try {
+                        const [hit]: any[] = await conn.query(`SELECT 1 FROM \`${rc.table}\` WHERE \`${rc.column}\` = ? LIMIT 1`, [entityId])
+                        if (hit.length > 0) inUse = true
+                    } catch { /* column vanished — ignore */ }
+                }
+                if (inUse) { keptEntities++; continue }
+                await conn.execute('DELETE FROM entities WHERE id = ?', [entityId])
+                await conn.execute("DELETE FROM compliance_check_results WHERE entity_type = 'entity' AND entity_id = ?", [entityId])
+                deletedEntities++
+            }
+            await conn.commit()
+        } catch (e) {
+            try { await conn.rollback() } catch { /* ignore */ }
+            throw e
+        } finally {
+            conn.release()
+        }
+        return { deletedEntities, keptEntities }
     }
 
     // --- Vessel Documents ---
@@ -4639,6 +4897,13 @@ export class MySQLAdapter {
 
     async mergeEntities(sourceId: string, targetId: string, keepName?: string): Promise<{ mergedAssuredLinks: number; mergedUBOLinks: number; mergedCustomerLinks: number }> {
         if (!this.pool) throw new Error('DB Not connected')
+        if (sourceId === targetId) throw new Error('Cannot merge an entity into itself')
+
+        // Every other column that links to an entity (policies, quotations, blue cards, receipts,
+        // sanctions reports, ...), discovered from the schema so nothing is left pointing at the
+        // deleted source. vessel_assureds / entity_ubos / vessels.customer_id are handled below.
+        const handledHere = new Set(['entity_ubos.ubo_entity_id', 'vessels.customer_id'])
+        const extraRefCols = (await this.entityReferenceColumns()).filter(rc => !handledHere.has(`${rc.table}.${rc.column}`))
 
         const conn = await this.pool.getConnection()
         try {
@@ -4724,6 +4989,33 @@ export class MySQLAdapter {
                 `UPDATE compliance_check_results SET entity_id = ? WHERE entity_type = 'entity' AND entity_id = ?`,
                 [targetId, sourceId]
             )
+
+            // 4a. Addresses move with their ids, so vessel_assureds.address_id and policy addresses
+            //     keep pointing at them (they used to be cascade-deleted with the source)
+            await conn.execute('UPDATE entity_addresses SET entity_id = ? WHERE entity_id = ?', [targetId, sourceId])
+
+            // 4c. Commission overrides: keep the target's own override per policy type
+            await conn.execute(
+                `DELETE s FROM entity_commission_overrides s
+                 JOIN entity_commission_overrides t ON t.entity_id = ? AND t.policy_type_id = s.policy_type_id
+                 WHERE s.entity_id = ?`, [targetId, sourceId])
+            await conn.execute('UPDATE entity_commission_overrides SET entity_id = ? WHERE entity_id = ?', [targetId, sourceId])
+
+            // 4d. All remaining entity links (policies customer/broker, quotations, quotation assureds,
+            //     policy addresses, blue card owners, receipts, sanctions report checks, ...)
+            for (const rc of extraRefCols) {
+                try {
+                    await conn.query(`UPDATE \`${rc.table}\` SET \`${rc.column}\` = ? WHERE \`${rc.column}\` = ?`, [targetId, sourceId])
+                } catch (e: any) {
+                    // A unique index can reject the move when the target already has that link:
+                    // drop the source's duplicate row instead of failing the whole merge
+                    if (e?.code === 'ER_DUP_ENTRY') {
+                        await conn.query(`DELETE FROM \`${rc.table}\` WHERE \`${rc.column}\` = ?`, [sourceId])
+                    } else {
+                        throw e
+                    }
+                }
+            }
 
             // 4b. Merge entity_documents: copy source docs to target where target doesn't have them
             try {
@@ -5011,9 +5303,9 @@ export class MySQLAdapter {
     ): Promise<EntityAddress> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 `INSERT INTO entity_addresses (id, entity_id, label, address_line1, address_line2, city, country, postal_code)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -5028,7 +5320,7 @@ export class MySQLAdapter {
                 ]
             )
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, ...addr }
     }
@@ -5129,14 +5421,14 @@ export class MySQLAdapter {
 
     async setGroupPermissions(groupId: string, permissionKeys: string[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM group_permissions WHERE group_id = ?', [groupId])
+            await fk.execute('DELETE FROM group_permissions WHERE group_id = ?', [groupId])
             for (const key of permissionKeys) {
-                await this.pool.execute('INSERT INTO group_permissions (group_id, permission_key) VALUES (?, ?)', [groupId, key])
+                await fk.execute('INSERT INTO group_permissions (group_id, permission_key) VALUES (?, ?)', [groupId, key])
             }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -5148,14 +5440,14 @@ export class MySQLAdapter {
 
     async setUserGroups(userId: string, groupIds: string[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM user_group_members WHERE user_id = ?', [userId])
+            await fk.execute('DELETE FROM user_group_members WHERE user_id = ?', [userId])
             for (const gid of groupIds) {
-                await this.pool.execute('INSERT INTO user_group_members (user_id, group_id) VALUES (?, ?)', [userId, gid])
+                await fk.execute('INSERT INTO user_group_members (user_id, group_id) VALUES (?, ?)', [userId, gid])
             }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -5167,14 +5459,14 @@ export class MySQLAdapter {
 
     async setUserPermissionOverrides(userId: string, overrides: { permissionKey: string; granted: boolean }[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM user_permission_overrides WHERE user_id = ?', [userId])
+            await fk.execute('DELETE FROM user_permission_overrides WHERE user_id = ?', [userId])
             for (const o of overrides) {
-                await this.pool.execute('INSERT INTO user_permission_overrides (user_id, permission_key, granted) VALUES (?, ?, ?)', [userId, o.permissionKey, o.granted ? 1 : 0])
+                await fk.execute('INSERT INTO user_permission_overrides (user_id, permission_key, granted) VALUES (?, ?, ?)', [userId, o.permissionKey, o.granted ? 1 : 0])
             }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -5494,7 +5786,13 @@ export class MySQLAdapter {
         }
 
         try {
-            return JSON.parse(settingValue)
+            const parsed = JSON.parse(settingValue)
+            // Older saves stored ".pdf " (trailing space), which never matched a real extension
+            const clean = (list: unknown): string[] => (Array.isArray(list) ? list : []).map(e => String(e).trim().toLowerCase()).filter(Boolean)
+            return {
+                allowedExtensions: clean(parsed?.allowedExtensions),
+                blockedExtensions: clean(parsed?.blockedExtensions)
+            }
         } catch {
             // If parsing fails, return defaults
             return defaultSettings
@@ -7167,33 +7465,41 @@ export class MySQLAdapter {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
         await this.pool.execute('INSERT INTO pi_warranty_sets (id, name, default_selected) VALUES (?, ?, ?)', [id, name, defaultSelected ? 1 : 0])
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
         const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
         const validIds = new Set((existing as any[]).map((r: any) => r.id))
-        let orderIdx = 0
-        for (const wid of warrantyIds) {
-            if (validIds.has(wid)) {
-                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, orderIdx++])
+        const fk = await this.fkOff()
+        try {
+            let orderIdx = 0
+            for (const wid of warrantyIds) {
+                if (validIds.has(wid)) {
+                    await fk.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, orderIdx++])
+                }
             }
+        } finally {
+            await fk.done()
         }
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
         return { id, name, warrantyIds: warrantyIds.filter(w => validIds.has(w)), defaultSelected: !!defaultSelected }
     }
 
     async updatePIWarrantySet(id: string, name: string, warrantyIds: string[], defaultSelected?: boolean): Promise<void> {
         if (!this.pool) return
         await this.pool.execute('UPDATE pi_warranty_sets SET name = ?, default_selected = ? WHERE id = ?', [name, defaultSelected ? 1 : 0, id])
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
-        await this.pool.execute('DELETE FROM pi_warranty_set_items WHERE set_id = ?', [id])
-        const [existing] = await this.pool.query('SELECT id FROM pi_warranties') as any[]
-        const validIds = new Set((existing as any[]).map((r: any) => r.id))
-        let updOrderIdx = 0
-        for (const wid of warrantyIds) {
-            if (validIds.has(wid)) {
-                await this.pool.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, updOrderIdx++])
+        {
+            const fk = await this.fkOff()
+            try {
+                await fk.execute('DELETE FROM pi_warranty_set_items WHERE set_id = ?', [id])
+                const [existing] = await fk.query('SELECT id FROM pi_warranties') as any[]
+                const validIds = new Set((existing as any[]).map((r: any) => r.id))
+                let updOrderIdx = 0
+                for (const wid of warrantyIds) {
+                    if (validIds.has(wid)) {
+                        await fk.execute('INSERT INTO pi_warranty_set_items (id, set_id, warranty_id, order_index) VALUES (?, ?, ?, ?)', [uuidv4(), id, wid, updOrderIdx++])
+                    }
+                }
+            } finally {
+                await fk.done()
             }
         }
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
     }
 
     async deletePIWarrantySet(id: string): Promise<void> {
@@ -8236,7 +8542,7 @@ export class MySQLAdapter {
             'SELECT id, name, filters, order_index as `order` FROM quotation_saved_filters WHERE user_id = ? ORDER BY order_index',
             [userId]
         )
-        return (rows as any[]).map((r: any) => ({ ...r, filters: JSON.parse(r.filters) }))
+        return (rows as any[]).map((r: any) => ({ ...r, filters: safeJson(r.filters, {}) }))
     }
 
     async saveQuotationFilter(
@@ -8260,9 +8566,16 @@ export class MySQLAdapter {
 
     async bulkDeleteQuotations(ids: string[]): Promise<number> {
         if (!this.pool || ids.length === 0) return 0
-        const placeholders = ids.map(() => '?').join(',')
-        const [r] = await this.pool.execute(`DELETE FROM quotations WHERE id IN (${placeholders})`, ids)
-        return (r as any).affectedRows || 0
+        // Same rules as a single permanent delete: all child rows go, quotations with policies stay
+        const [withPol] = await this.pool.query('SELECT DISTINCT quotation_id AS id FROM policy_documents WHERE quotation_id IN (?)', [ids])
+        const keep = new Set((withPol as any[]).map(r => r.id))
+        let deleted = 0
+        for (const id of ids) {
+            if (keep.has(id)) continue
+            await this.purgeQuotationRows(id)
+            deleted++
+        }
+        return deleted
     }
 
     // --- Quotation Groups ---
@@ -8780,9 +9093,68 @@ export class MySQLAdapter {
         )
     }
 
+    // Delete a quotation and EVERY row that belongs to it. Several quotation_* tables have no
+    // FK cascade, so deleting only the quotations row left orphans behind. Tables are discovered
+    // from the schema (any quotation_id column) so new child tables are included automatically.
+    // policy_documents are never touched here (callers refuse when policies exist).
+    private async purgeQuotationRows(id: string): Promise<void> {
+        if (!this.pool) return
+        const [tables] = await this.pool.query(`
+            SELECT TABLE_NAME AS t FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'quotation_id' AND TABLE_NAME <> 'policy_documents'
+        `)
+        const fk = await this.fkOff()
+        try {
+            // Grandchildren keyed by a child id
+            try {
+                await fk.execute(`DELETE p FROM quotation_hull_alt_vessel_premiums p
+                    JOIN quotation_hull_alternatives a ON a.id = p.alternative_id WHERE a.quotation_id = ?`, [id])
+            } catch { /* table may not exist */ }
+            for (const r of tables as any[]) {
+                const t = String(r.t)
+                if (!/^[a-z0-9_]+$/i.test(t)) continue
+                try { await fk.execute(`DELETE FROM \`${t}\` WHERE quotation_id = ?`, [id]) } catch (e) { console.warn(`[purgeQuotation] ${t}:`, (e as any)?.message) }
+            }
+            await fk.execute('DELETE FROM quotations WHERE id = ?', [id])
+        } finally {
+            await fk.done()
+        }
+    }
+
+    // Delete policy documents and their own child rows (instalments, addresses, blue cards, ...)
+    private async purgePolicyRows(policyIds: string[]): Promise<void> {
+        if (!this.pool || policyIds.length === 0) return
+        const [tables] = await this.pool.query(`
+            SELECT TABLE_NAME AS t FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'policy_doc_id'
+        `)
+        const fk = await this.fkOff()
+        try {
+            for (const r of tables as any[]) {
+                const t = String(r.t)
+                if (!/^[a-z0-9_]+$/i.test(t)) continue
+                try {
+                    if (t === 'receipt_policies') {
+                        // A receipt is a financial record: keep its line (policy number text), drop the link
+                        await fk.query('UPDATE receipt_policies SET policy_doc_id = NULL WHERE policy_doc_id IN (?)', [policyIds])
+                    } else {
+                        await fk.query(`DELETE FROM \`${t}\` WHERE policy_doc_id IN (?)`, [policyIds])
+                    }
+                } catch (e) { console.warn(`[purgePolicy] ${t}:`, (e as any)?.message) }
+            }
+            await fk.query('DELETE FROM policy_documents WHERE id IN (?)', [policyIds])
+        } finally {
+            await fk.done()
+        }
+    }
+
     async permanentlyDeleteQuotation(id: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('DELETE FROM quotations WHERE id = ?', [id])
+        // A policy keeps reading its quotation (coverage, wording, exports): never delete it
+        const [pol] = await this.pool.query('SELECT COUNT(*) AS n FROM policy_documents WHERE quotation_id = ?', [id])
+        const n = Number((pol as any[])[0]?.n || 0)
+        if (n > 0) throw new Error(`This quotation has ${n} polic${n === 1 ? 'y' : 'ies'} and cannot be permanently deleted.`)
+        await this.purgeQuotationRows(id)
     }
 
     async getDeletedQuotations(): Promise<any[]> {
@@ -8806,6 +9178,10 @@ export class MySQLAdapter {
 
     /** Assign a real quotation reference number (Q/{type}/{seq}) to a draft quotation */
     async assignQuotationNumber(quotationId: string): Promise<string> {
+        return this.withNamedLock('vc_quotation_number', () => this.assignQuotationNumberLocked(quotationId))
+    }
+
+    private async assignQuotationNumberLocked(quotationId: string): Promise<string> {
         if (!this.pool) throw new Error('DB not connected')
         const [qRows] = await this.pool.query(
             'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?', [quotationId]
@@ -8842,6 +9218,11 @@ export class MySQLAdapter {
     /** Release a real quotation number — if it's the last assigned, decrement the counter; otherwise void it */
     async releaseQuotationNumber(quotationId: string): Promise<void> {
         if (!this.pool) return
+        return this.withNamedLock('vc_quotation_number', () => this.releaseQuotationNumberLocked(quotationId))
+    }
+
+    private async releaseQuotationNumberLocked(quotationId: string): Promise<void> {
+        if (!this.pool) return
         const [qRows] = await this.pool.query(
             'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?', [quotationId]
         )
@@ -8852,9 +9233,11 @@ export class MySQLAdapter {
         // Only release real numbers (Q/...)
         if (ref.startsWith('DRAFT-') || !ref.startsWith('Q/')) return
 
-        // Parse the sequence number from Q/{code}/{seq}
-        const parts = ref.split('/')
-        const refSeq = parseInt(parts[2], 10)
+        // DB numbers are Q/{code}/{YY}/{seq} (4 parts) — the sequence is the LAST part, not
+        // parts[2] (that is the year). Registry numbers Q/{R|N}/{branch}/{YY}/{serial} (5 parts)
+        // are counted in the Excel registry, so they never touch the DB counter.
+        const parts = ref.replace(/-R\d+$/, '').split('/')
+        const refSeq = parts.length === 4 ? parseInt(parts[3], 10) : NaN
         if (isNaN(refSeq)) {
             // Can't parse — just set to draft
             const [tcRow] = await this.pool.query('SELECT pt.code FROM quotations q JOIN policy_types pt ON q.quotation_type_id = pt.id WHERE q.id = ?', [quotationId]) as any[]
@@ -8879,6 +9262,10 @@ export class MySQLAdapter {
 
     /** Assign a real policy number to a draft policy */
     async assignPolicyNumber(policyId: string): Promise<string> {
+        return this.withNamedLock('vc_policy_number', () => this.assignPolicyNumberLocked(policyId))
+    }
+
+    private async assignPolicyNumberLocked(policyId: string): Promise<string> {
         if (!this.pool) throw new Error('DB not connected')
         const [pRows] = await this.pool.query(
             'SELECT pd.policy_number, pd.quotation_id FROM policy_documents pd WHERE pd.id = ?', [policyId]
@@ -8924,10 +9311,12 @@ export class MySQLAdapter {
         const oldNumber = row.policy_number
         if (oldNumber) {
             const [bcRows] = await this.pool.query(
-                'SELECT id, card_type FROM policy_blue_cards WHERE policy_doc_id = ?', [policyId]
+                'SELECT id, card_type, card_number FROM policy_blue_cards WHERE policy_doc_id = ?', [policyId]
             )
             for (const bc of bcRows as any[]) {
-                const newCardNumber = policyNumber + '/' + bc.card_type
+                // Keep reissue suffixes (e.g. "-2/BBC"): swap only the draft policy-number prefix
+                const oldCard = String(bc.card_number || '')
+                const newCardNumber = oldCard.startsWith(oldNumber) ? policyNumber + oldCard.slice(oldNumber.length) : policyNumber + '/' + bc.card_type
                 await this.pool.execute('UPDATE policy_blue_cards SET card_number = ? WHERE id = ?', [newCardNumber, bc.id])
             }
         }
@@ -9179,14 +9568,14 @@ export class MySQLAdapter {
             newRef = `${baseRef}-R${newRevisionNumber}`
         }
 
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
             // Lock the source quotation and ensure it has the revision_group_id set
-            await this.pool.execute('UPDATE quotations SET is_locked = TRUE, revision_group_id = ? WHERE id = ?', [revisionGroupId, sourceId])
+            await fk.execute('UPDATE quotations SET is_locked = TRUE, revision_group_id = ? WHERE id = ?', [revisionGroupId, sourceId])
 
             // Clone the main quotation row
             const revCols = QUOTATION_CONTENT_COLS.join(', ')
-            await this.pool.execute(`
+            await fk.execute(`
                 INSERT INTO quotations (
                     id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
@@ -9199,9 +9588,15 @@ export class MySQLAdapter {
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newRevisionNumber, revisionGroupId, sourceId])
 
-            await this.cloneQuotationJunctions(sourceId, newId)
+            try {
+                await this.cloneQuotationJunctions(sourceId, newId)
+            } catch (e) {
+                // Half-copied quotation is worse than none: remove it, then report the error
+                try { await this.purgeQuotationRows(newId) } catch { /* best effort */ }
+                throw e
+            }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
 
         return (await this.getQuotation(newId))!
@@ -9257,13 +9652,13 @@ export class MySQLAdapter {
         // Auto-generate new draft reference number (fills gaps from deleted drafts)
         const newRef = await this.nextDraftRef(source.quotationTypeCode)
 
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
             // Clone the main quotation row — new revision group, revision 0, draft status.
             // Copies the same content columns as a revision (war excess, custom trading wording,
             // pro-rata, outstanding/full-loss notices, customer, per-vessel LOL, ...).
             const dupCols = QUOTATION_CONTENT_COLS.join(', ')
-            await this.pool.execute(`
+            await fk.execute(`
                 INSERT INTO quotations (
                     id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
@@ -9276,9 +9671,15 @@ export class MySQLAdapter {
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newId, sourceId])
 
-            await this.cloneQuotationJunctions(sourceId, newId)
+            try {
+                await this.cloneQuotationJunctions(sourceId, newId)
+            } catch (e) {
+                // Half-copied quotation is worse than none: remove it, then report the error
+                try { await this.purgeQuotationRows(newId) } catch { /* best effort */ }
+                throw e
+            }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
 
         return (await this.getQuotation(newId))!
@@ -9311,12 +9712,12 @@ export class MySQLAdapter {
             newPeriodText = `${newInception} to ${newExpiry}`
         }
 
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
             // 3. Clone the main quotation row (same content columns as a revision). The renewal
             //    overrides period/is_renewal and records the expiring premium as previous.
             const renewCols = QUOTATION_CONTENT_COLS.filter(c => c !== 'period_text' && c !== 'is_renewal' && c !== 'previous_premium_amount')
-            await this.pool.execute(`
+            await fk.execute(`
                 INSERT INTO quotations (
                     id, reference_number, quotation_date, status, title, period_text, is_renewal,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
@@ -9331,11 +9732,16 @@ export class MySQLAdapter {
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
-            // 4. Clone all junction tables
-            await this.cloneQuotationJunctions(source.id, newId)
+            // 4. Clone all junction tables (a failed clone removes the half-built renewal)
+            try {
+                await this.cloneQuotationJunctions(source.id, newId)
+            } catch (e) {
+                try { await this.purgeQuotationRows(newId) } catch { /* best effort */ }
+                throw e
+            }
 
             // 5. Copy current per-vessel premiums as previous values for renewal comparison
-            await this.pool.execute(
+            await fk.execute(
                 `UPDATE quotation_vessels SET
                     previous_premium = premium_amount,
                     previous_section1_premium = war_section1_premium,
@@ -9343,19 +9749,19 @@ export class MySQLAdapter {
                  WHERE quotation_id = ?`, [newId])
 
             // 6. Copy current deductible amounts as previous values for renewal comparison
-            await this.pool.execute(
+            await fk.execute(
                 `UPDATE quotation_deductibles SET
                     previous_amount = amount,
                     previous_secondary_amount = secondary_amount
                  WHERE quotation_id = ?`, [newId])
 
             // 7. Refresh vessel details from current DB data
-            const [qVessels] = await this.pool.query(
+            const [qVessels] = await fk.query(
                 'SELECT id, vessel_id FROM quotation_vessels WHERE quotation_id = ?', [newId]
             )
             for (const qv of qVessels as any[]) {
                 if (!qv.vessel_id) continue
-                const [vRows] = await this.pool.query(
+                const [vRows] = await fk.query(
                     'SELECT name, imo_number, built_year, rebuilt_year, gross_tonnage, flag_state_id, vessel_type, classification_society, call_sign FROM vessels WHERE id = ?',
                     [qv.vessel_id]
                 )
@@ -9364,22 +9770,22 @@ export class MySQLAdapter {
                 // Resolve flag name
                 let flagName = v.flag_state_id || ''
                 if (v.flag_state_id) {
-                    const [fRows] = await this.pool.query('SELECT name FROM flag_states WHERE id = ?', [v.flag_state_id])
+                    const [fRows] = await fk.query('SELECT name FROM flag_states WHERE id = ?', [v.flag_state_id])
                     if ((fRows as any[]).length > 0) flagName = (fRows as any[])[0].name
                 }
                 // Resolve classification name
                 let className = v.classification_society || ''
                 if (v.classification_society) {
-                    const [cRows] = await this.pool.query('SELECT name FROM classification_societies WHERE id = ?', [v.classification_society])
+                    const [cRows] = await fk.query('SELECT name FROM classification_societies WHERE id = ?', [v.classification_society])
                     if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
                 }
-                await this.pool.execute(
+                await fk.execute(
                     `UPDATE quotation_vessels SET name = ?, imo_number = ?, built_year = ?, rebuilt_year = ?, gross_tonnage = ?, flag = ?, vessel_type = ?, classification = ?, call_sign = ? WHERE id = ?`,
                     [v.name, v.imo_number, v.built_year, v.rebuilt_year, v.gross_tonnage, flagName, v.vessel_type, className, v.call_sign, qv.id]
                 )
             }
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
 
         return newId
@@ -9548,20 +9954,20 @@ export class MySQLAdapter {
             const sourceCustomWarranties = await this.getQuotationCustomWarranties(sourceQId)
             const existingCustom = await this.getQuotationCustomWarranties(newQuotationId)
             const existingCustomTexts = new Set(existingCustom.map((w: any) => (w.text || '').trim()))
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+            const fk = await this.fkOff()
             try {
                 for (const cw of sourceCustomWarranties) {
                     const cwText = (cw.text || '').trim()
                     if (existingCustomTexts.has(cwText)) continue
                     existingCustomTexts.add(cwText)
                     const vesselScope = qvId ? JSON.stringify([qvId]) : null
-                    await this.pool.execute(
+                    await fk.execute(
                         'INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
                         [uuidv4(), newQuotationId, cw.text, 0, vesselScope]
                     )
                 }
             } finally {
-                await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+                await fk.done()
             }
         }
 
@@ -9728,14 +10134,14 @@ export class MySQLAdapter {
             [quotationId]
         )
         const order = (maxRow as any[])[0].nextOrder
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 'INSERT INTO quotation_assured_groups (id, quotation_id, name, order_index) VALUES (?, ?, ?, ?)',
                 [id, quotationId, name, order]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId, name, order }
     }
@@ -9831,7 +10237,7 @@ export class MySQLAdapter {
     async getQuotationClauses(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, pi_clause_id as piClauseId, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_clauses WHERE quotation_id = ?', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async getQuotationClauseOverrides(quotationId: string): Promise<Record<string, string>> {
@@ -9920,7 +10326,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId
              FROM quotation_additional_clauses WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationAdditionalClause(data: { quotationId: string; piAdditionalClauseId?: string; customText?: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -9941,7 +10347,7 @@ export class MySQLAdapter {
     async getQuotationWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, pi_warranty_id as piWarrantyId, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async updateQuotationWarrantyVesselScope(quotationId: string, piWarrantyId: string, vesselScope: string[] | null): Promise<void> {
@@ -9971,18 +10377,18 @@ export class MySQLAdapter {
     async getQuotationCustomWarranties(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationCustomWarranty(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
+            await fk.execute('INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
                 [id, data.quotationId, data.text, data.order ?? 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId: data.quotationId, text: data.text, order: data.order ?? 0, vesselScope: data.vesselScope || null }
     }
@@ -10018,7 +10424,7 @@ export class MySQLAdapter {
                 secondary_amount as secondaryAmount, secondary_description as secondaryDescription, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId, vessel_amounts as vesselAmounts, vessel_secondary_amounts as vesselSecondaryAmounts,
                 previous_amount as previousAmount, previous_secondary_amount as previousSecondaryAmount
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselSecondaryAmounts: r.vesselSecondaryAmounts ? JSON.parse(r.vesselSecondaryAmounts) : null, previousAmount: r.previousAmount != null ? Number(r.previousAmount) : null, previousSecondaryAmount: r.previousSecondaryAmount != null ? Number(r.previousSecondaryAmount) : null }))
+        return (rows as any[]).map(r => ({ ...r, amount: Number(r.amount), secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null, vesselAmounts: r.vesselAmounts ? safeJson(r.vesselAmounts, null) : null, vesselSecondaryAmounts: r.vesselSecondaryAmounts ? safeJson(r.vesselSecondaryAmounts, null) : null, previousAmount: r.previousAmount != null ? Number(r.previousAmount) : null, previousSecondaryAmount: r.previousSecondaryAmount != null ? Number(r.previousSecondaryAmount) : null }))
     }
 
     async addQuotationDeductible(data: { quotationId: string; piDeductibleId?: string; title?: string; description: string; amount: number; currency: string; secondaryAmount?: number; secondaryDescription?: string; order?: number; vesselScope?: string[]; vesselAmounts?: Record<string, number> | null }): Promise<any> {
@@ -10067,18 +10473,18 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationTextDeductible(data: { quotationId: string; piTextDeductibleId?: string; title?: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
         if (!this.pool) throw new Error('DB not connected')
         const id = uuidv4()
-        await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('INSERT INTO quotation_text_deductibles (id, quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            await fk.execute('INSERT INTO quotation_text_deductibles (id, quotation_id, pi_text_deductible_id, title, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [id, data.quotationId, data.piTextDeductibleId || null, data.title || '', data.text, data.order ?? 0, data.vesselScope ? JSON.stringify(data.vesselScope) : null])
         } finally {
-            await this.pool.query('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId: data.quotationId, piTextDeductibleId: data.piTextDeductibleId, title: data.title || '', text: data.text, order: data.order ?? 0, vesselScope: data.vesselScope || null }
     }
@@ -10113,7 +10519,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope, alternative_id as alternativeId, COALESCE(order_index, 0) as \`order\`
              FROM quotation_exclusions WHERE quotation_id = ? ORDER BY order_index ASC`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async setQuotationExclusions(quotationId: string, items: { piExclusionId?: string; customText?: string }[]): Promise<void> {
@@ -10158,7 +10564,7 @@ export class MySQLAdapter {
     async getQuotationCustomExclusions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_exclusions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationCustomExclusion(data: { quotationId: string; text: string; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -10274,7 +10680,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, text, vessel_scope as vesselScope, order_index as \`order\`
              FROM quotation_trading_intros WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null }))
     }
 
     async addQuotationTradingIntro(data: { quotationId: string; text: string; vesselScope?: string[] | null; order?: number }): Promise<any> {
@@ -10365,7 +10771,7 @@ export class MySQLAdapter {
         if (!this.pool) return []
         const [rows] = await this.pool.query(
             `SELECT id, quotation_id as quotationId, pi_subjectivity_id as piSubjectivityId, text, is_custom as isCustom, is_auto_populated as isAutoPopulated, order_index as 'order', vessel_scope as vesselScope FROM quotation_subjectivities WHERE quotation_id = ? ORDER BY order_index`, [quotationId])
-        return (rows as any[]).map(r => ({ ...r, isCustom: Boolean(r.isCustom), isAutoPopulated: Boolean(r.isAutoPopulated), vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, isCustom: Boolean(r.isCustom), isAutoPopulated: Boolean(r.isAutoPopulated), vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null }))
     }
 
     async addQuotationSubjectivity(data: { quotationId: string; piSubjectivityId?: string; text: string; isCustom?: boolean; isAutoPopulated?: boolean; order?: number; vesselScope?: string[] }): Promise<any> {
@@ -10775,7 +11181,7 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({
             ...r,
             isRequired: Boolean(r.isRequired),
-            selectOptions: r.selectOptions ? JSON.parse(r.selectOptions) : undefined
+            selectOptions: r.selectOptions ? safeJson(r.selectOptions, null) : undefined
         }))
     }
 
@@ -11201,6 +11607,11 @@ export class MySQLAdapter {
     }
 
     async createReceipt(data: any, userId?: string): Promise<any> {
+        // Serial read + insert + advance must be atomic across users (no duplicate receipt numbers)
+        return this.withNamedLock('vc_receipt_number', () => this.createReceiptLocked(data, userId))
+    }
+
+    private async createReceiptLocked(data: any, userId?: string): Promise<any> {
         if (!this.pool) throw new Error('Database not connected')
         const conn = await this.pool.getConnection()
         try {
@@ -11352,7 +11763,8 @@ export class MySQLAdapter {
             qrEnabled: r.qr_enabled == null ? null : Boolean(r.qr_enabled),
             hideBroker: Boolean(r.hide_broker),
             proRata: Boolean(r.pro_rata),
-            commissionPercent: r.commission_percent ? Number(r.commission_percent) : null,
+            // 0% is a real commission, not "none"
+            commissionPercent: r.commission_percent != null ? Number(r.commission_percent) : null,
             perAnnumPremium: r.per_annum_premium ? Number(r.per_annum_premium) : null,
             premiumAmount: r.premium_amount ? Number(r.premium_amount) : 0,
             selectedAlternativeId: r.selected_alternative_id || null,
@@ -11637,6 +12049,25 @@ export class MySQLAdapter {
     }
 
     async createPolicyRevision(policyId: string, createdBy: string): Promise<string> {
+        // Serialised (revision number = current + 1) and cleaned up on failure: the old policy is
+        // only superseded at the end, so a half-built revision must not stay next to it
+        return this.withNamedLock('vc_policy_revision', async () => {
+            const [before] = await this.pool!.query('SELECT id FROM policy_documents WHERE policy_number = (SELECT policy_number FROM policy_documents WHERE id = ?)', [policyId])
+            const existing = new Set((before as any[]).map(r => r.id))
+            try {
+                return await this.createPolicyRevisionLocked(policyId, createdBy)
+            } catch (e) {
+                try {
+                    const [after] = await this.pool!.query('SELECT id FROM policy_documents WHERE policy_number = (SELECT policy_number FROM policy_documents WHERE id = ?)', [policyId])
+                    const created = (after as any[]).map(r => r.id).filter(pid => !existing.has(pid))
+                    await this.purgePolicyRows(created)
+                } catch (cleanupErr) { console.error('[revision] cleanup after failure failed:', cleanupErr) }
+                throw e
+            }
+        })
+    }
+
+    private async createPolicyRevisionLocked(policyId: string, createdBy: string): Promise<string> {
         if (!this.pool) throw new Error('DB not connected')
         const existing = await this.getPolicyDocumentById(policyId)
         if (!existing) throw new Error('Policy not found')
@@ -11726,11 +12157,9 @@ export class MySQLAdapter {
         const [polRows] = await this.pool.query('SELECT quotation_id FROM policy_documents WHERE id = ?', [id])
         const quotationId = (polRows as any[])[0]?.quotation_id || null
 
-        // Delete related records first (no FK cascade since no FK constraints)
-        await this.pool.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [id])
-        await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [id])
-        await this.pool.execute('DELETE FROM policy_blue_cards WHERE policy_doc_id = ?', [id])
-        await this.pool.execute('DELETE FROM policy_documents WHERE id = ?', [id])
+        // Delete the policy and all its own rows (instalments, addresses, blue cards, endorsements,
+        // ...); receipt lines keep their text but lose the link
+        await this.purgePolicyRows([id])
 
         // If the source quotation sits on the "Converted" workflow step but no longer has a
         // policy for every vessel, revert it so it can be re-converted (the "Convert to Policy"
@@ -11776,7 +12205,27 @@ export class MySQLAdapter {
         }
     }
 
-    async convertQuotationToPolicy(quotationId: string, options: {
+    async convertQuotationToPolicy(quotationId: string, options: Parameters<MySQLAdapter['convertQuotationToPolicyLocked']>[1]): Promise<any[]> {
+        // draft_policy_seq is read, used for N policies, then written back: serialise conversions
+        return this.withNamedLock('vc_policy_draft_number', async () => {
+            const [before] = await this.pool!.query('SELECT id FROM policy_documents WHERE quotation_id = ?', [quotationId])
+            const existing = new Set((before as any[]).map(r => r.id))
+            try {
+                return await this.convertQuotationToPolicyLocked(quotationId, options)
+            } catch (e) {
+                // Not atomic (many helper writes): remove any policy this failed run created so a
+                // retry does not leave half-built duplicate policies behind
+                try {
+                    const [after] = await this.pool!.query('SELECT id FROM policy_documents WHERE quotation_id = ?', [quotationId])
+                    const created = (after as any[]).map(r => r.id).filter(pid => !existing.has(pid))
+                    await this.purgePolicyRows(created)
+                } catch (cleanupErr) { console.error('[convert] cleanup after failure failed:', cleanupErr) }
+                throw e
+            }
+        })
+    }
+
+    private async convertQuotationToPolicyLocked(quotationId: string, options: {
         vesselIds: string[]
         inceptionDate: string
         inceptionTime: string
@@ -12755,23 +13204,23 @@ export class MySQLAdapter {
     async getQuotationAgreedValueItems(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_text_id as hullTextId, text, section, order_index as `order`, vessel_scope as vesselScope FROM quotation_agreed_value_items WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, section: r.section || 'hm', vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, section: r.section || 'hm', vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null }))
     }
 
     async setQuotationAgreedValueItems(quotationId: string, items: { hullTextId?: string; text: string; section?: string; vesselScope?: string[] | null }[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM quotation_agreed_value_items WHERE quotation_id = ?', [quotationId])
+            await fk.execute('DELETE FROM quotation_agreed_value_items WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
-                await this.pool.execute(
+                await fk.execute(
                     'INSERT INTO quotation_agreed_value_items (id, quotation_id, hull_text_id, text, section, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?)',
                     [uuidv4(), quotationId, item.hullTextId || null, item.text, item.section || 'hm', i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
                 )
             }
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -12791,14 +13240,14 @@ export class MySQLAdapter {
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_agreed_value_options WHERE quotation_id = ?', [quotationId])
         const order = (maxRow as any[])[0].nextOrder
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 'INSERT INTO quotation_agreed_value_options (id, quotation_id, label, amount, currency, premium_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [id, quotationId, label || null, amount, currency || 'USD', null, order]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId, label: label || null, amount, currency: currency || 'USD', premiumAmount: null, order }
     }
@@ -12885,14 +13334,14 @@ export class MySQLAdapter {
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_hull_alternatives WHERE quotation_id = ?', [quotationId])
         const order = (maxRow as any[])[0].nextOrder
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, label, order_index, vessel_scope_id, agreed_value, agreed_value_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 [id, quotationId, hullClauseId || null, label || null, order, vesselScopeId || null, agreedValue ?? null, agreedValueCurrency || null]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId, hullClauseId: hullClauseId || null, label: label || undefined, premiumAmount: undefined, agreedValue: agreedValue ?? undefined, agreedValueCurrency: agreedValueCurrency || undefined, order, vesselScopeId: vesselScopeId || null, includeInShared: true }
     }
@@ -12931,16 +13380,16 @@ export class MySQLAdapter {
     // Returns the new alternative total (sum of its vessels).
     async setHullAltVesselPremium(alternativeId: string, quotationVesselId: string, amount: number | null): Promise<number> {
         if (!this.pool) return 0
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 `INSERT INTO quotation_hull_alt_vessel_premiums (id, alternative_id, quotation_vessel_id, premium_amount)
                  VALUES (?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE premium_amount = VALUES(premium_amount)`,
                 [uuidv4(), alternativeId, quotationVesselId, amount ?? null]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         const [sumRows] = await this.pool.query(
             'SELECT COALESCE(SUM(premium_amount), 0) AS total FROM quotation_hull_alt_vessel_premiums WHERE alternative_id = ?',
@@ -13038,14 +13487,14 @@ export class MySQLAdapter {
         const id = uuidv4()
         const [maxRow] = await this.pool.query('SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_pi_alternatives WHERE quotation_id = ?', [quotationId])
         const order = (maxRow as any[])[0].nextOrder
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 'INSERT INTO quotation_pi_alternatives (id, quotation_id, label, order_index, lol_amount, lol_currency) VALUES (?, ?, ?, ?, ?, ?)',
                 [id, quotationId, label || null, order, lolAmount ?? null, lolCurrency || null]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, quotationId, label: label || undefined, premiumAmount: undefined, lolAmount: lolAmount ?? undefined, lolCurrency: lolCurrency || undefined, order }
     }
@@ -13092,7 +13541,7 @@ export class MySQLAdapter {
     async getQuotationHullConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, vessel_amounts as vesselAmounts, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, amount: r.amount != null ? Number(r.amount) : undefined, vesselAmounts: r.vesselAmounts ? JSON.parse(r.vesselAmounts) : null, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, amount: r.amount != null ? Number(r.amount) : undefined, vesselAmounts: r.vesselAmounts ? safeJson(r.vesselAmounts, null) : null, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, conditionSection: r.conditionSection || 'both', alternativeId: r.alternativeId || null }))
     }
 
     async setQuotationHullConditions(quotationId: string, items: { hullConditionId: string; textOverride?: string; conditionSection?: string; amount?: number; vesselAmounts?: Record<string, number> | null; vesselScope?: string[] | null; alternativeId?: string | null }[]): Promise<void> {
@@ -13116,9 +13565,9 @@ export class MySQLAdapter {
                     [uuidv4(), quotationId, item.hullConditionId, item.textOverride || null, item.conditionSection || 'both', item.amount ?? null, item.vesselAmounts ? JSON.stringify(item.vesselAmounts) : null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null]
                 )
             }
-            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            conn.release()
+            // Re-enable FK checks even on error; never return an FK-off connection to the pool
+            try { await conn.execute('SET FOREIGN_KEY_CHECKS=1'); conn.release() } catch { conn.destroy() }
         }
     }
 
@@ -13127,25 +13576,25 @@ export class MySQLAdapter {
     async getQuotationHullAdditionalConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, hull_additional_condition_id as hullAdditionalConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId, amount FROM quotation_hull_additional_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null, amount: r.amount != null ? Number(r.amount) : null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null, amount: r.amount != null ? Number(r.amount) : null }))
     }
 
     async setQuotationHullAdditionalConditions(quotationId: string, items: { hullAdditionalConditionId: string; textOverride?: string; vesselScope?: string[] | null; alternativeId?: string | null; amount?: number | null; order?: number }[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?', [quotationId])
+            await fk.execute('DELETE FROM quotation_hull_additional_conditions WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
                 // Honor an explicit order when supplied (shared namespace with custom conditions); fall back to array index
                 const orderIdx = item.order != null ? item.order : i
-                await this.pool.execute(
+                await fk.execute(
                     'INSERT INTO quotation_hull_additional_conditions (id, quotation_id, hull_additional_condition_id, text_override, order_index, vessel_scope, alternative_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     [uuidv4(), quotationId, item.hullAdditionalConditionId, item.textOverride || null, orderIdx, item.vesselScope ? JSON.stringify(item.vesselScope) : null, item.alternativeId || null, item.amount != null ? item.amount : null]
                 )
             }
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -13156,7 +13605,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(
             'SELECT id, quotation_id as quotationId, text, title, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_custom_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
             [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null, alternativeId: r.alternativeId || null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null, alternativeId: r.alternativeId || null }))
     }
 
     async addQuotationHullCustomCondition(data: { quotationId: string; text: string; title?: string; vesselScope?: string[] | null; alternativeId?: string | null }): Promise<any> {
@@ -13244,23 +13693,23 @@ export class MySQLAdapter {
     async getQuotationWarConditions(quotationId: string): Promise<any[]> {
         if (!this.pool) return []
         const [rows] = await this.pool.query('SELECT id, quotation_id as quotationId, war_condition_id as warConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope FROM quotation_war_conditions WHERE quotation_id = ? ORDER BY order_index ASC', [quotationId])
-        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? JSON.parse(r.vesselScope) : null }))
+        return (rows as any[]).map(r => ({ ...r, vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null }))
     }
 
     async setQuotationWarConditions(quotationId: string, items: { warConditionId: string; textOverride?: string; vesselScope?: string[] | null }[]): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute('DELETE FROM quotation_war_conditions WHERE quotation_id = ?', [quotationId])
+            await fk.execute('DELETE FROM quotation_war_conditions WHERE quotation_id = ?', [quotationId])
             for (let i = 0; i < items.length; i++) {
                 const item = items[i]
-                await this.pool.execute(
+                await fk.execute(
                     'INSERT INTO quotation_war_conditions (id, quotation_id, war_condition_id, text_override, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?)',
                     [uuidv4(), quotationId, item.warConditionId, item.textOverride || null, i, item.vesselScope ? JSON.stringify(item.vesselScope) : null]
                 )
             }
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
     }
 
@@ -13270,7 +13719,10 @@ export class MySQLAdapter {
         if (!this.pool) return { jwlaCode: 'JWLA032', jwlaDate: 'December 18, 2023', tcText: 'Al-Bahriah Hull War Terms & Conditions 01 January 2025', tradingWarrantyText: 'Worldwide, subject to JWC Hull War, Piracy, Terrorism and Related Perils Listed Areas {jwla_date} {jwla_code}.' }
         const [rows] = await this.pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'war_settings'")
         const arr = rows as any[]
-        if (arr.length > 0) return JSON.parse(arr[0].setting_value)
+        if (arr.length > 0) {
+            const parsed = safeJson<any>(arr[0].setting_value, null)
+            if (parsed) return parsed
+        }
         return { jwlaCode: 'JWLA032', jwlaDate: 'December 18, 2023', tcText: 'Al-Bahriah Hull War Terms & Conditions 01 January 2025', tradingWarrantyText: 'Worldwide, subject to JWC Hull War, Piracy, Terrorism and Related Perils Listed Areas {jwla_date} {jwla_code}.' }
     }
 
@@ -13290,21 +13742,21 @@ export class MySQLAdapter {
         )
         return (rows as any[]).map(r => ({
             ...r,
-            filters: typeof r.filters === 'string' ? JSON.parse(r.filters) : r.filters
+            filters: safeJson(r.filters, {})
         }))
     }
 
     async addAnalyticsPreset(preset: { userId: string; name: string; filters: AnalyticsFilters }): Promise<AnalyticsPreset> {
         if (!this.pool) throw new Error('No DB')
         const id = uuidv4()
-        await this.pool.execute('SET FOREIGN_KEY_CHECKS=0')
+        const fk = await this.fkOff()
         try {
-            await this.pool.execute(
+            await fk.execute(
                 'INSERT INTO analytics_presets (id, user_id, name, filters) VALUES (?, ?, ?, ?)',
                 [id, preset.userId, preset.name, JSON.stringify(preset.filters)]
             )
         } finally {
-            await this.pool.execute('SET FOREIGN_KEY_CHECKS=1')
+            await fk.done()
         }
         return { id, userId: preset.userId, name: preset.name, filters: preset.filters }
     }
@@ -13418,39 +13870,55 @@ export class MySQLAdapter {
         const [dbTables] = await this.pool.query("SHOW TABLES")
         const validTables = new Set((dbTables as any[]).map(r => Object.values(r)[0] as string))
 
+        // Live columns per table: backup columns the schema no longer has are dropped instead of
+        // failing the INSERT halfway through the restore
+        const liveColumns = async (table: string): Promise<Set<string>> => {
+            const [cols] = await this.pool!.query(`SHOW COLUMNS FROM \`${table}\``)
+            return new Set((cols as any[]).map(c => c.Field as string))
+        }
+
+        // One transaction on one connection: DELETE (transactional) instead of TRUNCATE (which
+        // commits immediately), so ANY failure rolls the whole restore back instead of leaving
+        // the database half-wiped. FK checks are off for the session and always re-enabled.
         const conn = await this.pool.getConnection()
         try {
             await conn.query('SET FOREIGN_KEY_CHECKS = 0')
+            await conn.beginTransaction()
+            try {
+                for (const [table, rows] of Object.entries(data.tables)) {
+                    // Skip users table to avoid locking out
+                    if (table === 'users') continue
+                    // Validate table exists in actual DB schema
+                    if (!validTables.has(table)) { console.warn(`[Restore] Skipping unknown table: ${table}`); continue }
+                    // Validate table name contains only safe characters
+                    if (!/^[a-z_][a-z0-9_]*$/i.test(table)) { console.warn(`[Restore] Skipping invalid table name: ${table}`); continue }
+                    await conn.query(`DELETE FROM \`${table}\``)
 
-            for (const [table, rows] of Object.entries(data.tables)) {
-                // Skip users table to avoid locking out
-                if (table === 'users') continue
-                // Validate table exists in actual DB schema
-                if (!validTables.has(table)) { console.warn(`[Restore] Skipping unknown table: ${table}`); continue }
-                // Validate table name contains only safe characters
-                if (!/^[a-z_][a-z0-9_]*$/i.test(table)) { console.warn(`[Restore] Skipping invalid table name: ${table}`); continue }
-                await conn.query(`TRUNCATE TABLE \`${table}\``)
+                    if (!Array.isArray(rows) || rows.length === 0) continue
+                    const live = await liveColumns(table)
 
-                if (rows.length === 0) continue
-
-                // Insert in batches of 100
-                for (let i = 0; i < rows.length; i += 100) {
-                    const batch = rows.slice(i, i + 100)
-                    const columns = Object.keys(batch[0]).filter(c => /^[a-z_][a-z0-9_]*$/i.test(c))
-                    const placeholders = batch
-                        .map(() => `(${columns.map(() => '?').join(',')})`)
-                        .join(',')
-                    const values = batch.flatMap(row => columns.map(col => row[col]))
-                    await conn.query(
-                        `INSERT INTO \`${table}\` (${columns.map(c => `\`${c}\``).join(',')}) VALUES ${placeholders}`,
-                        values
-                    )
+                    // Insert in batches of 100
+                    for (let i = 0; i < rows.length; i += 100) {
+                        const batch = rows.slice(i, i + 100)
+                        const columns = Object.keys(batch[0]).filter(c => /^[a-z_][a-z0-9_]*$/i.test(c) && live.has(c))
+                        if (columns.length === 0) continue
+                        const placeholders = batch
+                            .map(() => `(${columns.map(() => '?').join(',')})`)
+                            .join(',')
+                        const values = batch.flatMap(row => columns.map(col => row[col]))
+                        await conn.query(
+                            `INSERT INTO \`${table}\` (${columns.map(c => `\`${c}\``).join(',')}) VALUES ${placeholders}`,
+                            values
+                        )
+                    }
                 }
+                await conn.commit()
+            } catch (e) {
+                try { await conn.rollback() } catch { /* connection may be gone */ }
+                throw e
             }
-
-            await conn.query('SET FOREIGN_KEY_CHECKS = 1')
         } finally {
-            conn.release()
+            try { await conn.query('SET FOREIGN_KEY_CHECKS = 1'); conn.release() } catch { conn.destroy() }
         }
     }
 
@@ -13937,7 +14405,7 @@ export class MySQLAdapter {
             dateOfSurveyValue: r.date_of_survey_value,
             customText: r.custom_text,
             order: r.order_index,
-            vesselScope: r.vessel_scope ? JSON.parse(r.vessel_scope) : null,
+            vesselScope: r.vessel_scope ? safeJson(r.vessel_scope, null) : null,
             alternativeId: r.alternative_id
         }))
     }
@@ -13963,9 +14431,9 @@ export class MySQLAdapter {
                     ]
                 )
             }
-            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            conn.release()
+            // Re-enable FK checks even on error; never return an FK-off connection to the pool
+            try { await conn.execute('SET FOREIGN_KEY_CHECKS=1'); conn.release() } catch { conn.destroy() }
         }
     }
 
@@ -13992,9 +14460,9 @@ export class MySQLAdapter {
                     data.alternativeId || null
                 ]
             )
-            await conn.execute('SET FOREIGN_KEY_CHECKS=1')
         } finally {
-            conn.release()
+            // Re-enable FK checks even on error; never return an FK-off connection to the pool
+            try { await conn.execute('SET FOREIGN_KEY_CHECKS=1'); conn.release() } catch { conn.destroy() }
         }
         return { id, ...data, order }
     }
@@ -14511,7 +14979,7 @@ export class MySQLAdapter {
         const [rows] = await this.pool.query(query, params)
         return (rows as any[]).map(r => ({
             ...r,
-            placeholders: r.placeholders ? JSON.parse(r.placeholders) : null
+            placeholders: r.placeholders ? safeJson(r.placeholders, null) : null
         }))
     }
 
@@ -14529,7 +14997,7 @@ export class MySQLAdapter {
         const r = arr[0]
         return {
             ...r,
-            placeholders: r.placeholders ? JSON.parse(r.placeholders) : null
+            placeholders: r.placeholders ? safeJson(r.placeholders, null) : null
         }
     }
 
@@ -14629,7 +15097,7 @@ export class MySQLAdapter {
         return (rows as any[]).map(r => ({
             ...r,
             isShared: Boolean(r.isShared),
-            config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config
+            config: safeJson(r.config, {})
         }))
     }
 
