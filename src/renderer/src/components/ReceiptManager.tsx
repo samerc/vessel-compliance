@@ -7,6 +7,7 @@ import {
   exportReceiptDocx, ordinal, formatReceiptAmount
 } from '../services/ReceiptExportService'
 import { numberToWords } from '../utils/numberToWords'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Receipt as ReceiptIcon, Plus, FileDown, Trash2, Pencil, Search, X, Settings, Ship
 } from 'lucide-react'
@@ -54,6 +55,9 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // Deleting receipts / changing receipt settings needs Manage Policies (same gate as the server)
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission('policies:manage') || hasPermission('admin:settings')
   const [editing, setEditing] = useState<Receipt | null>(null)
 
   const modalBg = isLight ? '#ffffff' : '#1a1d28'
@@ -87,7 +91,8 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
     const ok = await confirmDialog(`Delete receipt ${r.receiptNumber}? This cannot be undone.`)
     if (!ok) return
     try {
-      await window.api.receiptDelete(r.id)
+      const res: any = await window.api.receiptDelete(r.id)
+      if (res?.error) throw new Error(res.message)
       showSuccess('Receipt deleted')
       loadReceipts()
     } catch (e: any) {
@@ -129,9 +134,9 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Payment receipts issued against vessel policies</p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn-secondary" onClick={() => setShowSettings(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {canManage && <button className="btn-secondary" onClick={() => setShowSettings(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Settings size={16} /> Settings
-            </button>
+            </button>}
             <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Plus size={16} /> New Receipt
             </button>
@@ -192,7 +197,7 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
                   <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button title="Export DOCX" onClick={() => handleExport(r)} style={iconBtn}><FileDown size={16} /></button>
                     <button title="Edit" onClick={() => openEdit(r)} style={iconBtn}><Pencil size={16} /></button>
-                    <button title="Delete" onClick={() => handleDelete(r)} style={{ ...iconBtn, color: 'var(--danger)' }}><Trash2 size={16} /></button>
+                    {canManage && <button title="Delete" onClick={() => handleDelete(r)} style={{ ...iconBtn, color: 'var(--danger)' }}><Trash2 size={16} /></button>}
                   </td>
                 </tr>
               ))}

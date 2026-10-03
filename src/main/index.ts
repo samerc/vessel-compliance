@@ -215,13 +215,17 @@ function requireAdmin(event: Electron.IpcMainInvokeEvent): Omit<import('../share
   return user
 }
 
-// Permission cache: userId → Set<permissionKey>
+// Permission cache: userId → Set<permissionKey>, refreshed at most every 60 s so permission
+// changes made by another admin (or on another machine) take effect without a restart
+const PERMISSION_CACHE_TTL = 60 * 1000
 const permissionCache = new Map<string, Set<string>>()
+const permissionCacheAt = new Map<string, number>()
 
 async function loadUserPermissions(userId: string): Promise<Set<string>> {
   const perms = await db.resolveUserPermissions(userId)
   const set = new Set(perms)
   permissionCache.set(userId, set)
+  permissionCacheAt.set(userId, Date.now())
   return set
 }
 
@@ -230,7 +234,9 @@ async function requirePermission(event: Electron.IpcMainInvokeEvent, ...keys: st
   // Admin role always passes (backward compat during migration)
   if (user.role === 'admin') return user
   let perms = permissionCache.get(user.id)
-  if (!perms) perms = await loadUserPermissions(user.id)
+  if (!perms || Date.now() - (permissionCacheAt.get(user.id) || 0) > PERMISSION_CACHE_TTL) {
+    perms = await loadUserPermissions(user.id)
+  }
   for (const key of keys) {
     if (perms.has(key)) return user
   }
@@ -335,7 +341,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // The preload only uses contextBridge/ipcRenderer/webUtils, so it runs sandboxed
+      sandbox: true,
       contextIsolation: true
     }
   })
@@ -420,7 +427,7 @@ function createWindow(): void {
         } catch (cleanupErr) {
           console.error('Activity log cleanup error (non-fatal):', cleanupErr)
         }
-        // Validate restored sessions against live DB (clears sessions for deleted users)
+        // Verify restored sessions against the DB (user_sessions row + fresh user/role)
         await auth.validateRestoredSessions().catch(() => {})
         // Update last_login for auto-restored sessions (no password re-entry on startup)
         const restoredSession = auth.getFirstSession()
@@ -447,6 +454,22 @@ function createWindow(): void {
       { label: 'Select All', role: 'selectAll', enabled: params.editFlags.canSelectAll },
     ])
     menu.popup()
+  })
+
+  // Never let the app window navigate away from the app itself (a dropped file, a stray link
+  // or injected markup must not load a foreign page with access to the preload API).
+  mainWindow.webContents.on('will-navigate', (navEvent, url) => {
+    const current = mainWindow.webContents.getURL()
+    const sameApp = (() => {
+      try {
+        const a = new URL(url), b = new URL(current)
+        return a.protocol === b.protocol && a.host === b.host && a.pathname === b.pathname
+      } catch { return false }
+    })()
+    if (!sameApp) {
+      navEvent.preventDefault()
+      console.warn('Blocked navigation to', url)
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -580,8 +603,9 @@ app.whenReady().then(() => {
     // Check if we have a session for this window
     let sessionId = windowSessions.get(windowId)
 
-    // If not, try to restore from persistent storage
+    // If not, try to restore from persistent storage (verified against the DB first)
     if (!sessionId) {
+      await auth.validateRestoredSessions().catch(() => {})
       const restoredSession = auth.getFirstSession()
       if (restoredSession) {
         console.log(`[IPC] Restoring session ${restoredSession.sessionId} for window ${windowId}`)
@@ -636,6 +660,7 @@ app.whenReady().then(() => {
   safeHandle('auth:forceResetPassword', async (event, newPassword) => {
     const user = requireSession(event)
     if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters')
+    if (newPassword === 'admin123') throw new Error('Please choose a password other than the default one')
     const hash = await bcrypt.hash(newPassword, 10)
     await db.updateUserPassword(user.id, hash)
     return { success: true }
@@ -1618,9 +1643,10 @@ app.whenReady().then(() => {
   })
   safeHandle('db:updateSurveyDefect', async (event, id, updates) => { await requirePermission(event, 'surveys:defects'); return db.updateSurveyDefect(id, updates) })
   safeHandle('db:deleteSurveyDefect', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.deleteSurveyDefect(id) })
-  safeHandle('db:closeDefect', async (event, id, closedBy, closureNotes) => {
+  safeHandle('db:closeDefect', async (event, id, _closedBy, closureNotes) => {
     const user = await requirePermission(event, 'surveys:defects')
-    const result = await db.closeDefect(id, closedBy, closureNotes)
+    // "Closed by" is the signed-in user, not a value supplied by the renderer
+    const result = await db.closeDefect(id, user.username, closureNotes)
     const [dfRows] = await (db as any).pool.query(
       'SELECT v.name FROM survey_defects sd JOIN condition_surveys cs ON cs.id = sd.survey_id JOIN vessels v ON v.id = cs.vessel_id WHERE sd.id = ?',
       [id]
@@ -1649,7 +1675,11 @@ app.whenReady().then(() => {
   safeHandle('defect:deleteAttachment', async (event, id) => { await requirePermission(event, 'surveys:defects'); return db.deleteDefectAttachment(id) })
   safeHandle('db:getOpenDefectsByVessel', (event) => { requireSession(event); return db.getOpenDefectsByVessel() })
   safeHandle('db:getSurveyHistory', (event, vesselId) => { requireSession(event); return db.getSurveyHistory(vesselId) })
-  safeHandle('db:closeSurvey', async (event, surveyId, userId) => { await requirePermission(event, 'surveys:manage'); return db.closeSurvey(surveyId, userId) })
+  safeHandle('db:closeSurvey', async (event, surveyId, _userId) => {
+    const user = await requirePermission(event, 'surveys:manage')
+    // Same "closed by" value as a single defect close (the username), from the session
+    return db.closeSurvey(surveyId, user.username)
+  })
   safeHandle('db:updateConditionSurveyEndorsement', async (event, surveyId, issued) => { await requirePermission(event, 'surveys:manage'); return db.updateConditionSurveyEndorsement(surveyId, issued) })
 
   // Dashboard
@@ -1826,32 +1856,32 @@ app.whenReady().then(() => {
   })
 
   // ── Receipts ──
-  safeHandle('receipt:list', (event) => {
-    requireSession(event)
+  safeHandle('receipt:list', async (event) => {
+    await requirePermission(event, 'policies:view')
     return db.getReceipts()
   })
-  safeHandle('receipt:listByVessel', (event, vesselId: string) => {
-    requireSession(event)
+  safeHandle('receipt:listByVessel', async (event, vesselId: string) => {
+    await requirePermission(event, 'policies:view')
     return db.getReceiptsByVessel(vesselId)
   })
-  safeHandle('receipt:get', (event, id: string) => {
-    requireSession(event)
+  safeHandle('receipt:get', async (event, id: string) => {
+    await requirePermission(event, 'policies:view')
     return db.getReceipt(id)
   })
-  safeHandle('receipt:nextNumber', (event, year?: number) => {
-    requireSession(event)
+  safeHandle('receipt:nextNumber', async (event, year?: number) => {
+    await requirePermission(event, 'policies:view')
     return db.getNextReceiptNumber(year)
   })
   safeHandle('receipt:create', async (event, data: any) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'policies:view', 'policies:manage')
     return db.createReceipt(data, user.id)
   })
   safeHandle('receipt:update', async (event, id: string, data: any) => {
-    requireSession(event)
+    await requirePermission(event, 'policies:view', 'policies:manage')
     return db.updateReceipt(id, data)
   })
   safeHandle('receipt:delete', async (event, id: string) => {
-    requireSession(event)
+    await requirePermission(event, 'policies:manage')
     await db.deleteReceipt(id)
     return { success: true }
   })
@@ -1860,7 +1890,7 @@ app.whenReady().then(() => {
     return db.getReceiptSettings()
   })
   safeHandle('receipt:setSettings', async (event, settings: any) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'policies:manage', 'admin:settings')
     await db.setReceiptSettings(settings, user.id)
     return { success: true }
   })
@@ -1965,6 +1995,9 @@ app.whenReady().then(() => {
 
   safeHandle('excel:import', async (event, filePath: string) => {
     requireSession(event)
+    if (typeof filePath !== 'string' || !['.xlsx', '.xls', '.xlsm', '.csv'].includes(require('path').extname(filePath).toLowerCase())) {
+      throw new Error('Please select an Excel file')
+    }
     const { ExcelImporter } = await import('./excelImporter')
     const importer = new ExcelImporter()
     return await importer.importFromExcel(filePath)
@@ -2038,9 +2071,22 @@ app.whenReady().then(() => {
   })
 
   // User Management (admin only)
+  // Granting, revoking or deleting the ADMIN role needs a real admin: the admin:users
+  // permission alone must not let a user promote themselves or anyone else to admin.
+  const assertValidRole = (role: unknown): 'admin' | 'user' => {
+    if (role !== 'admin' && role !== 'user') throw new Error('Invalid role')
+    return role
+  }
+  const countAdmins = async (): Promise<number> => {
+    const [rows] = await (db as any).pool.query("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'")
+    return Number((rows as any[])[0]?.n || 0)
+  }
+
   safeHandle('auth:createUser', async (event, { username, password, role }) => {
     const user = await requirePermission(event, 'admin:users')
-    const result = await auth.createUser(username, password, role)
+    const newRole = assertValidRole(role)
+    if (newRole === 'admin' && user.role !== 'admin') throw new Error('Only an administrator can create administrator accounts')
+    const result = await auth.createUser(username, password, newRole)
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2060,9 +2106,18 @@ app.whenReady().then(() => {
 
   safeHandle('db:deleteUser', async (event, id) => {
     const user = await requirePermission(event, 'admin:users')
-    const [userRows] = await (db as any).pool.query('SELECT username FROM users WHERE id = ?', [id])
+    const [userRows] = await (db as any).pool.query('SELECT username, role FROM users WHERE id = ?', [id])
     const targetUsername = (userRows as any[])[0]?.username || id
+    const targetRole = (userRows as any[])[0]?.role
+    if (id === user.id) throw new Error('You cannot delete your own account')
+    if (targetRole === 'admin') {
+      if (user.role !== 'admin') throw new Error('Only an administrator can delete an administrator account')
+      if (await countAdmins() <= 1) throw new Error('Cannot delete the last administrator')
+    }
     const result = await db.deleteUser(id)
+    await db.deleteUserSessionsForUser(id).catch(() => {})
+    await auth.refreshUser(id).catch(() => {})
+    invalidatePermissionCache(id)
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2084,11 +2139,21 @@ app.whenReady().then(() => {
 
   safeHandle('db:updateUserRole', async (event, userId: string, role: 'admin' | 'user') => {
     const user = await requirePermission(event, 'admin:users')
+    const newRole = assertValidRole(role)
     const [roleRows] = await (db as any).pool.query('SELECT username, role FROM users WHERE id = ?', [userId])
     const target = (roleRows as any[])[0]
     const targetUsername = target?.username || userId
     const oldRole = target?.role || 'unknown'
-    const result = await db.updateUserRole(userId, role)
+    if ((newRole === 'admin' || oldRole === 'admin') && user.role !== 'admin') {
+      throw new Error('Only an administrator can grant or remove the administrator role')
+    }
+    if (oldRole === 'admin' && newRole !== 'admin' && await countAdmins() <= 1) {
+      throw new Error('Cannot remove the last administrator')
+    }
+    const result = await db.updateUserRole(userId, newRole)
+    // Live sessions + permission cache pick up the new role immediately
+    await auth.refreshUser(userId).catch(() => {})
+    invalidatePermissionCache(userId)
     db.logActivity({
       userId: user.id,
       username: user.username,
@@ -2233,7 +2298,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:addEntity', async (event, entity: any) => {
-    requireSession(event)
+    await requirePermission(event, 'compliance:review', 'admin:settings')
     const e = {
       source: 'SIC' as const,
       source_id: entity.sourceId || null,
@@ -2257,7 +2322,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:updateEntity', async (event, id: number, entity: any) => {
-    requireSession(event)
+    await requirePermission(event, 'compliance:review', 'admin:settings')
     const updates: any = {}
     if (entity.name !== undefined) {
       updates.name = entity.name
@@ -2277,7 +2342,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:deleteEntity', async (event, id: number) => {
-    requireSession(event)
+    await requirePermission(event, 'compliance:review', 'admin:settings')
     sanctionsService.deleteSicEntity(id)
     return { success: true }
   })
@@ -2296,7 +2361,7 @@ app.whenReady().then(() => {
   })
 
   safeHandle('sic:setRemarkTemplates', async (event, templates: { label: string; text: string }[]) => {
-    requireSession(event)
+    await requirePermission(event, 'compliance:review', 'admin:settings')
     await db.setSetting('sic_remark_templates', JSON.stringify(templates))
     return { success: true }
   })
@@ -3052,20 +3117,21 @@ app.whenReady().then(() => {
   safeHandle('policy:getBlueCards', (event, policyId) => { requireSession(event); return db.getPolicyBlueCards(policyId) })
   safeHandle('policy:getRevisions', (event, policyNumber) => { requireSession(event); return db.getPolicyRevisions(policyNumber) })
   safeHandle('policy:addBlueCard', async (event, data) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'policies:manage')
     const result = await db.addPolicyBlueCard(data)
     db.logActivity({ userId: user.id, username: user.username, action: 'CREATE', module: 'Policies', entityType: 'blue_card', entityId: data.policyDocumentId, entityName: data.cardType || 'Blue Card', details: `Added ${data.cardType || 'blue card'}${data.policyNumber ? ' for policy ' + data.policyNumber : ''}` }).catch(() => {})
     return result
   })
-  safeHandle('policy:updateBlueCard', (event, id, data) => { requireSession(event); return db.updatePolicyBlueCard(id, data) })
+  safeHandle('policy:updateBlueCard', async (event, id, data) => { await requirePermission(event, 'policies:manage'); return db.updatePolicyBlueCard(id, data) })
   safeHandle('policy:supersedeBlueCard', async (event, id) => {
-    const user = requireSession(event)
+    const user = await requirePermission(event, 'policies:manage')
     const result = await db.supersedePolicyBlueCard(id)
     db.logActivity({ userId: user.id, username: user.username, action: 'UPDATE', module: 'Policies', entityType: 'blue_card', entityId: id, entityName: 'Blue Card', details: 'Superseded blue card' }).catch(() => {})
     return result
   })
   safeHandle('policy:convertFromQuotation', async (event, quotationId, options) => {
-    const session = requireSession(event)
+    // Same gate as the Convert to Policy action in the quotation editor
+    const session = await requirePermission(event, 'quotations:edit', 'policies:manage')
     const result = await db.convertQuotationToPolicy(quotationId, { ...options, createdBy: session.id })
     // Notify quotation creator about conversion
     try {
@@ -3184,7 +3250,8 @@ app.whenReady().then(() => {
     return db.getUserSignature(user.id)
   })
   safeHandle('signature:getForUser', async (event, userId: string) => {
-    requireSession(event)
+    const me = requireSession(event)
+    if (userId !== me.id) await requirePermission(event, 'policies:view', 'policies:sign', 'admin:settings')
     const sig = await db.getUserSignature(userId)
     if (sig && sig.imageData) {
       return { ...sig, imageData: Array.from(Buffer.isBuffer(sig.imageData) ? sig.imageData : Buffer.from(sig.imageData)) }
@@ -3331,7 +3398,7 @@ app.whenReady().then(() => {
   safeHandle('quotation:getCreators', (event) => { requireSession(event); return db.getQuotationCreators() })
   safeHandle('quotation:getSavedFilters', (event) => { const user = requireSession(event); return db.getQuotationSavedFilters(user.id) })
   safeHandle('quotation:saveFilter', (event, name: string, filters: any) => { const user = requireSession(event); return db.saveQuotationFilter(user.id, name, filters) })
-  safeHandle('quotation:deleteFilter', (event, id: string) => { requireSession(event); return db.deleteQuotationSavedFilter(id) })
+  safeHandle('quotation:deleteFilter', (event, id: string) => { const user = requireSession(event); return db.deleteQuotationSavedFilter(id, user.id) })
   safeHandle('quotation:getFavorites', (event) => { const user = requireSession(event); return db.getQuotationFavorites(user.id) })
   safeHandle('quotation:toggleFavorite', (event, quotationId: string) => { const user = requireSession(event); return db.toggleQuotationFavorite(user.id, quotationId) })
   safeHandle('quotation:bulkDelete', async (event, ids: string[]) => {
@@ -3684,7 +3751,8 @@ app.whenReady().then(() => {
   })
 
   // Generic file save (for exports that need save dialog in Electron)
-  safeHandle('file:saveDocx', async (_event, data: number[], defaultName: string) => {
+  safeHandle('file:saveDocx', async (event, data: number[], defaultName: string) => {
+    requireSession(event)
     const { dialog } = require('electron')
     const result = await dialog.showSaveDialog({
       title: 'Save Document',
@@ -4081,8 +4149,8 @@ app.whenReady().then(() => {
   })
 
   safeHandle('notifications:markRead', async (event, id: string) => {
-    requireSession(event)
-    return db.markNotificationRead(id)
+    const user = requireSession(event)
+    return db.markNotificationRead(id, user.id)
   })
 
   safeHandle('notifications:markAllRead', async (event) => {
@@ -4271,8 +4339,11 @@ app.whenReady().then(() => {
   })
 
   safeHandle('reports:delete', async (event, id: string) => {
-    requireSession(event)
-    return db.deleteSavedReport(id)
+    const user = requireSession(event)
+    // Only the report's creator (or an admin-settings holder) may delete a saved report
+    let isManager = user.role === 'admin'
+    if (!isManager) { try { await requirePermission(event, 'admin:settings'); isManager = true } catch { /* not a manager */ } }
+    return db.deleteSavedReport(id, isManager ? null : user.id)
   })
 
   safeHandle('reports:run', async (event, dataSource: string, config: any) => {
@@ -4609,20 +4680,32 @@ app.whenReady().then(() => {
   })
 
   // --- DOCX-to-PDF Conversion & Merging ---
+  const assertExt = (filePath: unknown, exts: string[]): string => {
+    if (typeof filePath !== 'string' || !filePath) throw new Error('Invalid file path')
+    const ext = require('path').extname(filePath).toLowerCase()
+    if (!exts.includes(ext)) throw new Error(`Unsupported file type: ${ext || 'none'}`)
+    return filePath
+  }
+
   safeHandle('convert:docxToPdf', async (event, docxPath: string) => {
     requireSession(event)
+    assertExt(docxPath, ['.docx'])
     const { convertDocxToPdf } = await import('./services/DocxToPdfService')
     return convertDocxToPdf(docxPath)
   })
 
   safeHandle('convert:countPdfPages', async (event, pdfPath: string) => {
     requireSession(event)
+    assertExt(pdfPath, ['.pdf'])
     const { countPdfPages } = await import('./services/DocxToPdfService')
     return countPdfPages(pdfPath)
   })
 
   safeHandle('convert:mergePdfs', async (event, pdfPaths: string[], outputPath: string) => {
     requireSession(event)
+    if (!Array.isArray(pdfPaths) || pdfPaths.length === 0) throw new Error('No PDF files to merge')
+    pdfPaths.forEach(p => assertExt(p, ['.pdf']))
+    assertExt(outputPath, ['.pdf'])
     const { mergePdfs } = await import('./services/DocxToPdfService')
     await mergePdfs(pdfPaths, outputPath)
     return outputPath
@@ -4678,6 +4761,20 @@ app.whenReady().then(() => {
   })
 
   // ==================== File Manager ====================
+  // File Manager operations are confined to the configured root folder (local or its
+  // network-mapped form) so the IPC cannot browse / open arbitrary locations on the machine.
+  const assertInFileManagerRoot = async (target: string): Promise<string> => {
+    if (!target || typeof target !== 'string') throw new Error('Invalid path')
+    const root = await db.getSetting('file_manager_root')
+    if (!root) throw new Error('File manager root folder is not configured')
+    const norm = (p: string) => require('path').resolve(p).replace(/[\\/]+$/, '').toLowerCase()
+    const t = norm(target)
+    const roots = [norm(root), norm(resolveFilePath(root))]
+    const inside = roots.some(r => t === r || t.startsWith(r + require('path').sep))
+    if (!inside) throw new Error('Path is outside the file manager root folder')
+    return target
+  }
+
   safeHandle('fileManager:getRoot', async (event) => {
     requireSession(event)
     return db.getSetting('file_manager_root')
@@ -4686,28 +4783,34 @@ app.whenReady().then(() => {
     await requirePermission(event, 'admin:settings')
     return db.setSetting('file_manager_root', rootPath)
   })
-  safeHandle('fileManager:readDirectory', (event, dirPath: string) => {
-    requireSession(event)
-    return FileManagerService.readDirectory(dirPath)
+  safeHandle('fileManager:readDirectory', async (event, dirPath: string) => {
+    await requirePermission(event, 'fileManager:view', 'fileManager:manage')
+    return FileManagerService.readDirectory(await assertInFileManagerRoot(dirPath))
   })
-  safeHandle('fileManager:readTree', (event, dirPath: string, depth?: number) => {
-    requireSession(event)
-    return FileManagerService.readTree(dirPath, depth)
+  safeHandle('fileManager:readTree', async (event, dirPath: string, depth?: number) => {
+    await requirePermission(event, 'fileManager:view', 'fileManager:manage')
+    return FileManagerService.readTree(await assertInFileManagerRoot(dirPath), depth)
   })
   safeHandle('fileManager:moveFolder', async (event, sourcePath: string, destParentPath: string) => {
     await requirePermission(event, 'fileManager:manage')
+    await assertInFileManagerRoot(sourcePath)
+    await assertInFileManagerRoot(destParentPath)
     const result = FileManagerService.moveItem(sourcePath, destParentPath)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
     return { ...result, remapped: remapped.remapped }
   })
   safeHandle('fileManager:renameFolder', async (event, folderPath: string, newName: string) => {
     await requirePermission(event, 'fileManager:manage')
+    await assertInFileManagerRoot(folderPath)
+    if (!newName || /[\\/]/.test(newName) || newName.includes('..')) throw new Error('Invalid name')
     const result = FileManagerService.renameItem(folderPath, newName)
     const remapped = await db.remapAllFilePaths(result.oldPath, result.newPath)
     return { ...result, remapped: remapped.remapped }
   })
   safeHandle('fileManager:createFolder', async (event, parentPath: string, name: string) => {
     await requirePermission(event, 'fileManager:manage')
+    await assertInFileManagerRoot(parentPath)
+    if (!name || /[\\/]/.test(name) || name.includes('..')) throw new Error('Invalid name')
     return FileManagerService.createFolder(parentPath, name)
   })
   safeHandle('fileManager:exists', (event, filePath: string) => {
@@ -4719,13 +4822,13 @@ app.whenReady().then(() => {
     const allPaths = await db.getAllStoredFilePaths()
     return allPaths.map((p) => ({ ...p, exists: FileManagerService.exists(p.path) }))
   })
-  safeHandle('fileManager:openInExplorer', (event, filePath: string) => {
-    requireSession(event)
-    shell.showItemInFolder(filePath)
+  safeHandle('fileManager:openInExplorer', async (event, filePath: string) => {
+    await requirePermission(event, 'fileManager:view', 'fileManager:manage')
+    shell.showItemInFolder(await assertInFileManagerRoot(filePath))
   })
-  safeHandle('fileManager:openFile', (event, filePath: string) => {
-    requireSession(event)
-    return shell.openPath(filePath)
+  safeHandle('fileManager:openFile', async (event, filePath: string) => {
+    await requirePermission(event, 'fileManager:view', 'fileManager:manage')
+    return shell.openPath(await assertInFileManagerRoot(filePath))
   })
 
   // Initialize update service with main window

@@ -40,5 +40,19 @@ if (app.isPackaged) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require(appEntry)
+const bundledEntry = join(__dirname, 'index.js')
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require(appEntry)
+} catch (err) {
+  if (appEntry === bundledEntry) throw err
+  // A broken hot-update must not crash the app on every launch: disable the cache (renamed,
+  // kept for diagnosis) and start the bundled code instead. The next update check re-downloads.
+  console.error('[bootstrap] Hot-update failed to load, falling back to bundled code:', err)
+  try {
+    const { renameSync } = require('fs')
+    renameSync(HOT_UPDATE_DIR, `${HOT_UPDATE_DIR}-broken-${Date.now()}`)
+  } catch { /* ignore — fallback still proceeds */ }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require(bundledEntry)
+}

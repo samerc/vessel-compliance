@@ -32,6 +32,7 @@ import { useAuth } from '../contexts/AuthContext'
 import RichTextEditor from './RichTextEditor'
 import { SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import { BC_DEFAULTS } from '../services/PolicyExportService'
+import { sanitizeHtml } from '../utils/sanitize'
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -1202,7 +1203,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setPreviewHtml(null)}>
           <div style={{ background: '#ffffff', color: '#000', borderRadius: '10px', padding: '32px 40px', width: '720px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ textAlign: 'center', fontWeight: 700, textDecoration: 'underline', marginBottom: '16px' }}>TERMS AND CONDITIONS</div>
-            <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11pt', lineHeight: 1.5, textAlign: 'justify' }} dangerouslySetInnerHTML={{ __html: previewHtml.html || '<p style="color:#888">(empty)</p>' }} />
+            <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '11pt', lineHeight: 1.5, textAlign: 'justify' }} dangerouslySetInnerHTML={{ __html: previewHtml.html ? sanitizeHtml(previewHtml.html) : '<p style="color:#888">(empty)</p>' }} />
           </div>
         </div>
       )}

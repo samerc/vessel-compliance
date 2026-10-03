@@ -1,6 +1,6 @@
 import XLSX from 'xlsx-js-style'
 import { existsSync, writeFileSync } from 'fs'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 import { join } from 'path'
 
 const BRANCH_MAP: Record<string, string> = {
@@ -58,19 +58,34 @@ function getLastSerial(ws: XLSX.WorkSheet): number {
 
 // ── Write via Excel COM (preserves tables/formulas) ───────────────────────────
 
-function runPowerShellScript(script: string): string {
+// User data (file path, vessel/broker names, references) NEVER goes into the script text:
+// it is written to a UTF-8 JSON file and read by the script as $d. Interpolating it into
+// '...' strings is unsafe — PowerShell also treats the curly quotes ‘ ’ ‚ ‛ as string
+// delimiters, so a name like O’BRIEN could break out of the string.
+function runPowerShellScript(body: string, data: Record<string, unknown>): string {
   const { tmpdir } = require('os')
-  const tempFile = join(tmpdir(), `vc-registry-${Date.now()}.ps1`)
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const tempFile = join(tmpdir(), `vc-registry-${stamp}.ps1`)
+  const dataFile = join(tmpdir(), `vc-registry-${stamp}.json`)
+  const script = [
+    'param([string]$DataPath)',
+    '$d = Get-Content -Raw -Encoding UTF8 -LiteralPath $DataPath | ConvertFrom-Json',
+    body
+  ].join('\n')
   try {
-    writeFileSync(tempFile, script, 'utf-8')
-    return execSync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempFile}"`,
-      { encoding: 'utf-8', timeout: 30000 }
+    // BOM so Windows PowerShell 5.1 reads the script as UTF-8, not the ANSI code page
+    writeFileSync(tempFile, '\ufeff' + script, 'utf-8')
+    writeFileSync(dataFile, JSON.stringify(data), 'utf-8')
+    return execFileSync(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tempFile, '-DataPath', dataFile],
+      { encoding: 'utf-8', timeout: 30000, windowsHide: true }
     ).trim()
   } catch (err: any) {
     throw new Error(`Excel COM failed: ${err.stderr || err.message}`)
   } finally {
     try { require('fs').unlinkSync(tempFile) } catch { /* ignore */ }
+    try { require('fs').unlinkSync(dataFile) } catch { /* ignore */ }
   }
 }
 
@@ -79,27 +94,26 @@ function appendRowViaCom(
   sheetName: string,
   values: { quotationType: string; branch: string; serial: number; reference: string; managers: string; vessel: string; imo: string; vesselType: string; broker: string }
 ): void {
-  const esc = (s: string) => s.replace(/'/g, "''")
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 try {
-  $wb = $excel.Workbooks.Open('${esc(filePath)}')
-  $ws = $wb.Sheets.Item('${esc(sheetName)}')
+  $wb = $excel.Workbooks.Open([string]$d.filePath)
+  $ws = $wb.Sheets.Item([string]$d.sheetName)
   $usedRange = $ws.UsedRange
   $newRow = $usedRange.Row + $usedRange.Rows.Count
   $ws.Cells.Item($newRow, 1).Value2 = Get-Date
   $ws.Cells.Item($newRow, 1).NumberFormat = 'dd/mm/yyyy'
-  $ws.Cells.Item($newRow, 2).Value2 = '${esc(values.quotationType)}'
-  $ws.Cells.Item($newRow, 3).Value2 = '${esc(values.branch)}'
-  $ws.Cells.Item($newRow, 4).Value2 = ${values.serial}
-  $ws.Cells.Item($newRow, 5).Value2 = '${esc(values.reference)}'
-  $ws.Cells.Item($newRow, 6).Value2 = '${esc(values.managers)}'
-  $ws.Cells.Item($newRow, 7).Value2 = '${esc(values.vessel)}'
-  $ws.Cells.Item($newRow, 8).Value2 = '${esc(values.imo)}'
-  $ws.Cells.Item($newRow, 9).Value2 = '${esc(values.vesselType)}'
-  $ws.Cells.Item($newRow, 10).Value2 = '${esc(values.broker)}'
+  $ws.Cells.Item($newRow, 2).Value2 = [string]$d.quotationType
+  $ws.Cells.Item($newRow, 3).Value2 = [string]$d.branch
+  $ws.Cells.Item($newRow, 4).Value2 = [int]$d.serial
+  $ws.Cells.Item($newRow, 5).Value2 = [string]$d.reference
+  $ws.Cells.Item($newRow, 6).Value2 = [string]$d.managers
+  $ws.Cells.Item($newRow, 7).Value2 = [string]$d.vessel
+  $ws.Cells.Item($newRow, 8).Value2 = [string]$d.imo
+  $ws.Cells.Item($newRow, 9).Value2 = [string]$d.vesselType
+  $ws.Cells.Item($newRow, 10).Value2 = [string]$d.broker
   $wb.Save()
   $wb.Close()
   Write-Output "OK"
@@ -110,7 +124,7 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runPowerShellScript(ps)
+  const result = runPowerShellScript(ps, { filePath, sheetName, ...values })
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }
@@ -120,15 +134,14 @@ try {
 }
 
 function setCellViaCom(filePath: string, sheetName: string, row: number, col: number, value: string): void {
-  const esc = (s: string) => s.replace(/'/g, "''")
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 try {
-  $wb = $excel.Workbooks.Open('${esc(filePath)}')
-  $ws = $wb.Sheets.Item('${esc(sheetName)}')
-  $ws.Cells.Item(${row}, ${col}).Value2 = '${esc(value)}'
+  $wb = $excel.Workbooks.Open([string]$d.filePath)
+  $ws = $wb.Sheets.Item([string]$d.sheetName)
+  $ws.Cells.Item([int]$d.row, [int]$d.col).Value2 = [string]$d.value
   $wb.Save()
   $wb.Close()
   Write-Output 'OK'
@@ -139,7 +152,7 @@ try {
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
 }
 `
-  const result = runPowerShellScript(ps)
+  const result = runPowerShellScript(ps, { filePath, sheetName, row, col, value })
   if (result.startsWith('ERR:')) {
     throw new Error(result.substring(4))
   }

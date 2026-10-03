@@ -1,11 +1,13 @@
 import * as bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { db } from './mysql/adapter'
 import { User } from '../shared/types'
 import Store from 'electron-store'
 
 const store = new Store()
+
+const hashSessionId = (sessionId: string): string => createHash('sha256').update(sessionId).digest('hex')
 
 interface LoginAttempt {
     count: number
@@ -15,7 +17,10 @@ interface LoginAttempt {
 }
 
 export class AuthService {
-    private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number }> = new Map()
+    // verified = false for a session restored from the local store until it has been checked
+    // against user_sessions and its user (role) re-read from the DB. Unverified sessions are
+    // never honoured: the persisted user object is untrusted input.
+    private sessions: Map<string, { user: Omit<User, 'passwordHash'>; timestamp: number; verified: boolean }> = new Map()
     private loginAttempts: Map<string, LoginAttempt> = new Map()
     private readonly SESSION_TIMEOUT = 30 * 24 * 60 * 60 * 1000 // 30 days for persistent login
     private readonly MAX_LOGIN_ATTEMPTS = 5
@@ -47,7 +52,8 @@ export class AuthService {
             if (Date.now() - savedSession.timestamp < this.SESSION_TIMEOUT) {
                 this.sessions.set(savedSession.sessionId, {
                     user: savedSession.user,
-                    timestamp: savedSession.timestamp
+                    timestamp: savedSession.timestamp,
+                    verified: false
                 })
                 console.log(`[AuthService] Restored session for user: ${savedSession.user.username} (ID: ${savedSession.sessionId})`)
             } else {
@@ -64,7 +70,7 @@ export class AuthService {
         if (!sessionId) return null
 
         const session = this.sessions.get(sessionId)
-        if (!session) return null
+        if (!session || !session.verified) return null
 
         // Check if session is expired
         if (Date.now() - session.timestamp > this.SESSION_TIMEOUT) {
@@ -81,7 +87,8 @@ export class AuthService {
 
     getSessionData(sessionId?: string): { user: Omit<User, 'passwordHash'>; timestamp: number } | null {
         if (!sessionId) return null
-        return this.sessions.get(sessionId) || null
+        const session = this.sessions.get(sessionId)
+        return session && session.verified ? session : null
     }
 
     isAdmin(sessionId?: string): boolean {
@@ -91,14 +98,16 @@ export class AuthService {
 
     createSession(user: Omit<User, 'passwordHash'>): string {
         const sessionId = uuidv4()
-        this.sessions.set(sessionId, { user, timestamp: Date.now() })
+        this.sessions.set(sessionId, { user, timestamp: Date.now(), verified: true })
         this.saveSessionToDisk(sessionId, user)
+        db.createUserSession(hashSessionId(sessionId), user.id).catch(err => console.error('[AuthService] Failed to record session:', err))
         return sessionId
     }
 
     clearSession(sessionId: string): void {
         this.sessions.delete(sessionId)
         this.clearSessionFromDisk()
+        db.deleteUserSession(hashSessionId(sessionId)).catch(() => {})
     }
 
     async createInitialAdmin(): Promise<boolean> {
@@ -162,6 +171,11 @@ export class AuthService {
 
         // Security: Clear failed attempts on successful login
         this.loginAttempts.delete(username)
+
+        // Still on the seeded default password: force a change before the app can be used
+        if (password === 'admin123') {
+            await db.setForcePasswordReset(user.id).catch(() => {})
+        }
 
         // Record last login timestamp (fire and forget)
         db.updateUserLastLogin(user.id).catch(() => {})
@@ -236,6 +250,9 @@ export class AuthService {
         if (newPassword.length < 6) {
             return { success: false, message: 'New password must be at least 6 characters long' }
         }
+        if (newPassword === 'admin123') {
+            return { success: false, message: 'Please choose a password other than the default one' }
+        }
 
         // Hash and update password
         const newPasswordHash = await bcrypt.hash(newPassword, 10)
@@ -255,6 +272,8 @@ export class AuthService {
         const passwordHash = await bcrypt.hash(tempPassword, 10)
 
         await db.updateUserPassword(user.id, passwordHash)
+        // An admin reset ends that user's remembered logins everywhere
+        await db.deleteUserSessionsForUser(user.id).catch(() => {})
 
         return {
             success: true,
@@ -266,26 +285,46 @@ export class AuthService {
 
     // Get the first available session (for auto-login)
     getFirstSession(): { sessionId: string; user: Omit<User, 'passwordHash'> } | null {
-        const firstEntry = this.sessions.entries().next()
-        if (firstEntry.done) return null
-
-        const [sessionId, session] = firstEntry.value
-        return { sessionId, user: session.user }
+        for (const [sessionId, session] of this.sessions) {
+            if (session.verified) return { sessionId, user: session.user }
+        }
+        return null
     }
 
-    // Validate that restored sessions still have a live DB user — call after DB connects
+    // Verify sessions restored from the local store; call after the DB connects (startup and
+    // auth:getSession). A session is accepted only when user_sessions holds its id for that same
+    // user; the user record (role) is then re-read from the DB. Anything else is dropped and the
+    // user logs in again. DB not reachable: stays unverified (not honoured) and is retried.
     async validateRestoredSessions(): Promise<void> {
         for (const [sessionId, session] of this.sessions) {
+            if (session.verified) continue
             try {
-                const user = await db.getUserById(session.user.id)
-                if (!user) {
-                    console.warn(`[AuthService] Clearing stale session for deleted user: ${session.user.username}`)
+                const ownerId = await db.getUserSessionOwner(hashSessionId(sessionId))
+                const fresh = ownerId && ownerId === session.user.id ? await db.getUserById(ownerId) : null
+                if (!fresh) {
+                    console.warn(`[AuthService] Discarding unverifiable restored session (${session.user?.username || 'unknown'})`)
                     this.sessions.delete(sessionId)
                     this.clearSessionFromDisk()
+                    continue
                 }
+                const { passwordHash: _ph, ...safeUser } = fresh
+                session.user = safeUser
+                session.verified = true
+                this.saveSessionToDisk(sessionId, safeUser)
             } catch {
-                // DB not ready yet — leave session intact, it will be validated on next use
+                // DB not ready yet: leave unverified; retried on the next auth:getSession
             }
+        }
+    }
+
+    /** Refresh the cached user of every live session for this user (e.g. after a role change). */
+    async refreshUser(userId: string): Promise<void> {
+        const fresh = await db.getUserById(userId)
+        for (const [sessionId, session] of this.sessions) {
+            if (session.user.id !== userId) continue
+            if (!fresh) { this.sessions.delete(sessionId); continue }
+            const { passwordHash: _ph, ...safeUser } = fresh
+            session.user = { ...session.user, ...safeUser }
         }
     }
 }

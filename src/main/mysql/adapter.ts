@@ -2740,6 +2740,20 @@ export class MySQLAdapter {
                 console.error('user_recent_items migration:', e)
             }
 
+            // Server-side record of persistent login sessions. A session restored from the
+            // local store is only honoured when its id (stored as a SHA-256 hash) exists here for
+            // that user, so editing the local file cannot promote or impersonate a user.
+            try {
+                await this.pool.query(`CREATE TABLE IF NOT EXISTS user_sessions (
+                    session_hash CHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_us_user (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+                // Sessions live 30 days
+                await this.pool.query('DELETE FROM user_sessions WHERE created_at < (NOW() - INTERVAL 30 DAY)')
+            } catch (e) { console.error('user_sessions migration:', e) }
+
             // Dashboard onboarded column
             try {
                 const [dboCols] = await this.pool.query('SHOW COLUMNS FROM users LIKE \'dashboard_onboarded\'') as any[]
@@ -5376,12 +5390,40 @@ export class MySQLAdapter {
         return rows.length > 0 ? (rows[0] as User) : null
     }
 
+    // Persistent login sessions (see user_sessions migration)
+    async createUserSession(sessionHash: string, userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('INSERT INTO user_sessions (session_hash, user_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE user_id = VALUES(user_id)', [sessionHash, userId])
+    }
+
+    /** Owner of a live (30 days max) session, or null when unknown/expired. */
+    async getUserSessionOwner(sessionHash: string): Promise<string | null> {
+        if (!this.pool) throw new Error('DB not connected')
+        const [rows] = await this.pool.query('SELECT user_id FROM user_sessions WHERE session_hash = ? AND created_at >= (NOW() - INTERVAL 30 DAY)', [sessionHash])
+        return (rows as any[])[0]?.user_id ?? null
+    }
+
+    async deleteUserSession(sessionHash: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM user_sessions WHERE session_hash = ?', [sessionHash])
+    }
+
+    async deleteUserSessionsForUser(userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM user_sessions WHERE user_id = ?', [userId])
+    }
+
     async updateUserPassword(userId: string, newPasswordHash: string): Promise<void> {
         if (!this.pool) return
         await this.pool.execute(
             'UPDATE users SET password_hash = ?, force_password_reset = FALSE WHERE id = ?',
             [newPasswordHash, userId]
         )
+    }
+
+    async setForcePasswordReset(userId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('UPDATE users SET force_password_reset = TRUE WHERE id = ?', [userId])
     }
 
     async isPasswordResetRequired(userId: string): Promise<boolean> {
@@ -8211,9 +8253,9 @@ export class MySQLAdapter {
         return { id, name, filters }
     }
 
-    async deleteQuotationSavedFilter(id: string): Promise<void> {
+    async deleteQuotationSavedFilter(id: string, userId: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('DELETE FROM quotation_saved_filters WHERE id = ?', [id])
+        await this.pool.execute('DELETE FROM quotation_saved_filters WHERE id = ? AND user_id = ?', [id, userId])
     }
 
     async bulkDeleteQuotations(ids: string[]): Promise<number> {
@@ -14016,9 +14058,9 @@ export class MySQLAdapter {
         )
     }
 
-    async markNotificationRead(id: string): Promise<void> {
+    async markNotificationRead(id: string, userId: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('UPDATE notifications SET is_read = TRUE WHERE id = ?', [id])
+        await this.pool.execute('UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?', [id, userId])
     }
 
     async markAllNotificationsRead(userId: string): Promise<void> {
@@ -14636,9 +14678,14 @@ export class MySQLAdapter {
         await this.pool.execute(`UPDATE saved_reports SET ${sets.join(', ')} WHERE id = ?`, params)
     }
 
-    async deleteSavedReport(id: string): Promise<void> {
+    /** ownerId = null deletes any report (managers); otherwise only the owner's own report. */
+    async deleteSavedReport(id: string, ownerId: string | null): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('DELETE FROM saved_reports WHERE id = ?', [id])
+        if (ownerId == null) await this.pool.execute('DELETE FROM saved_reports WHERE id = ?', [id])
+        else {
+            const [r]: any = await this.pool.execute('DELETE FROM saved_reports WHERE id = ? AND created_by = ?', [id, ownerId])
+            if (!r?.affectedRows) throw new Error('You can only delete reports you created')
+        }
     }
 
     async runReport(dataSource: string, config: ReportConfig): Promise<any[]> {

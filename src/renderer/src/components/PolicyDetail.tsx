@@ -2672,6 +2672,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 gap: '5px'
               }}
               onClick={() => openIssueModal()}
+                disabled={!hasPermission('policies:manage')}
+                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
             >
               <Plus size={14} /> Issue New
             </button>
@@ -2739,6 +2741,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                           marginLeft: '4px'
                         }}
                         onClick={() => openIssueModal(ct)}
+                disabled={!hasPermission('policies:manage')}
+                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
                       >
                         Issue
                       </button>
@@ -2923,6 +2927,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                                   gap: '4px'
                                 }}
                                 onClick={() => openReissueModal(card)}
+                disabled={!hasPermission('policies:manage')}
+                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
                               >
                                 <RefreshCw size={12} /> Reissue
                               </button>
@@ -2936,6 +2942,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                                   gap: '4px'
                                 }}
                                 onClick={() => openEditModal(card)}
+                disabled={!hasPermission('policies:manage')}
+                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
                               >
                                 <Edit3 size={12} /> Edit
                               </button>

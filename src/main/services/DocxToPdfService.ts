@@ -1,10 +1,12 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 
-const execAsync = promisify(exec)
+// execFile (no shell): file paths travel as argv, never as code. A vessel name in a
+// file name (e.g. containing $(...) or quotes) must not be able to run commands.
+const execFileAsync = promisify(execFile)
 
 /**
  * Convert a DOCX file to PDF.
@@ -38,13 +40,15 @@ async function convertViaWord(docxPath: string, pdfPath: string): Promise<void> 
   const absPdf = path.resolve(pdfPath).replace(/\//g, '\\')
   const tmpScript = path.join(os.tmpdir(), `vc_convert_${Date.now()}.ps1`)
 
+  // Paths are passed as -File parameters (bound literally, not parsed as PowerShell)
   const script = [
+    'param([string]$InPath, [string]$OutPath)',
     '$ErrorActionPreference = "Stop"',
     '$word = New-Object -ComObject Word.Application',
     '$word.Visible = $false',
     'try {',
-    `    $doc = $word.Documents.Open("${absDocx}")`,
-    `    $doc.SaveAs2("${absPdf}", 17)`,
+    '    $doc = $word.Documents.Open($InPath)',
+    '    $doc.SaveAs2($OutPath, 17)',
     '    $doc.Close([ref]$false)',
     '} finally {',
     '    $word.Quit([ref]$false)',
@@ -54,9 +58,10 @@ async function convertViaWord(docxPath: string, pdfPath: string): Promise<void> 
 
   fs.writeFileSync(tmpScript, script, 'utf-8')
   try {
-    await execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpScript}"`,
-      { timeout: 120000 }
+    await execFileAsync(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpScript, '-InPath', absDocx, '-OutPath', absPdf],
+      { timeout: 120000, windowsHide: true }
     )
   } finally {
     try { fs.unlinkSync(tmpScript) } catch { /* ignore */ }
@@ -87,7 +92,7 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
   // Fallback: try 'soffice' on PATH
   if (!loPath) {
     try {
-      await execAsync('soffice --version', { timeout: 5000 })
+      await execFileAsync('soffice', ['--version'], { timeout: 5000, windowsHide: true })
       loPath = 'soffice'
     } catch { /* not on PATH */ }
   }
@@ -95,9 +100,10 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
   if (!loPath) throw new Error('LibreOffice not found. Checked: ' + loPaths.join(', '))
 
   console.log(`[DocxToPdf] Using LibreOffice at: ${loPath}`)
-  await execAsync(
-    `"${loPath}" --headless --convert-to pdf --outdir "${outDir}" "${absDocx}"`,
-    { timeout: 120000 }
+  await execFileAsync(
+    loPath,
+    ['--headless', '--convert-to', 'pdf', '--outdir', outDir, absDocx],
+    { timeout: 120000, windowsHide: true }
   )
 }
 

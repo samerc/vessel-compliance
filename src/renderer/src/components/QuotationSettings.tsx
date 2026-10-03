@@ -3909,7 +3909,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                                 </div>
                             </div>
                         ) : (
-                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: c.text }} />
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(c.text || '') }} />
                         )}
                     </div>
                     {/* Footer: clause pills */}

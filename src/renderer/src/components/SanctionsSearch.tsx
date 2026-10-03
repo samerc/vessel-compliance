@@ -39,7 +39,9 @@ interface RemarkTemplate {
 }
 
 export default function SanctionsSearch() {
-    const { user } = useAuth()
+    const { user, hasPermission } = useAuth()
+    // Editing the local SIC list (same gate as the server)
+    const canEditSic = hasPermission('compliance:review') || hasPermission('admin:settings')
     const { theme } = useTheme()
     const { showSuccess, showError } = useToast()
     const isLight = theme === 'light' || theme === 'aurora'
@@ -742,15 +744,19 @@ export default function SanctionsSearch() {
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             {filteredSic.length} of {sicEntries.length} entries
                         </span>
+                        {canEditSic && (<>
                         <button className="btn-secondary" onClick={openTemplateManager} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
                             <Settings size={14} /> Templates
                         </button>
+                        {hasPermission('admin:settings') && (
                         <button className="btn-secondary" onClick={handleImportSic} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
                             <Upload size={14} /> Import Excel
                         </button>
+                        )}
                         <button className="btn-primary" onClick={openAddSic} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
                             <Plus size={14} /> Add Entry
                         </button>
+                        </>)}
                     </div>
 
                     {/* Table */}
@@ -797,7 +803,7 @@ export default function SanctionsSearch() {
                                             <td style={{ padding: '10px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{entry.listed_date || '—'}</td>
                                             <td style={{ padding: '10px 14px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.source_id || '—'}</td>
                                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                                {canEditSic && <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                                                     <button
                                                         onClick={() => openEditSic(entry)}
                                                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '4px' }}
@@ -829,7 +835,7 @@ export default function SanctionsSearch() {
                                                             <Trash2 size={15} />
                                                         </button>
                                                     )}
-                                                </div>
+                                                </div>}
                                             </td>
                                         </tr>
                                     ))}
