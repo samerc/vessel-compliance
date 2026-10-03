@@ -1,4 +1,5 @@
 import XLSX from 'xlsx-js-style'
+import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
 
 // ── Column descriptions (Row 1) ─────────────────────────────────────────────
 const HEADER_DESCRIPTIONS = [
@@ -116,6 +117,10 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   let qSubjectivities: any[] = []
   let qClauses: any[] = []
   let deductibleDefs: any[] = []
+  // This policy's own technical premium (one policy per vessel) — null = fall back to quotation
+  let vesselTech: number | null = null
+  let qVessel: any = null
+  let qDiscounts: any[] = []
 
   if (policy.quotationId) {
     try {
@@ -133,6 +138,33 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
       qSubjectivities = Array.isArray(subs) ? subs : []
       qClauses = Array.isArray(cls) ? cls : []
       deductibleDefs = Array.isArray(dedDefs) ? dedDefs : []
+      if (q && !(q as any).error) {
+        const isHull = q.quotationTypeCode === 'H'
+        const [qvs, piAlts, hullAlts, lols, avp, disc] = await Promise.all([
+          window.api.getQuotationVessels(policy.quotationId),
+          q.quotationTypeCode === 'P' ? window.api.piGetQuotationAlternatives(policy.quotationId) : Promise.resolve([]),
+          isHull ? window.api.hullGetQuotationAlternatives(policy.quotationId) : Promise.resolve([]),
+          q.quotationTypeCode === 'P' ? window.api.lolGetOptions(policy.quotationId) : Promise.resolve([]),
+          isHull ? window.api.hullGetAltVesselPremiums(policy.quotationId) : Promise.resolve([]),
+          window.api.quotationDiscountGetByQuotation(policy.quotationId)
+        ])
+        const vessels = Array.isArray(qvs) ? qvs : []
+        qDiscounts = Array.isArray(disc) ? disc : []
+        qVessel = vessels.find((v: any) => v.vesselId === policy.vesselId) || (vessels.length === 1 ? vessels[0] : null)
+        if (qVessel) {
+          const altVesselPrems: Record<string, number> = {}
+          for (const r of (Array.isArray(avp) ? avp : []) as any[]) {
+            if (r.premiumAmount != null) altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+          }
+          vesselTech = vesselTechnical({
+            quotation: q, vessels,
+            piAlts: Array.isArray(piAlts) ? piAlts : [],
+            hullAlts: Array.isArray(hullAlts) ? hullAlts : [],
+            lolOptions: Array.isArray(lols) ? lols : [],
+            altVesselPrems, discounts: qDiscounts
+          }, qVessel, policy.selectedAlternativeId || '', (policy as any).selected_lol_option_id || '')
+        }
+      }
     } catch { /* ignore — quotation data is supplementary */ }
   }
 
@@ -154,18 +186,16 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
 
   // Value / insured value from quotation
   const insuredValue = quotation?.agreedValue || quotation?.limitOfLiabilityAmount || 0
-  const technicalPremium = quotation?.premiumAmount || premium
-  const ncbPct = quotation?.ncbEnabled && quotation?.ncbDiscountPercent
-    ? `${quotation.ncbDiscountPercent}%` : '--'
+  // Technical premium of THIS vessel (not the fleet total of the quotation)
+  const technicalPremium = vesselTech ?? (quotation?.premiumAmount || premium)
+  const ncbApplies = !!quotation?.ncbEnabled && !qVessel?.ncbExcluded
+  const ncbPct = !ncbApplies ? '--'
+    : quotation.ncbDiscountType === 'amount'
+      ? (quotation.ncbDiscountAmount ? formatWithCommas(quotation.ncbDiscountAmount) : '--')
+      : (quotation.ncbDiscountPercent ? `${quotation.ncbDiscountPercent}%` : '--')
 
-  // Gross adjusted premium
-  let grossPremium = technicalPremium
-  if (quotation?.ncbEnabled && quotation?.ncbDiscountPercent) {
-    grossPremium = grossPremium * (1 - quotation.ncbDiscountPercent / 100)
-  }
-  if (quotation?.upccEnabled && quotation?.upccDiscountPercent) {
-    grossPremium = grossPremium * (1 - quotation.upccDiscountPercent / 100)
-  }
+  // Gross adjusted premium (after NCB/UPCC/extra discounts, honouring per-vessel exclusions)
+  const grossPremium = quotation ? computePayablePremium(technicalPremium, quotation, qDiscounts, qVessel) : technicalPremium
 
   // Rate
   const rate = insuredValue > 0

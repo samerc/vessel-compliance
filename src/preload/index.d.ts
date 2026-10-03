@@ -940,6 +940,7 @@ export interface Api {
     blueCardExpiry?: string | null
     blueCardOwners?: Record<string, string>
     selectedSubjectivityIds?: string[] | null
+    perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
   }) => Promise<any[]>
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>

@@ -51,6 +51,7 @@ import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
 import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
 import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
+import { splitInstalments } from '../../../shared/premium'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -646,12 +647,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   // Recalculate instalment amounts when premium or commission change
   const recalcInstalments = (newPremium: number, newCommission: number, currentInstalments: typeof editInstalments): typeof editInstalments => {
     if (currentInstalments.length === 0) return currentInstalments
-    const perInstPremium = newPremium / currentInstalments.length
+    // Rounding remainder goes into the 1st instalment so the instalments add up to the premium
+    // (exports print the instalment sum)
+    const amounts = splitInstalments(newPremium, currentInstalments.length)
     const commRate = newCommission / 100
-    return currentInstalments.map(inst => ({
+    return currentInstalments.map((inst, i) => ({
       ...inst,
-      premiumAmount: Math.round(perInstPremium * 100) / 100,
-      commissionAmount: Math.round(perInstPremium * commRate * 100) / 100
+      premiumAmount: amounts[i],
+      commissionAmount: Math.round(amounts[i] * commRate * 100) / 100
     }))
   }
 

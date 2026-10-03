@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2, LayoutList, ListChecks } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption } from '../../../shared/types'
+import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption, QuotationDiscount } from '../../../shared/types'
+import { computePayablePremium, splitInstalments, addMonthsISO, round2, vesselTechnical, PremiumContext, PremiumLolOption } from '../../../shared/premium'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 
@@ -46,6 +47,9 @@ interface WizardData {
   expiryTime: string
   timezone: string
   totalPremium: number
+  // Payable premium per selected vessel (vesselId → amount). Each vessel becomes its own
+  // policy, so a multi-vessel conversion must carry each vessel's own premium.
+  vesselPremiums: Record<string, number>
   // Step 3
   instalmentDates: string[]
   instalmentAmounts: number[]
@@ -78,6 +82,34 @@ interface WizardData {
   selectedSubjectivityIds: string[]
 }
 
+type LolOptionLite = PremiumLolOption
+
+// Payable premium per selected vessel + the instalment amounts (summed over vessels).
+function seedPremiums(ctx: PremiumContext, selectedIds: string[], altId: string, lolId: string, instalmentCount: number) {
+  const vesselPremiums: Record<string, number> = {}
+  for (const vid of selectedIds) {
+    const qv = ctx.vessels.find(v => (v.vesselId || v.id) === vid)
+    if (!qv) continue
+    vesselPremiums[vid] = computePayablePremium(vesselTechnical(ctx, qv, altId, lolId), ctx.quotation, ctx.discounts, qv)
+  }
+  const totalPremium = round2(Object.values(vesselPremiums).reduce((s, a) => s + a, 0))
+  return { vesselPremiums, totalPremium, instalmentAmounts: sumVesselInstalments(vesselPremiums, instalmentCount) }
+}
+
+// Instalment due date: each 30 days = 1 calendar month from inception (month-end clamped)
+function instalmentDueDate(inception: string, daysFromInception: number): string {
+  return addMonthsISO(inception, Math.round(daysFromInception / 30))
+}
+
+// Fleet-level instalment amounts = per-vessel splits added together
+function sumVesselInstalments(vesselPremiums: Record<string, number>, count: number): number[] {
+  const totals = Array.from({ length: count }, () => 0)
+  for (const amt of Object.values(vesselPremiums)) {
+    splitInstalments(amt, count).forEach((a, i) => { totals[i] += a })
+  }
+  return totals.map(round2)
+}
+
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -108,6 +140,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     expiryTime: '12:00',
     timezone: 'Lebanon Standard Time',
     totalPremium: 0,
+    vesselPremiums: {},
     instalmentDates: [],
     instalmentAmounts: [],
     nonRefundableType: null,
@@ -135,7 +168,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   // Quotation subjectivities available to keep/uncheck in the wizard
   const [subjectivityItems, setSubjectivityItems] = useState<{ id: string; text: string }[]>([])
 
-  const [lolOptions, setLolOptions] = useState<{ id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]>([])
+  const [lolOptions, setLolOptions] = useState<LolOptionLite[]>([])
+  // Extra quotation discounts (beyond NCB/UPCC) + hull alternative × vessel premium matrix
+  const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
+  const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
   const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
   // Insured editor data
   const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([])
@@ -148,6 +184,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const allAlts = useMemo(() => [...piAlts, ...hullAlts], [piAlts, hullAlts])
   const hasAlts = allAlts.length > 1
   const isMultiVessel = qVessels.length > 1
+  // More than one vessel being converted now → one policy per vessel, each with its own premium
+  const isMultiSelection = data.selectedVesselIds.length > 1
   const hasBroker = !!quotation?.coName
 
   // Determine which steps to show
@@ -270,68 +308,38 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         if (bcSetting) setBaseCurrency(bcSetting)
       } catch { /* use default USD */ }
 
-      // Calculate payable premium — use per-vessel premium when multi-vessel.
-      // Seed from the first vessel we're actually converting (skip already-converted ones)
-      // so converting the 2nd vessel of a quotation doesn't inherit the 1st vessel's premium.
+      // Extra discounts + hull alternative × vessel premiums (both feed the payable maths)
       const quot = q as Quotation
-      let techPremium = quot.premiumAmount || 0
-      const premiumVessel = vessels.find(v => !alreadyConverted.includes(v.vesselId || v.id)) || vessels[0]
-
-      // War excess: premium = Section 1 + Section 2 for the vessel
-      if (quot.quotationTypeCode === 'W' && quot.warExcessEnabled && vessels.length > 0) {
-        const v = premiumVessel
-        const s1Rate = quot.premiumRate || 0
-        const s2Rate = quot.warExcessRate || 0
-        const s1Amt = v.agreedValue ?? quot.agreedValue ?? 0
-        const s2Amt = (v as any).warExcessAmount ?? quot.warExcessAmount ?? 0
-        const s1Prem = (v as any).warSection1Premium ?? Math.round(s1Amt * s1Rate / 100 * 100) / 100
-        const s2Prem = (v as any).warSection2Premium ?? Math.round((s2Amt - s1Amt) * s2Rate / 100 * 100) / 100
-        techPremium = s1Prem + s2Prem
-      } else if (vessels.length > 1) {
-        // Multi-vessel: each vessel gets its own policy — seed from the vessel being converted
-        const firstVesselPrem = premiumVessel?.premiumAmount || 0
-        if (firstVesselPrem > 0) techPremium = firstVesselPrem
-      } else if (vessels.length === 1) {
-        const singlePrem = vessels[0]?.premiumAmount || 0
-        if (singlePrem > 0) techPremium = singlePrem
-      }
-      const allAltsLocal = [...safePiAlts, ...safeHullAlts]
-      let firstAltId = ''
-      let firstLolId = ''
-      // LOL options: use first option's premium if available
-      if (safeLolOptions.length > 0 && safeLolOptions.some(o => o.premiumAmount != null)) {
-        firstLolId = safeLolOptions[0].id
-        const lolPrem = safeLolOptions[0].premiumAmount
-        if (lolPrem != null && lolPrem > 0) techPremium = lolPrem
-      }
-      // P&I/Hull alternatives: use first alternative's premium
-      if (allAltsLocal.length > 1) {
-        firstAltId = allAltsLocal[0].id
-        const firstAlt = allAltsLocal[0]
-        if (firstAlt.premiumAmount) {
-          techPremium = firstAlt.premiumAmount
+      let safeDiscounts: QuotationDiscount[] = []
+      let safeAltVesselPrems: Record<string, number> = {}
+      try {
+        const [discRes, avpRes] = await Promise.all([
+          window.api.quotationDiscountGetByQuotation(quotationId),
+          quot.quotationTypeCode === 'H' ? window.api.hullGetAltVesselPremiums(quotationId) : Promise.resolve([])
+        ])
+        if (Array.isArray(discRes)) safeDiscounts = discRes
+        for (const r of (Array.isArray(avpRes) ? avpRes : []) as any[]) {
+          if (r.premiumAmount != null) safeAltVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
         }
-      }
-      // Increased Value (Hull): the IV premium adds on top of the hull technical premium,
-      // regardless of how many alternatives exist (single-alt hull must still include it).
-      if (quot.ivEnabled && quot.ivPremiumAmount) techPremium += quot.ivPremiumAmount
-      let payable = techPremium
-      if (quot.ncbEnabled && quot.ncbDiscountPercent) payable = payable * (1 - quot.ncbDiscountPercent / 100)
-      if (quot.upccEnabled && quot.upccDiscountPercent) payable = payable * (1 - quot.upccDiscountPercent / 100)
-      payable = Math.round(payable * 100) / 100
+      } catch { /* non-critical — falls back to fleet-level premiums */ }
+      setDiscounts(safeDiscounts)
+      setAltVesselPrems(safeAltVesselPrems)
 
-      // Calculate initial instalment amounts
-      const count = safeInstalments.length
-      let initDates: string[] = []
-      let initAmounts: number[] = []
-      if (count > 0) {
-        const perInstalment = Math.round((payable / count) * 100) / 100
-        initAmounts = safeInstalments.map((_, i) => {
-          if (i === 0) return Math.round((payable - perInstalment * (count - 1)) * 100) / 100
-          return perInstalment
-        })
-        initDates = safeInstalments.map(() => '')
-      }
+      // Default alternative / LOL option = the first one (only when there is a real choice)
+      const allAltsLocal = [...safePiAlts, ...safeHullAlts]
+      const firstAltId = allAltsLocal.length > 1 ? allAltsLocal[0].id : ''
+      const firstLolId = safeLolOptions.length > 0 && safeLolOptions.some(o => o.premiumAmount != null) ? safeLolOptions[0].id : ''
+
+      // Payable premium per vessel being converted (skip vessels that already have a policy),
+      // so a multi-vessel conversion gives every policy its own premium and instalments.
+      const initialSelection = vessels.map(v => v.vesselId || v.id).filter(id => !alreadyConverted.includes(id))
+      const seeded = seedPremiums(
+        { quotation: quot, vessels, piAlts: safePiAlts, hullAlts: safeHullAlts, lolOptions: safeLolOptions, altVesselPrems: safeAltVesselPrems, discounts: safeDiscounts },
+        initialSelection, firstAltId, firstLolId, safeInstalments.length
+      )
+      const payable = seeded.totalPremium
+      let initDates: string[] = safeInstalments.map(() => '')
+      const initAmounts = seeded.instalmentAmounts
 
       // Try to pre-fill inception/expiry from vessel's existing policy
       let inception = ''
@@ -343,22 +351,15 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           const endDate = resolveEffectivePolicyExpiry(policies)
           if (endDate) {
             inception = endDate
-            // Add 1 year using string math (no timezone issues)
-            const parts = endDate.split('-')
-            const yr = parseInt(parts[0], 10) + 1
-            expiry = `${yr}-${parts[1]}-${parts[2]}`
+            // +1 year (string math, clamps 29 Feb → 28 Feb)
+            expiry = addMonthsISO(endDate, 12)
           }
         } catch { /* ignore */ }
       }
 
       // Calculate instalment dates from inception if we have both
       if (inception && safeInstalments.length > 0) {
-        initDates = safeInstalments.map(inst => {
-          const [y, mo, day] = inception.split('-').map(Number)
-          const months = Math.round(inst.daysFromInception / 30)
-          const d = new Date(y, mo - 1 + months, day)
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        })
+        initDates = safeInstalments.map(inst => instalmentDueDate(inception, inst.daysFromInception))
       }
 
       // Resolve commission from hierarchy: customer override → policy type default
@@ -382,12 +383,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       setData(prev => ({
         ...prev,
         // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
-        selectedVesselIds: vessels.map(v => v.vesselId || v.id).filter(id => !alreadyConverted.includes(id)),
+        selectedVesselIds: initialSelection,
         selectedAltId: firstAltId,
         selectedLolOptionId: firstLolId,
         inceptionDate: inception,
         expiryDate: expiry,
         totalPremium: payable,
+        vesselPremiums: seeded.vesselPremiums,
         instalmentDates: initDates,
         instalmentAmounts: initAmounts,
         nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
@@ -414,33 +416,23 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   // Auto-calculate expiry date/time when inception changes
   useEffect(() => {
     if (!data.inceptionDate) return
-    const [y, m, d] = data.inceptionDate.split('-').map(Number)
+    const oneYear = addMonthsISO(data.inceptionDate, 12)
     if (data.inceptionTime === '00:00') {
       // 00:00 inception → expiry = 1 year minus 1 day at 23:59
-      const exp = new Date(y + 1, m - 1, d - 1)
+      const [y, m, d] = oneYear.split('-').map(Number)
+      const exp = new Date(y, m - 1, d - 1)
       const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
       setData(prev => ({ ...prev, expiryDate, expiryTime: '23:59' }))
     } else {
       // Other times → expiry = 1 year same time
-      const exp = new Date(y + 1, m - 1, d)
-      const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
-      setData(prev => ({ ...prev, expiryDate, expiryTime: data.inceptionTime }))
+      setData(prev => ({ ...prev, expiryDate: oneYear, expiryTime: data.inceptionTime }))
     }
   }, [data.inceptionDate, data.inceptionTime])
 
   // Recalculate instalment dates when inception date changes
   useEffect(() => {
     if (!data.inceptionDate || instalments.length === 0) return
-    const dates = instalments.map(inst => {
-      const [y, m, day] = data.inceptionDate.split('-').map(Number)
-      const months = Math.round(inst.daysFromInception / 30)
-      const newMonth = m - 1 + months
-      const d = new Date(y, newMonth, day)
-      const yr = d.getFullYear()
-      const mo = String(d.getMonth() + 1).padStart(2, '0')
-      const dy = String(d.getDate()).padStart(2, '0')
-      return `${yr}-${mo}-${dy}`
-    })
+    const dates = instalments.map(inst => instalmentDueDate(data.inceptionDate, inst.daysFromInception))
     setData(prev => ({ ...prev, instalmentDates: dates }))
   }, [data.inceptionDate, instalments])
 
@@ -467,29 +459,25 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       daysFromInception: instalmentDaysFor(count, i)
     }))
     const dates = data.inceptionDate
-      ? newInstalments.map(inst => {
-          const [y, m, day] = data.inceptionDate.split('-').map(Number)
-          const months = Math.round(inst.daysFromInception / 30)
-          const d = new Date(y, m - 1 + months, day)
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        })
+      ? newInstalments.map(inst => instalmentDueDate(data.inceptionDate, inst.daysFromInception))
       : Array.from({ length: count }, () => '')
-    const total = data.totalPremium || 0
-    const per = Math.round((total / count) * 100) / 100
-    const amounts = Array.from({ length: count }, (_, i) =>
-      i === count - 1 ? Math.round((total - per * (count - 1)) * 100) / 100 : per
-    )
+    const amounts = isMultiSelection
+      ? sumVesselInstalments(data.vesselPremiums, count)
+      : splitInstalments(data.totalPremium || 0, count)
     setInstalments(newInstalments)
     setData(prev => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts }))
   }
 
-  const computePayable = (techPremium: number): number => {
-    if (!quotation) return techPremium
-    let pay = techPremium
-    if (quotation.ncbEnabled && quotation.ncbDiscountPercent) pay = pay * (1 - quotation.ncbDiscountPercent / 100)
-    if (quotation.upccEnabled && quotation.upccDiscountPercent) pay = pay * (1 - quotation.upccDiscountPercent / 100)
-    return Math.round(pay * 100) / 100
+  // Re-derive per-vessel payable premiums + instalment amounts for a selection / alternative / LOL
+  const reseedPremiums = (selection: string[], altId: string, lolId: string): Partial<WizardData> => {
+    if (!quotation) return {}
+    return seedPremiums(
+      { quotation, vessels: qVessels, piAlts, hullAlts, lolOptions, altVesselPrems, discounts },
+      selection, altId, lolId, data.instalmentDates.length
+    )
   }
+  const computePayable = (techPremium: number): number =>
+    quotation ? computePayablePremium(techPremium, quotation, discounts) : techPremium
 
   // Hull technical premium (selected alternative, else quotation premium) — excludes IV
   const hullTechnical = (() => {
@@ -520,27 +508,23 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
   const handleAltChange = (altId: string) => {
     if (!quotation) return
-    const piAlt = piAlts.find(a => a.id === altId)
-    const hullAlt = hullAlts.find(a => a.id === altId)
-    const altPremium = piAlt?.premiumAmount ?? hullAlt?.premiumAmount ?? null
-    let tech = altPremium != null ? altPremium : (quotation.premiumAmount || 0)
-    if (quotation.ivEnabled && quotation.ivPremiumAmount) tech += quotation.ivPremiumAmount
-    const pay = computePayable(tech)
-    const count = data.instalmentAmounts.length
-    let newAmounts = data.instalmentAmounts
-    if (count > 0) {
-      const perInstalment = Math.round((pay / count) * 100) / 100
-      newAmounts = data.instalmentAmounts.map((_, i) => {
-        if (i === 0) return Math.round((pay - perInstalment * (count - 1)) * 100) / 100
-        return perInstalment
-      })
-    }
-    updateData({ selectedAltId: altId, totalPremium: pay, instalmentAmounts: newAmounts })
+    updateData({ selectedAltId: altId, ...reseedPremiums(data.selectedVesselIds, altId, data.selectedLolOptionId) })
+  }
+
+  // Edit one vessel's payable premium (multi-vessel conversion) → re-split that vessel's instalments
+  const updateVesselPremium = (vid: string, amount: number) => {
+    const vesselPremiums = { ...data.vesselPremiums, [vid]: round2(amount) }
+    updateData({
+      vesselPremiums,
+      totalPremium: round2(Object.values(vesselPremiums).reduce((s, a) => s + a, 0)),
+      instalmentAmounts: sumVesselInstalments(vesselPremiums, data.instalmentDates.length)
+    })
   }
 
   const recalcPremiumFromInstalments = (amounts: number[]) => {
-    const sum = amounts.reduce((s, a) => s + (a || 0), 0)
-    updateData({ instalmentAmounts: amounts, totalPremium: Math.round(sum * 100) / 100 })
+    const sum = round2(amounts.reduce((s, a) => s + (a || 0), 0))
+    const only = data.selectedVesselIds[0]
+    updateData({ instalmentAmounts: amounts, totalPremium: sum, ...(only ? { vesselPremiums: { [only]: sum } } : {}) })
   }
 
   // Validation per step
@@ -562,6 +546,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       case 2: // Instalments
         if (data.instalmentDates.some(d => !d)) return 'All instalment dates are required'
         if (data.instalmentAmounts.some(a => !a || a <= 0)) return 'All instalment amounts must be greater than 0'
+        if (isMultiSelection) {
+          const zero = data.selectedVesselIds.find(vid => !(data.vesselPremiums[vid] > 0))
+          if (zero) {
+            const qv = qVessels.find(v => (v.vesselId || v.id) === zero)
+            return `Premium for ${(qv?.name || qv?.vesselLabel || 'a vessel').toUpperCase()} must be greater than 0`
+          }
+        }
         return null
       case 3: // Details
         if (!data.bankId && banks.length > 0) return 'Please select a bank'
@@ -618,8 +609,20 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           addressText: r.addressText || '', addressLabel: (r.addressLabel || '').trim(), isNewAddress: !!r.isNew
         }))
       )
+      // Each vessel gets its own policy → its own premium + instalment split (same dates).
+      // A single vessel keeps the instalment amounts exactly as edited in the wizard.
+      const instCount = data.instalmentDates.length
+      const perVessel: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> = {}
+      for (const vid of data.selectedVesselIds) {
+        const prem = isMultiSelection ? (data.vesselPremiums[vid] || 0) : (data.totalPremium || 0)
+        perVessel[vid] = {
+          premiumAmount: prem,
+          instalmentAmounts: isMultiSelection ? splitInstalments(prem, instCount) : data.instalmentAmounts.slice(0, instCount)
+        }
+      }
       const result = await window.api.policyConvertFromQuotation(quotation.id, {
         vesselIds: data.selectedVesselIds,
+        perVessel,
         inceptionDate: data.inceptionDate,
         inceptionTime: data.inceptionTime,
         expiryDate: data.expiryDate,
@@ -805,45 +808,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               const newSelection = data.selectedVesselIds.includes(id)
                 ? data.selectedVesselIds.filter(v => v !== id)
                 : [...data.selectedVesselIds, id]
-              const patch: Partial<WizardData> = { selectedVesselIds: newSelection }
-              // Plain per-vessel premium (no alternatives/LOL/war-excess): when exactly one
-              // vessel is selected, follow that vessel's own premium and re-split instalments.
-              const plainPerVessel = !!quotation && allAlts.length <= 1 &&
-                !lolOptions.some(o => o.premiumAmount != null) &&
-                !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled)
-              if (plainPerVessel && newSelection.length === 1) {
-                const qv = qVessels.find(v => (v.vesselId || v.id) === newSelection[0])
-                let tech = qv?.premiumAmount || quotation!.premiumAmount || 0
-                if (quotation!.ivEnabled && quotation!.ivPremiumAmount) tech += quotation!.ivPremiumAmount
-                if (tech > 0) {
-                  const pay = computePayable(tech)
-                  const count = data.instalmentAmounts.length
-                  if (count > 0) {
-                    const per = Math.round((pay / count) * 100) / 100
-                    patch.instalmentAmounts = data.instalmentAmounts.map((_, i) => i === 0 ? Math.round((pay - per * (count - 1)) * 100) / 100 : per)
-                  }
-                  patch.totalPremium = pay
-                }
-              }
-              updateData(patch)
+              updateData({ selectedVesselIds: newSelection, ...reseedPremiums(newSelection, data.selectedAltId, data.selectedLolOptionId) })
             }}
             onSelectAlt={handleAltChange}
-            onSelectLolOption={(id) => {
-              const opt = lolOptions.find(o => o.id === id)
-              if (opt?.premiumAmount != null && quotation) {
-                const tech = opt.premiumAmount
-                const pay = computePayable(tech)
-                const count = data.instalmentAmounts.length
-                let newAmounts = data.instalmentAmounts
-                if (count > 0) {
-                  const perInstalment = Math.round((pay / count) * 100) / 100
-                  newAmounts = data.instalmentAmounts.map((_, i) => i === 0 ? Math.round((pay - perInstalment * (count - 1)) * 100) / 100 : perInstalment)
-                }
-                updateData({ selectedLolOptionId: id, totalPremium: pay, instalmentAmounts: newAmounts })
-              } else {
-                updateData({ selectedLolOptionId: id })
-              }
-            }}
+            onSelectLolOption={(id) => updateData({ selectedLolOptionId: id, ...reseedPremiums(data.selectedVesselIds, data.selectedAltId, id) })}
             onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
             labelStyle={labelStyle}
           />
@@ -869,6 +837,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             onChangeCount={changeInstalmentCount}
             hullTechnical={hullTechnical}
             inputStyle={inputStyle}
+            qVessels={qVessels}
+            isMultiSelection={isMultiSelection}
+            onUpdateVesselPremium={updateVesselPremium}
+            computePayable={computePayable}
           />
         )}
 
@@ -1204,7 +1176,7 @@ function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputS
   )
 }
 
-function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, hullTechnical, inputStyle }: {
+function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, hullTechnical, inputStyle, qVessels, isMultiSelection, onUpdateVesselPremium, computePayable }: {
   data: WizardData
   quotation: Quotation
   isLight: boolean
@@ -1213,6 +1185,10 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
   onChangeCount: (count: number) => void
   hullTechnical: number
   inputStyle: React.CSSProperties
+  qVessels: QuotationVessel[]
+  isMultiSelection: boolean
+  onUpdateVesselPremium: (vesselId: string, amount: number) => void
+  computePayable: (tech: number) => number
 }) {
   const labelUpper: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }
   const count = data.instalmentDates.length
@@ -1226,6 +1202,34 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
 
       {/* Premium + number of instalments */}
       <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {isMultiSelection ? (
+          <div style={{ flex: '1 1 320px', maxWidth: '420px' }}>
+            <div style={labelUpper}>Payable Premium per Vessel</div>
+            <div style={{ border: '1px solid var(--table-border)', borderRadius: '10px', overflow: 'hidden' }}>
+              {data.selectedVesselIds.map(vid => {
+                const qv = qVessels.find(v => (v.vesselId || v.id) === vid)
+                return (
+                  <div key={vid} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderBottom: '1px solid var(--table-border)' }}>
+                    <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase' }}>{qv?.name || qv?.vesselLabel || vid}</span>
+                    <input
+                      type="number"
+                      value={data.vesselPremiums[vid] ?? ''}
+                      onChange={e => onUpdateVesselPremium(vid, parseFloat(e.target.value) || 0)}
+                      style={{ ...inputStyle, width: '140px', flex: 'none', textAlign: 'right', padding: '5px 8px' }}
+                    />
+                  </div>
+                )
+              })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(0,170,200,0.06)', fontSize: '0.82rem' }}>
+                <span style={{ fontWeight: 700 }}>Total</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{data.totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })} {quotation?.premiumCurrency || 'USD'}</span>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+              One policy per vessel — each vessel's premium is split over the instalments below
+            </p>
+          </div>
+        ) : (
         <div>
           <div style={labelUpper}>Payable Premium</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
@@ -1234,12 +1238,12 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
               value={data.totalPremium}
               onChange={e => {
                 const val = parseFloat(e.target.value) || 0
-                const c = data.instalmentDates.length || 1
-                const perInst = Math.round((val / c) * 100) / 100
-                const newAmounts = Array.from({ length: c }, (_, idx) =>
-                  idx === c - 1 ? Math.round((val - perInst * (c - 1)) * 100) / 100 : perInst
-                )
-                onUpdate({ totalPremium: val, instalmentAmounts: newAmounts })
+                const only = data.selectedVesselIds[0]
+                onUpdate({
+                  totalPremium: val,
+                  instalmentAmounts: splitInstalments(val, data.instalmentDates.length),
+                  ...(only ? { vesselPremiums: { [only]: val } } : {})
+                })
               }}
               style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
               placeholder="Premium amount"
@@ -1250,6 +1254,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             Changing premium will recalculate instalment amounts
           </p>
         </div>
+        )}
         <div>
           <div style={labelUpper}>Number of Instalments</div>
           <input
@@ -1269,13 +1274,8 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
       {/* Hull + IV premium breakdown (Hull quotations with IV). Technical/Payable split
           only shown when there's an NCB/UPCC discount — otherwise a single amount. */}
       {quotation.ivEnabled && (() => {
-        const hasDiscount = !!(quotation.ncbEnabled && quotation.ncbDiscountPercent) || !!(quotation.upccEnabled && quotation.upccDiscountPercent)
-        const cp = (t: number) => {
-          let p = t
-          if (quotation.ncbEnabled && quotation.ncbDiscountPercent) p *= (1 - quotation.ncbDiscountPercent / 100)
-          if (quotation.upccEnabled && quotation.upccDiscountPercent) p *= (1 - quotation.upccDiscountPercent / 100)
-          return Math.round(p * 100) / 100
-        }
+        const cp = computePayable
+        const hasDiscount = cp(100) !== 100
         const cur = quotation.premiumCurrency || 'USD'
         const fmt = (n: number) => `${cur} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
         const rows = [
@@ -1346,7 +1346,10 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             <input
               type="number"
               value={data.instalmentAmounts[i] || ''}
+              readOnly={isMultiSelection}
+              title={isMultiSelection ? 'Sum of the per-vessel instalments — edit the vessel premiums above' : undefined}
               onChange={e => {
+                if (isMultiSelection) return
                 const updated = [...data.instalmentAmounts]
                 updated[i] = parseFloat(e.target.value) || 0
                 recalcPremiumFromInstalments(updated)
@@ -1971,6 +1974,20 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
         <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '10px' }}>
           {data.totalPremium.toLocaleString()} {quotation.premiumCurrency || 'USD'}
         </div>
+        {data.selectedVesselIds.length > 1 && (
+          <div style={{ fontSize: '0.82rem', marginBottom: '10px' }}>
+            {data.selectedVesselIds.map(vid => {
+              const qv = qVessels.find(v => (v.vesselId || v.id) === vid)
+              return (
+                <div key={vid} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                  <span style={{ textTransform: 'uppercase' }}>{qv?.name || qv?.vesselLabel || vid}</span>
+                  <span style={{ fontWeight: 600 }}>{(data.vesselPremiums[vid] || 0).toLocaleString()} {quotation.premiumCurrency || 'USD'}</span>
+                </div>
+              )
+            })}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>One policy per vessel. Instalments below are fleet totals.</div>
+          </div>
+        )}
         {data.instalmentDates.length > 0 && (
           <div style={{ fontSize: '0.82rem' }}>
             {data.instalmentDates.map((date, i) => (

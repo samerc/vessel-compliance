@@ -14,8 +14,9 @@ import {
   QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition,
   QuotationHullAlternative,
   QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings,
-  QuotationAssuredGroup, QuotationAgreedValueOption
+  QuotationAssuredGroup, QuotationAgreedValueOption, QuotationDiscount
 } from '../../../shared/types'
+import { computePayablePremium } from '../../../shared/premium'
 import JSZip from 'jszip'
 import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
@@ -850,6 +851,8 @@ interface PolicyExportData {
   agreedValueOptions: QuotationAgreedValueOption[]
   fleets: { id: string; name: string }[]
   vesselClassificationNames: Record<string, string>
+  // Extra quotation discounts (beyond NCB/UPCC). Optional: absent on older frozen snapshots.
+  discounts?: QuotationDiscount[]
   // Frozen render settings — everything the builders would otherwise read live from
   // getSetting/settings. Captured on first export so re-exports (policy/DA/CA/BC) never
   // pick up later setting changes. A new revision produces a new row with no snapshot,
@@ -1157,10 +1160,17 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     : scopedSubjectivities
   const subjectivitiesNil = selSubjIds != null && finalSubjectivities.length === 0
 
+  let discounts: QuotationDiscount[] = []
+  try {
+    const dRes = await window.api.quotationDiscountGetByQuotation(policy.quotationId)
+    if (Array.isArray(dRes)) discounts = dRes
+  } catch { /* no extra discounts */ }
+
   return {
     policy,
     quotation,
     frozen,
+    discounts,
     instalments: Array.isArray(instalments) ? instalments : [],
     addresses: Array.isArray(addresses) ? addresses : [],
     blueCards: Array.isArray(blueCards) ? blueCards : [],
@@ -1328,7 +1338,8 @@ function polFormatTime(time: string | null | undefined): string {
 function polFormatCurrency(amount: number | undefined, currency: string | undefined): string {
   if (amount == null) return '-'
   const c = currency || 'USD'
-  return `${c} ${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  // Whole amounts print without decimals; cents are kept so the figure matches its words
+  return `${c} ${polFormatAmountOnly(Math.round(amount * 100) / 100)}`
 }
 
 function polFormatAmountOnly(amount: number | undefined): string {
@@ -2225,6 +2236,9 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         resolvedLolAmount = (selAlt as any).lolAmount
         if ((selAlt as any).lolCurrency) resolvedLolCurrency = (selAlt as any).lolCurrency
       }
+    } else if (data.vessel && data.quotation.limitOfLiabilityVesselAmounts?.[data.vessel.id] != null) {
+      // Fleet quotation with a per-vessel limit — this policy covers just this vessel
+      resolvedLolAmount = data.quotation.limitOfLiabilityVesselAmounts[data.vessel.id]
     }
 
     // Amount rendered with its wording in parentheses, e.g. "50,000,000 (US Dollars Fifty Million Only)"
@@ -2494,8 +2508,12 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
       const resolvedAmount = (policyVesselId && d.vesselAmounts && d.vesselAmounts[policyVesselId] != null)
         ? d.vesselAmounts[policyVesselId]
         : d.amount
+      // Per-vessel secondary amount (fleet quotes) — falls back to the deductible's own value
+      const resolvedSecondary = (policyVesselId && d.vesselSecondaryAmounts && d.vesselSecondaryAmounts[policyVesselId] != null)
+        ? d.vesselSecondaryAmounts[policyVesselId]
+        : d.secondaryAmount
       const replDed = (text: string, cur: string, amt: number | undefined | null) => { const a = amt != null ? polFormatCurrency(amt, cur) : '___'; return text.replace(/\{currency\}\s*\{amount\}/g, a).replace(/\{currency\}/g, cur).replace(/\{amount\}/g, a) }
-      const mainDesc = replDed(d.description, d.currency, d.secondaryAmount)
+      const mainDesc = replDed(d.description, d.currency, resolvedSecondary)
       dedRows.push(new TableRow({
         children: [
           new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(resolvedAmount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
@@ -2503,10 +2521,10 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
         ]
       }))
       if (d.secondaryDescription) {
-        const secDesc = replDed(d.secondaryDescription, d.currency, d.secondaryAmount)
+        const secDesc = replDed(d.secondaryDescription, d.currency, resolvedSecondary)
         dedRows.push(new TableRow({
           children: [
-            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: d.secondaryAmount != null ? polFormatCurrency(d.secondaryAmount, d.currency) : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
+            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: resolvedSecondary != null ? polFormatCurrency(resolvedSecondary, d.currency) : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
             new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
           ]
         }))
@@ -2853,10 +2871,12 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
+  // Exclusions are already narrowed to the policy's selected alternative at load time.
+  // Only legacy policies with no recorded alternative fall back to the first one.
   const hasAltExclusions = data.piAlternatives.length > 0
-  const firstAltId = data.piAlternatives.length > 0 ? data.piAlternatives[0].id : null
+  const exclAltId = data.policy.selectedAlternativeId || (hasAltExclusions ? data.piAlternatives[0].id : null)
   for (const se of data.selectedExclusions) {
-    if (hasAltExclusions && se.alternativeId && se.alternativeId !== firstAltId) continue
+    if (hasAltExclusions && se.alternativeId && se.alternativeId !== exclAltId) continue
     if (se.customText) exclusionsContent.push(polBulletP(decodeHtmlEntities(se.customText)))
     else if (se.piExclusionId) {
       const found = data.allExclusions.find(e => e.id === se.piExclusionId)
@@ -2864,7 +2884,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     }
   }
   for (const ce of data.customExclusions) {
-    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== firstAltId) continue
+    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== exclAltId) continue
     exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
   if (exclusionsContent.length > 0) addRow('exclusions', makeRow('Exclusions', exclusionsContent))
@@ -2904,15 +2924,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   if (data.quotation.ncbEnabled && data.quotation.ncbText && !data.vessel?.ncbExcluded) {
     const ncbContent: (Paragraph | Table)[] = []
     let ncbText = decodeHtmlEntities(htmlToPlainText(data.quotation.ncbText))
+    // {ncb_amount} follows the discount TYPE (mirrors the quotation export): a fixed amount
+    // for amount-type, "X%" for percentage-type — a stale value of the other type is ignored.
     const ncbPct = data.quotation.ncbDiscountPercent
     const ncbAmt = data.quotation.ncbDiscountAmount
+    const ncbIsAmount = data.quotation.ncbDiscountType === 'amount'
     if (ncbPct != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(ncbPct))
-    if (ncbAmt != null) {
-      ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
-    } else if (ncbPct != null) {
-      // If discount is percentage-based, resolve {ncb_amount} to "X%"
-      ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
-    }
+    if (ncbIsAmount && ncbAmt != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
+    else if (!ncbIsAmount && ncbPct != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
     ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
     ncbContent.push(...ncbText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
     addRow('ncb', makeRow('No Claims\nBonus (NCB)', ncbContent))
@@ -2922,11 +2941,39 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   if (data.quotation.upccEnabled && data.quotation.upccText && !data.vessel?.upccExcluded) {
     const upccContent: (Paragraph | Table)[] = []
     let upccText = decodeHtmlEntities(htmlToPlainText(data.quotation.upccText))
+    const upccIsAmount = data.quotation.upccDiscountType === 'amount'
     if (data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
-    if (data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
+    if (upccIsAmount && data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
+    else if (!upccIsAmount && data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_amount\}/g, `${data.quotation.upccDiscountPercent}%`)
     upccText = upccText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
     upccContent.push(...upccText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
     addRow('upcc', makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
+  }
+
+  // EXTRA DISCOUNTS (beyond NCB/UPCC) — wording with {amount}/{percentage} resolved against
+  // this vessel's premium. A targeted discount is placed right under its target section.
+  const targetedDiscountRows: { target: string; row: TableRow }[] = []
+  if ((data.discounts || []).length > 0) {
+    const q = data.quotation
+    const cur = q.premiumCurrency || 'USD'
+    const tech = data.vessel?.premiumAmount || q.premiumAmount || 0
+    // Base after NCB/UPCC (no extra discounts), then each discount reduces it in order
+    let base = computePayablePremium(tech, q, [], data.vessel)
+    for (const d of data.discounts || []) {
+      const ded = d.discountType === 'amount' ? (d.amount || 0) : base * (d.percent || 0) / 100
+      base -= ded
+      if (!d.text) continue
+      const pctStr = `${d.percent || 0}%`
+      const resolved = decodeHtmlEntities(htmlToPlainText(d.text))
+        .replace(/\{amount\}/g, polFormatCurrency(Math.round(ded * 100) / 100, cur))
+        .replace(/\{percentage\}/g, pctStr)
+        .replace(/\{percent\}/g, pctStr)
+        .replace(/\{currency\}/g, cur)
+      const dContent = resolved.split('\n').filter(l => l.trim()).map(l => polNp(l))
+      if (dContent.length === 0) continue
+      if (d.targetSection) targetedDiscountRows.push({ target: d.targetSection, row: makeRow('', dContent) })
+      else addRow(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
+    }
   }
 
   // PREMIUM PAYMENT
@@ -2936,6 +2983,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Emit sections in the configured order. Any section whose key isn't in the configured
   // order (e.g. a War policy's sanctions section) is anchored right after its original
   // preceding section, so it keeps its natural position instead of jumping to the end.
+  // Targeted discounts: insert directly after their target section (untitled, so they read as
+  // the end of that section); unknown target → appended at the end
+  for (const td of targetedDiscountRows) {
+    const at = secList.findIndex(s => s.key === td.target)
+    const entry = { key: `discount-in:${td.target}:${at}`, row: td.row }
+    if (at >= 0) secList.splice(at + 1, 0, entry)
+    else secList.push(entry)
+  }
   const policySecDefault: string[] = data.frozen?.sectionOrderDefault || []
   const secOrder = resolvePolicySectionOrder(data, policySecDefault)
   const inOrder = new Set(secOrder)
@@ -3674,10 +3729,13 @@ async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fil
   const showIvSplit = data.quotation.ivEnabled === true && ivPremRaw > 0
   const premiumContent: (Paragraph | Table)[] = []
   if (showIvSplit) {
-    let ivPay = ivPremRaw
-    if (data.quotation.ncbEnabled && data.quotation.ncbDiscountPercent) ivPay *= (1 - data.quotation.ncbDiscountPercent / 100)
-    if (data.quotation.upccEnabled && data.quotation.upccDiscountPercent) ivPay *= (1 - data.quotation.upccDiscountPercent / 100)
-    ivPay = Math.round(ivPay * 100) / 100
+    // Fleet quotes: IV is a fleet-level amount, so this vessel carries its share
+    // (in proportion to the vessels' own premiums, evenly if none are set)
+    const qvs = data.quotationVessels
+    const sumVP = qvs.reduce((s, v) => s + (v.premiumAmount || 0), 0)
+    const ivShare = qvs.length <= 1 || !data.vessel ? ivPremRaw
+      : (sumVP > 0 ? ivPremRaw * (data.vessel.premiumAmount || 0) / sumVP : ivPremRaw / qvs.length)
+    const ivPay = computePayablePremium(ivShare, data.quotation, data.discounts || [], data.vessel)
     const hmPay = Math.round((totalPremium - ivPay) * 100) / 100
     premiumContent.push(...polBuildAmountBreakdown(
       [{ label: 'Section A: H&M', amount: hmPay }, { label: 'Section B: IV', amount: ivPay }],

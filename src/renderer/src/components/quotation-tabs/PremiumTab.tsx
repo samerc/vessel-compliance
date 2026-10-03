@@ -530,7 +530,14 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                                 updateField('premiumAmount', proRata)
                                             }
                                         }} style={{ width: '70px', padding: '4px 8px', fontSize: '0.82rem' }} />
-                                        <button onClick={() => { setQ(p => ({ ...p, isProRata: false })); updateField('isProRata', false) }} style={{ fontSize: '0.72rem', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Disable pro-rata</button>
+                                        <button onClick={() => {
+                                            // Back to an annual premium: restore the full-year amount (the field shows "p.a."),
+                                            // otherwise the pro-rata figure would be quoted as if it were annual
+                                            const annual = quotation.annualPremiumAmount
+                                            setQ(p => ({ ...p, isProRata: false, ...(annual ? { premiumAmount: annual } : {}) }))
+                                            updateField('isProRata', false)
+                                            if (annual) updateField('premiumAmount', annual)
+                                        }} style={{ fontSize: '0.72rem', color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Disable pro-rata</button>
                                     </div>
                                 </>
                             ) : (
@@ -554,7 +561,17 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency} p.a.</span>
                                         </div>
                                     )}
-                                    <button onClick={() => { setQ(p => ({ ...p, isProRata: true, proRataMonths: parsePeriodMonths(quotation.periodText) || undefined })); updateField('isProRata', true); updateField('proRataMonths', parsePeriodMonths(quotation.periodText) || null) }} style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline', alignSelf: 'flex-start' }}>Enable pro-rata premium</button>
+                                    <button onClick={() => {
+                                        // The current premium is annual — keep it as the annual figure and charge the pro-rata share
+                                        const months = parsePeriodMonths(quotation.periodText) || null
+                                        const annual = quotation.annualPremiumAmount || quotation.premiumAmount || null
+                                        const proRata = annual && months ? Math.round(annual / 12 * months * 100) / 100 : (quotation.premiumAmount ?? null)
+                                        setQ(p => ({ ...p, isProRata: true, proRataMonths: months || undefined, annualPremiumAmount: annual || undefined, premiumAmount: proRata || undefined }))
+                                        updateField('isProRata', true)
+                                        updateField('proRataMonths', months)
+                                        if (annual) updateField('annualPremiumAmount', annual)
+                                        updateField('premiumAmount', proRata)
+                                    }} style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline', alignSelf: 'flex-start' }}>Enable pro-rata premium</button>
                                 </>
                             )}
                         </div>

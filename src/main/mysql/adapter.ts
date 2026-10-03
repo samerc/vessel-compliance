@@ -4,8 +4,40 @@ import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
 import { DocumentType, Fleet, Vessel, VesselDocument, Entity, AssuredRole, VesselAssured, EntityUBO, User, ConditionSurvey, SurveyDefect, SurveyAttachment, Surveyor, PaginatedResult, VesselQueryParams, EntityQueryParams, SurveyorQueryParams, ComplianceResultQueryParams, VesselCustomDocType, PolicyType, VesselPolicy, DABQueryCriteria, PIClause, PIClauseSet, PIWarranty, PIWarrantyTag, PIDeductible, PIDeductibleSet, PIDeductibleSetItem, PIExclusion, PISubLimitTemplate, PIAdditionalClause, PIAdditionalClauseSet, TradingExcludedCountry, TradingWarrantyTemplate, Quotation, PISanctionsVersion, InstalmentDefaults, ClassificationSociety, VesselClassification, VesselType, VesselAuditEntry, PolicyTypeCharacteristic, PolicyTypeCondition, VesselDynamicPolicy, VesselPolicyValue, QuotationVessel, QuotationType, EntityAddress, UserGroup, AnalyticsPreset, AnalyticsFilters, PremiumTextTemplate, TradingCustomText, SavedReport, ReportConfig, EntityDocumentType, EntityDocument } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
+import { addMonthsISO } from '../../shared/premium'
 // @ts-ignore
 import schemaSql from './schema.sql?raw'
+
+// Content columns copied verbatim when a quotation is revised, duplicated or renewed.
+// One list for all three so a new quotation column cannot be forgotten in one of them.
+// (Identity/state columns - id, reference, date, status, title, revision, lock, snapshot,
+// created_by - are set by each caller.)
+const QUOTATION_CONTENT_COLS = [
+    'quotation_type_id', 'policy_type_id', 'vessel_id', 'is_renewal', 'period_text',
+    'limit_of_liability_amount', 'limit_of_liability_currency', 'limit_of_liability_text', 'limit_of_liability_vessel_amounts',
+    'premium_amount', 'premium_currency', 'num_instalments',
+    'trading_warranty_intro', 'trading_show_excluded', 'trading_show_ddq_list', 'trading_show_ddq_warranties', 'trading_show_israel',
+    'trading_custom_text', 'trading_custom_mode', 'trading_custom_wording',
+    'sanctions_clause_version', 'vdr_deductible_enabled',
+    'deductible_aggregate_enabled', 'deductible_aggregate_text', 'validity_days',
+    'premium_additional_text', 'ncb_enabled', 'ncb_discount_type', 'ncb_discount_percent',
+    'ncb_discount_amount', 'ncb_text', 'cpc_enabled', 'cpc_discount_type', 'cpc_discount_percent',
+    'cpc_discount_amount', 'cpc_text', 'non_refundable_type', 'non_refundable_percent',
+    'agreed_value', 'agreed_value_currency', 'iv_enabled', 'iv_value', 'iv_currency', 'iv_premium_amount',
+    'hull_clause_id', 'iv_clause_id', 'co_name',
+    'customer_entity_id', 'customer_type',
+    'section_texts_override', 'sanctions_text_override', 'section_order',
+    'insured_value_amount', 'insured_value_currency', 'insured_value_text',
+    'port_of_loading', 'port_of_destination', 'estimated_departure', 'estimated_type',
+    'subject_matter', 'any_other_vessel', 'premium_rate', 'premium_type', 'voyage_text',
+    'cargo_clause_id',
+    'war_excess_enabled', 'war_excess_amount', 'war_excess_rate', 'war_section2_only',
+    'war_section1_text', 'war_section2_text', 'war_combined_limit_text',
+    'outstanding_premium_enabled', 'outstanding_premium_text', 'outstanding_premium_bold', 'outstanding_premium_underline',
+    'full_premium_loss_enabled', 'full_premium_loss_text',
+    'is_pro_rata', 'annual_premium_amount', 'pro_rata_months',
+    'previous_premium_amount', 'subjectivity_days'
+]
 
 export class MySQLAdapter {
     pool: Pool | null = null
@@ -8930,6 +8962,28 @@ export class MySQLAdapter {
                 return JSON.stringify(ids.map((id: string) => vesselIdMap[id] || id))
             } catch { return scope }
         }
+        // Helper to remap a JSON object keyed by quotation_vessels.id (per-vessel amounts).
+        // Without this the copy keeps the SOURCE vessel ids and every per-vessel value is lost.
+        const remapVesselMap = (raw: string | null): string | null => {
+            if (!raw) return null
+            try {
+                const obj = JSON.parse(raw)
+                if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return raw
+                const out: Record<string, unknown> = {}
+                for (const [k, v] of Object.entries(obj)) out[vesselIdMap[k] || k] = v
+                return JSON.stringify(out)
+            } catch { return raw }
+        }
+        const VESSEL_MAP_COLS = new Set(['vessel_amounts', 'vessel_secondary_amounts'])
+
+        // Quotation-level per-vessel LOL map (copied raw with the main row by the callers)
+        try {
+            const [lolRows] = await this.pool.query('SELECT limit_of_liability_vessel_amounts AS m FROM quotations WHERE id = ?', [newId])
+            const lolRaw = (lolRows as any[])[0]?.m ?? null
+            if (lolRaw) {
+                await this.pool.execute('UPDATE quotations SET limit_of_liability_vessel_amounts = ? WHERE id = ?', [remapVesselMap(lolRaw), newId])
+            }
+        } catch { /* column may not exist on very old schemas */ }
 
         // Clone quotation_pi_alternatives (need ID mapping for alternative_id on P&I tables)
         const piAltIdMap: Record<string, string> = {}
@@ -9000,6 +9054,7 @@ export class MySQLAdapter {
                     if (c === 'quotation_id') return newId
                     if (c === 'vessel_scope') return remapScope(row[c])
                     if (c === 'alternative_id') return remapAlt(row[c])
+                    if (VESSEL_MAP_COLS.has(c)) return remapVesselMap(row[c])
                     return row[c]
                 })
                 await this.pool.execute(
@@ -9088,60 +9143,17 @@ export class MySQLAdapter {
             await this.pool.execute('UPDATE quotations SET is_locked = TRUE, revision_group_id = ? WHERE id = ?', [revisionGroupId, sourceId])
 
             // Clone the main quotation row
+            const revCols = QUOTATION_CONTENT_COLS.join(', ')
             await this.pool.execute(`
                 INSERT INTO quotations (
-                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
-                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, limit_of_liability_vessel_amounts, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, trading_custom_mode, trading_custom_wording,
-                    sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, title,
-                    customer_entity_id, customer_type,
-                    section_texts_override, sanctions_text_override, section_order,
+                    id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id,
-                    war_excess_enabled, war_excess_amount, war_excess_rate, war_section2_only,
-                    war_section1_text, war_section2_text, war_combined_limit_text,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    full_premium_loss_enabled, full_premium_loss_text,
-                    is_pro_rata, annual_premium_amount, pro_rata_months,
-                    previous_premium_amount, subjectivity_days
+                    ${revCols}
                 )
                 SELECT
-                    ?, ?, quotation_type_id, quotation_date, policy_type_id, vessel_id,
-                    is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, limit_of_liability_vessel_amounts, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, trading_custom_mode, trading_custom_wording,
-                    sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, title,
-                    customer_entity_id, customer_type,
-                    section_texts_override, sanctions_text_override, section_order,
+                    ?, ?, quotation_date, 'draft', title,
                     ?, ?, FALSE, NULL, created_by,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id,
-                    war_excess_enabled, war_excess_amount, war_excess_rate, war_section2_only,
-                    war_section1_text, war_section2_text, war_combined_limit_text,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    full_premium_loss_enabled, full_premium_loss_text,
-                    is_pro_rata, annual_premium_amount, pro_rata_months,
-                    previous_premium_amount, subjectivity_days
+                    ${revCols}
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newRevisionNumber, revisionGroupId, sourceId])
 
@@ -9205,45 +9217,20 @@ export class MySQLAdapter {
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
-            // Clone the main quotation row — new revision group, revision 0, draft status
+            // Clone the main quotation row — new revision group, revision 0, draft status.
+            // Copies the same content columns as a revision (war excess, custom trading wording,
+            // pro-rata, outstanding/full-loss notices, customer, per-vessel LOL, ...).
+            const dupCols = QUOTATION_CONTENT_COLS.join(', ')
             await this.pool.execute(`
                 INSERT INTO quotations (
-                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
-                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, title,
-                    section_texts_override, sanctions_text_override, section_order,
+                    id, reference_number, quotation_date, status, title,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id
+                    ${dupCols}
                 )
                 SELECT
-                    ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
-                    is_renewal, 'draft', period_text, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, NULL,
-                    section_texts_override, sanctions_text_override, section_order,
+                    ?, ?, CURDATE(), 'draft', NULL,
                     0, ?, FALSE, NULL, created_by,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id
+                    ${dupCols}
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newId, sourceId])
 
@@ -9271,12 +9258,9 @@ export class MySQLAdapter {
         // Auto-generate new draft reference number (fills gaps from deleted drafts)
         const newRef = await this.nextDraftRef(source.quotationTypeCode)
 
-        // Calculate new period: add 1 year to inception/expiry
-        const addOneYear = (dateStr: string): string => {
-            const d = new Date(dateStr)
-            d.setFullYear(d.getFullYear() + 1)
-            return d.toISOString().split('T')[0]
-        }
+        // Calculate new period: add 1 year to inception/expiry (string math, no timezone
+        // shift; 29 Feb clamps to 28 Feb)
+        const addOneYear = (dateStr: string): string => addMonthsISO(String(dateStr).slice(0, 10), 12)
 
         let newPeriodText = source.periodText || null
         if (policy.inceptionDate && policy.expiryDate) {
@@ -9287,55 +9271,21 @@ export class MySQLAdapter {
 
         await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
         try {
-            // 3. Clone the main quotation row
+            // 3. Clone the main quotation row (same content columns as a revision). The renewal
+            //    overrides period/is_renewal and records the expiring premium as previous.
+            const renewCols = QUOTATION_CONTENT_COLS.filter(c => c !== 'period_text' && c !== 'is_renewal' && c !== 'previous_premium_amount')
             await this.pool.execute(`
                 INSERT INTO quotations (
-                    id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id,
-                    is_renewal, status, period_text, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, title,
-                    section_texts_override, sanctions_text_override, section_order,
+                    id, reference_number, quotation_date, status, title, period_text, is_renewal,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
-                    renewed_from_policy_id, renewed_from_policy_number,
-                    trading_custom_mode, trading_custom_wording,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id, previous_premium_amount,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    is_pro_rata, annual_premium_amount, pro_rata_months,
-                    full_premium_loss_enabled, full_premium_loss_text
+                    renewed_from_policy_id, renewed_from_policy_number, previous_premium_amount,
+                    ${renewCols.join(', ')}
                 )
                 SELECT
-                    ?, ?, quotation_type_id, CURDATE(), policy_type_id, vessel_id,
-                    TRUE, 'draft', ?, limit_of_liability_amount, limit_of_liability_currency,
-                    limit_of_liability_text, premium_amount, premium_currency, num_instalments,
-                    trading_warranty_intro, trading_show_excluded, trading_show_ddq_list, trading_show_ddq_warranties, trading_show_israel,
-                    trading_custom_text, sanctions_clause_version, vdr_deductible_enabled,
-                    deductible_aggregate_enabled, deductible_aggregate_text, validity_days,
-                    premium_additional_text, ncb_enabled, ncb_discount_type, ncb_discount_percent,
-                    ncb_discount_amount, ncb_text, cpc_enabled, cpc_discount_type, cpc_discount_percent,
-                    cpc_discount_amount, cpc_text, non_refundable_type, non_refundable_percent,
-                    agreed_value, agreed_value_currency, iv_enabled, iv_value, iv_currency, iv_premium_amount,
-                    hull_clause_id, iv_clause_id, co_name, NULL,
-                    section_texts_override, sanctions_text_override, section_order,
+                    ?, ?, CURDATE(), 'draft', NULL, ?, TRUE,
                     0, ?, FALSE, NULL, ?,
-                    ?, ?,
-                    trading_custom_mode, trading_custom_wording,
-                    insured_value_amount, insured_value_currency, insured_value_text,
-                    port_of_loading, port_of_destination, estimated_departure, estimated_type,
-                    subject_matter, any_other_vessel, premium_rate, premium_type, voyage_text,
-                    cargo_clause_id, premium_amount,
-                    outstanding_premium_enabled, outstanding_premium_text, outstanding_premium_bold, outstanding_premium_underline,
-                    is_pro_rata, annual_premium_amount, pro_rata_months,
-                    full_premium_loss_enabled, full_premium_loss_text
+                    ?, ?, premium_amount,
+                    ${renewCols.join(', ')}
                 FROM quotations WHERE id = ?
             `, [newId, newRef, newPeriodText, newId, createdBy, policyId, policy.policyNumber || null, source.id])
 
@@ -9491,35 +9441,47 @@ export class MySQLAdapter {
         // Assureds are NOT merged here — copying them from source quotations cross-contaminates
         // (a multi-vessel source carries every vessel's assureds) and misses registry changes.
         // They are rebuilt authoritatively from each vessel's registry after this loop.
+        const primarySourceQId = quotationMap.get(primaryVesselId) || null
         for (const vid of vesselIds) {
             if (vid === primaryVesselId) continue
             const sourceQId = quotationMap.get(vid)
             if (!sourceQId) continue // no source policy → nothing to merge
+            // Same source quotation as the primary → already fully cloned by renewPolicy
+            // (premiums, values, warranties). Merging again would duplicate custom warranties.
+            if (sourceQId === primarySourceQId && existingVesselDbIds.has(vid)) continue
 
             // Merge from source quotation
             const sourceQ = await this.getQuotation(sourceQId)
             if (!sourceQ) continue
 
-            // Merge per-vessel premium
+            // This vessel's own row in the source quotation — a fleet source quotation's
+            // premium_amount is the FLEET total, so per-vessel figures must come from here.
+            const sourceQVs = await this.getQuotationVessels(sourceQId)
+            const srcQv = sourceQVs.find(v => v.vesselId === vid) || (sourceQVs.length === 1 ? sourceQVs[0] : null)
+            const vesselPremium = srcQv?.premiumAmount ?? (sourceQVs.length <= 1 ? sourceQ.premiumAmount : null) ?? null
+            const vesselAgreed = srcQv?.agreedValue ?? (sourceQVs.length <= 1 ? sourceQ.agreedValue : null) ?? null
+            const vesselIv = srcQv?.ivValue ?? (sourceQVs.length <= 1 ? sourceQ.ivValue : null) ?? null
+
+            // Merge per-vessel premium (also the renewal comparison's previous premium)
             const qvId = vesselIdToQvId.get(vid)
-            if (qvId && sourceQ.premiumAmount) {
+            if (qvId && vesselPremium) {
                 await this.pool.execute(
-                    'UPDATE quotation_vessels SET premium_amount = ? WHERE id = ?',
-                    [sourceQ.premiumAmount, qvId]
+                    'UPDATE quotation_vessels SET premium_amount = ?, previous_premium = ? WHERE id = ?',
+                    [vesselPremium, vesselPremium, qvId]
                 )
             }
 
             // Merge per-vessel agreed value
-            if (qvId && sourceQ.agreedValue) {
+            if (qvId && vesselAgreed) {
                 await this.pool.execute(
                     'UPDATE quotation_vessels SET agreed_value = ? WHERE id = ?',
-                    [sourceQ.agreedValue, qvId]
+                    [vesselAgreed, qvId]
                 )
             }
-            if (qvId && sourceQ.ivValue) {
+            if (qvId && vesselIv) {
                 await this.pool.execute(
                     'UPDATE quotation_vessels SET iv_value = ? WHERE id = ?',
-                    [sourceQ.ivValue, qvId]
+                    [vesselIv, qvId]
                 )
             }
 
@@ -9540,11 +9502,16 @@ export class MySQLAdapter {
                 }
             }
 
-            // Merge custom warranties
+            // Merge custom warranties (skip text already present — fleet renewals often share them)
             const sourceCustomWarranties = await this.getQuotationCustomWarranties(sourceQId)
+            const existingCustom = await this.getQuotationCustomWarranties(newQuotationId)
+            const existingCustomTexts = new Set(existingCustom.map((w: any) => (w.text || '').trim()))
             await this.pool.query('SET FOREIGN_KEY_CHECKS=0')
             try {
                 for (const cw of sourceCustomWarranties) {
+                    const cwText = (cw.text || '').trim()
+                    if (existingCustomTexts.has(cwText)) continue
+                    existingCustomTexts.add(cwText)
                     const vesselScope = qvId ? JSON.stringify([qvId]) : null
                     await this.pool.execute(
                         'INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
@@ -11802,6 +11769,9 @@ export class MySQLAdapter {
         // Per-policy subjectivity selection (quotation_subjectivity IDs to keep).
         // undefined/null = keep all (legacy); [] = none → renders "NIL"; [ids] = only those.
         selectedSubjectivityIds?: string[] | null
+        // Per-vessel payable premium + instalment amounts (same dates as `instalments`).
+        // Each vessel becomes its own policy, so each needs its own figures.
+        perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
     }): Promise<any[]> {
         if (!this.pool) throw new Error('DB not connected')
 
@@ -11829,9 +11799,22 @@ export class MySQLAdapter {
             const policyNumber = typeCode ? `POL-DRAFT-${typeCode}-${String(polDraftSeq).padStart(4, '0')}` : `POL-DRAFT-${String(polDraftSeq).padStart(4, '0')}`
             const policyId = uuidv4()
 
-            // Get payable premium: explicit amount → instalment sum → vessel premium → quotation premium
-            const instalmentSum = options.instalments.reduce((sum, inst) => sum + (inst.premiumAmount || 0), 0)
-            const premiumAmount = (options as any).premiumAmount || (instalmentSum > 0 ? instalmentSum : (vessel?.premiumAmount || quotation.premiumAmount || 0))
+            // This vessel's own premium + instalments when the wizard sent a per-vessel split
+            // (legacy callers send one shared set, which is only right for a single vessel).
+            const pv = options.perVessel?.[vid] || (vessel?.vesselId ? options.perVessel?.[vessel.vesselId] : undefined) || (vessel ? options.perVessel?.[vessel.id] : undefined)
+            const commPct = Number(options.commissionPercent) || 0
+            const vesselInstalments = pv
+                ? options.instalments.map((inst, i) => {
+                    const amt = pv.instalmentAmounts[i] ?? 0
+                    return { ...inst, premiumAmount: amt, commissionAmount: Math.round(amt * commPct / 100 * 100) / 100 }
+                })
+                : options.instalments
+
+            // Payable premium: per-vessel → explicit amount → instalment sum → vessel premium → quotation premium
+            const instalmentSum = vesselInstalments.reduce((sum, inst) => sum + (inst.premiumAmount || 0), 0)
+            const premiumAmount = pv
+                ? pv.premiumAmount
+                : ((options as any).premiumAmount || (instalmentSum > 0 ? instalmentSum : (vessel?.premiumAmount || quotation.premiumAmount || 0)))
 
             await this.pool.execute(`
                 INSERT INTO policy_documents (id, quotation_id, vessel_id, policy_number, status,
@@ -11859,8 +11842,8 @@ export class MySQLAdapter {
                 options.selectedSubjectivityIds != null ? JSON.stringify(options.selectedSubjectivityIds) : null])
 
             // Create instalments
-            for (let i = 0; i < options.instalments.length; i++) {
-                const inst = options.instalments[i]
+            for (let i = 0; i < vesselInstalments.length; i++) {
+                const inst = vesselInstalments[i]
                 await this.pool.execute(`
                     INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number,
                         due_date, premium_amount, commission_amount, is_non_refundable)

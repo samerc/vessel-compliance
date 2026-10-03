@@ -594,11 +594,23 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
             ? renewals.filter(r => r.policyTypeId === policyTypeFilter || (filterPt && r.policyTypeName === filterPt.name))
             : renewals
         const total = data.length
-        const totalPremium = data.reduce((sum: number, r: any) => sum + (Number(r.premium) || 0), 0)
-        const avgPremium = total > 0 ? totalPremium / total : 0
+        // Premiums are summed PER CURRENCY — adding USD and EUR together is meaningless
+        const byCurrency = new Map<string, { sum: number; count: number }>()
+        for (const r of data as any[]) {
+            const p = Number(r.premium) || 0
+            if (p <= 0) continue
+            const cur = r.currency || 'USD'
+            const e = byCurrency.get(cur) || { sum: 0, count: 0 }
+            e.sum += p; e.count++
+            byCurrency.set(cur, e)
+        }
+        const curs = [...byCurrency.entries()].sort((a, b) => b[1].sum - a[1].sum)
+        const fmtCur = (cur: string, n: number) => `${cur} ${Math.round(n).toLocaleString()}`
+        const totalPremiumLabel = curs.length > 0 ? curs.map(([c, e]) => fmtCur(c, e.sum)).join(' · ') : '--'
+        const avgPremiumLabel = curs.length > 0 ? curs.map(([c, e]) => fmtCur(c, e.sum / e.count)).join(' · ') : '--'
         const withStatus = data.filter((r: any) => r.renewalStatusName)
         const renewalRate = total > 0 ? Math.round((withStatus.length / total) * 100) : 0
-        return { total, totalPremium, avgPremium, renewalRate }
+        return { total, totalPremiumLabel, avgPremiumLabel, renewalRate }
     }, [renewals, policyTypeFilter])
 
     const exportToExcel = async () => {
@@ -874,14 +886,14 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                     icon={<DollarSign size={20} color="#fff" />}
                     gradient={G.green}
                     label="Total Premium"
-                    value={kpis.totalPremium > 0 ? `$${Math.round(kpis.totalPremium).toLocaleString()}` : '--'}
+                    value={kpis.totalPremiumLabel}
                     sub="combined value"
                 />
                 <KPI
                     icon={<TrendingUp size={20} color="#fff" />}
                     gradient={G.amber}
                     label="Avg Premium"
-                    value={kpis.avgPremium > 0 ? `$${Math.round(kpis.avgPremium).toLocaleString()}` : '--'}
+                    value={kpis.avgPremiumLabel}
                     sub="per policy"
                 />
                 <KPI

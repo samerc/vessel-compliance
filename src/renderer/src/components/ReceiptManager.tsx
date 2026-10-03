@@ -258,7 +258,13 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const [numberPreview, setNumberPreview] = useState(editing?.receiptNumber || '')
   const [numberOverride, setNumberOverride] = useState(!!editing)
   const [beingOverride, setBeingOverride] = useState<string | null>(editing?.beingText ?? null)
-  const [wordsOverride, setWordsOverride] = useState<string | null>(editing?.amountWords ?? null)
+  // Saved words that are just the auto wording of the saved amount are NOT an override —
+  // otherwise editing the amount would keep printing the old figure in words.
+  const [wordsOverride, setWordsOverride] = useState<string | null>(() => {
+    const saved = editing?.amountWords ?? null
+    if (saved == null || editing?.amount == null) return saved
+    return saved.trim() === numberToWords(Number(editing.amount), editing.currency ?? 'USD').trim() ? null : saved
+  })
   const [city, setCity] = useState(editing?.city || 'BEIRUT')
 
   // Load vessels + next number + settings once
