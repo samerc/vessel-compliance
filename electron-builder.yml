@@ -38,6 +38,12 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
+# Hardening: the packaged app can no longer be started as a plain Node runtime or have code
+# injected through NODE_OPTIONS / --inspect (the app itself never uses these)
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
 publish:
   provider: github
   releaseType: release

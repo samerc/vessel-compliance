@@ -15,7 +15,7 @@ import {
   rmSync,
   mkdirSync
 } from 'fs'
-import { join } from 'path'
+import { join, resolve, dirname, sep } from 'path'
 
 const USER_DATA = app.getPath('userData')
 const HOT_UPDATE_DIR = join(USER_DATA, 'hot-update')
@@ -215,15 +215,18 @@ class HotUpdateService {
       const zip = await JSZip.loadAsync(zipBuffer)
       const entries = Object.keys(zip.files)
 
+      const root = resolve(extractDir) + sep
       for (const entryPath of entries) {
         const entry = zip.files[entryPath]
+        // Zip Slip guard: an entry like "../../x" must not write outside the staging folder
+        const target = resolve(extractDir, entryPath)
+        if (!target.startsWith(root)) throw new Error(`Unsafe path in update archive: ${entryPath}`)
         if (entry.dir) {
-          mkdirSync(join(extractDir, entryPath), { recursive: true })
+          mkdirSync(target, { recursive: true })
         } else {
-          const dir = join(extractDir, entryPath, '..')
-          mkdirSync(dir, { recursive: true })
+          mkdirSync(dirname(target), { recursive: true })
           const content = await entry.async('nodebuffer')
-          writeFileSync(join(extractDir, entryPath), content)
+          writeFileSync(target, content)
         }
       }
 
