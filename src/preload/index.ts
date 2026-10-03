@@ -164,8 +164,9 @@ const api = {
   setupGetConfigPath: () => ipcRenderer.invoke('setup:getConfigPath'),
   setupLoadConfigFromDir: (directory: string) => ipcRenderer.invoke('setup:loadConfigFromDir', directory),
   setupLoadConfigFromFile: (filePath: string) => ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
-  onDbStatus: (callback) => ipcRenderer.on('app:db-status', (_, status) => callback(status)),
-  onHotUpdateAvailable: (callback) => ipcRenderer.on('hotUpdate:available', (_, version) => callback(version)),
+  // Both return an unsubscribe function (React effects remove their listener on unmount)
+  onDbStatus: (callback) => { const h = (_, status) => callback(status); ipcRenderer.on('app:db-status', h); return () => ipcRenderer.removeListener('app:db-status', h) },
+  onHotUpdateAvailable: (callback) => { const h = (_, version) => callback(version); ipcRenderer.on('hotUpdate:available', h); return () => ipcRenderer.removeListener('hotUpdate:available', h) },
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),

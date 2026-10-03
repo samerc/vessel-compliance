@@ -212,9 +212,10 @@ function App(): React.JSX.Element {
   useEffect(() => {
     window.api.setupCheckConnection().then(setDbConnected)
     window.api.updateGetCurrentVersion().then(setAppVersion)
-    window.api.onDbStatus((status) => { setDbConnected(status.connected) })
-    window.api.onHotUpdateAvailable(() => { setHotUpdateAvailable(true) })
+    const offDb = window.api.onDbStatus((status) => { setDbConnected(status.connected) })
+    const offHot = window.api.onHotUpdateAvailable(() => { setHotUpdateAvailable(true) })
     window.api.hotUpdateGetInfo().then(info => { setHotBuildNumber(info.currentBuild) }).catch(() => {})
+    return () => { offDb?.(); offHot?.() }
   }, [])
 
   useEffect(() => {

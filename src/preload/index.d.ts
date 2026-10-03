@@ -25,8 +25,8 @@ export interface Api {
   setupGetConfigPath: () => Promise<string | null>
   setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
   setupLoadConfigFromFile: (filePath: string) => Promise<{ success: boolean; message?: string }>
-  onDbStatus: (callback: (status: { connected: boolean }) => void) => void
-  onHotUpdateAvailable: (callback: (version: any) => void) => void
+  onDbStatus: (callback: (status: { connected: boolean }) => void) => () => void
+  onHotUpdateAvailable: (callback: (version: any) => void) => () => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>

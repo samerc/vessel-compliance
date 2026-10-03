@@ -2230,7 +2230,9 @@ app.whenReady().then(() => {
         threshold: effectiveThreshold,
         sources: sources?.map(s => s.toUpperCase()),
         limit: 20,
-        mode: 'both'
+        mode: 'both',
+        // Only matches >= effectiveThreshold are returned below, so the fast prefilter is exact
+        minScore: effectiveThreshold
       })
 
       const matches = data.results

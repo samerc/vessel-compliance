@@ -346,15 +346,22 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
             const pMap = new Map<string, VesselDynamicPolicy[]>()
             const cMap = new Map<string, string[]>()
             if (selectedPolicyTypes.length > 0 || policyStatus !== 'all') {
-                for (const v of vessels) {
-                    const p = await window.api.getVesselDynamicPolicies(v.id)
-                    if (p.length > 0) pMap.set(v.id, p)
+                // One bulk query (policies + values) instead of one round-trip per vessel
+                const all = await window.api.getAllVesselDynamicPolicies()
+                for (const p of (Array.isArray(all) ? all : []) as VesselDynamicPolicy[]) {
+                    const list = pMap.get(p.vesselId)
+                    if (list) list.push(p); else pMap.set(p.vesselId, [p])
                 }
             }
             if (selectedClassifications.length > 0) {
-                for (const v of vessels) {
-                    const cls = await window.api.getVesselClassifications(v.id)
-                    if (cls.length > 0) cMap.set(v.id, cls.map((c: any) => c.classificationSocietyId))
+                // Parallel in small batches (was strictly one vessel after another)
+                const BATCH = 16
+                for (let i = 0; i < vessels.length; i += BATCH) {
+                    const chunk = vessels.slice(i, i + BATCH)
+                    const res = await Promise.all(chunk.map(v => window.api.getVesselClassifications(v.id)))
+                    res.forEach((cls, j) => {
+                        if (Array.isArray(cls) && cls.length > 0) cMap.set(chunk[j].id, cls.map((c: any) => c.classificationSocietyId))
+                    })
                 }
             }
             setVesselPolicies(pMap); setVesselClassifications(cMap)

@@ -43,20 +43,39 @@ class ComplianceScheduler {
         } catch { /* ignore */ }
     }
 
-    async runComplianceCheck(): Promise<void> {
+    // trigger 'manual' = Run Now (always runs); 'scheduled' = the weekly slot (runs only when the
+    // schedule is enabled and no other workstation has already run / is running this slot)
+    async runComplianceCheck(trigger: 'manual' | 'scheduled' = 'manual'): Promise<void> {
         if (this._isRunning) {
             console.log('Compliance check already running, skipping')
             return
         }
         this._isRunning = true
-        console.log('Starting scheduled compliance check...')
+        console.log(`Starting ${trigger} compliance check...`)
+        let releaseLock: (() => Promise<void>) | null = null
 
         try {
             const settings = await db.getComplianceScheduleSettings()
-            if (!settings.enabled) {
+            if (trigger === 'scheduled' && !settings.enabled) {
                 console.log('Compliance check is disabled, skipping')
                 return
             }
+            // Every open app runs this scheduler: only ONE workstation may run the check
+            releaseLock = await db.tryNamedLock('vc_compliance_run')
+            if (!releaseLock) {
+                if (trigger === 'manual') throw new Error('A compliance check is already running on another workstation')
+                console.log('Compliance check is running on another workstation, skipping')
+                return
+            }
+            if (trigger === 'scheduled' && settings.lastRunAt) {
+                // Another workstation already ran this weekly slot (lastRunAt is shared in the DB)
+                const sinceLast = Date.now() - new Date(settings.lastRunAt).getTime()
+                if (sinceLast < 6 * 24 * 60 * 60 * 1000) {
+                    console.log('Compliance check already ran this week on another workstation, skipping')
+                    return
+                }
+            }
+            await db.failStaleComplianceRuns().catch(() => 0)
 
             // Get all entities and optionally vessels
             const entities = await db.getEntities()
@@ -83,11 +102,13 @@ class ComplianceScheduler {
             const threshold = settings.threshold / 100 // Convert to decimal
 
             // Check entities
+            const yieldToEventLoop = () => new Promise<void>(r => setImmediate(r))
             for (const entity of entitiesToCheck) {
                 checkedCount++
                 this.sendProgress(checkedCount, totalToCheck, entity.name)
+                await yieldToEventLoop()
                 try {
-                    const data = sanctionsService.search(entity.name, { threshold: 0.6, limit: 10, mode: 'both' })
+                    const data = sanctionsService.search(entity.name, { threshold: 0.6, limit: 10, mode: 'both', minScore: threshold })
                     const highScoreMatches = data.results.filter(r => r.score >= threshold)
 
                     if (highScoreMatches.length > 0) {
@@ -133,8 +154,9 @@ class ComplianceScheduler {
             for (const vessel of vesselsToCheck) {
                 checkedCount++
                 this.sendProgress(checkedCount, totalToCheck, vessel.name)
+                await yieldToEventLoop()
                 try {
-                    const data = sanctionsService.search(vessel.name, { threshold: 0.6, limit: 10, mode: 'both' })
+                    const data = sanctionsService.search(vessel.name, { threshold: 0.6, limit: 10, mode: 'both', minScore: threshold })
                     const highScoreMatches = data.results.filter(r => r.score >= threshold)
 
                     if (highScoreMatches.length > 0) {
@@ -199,7 +221,9 @@ class ComplianceScheduler {
 
         } catch (error: any) {
             console.error('Compliance check failed:', error)
+            if (trigger === 'manual') throw error
         } finally {
+            if (releaseLock) await releaseLock().catch(() => {})
             this._isRunning = false
             this.sendProgress(0, 0, '')
         }
@@ -214,7 +238,10 @@ class ComplianceScheduler {
         }
 
         if (!db.isConnected()) {
-            console.log('Database not connected, scheduler will start after connection')
+            // start() runs at launch BEFORE the database connects. It used to give up here and
+            // nothing called it again, so the weekly check never ran. Retry until connected.
+            console.log('Database not connected yet, compliance scheduler will retry in 30 s')
+            this.checkTimer = setTimeout(() => { if (!this.stopped) this.start() }, 30000)
             return
         }
 
@@ -223,19 +250,26 @@ class ComplianceScheduler {
             if (!settings.enabled) return
 
             const now = new Date()
-            let nextRun = new Date(settings.nextRunAt)
+            let nextRun = settings.nextRunAt ? new Date(settings.nextRunAt) : new Date(NaN)
+            const lastRun = settings.lastRunAt ? new Date(settings.lastRunAt).getTime() : 0
+            const weekMs = 7 * 24 * 60 * 60 * 1000
 
-            // If next run is in the past, calculate new next run
-            if (nextRun <= now) {
-                const calculatedNext = this.calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay)
-                nextRun = new Date(calculatedNext)
+            if (isNaN(nextRun.getTime()) || nextRun <= now) {
+                // The slot passed while no app was open (or was never set): catch up shortly
+                // after launch when the last run is more than a week old, else wait for the next slot
+                if (now.getTime() - lastRun > weekMs) {
+                    nextRun = new Date(now.getTime() + 2 * 60 * 1000)
+                    console.log('Weekly compliance check was missed — running it in 2 minutes')
+                } else {
+                    nextRun = new Date(this.calculateNextRunTime(settings.dayOfWeek, settings.timeOfDay))
+                }
             }
 
-            const delay = nextRun.getTime() - now.getTime()
+            const delay = Math.max(0, nextRun.getTime() - now.getTime())
             console.log(`Compliance check scheduled for ${nextRun.toLocaleString()} (in ${Math.round(delay / 1000 / 60)} mins)`)
 
             this.checkTimer = setTimeout(async () => {
-                await this.runComplianceCheck()
+                try { await this.runComplianceCheck('scheduled') } catch { /* logged inside */ }
                 // Reschedule only if not stopped mid-check
                 if (!this.stopped) this.start()
             }, delay)

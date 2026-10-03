@@ -213,6 +213,24 @@ export class MySQLAdapter {
         await (runner || this.pool).query(`ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
     }
 
+    // Non-blocking variant: returns a release function, or null when another app instance holds
+    // the lock (used for long jobs that must run once across all workstations)
+    async tryNamedLock(name: string): Promise<(() => Promise<void>) | null> {
+        if (!this.pool) return null
+        const conn = await this.pool.getConnection()
+        try {
+            const [r] = await conn.query('SELECT GET_LOCK(?, 0) AS got', [name])
+            if (Number((r as any[])[0]?.got) !== 1) { conn.release(); return null }
+        } catch (e) { conn.release(); throw e }
+        let released = false
+        return async () => {
+            if (released) return
+            released = true
+            try { await conn.query('SELECT RELEASE_LOCK(?)', [name]) } catch { /* dies with session */ }
+            conn.release()
+        }
+    }
+
     async initSchema(): Promise<void> {
         if (!this.pool) throw new Error('Not connected')
 
@@ -2902,6 +2920,27 @@ export class MySQLAdapter {
                 // Sessions live 30 days
                 await this.pool.query('DELETE FROM user_sessions WHERE created_at < (NOW() - INTERVAL 30 DAY)')
             } catch (e) { console.error('user_sessions migration:', e) }
+
+            // Lookup indexes on hot columns that had none (policy screens, exports, renewals and
+            // customer reports filter on these; each was a full table scan). Plain ADD INDEX is
+            // cheap on these table sizes and only runs when the index is missing.
+            for (const ix of [
+                { table: 'policy_documents', name: 'idx_pd_quotation', cols: 'quotation_id' },
+                { table: 'policy_documents', name: 'idx_pd_vessel', cols: 'vessel_id' },
+                { table: 'policy_documents', name: 'idx_pd_status', cols: 'status' },
+                { table: 'policy_blue_cards', name: 'idx_pbc_policy', cols: 'policy_doc_id' },
+                { table: 'policy_doc_instalments', name: 'idx_pdi_policy', cols: 'policy_doc_id' },
+                { table: 'policy_doc_addresses', name: 'idx_pda_policy', cols: 'policy_doc_id' },
+                { table: 'vessel_dynamic_policies', name: 'idx_vdp_customer', cols: 'customer_entity_id' },
+                { table: 'vessel_dynamic_policies', name: 'idx_vdp_status', cols: 'status' },
+                { table: 'vessel_audit_log', name: 'idx_val_changed', cols: 'changed_at' },
+                { table: 'quotations', name: 'idx_q_reference', cols: 'reference_number' }
+            ]) {
+                try {
+                    const [has] = await this.pool.query(`SHOW INDEX FROM \`${ix.table}\` WHERE Key_name = ?`, [ix.name]) as any[]
+                    if ((has as any[]).length === 0) await this.pool.query(`ALTER TABLE \`${ix.table}\` ADD INDEX \`${ix.name}\` (${ix.cols})`)
+                } catch (e) { console.error(`index ${ix.name}:`, (e as any)?.message) }
+            }
 
             // Backstop for numbering: real policy and receipt numbers must be unique. Added only
             // when the data has no duplicates already (otherwise logged, never blocks startup).
@@ -6918,6 +6957,16 @@ export class MySQLAdapter {
             [id, log.totalChecked, log.status]
         )
         return id
+    }
+
+    /** Runs left "running" by a closed/crashed app never finish: mark them failed. */
+    async failStaleComplianceRuns(olderThanHours = 12): Promise<number> {
+        if (!this.pool) return 0
+        const [r] = await this.pool.execute(
+            `UPDATE compliance_check_logs SET status = 'failed' WHERE status = 'running' AND run_at < (NOW() - INTERVAL ? HOUR)`,
+            [olderThanHours]
+        )
+        return (r as any).affectedRows || 0
     }
 
     async updateComplianceCheckLog(id: string, updates: { matchesFound?: number; status?: string; error?: string }): Promise<void> {
@@ -11281,22 +11330,27 @@ export class MySQLAdapter {
             [vesselId]
         )
         const policies = rows as VesselDynamicPolicy[]
+        if (policies.length === 0) return policies
 
-        // Load values for each policy
-        for (const p of policies) {
-            const [vals] = await this.pool.query(
-                `SELECT vpv.id, vpv.policy_id as policyId, vpv.characteristic_id as characteristicId,
-                        ptch.name as characteristicName, ptch.field_type as fieldType,
-                        vpv.value_text as valueText, vpv.value_amount as valueAmount,
-                        vpv.value_date as valueDate, vpv.value_boolean as valueBoolean
-                 FROM vessel_policy_values vpv
-                 JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
-                 WHERE vpv.policy_id = ?
-                 ORDER BY ptch.order_index ASC`,
-                [p.id]
-            )
-            p.values = (vals as any[]).map(v => ({ ...v, valueBoolean: v.valueBoolean != null ? Boolean(v.valueBoolean) : undefined, valueAmount: v.valueAmount != null ? Number(v.valueAmount) : undefined }))
+        // Values for all of this vessel's policies in ONE query (was one query per policy)
+        const [vals] = await this.pool.query(
+            `SELECT vpv.id, vpv.policy_id as policyId, vpv.characteristic_id as characteristicId,
+                    ptch.name as characteristicName, ptch.field_type as fieldType,
+                    vpv.value_text as valueText, vpv.value_amount as valueAmount,
+                    vpv.value_date as valueDate, vpv.value_boolean as valueBoolean
+             FROM vessel_policy_values vpv
+             JOIN policy_type_characteristics ptch ON vpv.characteristic_id = ptch.id
+             WHERE vpv.policy_id IN (?)
+             ORDER BY ptch.order_index ASC`,
+            [policies.map(p => p.id)]
+        )
+        const byPolicy = new Map<string, any[]>()
+        for (const v of vals as any[]) {
+            const list = byPolicy.get(v.policyId) || []
+            list.push({ ...v, valueBoolean: v.valueBoolean != null ? Boolean(v.valueBoolean) : undefined, valueAmount: v.valueAmount != null ? Number(v.valueAmount) : undefined })
+            byPolicy.set(v.policyId, list)
         }
+        for (const p of policies) p.values = byPolicy.get(p.id) || []
 
         return policies
     }
@@ -11318,7 +11372,7 @@ export class MySQLAdapter {
              LEFT JOIN policy_type_conditions ptc ON vdp.condition_id = ptc.id
              LEFT JOIN entities e ON vdp.broker_entity_id = e.id
              LEFT JOIN entities ce ON vdp.customer_entity_id = ce.id
-             ORDER BY vdp.vessel_id, pt.order_index ASC`
+             ORDER BY vdp.vessel_id, pt.order_index ASC, vdp.created_at DESC`
         )
         const policies = rows as VesselDynamicPolicy[]
 

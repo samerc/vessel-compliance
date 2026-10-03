@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers, Search, FileText } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -481,7 +481,10 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
         return filtered
     }
 
-    const alerts = getAllAlerts()
+    // Every document/entity alert across the fleet — recomputed only when its inputs change
+    // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const alerts = useMemo(() => getAllAlerts(), [vessels, docs, docTypes, entityDocTypes, entityDocs, allAssureds, filter, docSearch, endorsementsDue])
 
     // Group alerts by vessel
     const alertsByVessel = alerts.reduce<Record<string, { vesselId: string; vessel: string; alerts: any[] }>>((acc, a) => {

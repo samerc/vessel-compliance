@@ -646,13 +646,21 @@ export default function CustomerComplianceReport() {
       const today = new Date(); today.setHours(0, 0, 0, 0)
       const threshold = new Date(today); threshold.setDate(today.getDate() + 30)
 
+      // All vessel documents once (was one IPC round-trip per vessel)
+      const allDocsRaw = await window.api.getVesselDocuments()
+      const docsByVessel = new Map<string, any[]>()
+      for (const d of (Array.isArray(allDocsRaw) ? allDocsRaw : []) as any[]) {
+        const list = docsByVessel.get(d.vesselId) || []
+        list.push(d)
+        docsByVessel.set(d.vesselId, list)
+      }
+
       const buildVesselMissing = async (v: typeof reportVessels[0]) => {
         const vLines: string[] = []
-        // Resolve P&I expiry for annual docs
-        const dynPolicies = await window.api.getVesselDynamicPolicies(v.id)
-        const effectiveExpiry = resolveEffectivePolicyExpiry(Array.isArray(dynPolicies) ? dynPolicies : [])
+        // Resolve P&I expiry for annual docs — from the policies already loaded in bulk (with values)
+        const effectiveExpiry = resolveEffectivePolicyExpiry(copyPolicies.filter((p: any) => p.vesselId === v.id))
         // Vessel docs
-        const vDocs = await window.api.getVesselDocuments(v.id)
+        const vDocs = docsByVessel.get(v.id) || []
         const customTypes = await window.api.getVesselCustomDocTypes(v.id)
         // Filter doc types by customer's policy types for this vessel
         let relevantDocTypes = safeDocTypes

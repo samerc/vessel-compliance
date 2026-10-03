@@ -1,4 +1,4 @@
-import Fuse from 'fuse.js'
+import Fuse, { type FuseResult } from 'fuse.js'
 import { SanctionsDatabase, SanctionsEntity, DataUpdate } from './SanctionsDatabase'
 import { parseOfacSdn } from './parsers/ofacParser'
 import { parseEuSanctions } from './parsers/euParser'
@@ -34,11 +34,48 @@ const FUSE_OPTIONS = {
   findAllMatches: true
 }
 
+// Trigram candidate prefilter for fuzzy search. A full Fuse scan scores every one of ~34k
+// entities per query (avg ~4 s, up to ~10 s on the main thread). Fuse scores each item
+// independently, so scoring only the entities that share enough character trigrams with the
+// query gives the same scores for those items. Measured on real data: with a minimum overlap
+// of 15% of the query's trigrams, every match the full scan finds at >= 0.70 was kept (and all
+// true matches of exact, typo'd and shortened names at >= 0.60) at ~6x the speed. Below 0.60
+// similarity some weak matches share no trigram at all, so the prefilter is only used when the
+// caller discards anything under PREFILTER_MIN_SCORE anyway (otherwise: full scan, as before).
+// Overlap needed per caller minimum: 15% is exact from 0.70 up; between 0.60 and 0.70 a
+// weak match can share a single trigram (e.g. "Emile Khlat" ~ "Esmail KHATIB" at 0.61), so
+// that band uses 5% (= at least one shared trigram for normal-length names).
+const PREFILTER_MIN_SCORE = 0.6
+function prefilterOverlap(minScore: number): number {
+  return minScore >= 0.7 ? 0.15 : 0.05
+}
+// When the prefilter would keep most of the list anyway, a plain full scan is cheaper
+const PREFILTER_MAX_SHARE = 0.6
+
+// Unicode-aware (keeps Arabic etc.), unlike normalizeText which keeps ASCII \w only
+function gramNormalize(s: string): string {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
+function trigrams(s: string): Set<string> {
+  const out = new Set<string>()
+  for (const w of gramNormalize(s).split(' ')) {
+    if (!w) continue
+    const padded = ` ${w} `
+    for (let i = 0; i + 3 <= padded.length; i++) out.add(padded.slice(i, i + 3))
+  }
+  return out
+}
+
 export interface SearchOptions {
   threshold?: number // 0-1 (Fuse scale)
   sources?: string[] // e.g. ['OFAC', 'UN']
   limit?: number
   mode?: 'exact' | 'fuzzy' | 'both'
+  // Lowest similarity (0-1) the caller will keep. >= PREFILTER_MIN_SCORE enables the fast
+  // trigram prefilter (same results above that score); omitted = full scan
+  minScore?: number
 }
 
 export interface SearchResult {
@@ -51,6 +88,9 @@ export class SanctionsService {
   private db = new SanctionsDatabase()
   private fuseIndex: Fuse<any> | null = null
   private entityCache: SanctionsEntity[] = []
+  private searchable: any[] = []
+  private gramIndex: Map<string, number[]> = new Map()
+  private gramCounts: Uint16Array = new Uint16Array(0)
   public initialized = false
 
   initialize(dbDir: string): void {
@@ -73,6 +113,45 @@ export class SanctionsService {
       aliasesFlat: Array.isArray(e.aliases) ? e.aliases.join(' ') : ''
     }))
     this.fuseIndex = new Fuse(searchable, FUSE_OPTIONS)
+    this.searchable = searchable
+    // Inverted trigram index over every searched field (see prefilterOverlap)
+    const gramIndex = new Map<string, number[]>()
+    searchable.forEach((e, idx) => {
+      const text = [e.name, e.name_normalized, e.aliasesFlat, e.mother_name, e.father_name, e.vessel_imo].filter(Boolean).join(' ')
+      for (const g of trigrams(text)) {
+        let list = gramIndex.get(g)
+        if (!list) gramIndex.set(g, (list = []))
+        list.push(idx)
+      }
+    })
+    this.gramIndex = gramIndex
+    this.gramCounts = new Uint16Array(searchable.length)
+  }
+
+  // Fuse over the trigram candidates only; falls back to the full index when the query has no
+  // usable trigrams or the candidates are most of the list anyway
+  private fuzzyCandidatesSearch(query: string, minScore: number): FuseResult<any>[] {
+    if (!this.fuseIndex) return []
+    if (!(minScore >= PREFILTER_MIN_SCORE)) return this.fuseIndex.search(query)
+    const qGrams = trigrams(query)
+    if (qGrams.size === 0) return this.fuseIndex.search(query)
+    const counts = this.gramCounts
+    const touched: number[] = []
+    for (const g of qGrams) {
+      const list = this.gramIndex.get(g)
+      if (!list) continue
+      for (const i of list) {
+        if (counts[i] === 0) touched.push(i)
+        counts[i]++
+      }
+    }
+    const need = Math.max(1, Math.ceil(qGrams.size * prefilterOverlap(minScore)))
+    const candidates = touched.filter(i => counts[i] >= need)
+    for (const i of touched) counts[i] = 0
+    if (candidates.length > this.searchable.length * PREFILTER_MAX_SHARE) return this.fuseIndex.search(query)
+    if (candidates.length === 0) return []
+    const sub = new Fuse(candidates.map(i => this.searchable[i]), FUSE_OPTIONS)
+    return sub.search(query)
   }
 
   search(query: string, options: SearchOptions = {}): { query: string; total: number; results: SearchResult[] } {
@@ -114,7 +193,7 @@ export class SanctionsService {
 
   private searchFuzzy(query: string, threshold: number, options: SearchOptions): SearchResult[] {
     if (!this.fuseIndex) return []
-    let fuseResults = this.fuseIndex.search(query)
+    let fuseResults = this.fuzzyCandidatesSearch(query, options.minScore ?? 0)
     fuseResults = fuseResults.filter(r => (r.score ?? 1) <= threshold)
     if (options.sources && options.sources.length > 0) {
       const srcSet = new Set(options.sources.map(s => s.toUpperCase()))
