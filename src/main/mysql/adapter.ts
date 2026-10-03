@@ -2575,6 +2575,12 @@ export class MySQLAdapter {
                      SET q.created_by = u.id, q.updated_at = q.updated_at
                      WHERE q.created_by <> u.id`
                 )
+                // 'nisso' was Nisrine's username before it was renamed to 'nis' (confirmed by the business)
+                await this.pool.query(
+                    `UPDATE quotations q JOIN users u ON u.username = 'nis'
+                     SET q.created_by = u.id, q.updated_at = q.updated_at
+                     WHERE q.created_by = 'nisso'`
+                )
             } catch (e) { console.warn('[migration] quotations.created_by normalise:', (e as Error).message) }
 
             // Seed default workflow steps if table is empty
