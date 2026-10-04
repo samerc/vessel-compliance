@@ -264,7 +264,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
 
             <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>{fleet.name}</h1>
+                    <h1 style={{ fontSize: '1.75rem', marginBottom: '8px' }}>{fleet.name}</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>
                         {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''}
                         {inactiveVessels.length > 0 && ` · ${inactiveVessels.length} inactive`}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search, ChevronUp, ChevronDown as ChevronDownIcon, Download, CheckSquare } from 'lucide-react'
+import { PageHeader, Badge } from './ui'
 import XLSX from 'xlsx-js-style'
 import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -370,45 +371,21 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <FileWarning size={20} color="#fff" />
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '700' }}>Survey Follow-Up</h1>
-            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              Track condition survey warranties and endorsement reminders
-            </p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div className="fade-in page">
+      <PageHeader
+        icon={<FileWarning size={26} />}
+        title="Survey Follow-Up"
+        subtitle="Track condition survey warranties and endorsement reminders"
+        actions={<>
           {overdueCount > 0 && (
-            <span style={{
-              padding: '4px 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: '700',
-              background: 'rgba(255,77,77,0.15)', color: 'var(--danger)',
-              display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap'
-            }}>
-              <AlertTriangle size={13} /> {overdueCount} overdue
-            </span>
+            <Badge tone="danger"><AlertTriangle size={12} /> {overdueCount} overdue</Badge>
           )}
-          <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="btn-secondary"
-            style={{ fontSize: '0.82rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <RefreshCw size={14} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+          <button onClick={loadData} disabled={isLoading} className="btn-secondary btn-sm">
+            <RefreshCw size={14} className={isLoading ? 'spinner' : undefined} />
             Refresh
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>

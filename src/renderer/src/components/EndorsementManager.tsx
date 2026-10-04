@@ -910,7 +910,7 @@ export default function EndorsementManager({
                 <span style={{
                   fontSize: '0.75rem', padding: '2px 8px', borderRadius: '8px',
                   background: Number(end.premiumAmount) > 0 ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(255,77,77,0.1)',
-                  color: Number(end.premiumAmount) > 0 ? '#00aac8' : 'var(--danger)'
+                  color: Number(end.premiumAmount) > 0 ? 'var(--accent-primary)' : 'var(--danger)'
                 }}>
                   {end.premiumCurrency || 'USD'} {Number(end.premiumAmount).toLocaleString()}
                 </span>

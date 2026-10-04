@@ -4839,7 +4839,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
                                     <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title (optional)" style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem' }} />
                                     <div style={{ display: 'flex', gap: '6px' }}>
                                         <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={2} style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }} />
-                                        <button title="Save" aria-label="Save" onClick={handleUpdate} style={{ background: 'none', border: 'none', color: '#00aac8', cursor: 'pointer' }}><Save size={15} /></button>
+                                        <button title="Save" aria-label="Save" onClick={handleUpdate} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer' }}><Save size={15} /></button>
                                         <button title="Cancel" aria-label="Cancel" onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={15} /></button>
                                     </div>
                                 </div>

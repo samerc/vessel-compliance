@@ -15,6 +15,7 @@ React components in `src/renderer/src/components/ui/` (import from `./ui`) and m
 | List / Settings switch in a header | `<SegmentedControl items value onChange />` (`.segmented`) |
 | View tabs inside a page | `<Tabs items value onChange trailing? />` or `.tabs` + `.tab.active` + `.tab-count` |
 | Status pill | `<Badge tone="success\|danger\|warning\|info\|accent\|violet\|neutral" dot?>` or `color="#hex/var"` for user-chosen colors |
+| Sanctions status | `<SanctionsBadge status checking checkedAt onReview onRecheck />` |
 | Filter toggle pill | `<button className="chip active">` + `.chip-count` |
 | Empty list / no results | `<EmptyState icon title text action />` |
 | Loading | `<Spinner size label? />` |

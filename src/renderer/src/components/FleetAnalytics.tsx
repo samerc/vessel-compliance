@@ -3,7 +3,9 @@ import {
   Ship, Globe, Anchor, Calendar, TrendingUp, Shield, BarChart3,
   RefreshCw, Loader2, ChevronDown, ChevronRight, Save, Trash2,
   FileDown, Users, Filter, X,
+  BarChart2,
 } from 'lucide-react'
+import { PageHeader, Badge } from './ui'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import XLSX from 'xlsx-js-style'
@@ -1408,48 +1410,20 @@ export default function FleetAnalytics() {
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
 
         {/* Top bar */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: '20px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{ fontSize: '1.6rem', margin: 0, fontWeight: 800 }}>Fleet Analytics</h1>
-            {hasQueried && (
-              <span style={{
-                padding: '3px 12px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700,
-                background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)',
-                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
-              }}>
-                {pool.length} vessel{pool.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {hasQueried && (
-              <button
-                onClick={applyFilters}
-                className="btn-secondary"
-                style={{ padding: '8px 10px' }}
-                title="Refresh data"
-                disabled={loading}
-              >
-                {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
-              </button>
-            )}
-            {hasQueried && pool.length > 0 && (
-              <button
-                onClick={() => setExportModalOpen(true)}
-                className="btn-secondary"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 14px', fontSize: '0.84rem',
-                }}
-              >
+        <PageHeader
+          icon={<BarChart2 size={26} />}
+          title={<>Fleet Analytics {hasQueried && <Badge tone="accent">{pool.length} vessel{pool.length !== 1 ? 's' : ''}</Badge>}</>}
+          actions={hasQueried && <>
+            <button onClick={applyFilters} className="btn-secondary btn-icon" title="Refresh data" aria-label="Refresh data" disabled={loading}>
+              {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
+            </button>
+            {pool.length > 0 && (
+              <button onClick={() => setExportModalOpen(true)} className="btn-secondary">
                 <FileDown size={16} /> Export
               </button>
             )}
-          </div>
-        </div>
+          </>}
+        />
 
         {/* ── Content ── */}
         {!hasQueried ? (

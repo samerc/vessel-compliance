@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
+import { PageHeader, Tabs, Badge } from './ui'
 
 const STATIC_RULES = [
     { id: 'vessels_no_customer', name: 'Vessels without customer', description: 'Active vessels with no customer assigned' },
@@ -514,122 +515,23 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
     }
 
     return (
-        <div className="fade-in">
-            <header style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-                    <div>
-                        <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Compliance Center</h1>
-                        <p style={{ color: 'var(--text-secondary)' }}>Centralized monitoring for document alerts and sanctions screening.</p>
-                    </div>
-                </div>
-
-                {/* Tab Navigation */}
-                <div role="tablist" aria-label="Compliance sections" style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
-                    <button
-                        id="tab-documents"
-                        role="tab"
-                        aria-selected={activeTab === 'documents'}
-                        aria-controls="panel-documents"
-                        onClick={() => setActiveTab('documents')}
-                        style={{
-                            padding: '10px 24px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: activeTab === 'documents' ? 'var(--bg-card)' : 'transparent',
-                            color: activeTab === 'documents' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: activeTab === 'documents' ? '600' : '400',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <AlertCircle size={16} />
-                        Document Alerts
-                        {alerts.length > 0 && (
-                            <span style={{ background: 'rgba(255, 77, 77, 0.2)', color: 'var(--danger)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
-                                {alerts.length}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        id="tab-policies"
-                        role="tab"
-                        aria-selected={activeTab === 'policies'}
-                        aria-controls="panel-policies"
-                        onClick={() => setActiveTab('policies')}
-                        style={{
-                            padding: '10px 24px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: activeTab === 'policies' ? 'var(--bg-card)' : 'transparent',
-                            color: activeTab === 'policies' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: activeTab === 'policies' ? '600' : '400',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <FileWarning size={16} />
-                        Policy Alerts
-                        {(policyAlerts.length + policyExpiringSoon.length) > 0 && (
-                            <span style={{ background: 'rgba(255, 165, 0, 0.2)', color: '#ffa500', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
-                                {policyAlerts.length + policyExpiringSoon.length}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        id="tab-sanctions"
-                        role="tab"
-                        aria-selected={activeTab === 'sanctions'}
-                        aria-controls="panel-sanctions"
-                        onClick={() => setActiveTab('sanctions')}
-                        style={{
-                            padding: '10px 24px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: activeTab === 'sanctions' ? 'var(--bg-card)' : 'transparent',
-                            color: activeTab === 'sanctions' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: activeTab === 'sanctions' ? '600' : '400',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <Shield size={16} />
-                        Sanctions Screening
-                        {resultsTotal > 0 && (
-                            <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem' }}>
-                                {resultsTotal}
-                            </span>
-                        )}
-                    </button>
-                    <button
-                        id="tab-dataQuality"
-                        role="tab"
-                        aria-selected={activeTab === 'dataQuality'}
-                        aria-controls="panel-dataQuality"
-                        onClick={() => { setActiveTab('dataQuality'); loadDataValidation() }}
-                        style={{
-                            padding: '10px 24px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: activeTab === 'dataQuality' ? 'var(--bg-card)' : 'transparent',
-                            color: activeTab === 'dataQuality' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            fontWeight: activeTab === 'dataQuality' ? '600' : '400',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <Database size={16} />
-                        Data Quality
-                    </button>
-                </div>
-            </header>
+        <div className="fade-in page">
+            <PageHeader
+                icon={<ShieldAlert size={26} />}
+                title="Compliance Center"
+                subtitle="Centralized monitoring for document alerts and sanctions screening."
+            />
+            <Tabs
+                style={{ marginBottom: '24px' }}
+                value={activeTab}
+                onChange={k => { setActiveTab(k); if (k === 'dataQuality') loadDataValidation() }}
+                items={[
+                    { key: 'documents', icon: <AlertCircle size={16} />, label: <>Document Alerts {alerts.length > 0 && <Badge tone="danger">{alerts.length}</Badge>}</> },
+                    { key: 'policies', icon: <FileWarning size={16} />, label: <>Policy Alerts {(policyAlerts.length + policyExpiringSoon.length) > 0 && <Badge tone="warning">{policyAlerts.length + policyExpiringSoon.length}</Badge>}</> },
+                    { key: 'sanctions', icon: <Shield size={16} />, label: <>Sanctions Screening {resultsTotal > 0 && <Badge tone="warning">{resultsTotal}</Badge>}</> },
+                    { key: 'dataQuality', icon: <Database size={16} />, label: 'Data Quality' }
+                ]}
+            />
 
             {activeTab === 'documents' && (
                 <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">

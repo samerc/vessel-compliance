@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Search,
   User,
@@ -9,9 +9,6 @@ import {
   ChevronsRight,
   Shield,
   Building2,
-  ShieldCheck,
-  ShieldAlert,
-  RefreshCw,
   Loader2,
   X,
   Pencil,
@@ -58,8 +55,8 @@ import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
-import { formatDateTime } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { SanctionsBadge } from './ui'
 
 function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
@@ -746,114 +743,14 @@ export default function EntityDirectory({
     onRecheck: () => void
   }) => {
     const target = entity || vessel
-    const isChecking = checkingId === target?.id
-    const isMatch = target?.ofacStatus === 'MATCH' || target?.ofacStatus === 'SANCTIONED'
-    const isPotentialMatch = target?.ofacStatus === 'POTENTIAL_MATCH'
-    const isError = target?.ofacStatus === 'ERROR'
-    const isPending = !target?.ofacStatus || target.ofacStatus === 'PENDING'
-
-    if (isChecking) {
-      return (
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontSize: '0.68rem',
-            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(var(--accent-primary-rgb), 0.1)',
-            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(var(--accent-primary-rgb), 0.3)',
-            color: 'var(--accent-primary)'
-          }}
-        >
-          <Loader2 size={11} className="spinner" /> CHECKING...
-        </div>
-      )
-    }
-
-    let config: { bg: string; border: string; color: string; text: string; icon: React.ReactNode }
-    if (isPending) {
-      config = {
-        bg: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-        border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
-        color: 'var(--text-secondary)',
-        text: 'NOT CHECKED',
-        icon: <Shield size={11} opacity={0.5} />
-      }
-    } else if (isError) {
-      config = {
-        bg: isLight ? 'rgba(200,120,0,0.15)' : 'rgba(255,153,0,0.1)',
-        border: isLight ? '1px solid rgba(200,120,0,0.4)' : '1px solid rgba(255,153,0,0.3)',
-        color: isLight ? '#b36b00' : '#ff9900',
-        text: 'CHECK FAILED',
-        icon: <Shield size={11} />
-      }
-    } else if (isMatch) {
-      config = {
-        bg: isLight ? 'rgba(200,0,0,0.12)' : 'rgba(255,77,77,0.1)',
-        border: isLight ? '1px solid rgba(200,0,0,0.35)' : '1px solid rgba(255,77,77,0.3)',
-        color: 'var(--danger)',
-        text: 'SANCTIONED',
-        icon: <ShieldAlert size={11} />
-      }
-    } else if (isPotentialMatch) {
-      config = {
-        bg: isLight ? 'rgba(180,140,0,0.15)' : 'rgba(255,193,7,0.1)',
-        border: isLight ? '1px solid rgba(180,140,0,0.4)' : '1px solid rgba(255,193,7,0.3)',
-        color: isLight ? '#997a00' : '#ffc107',
-        text: 'POSSIBLE MATCH',
-        icon: <ShieldAlert size={11} />
-      }
-    } else {
-      config = {
-        bg: isLight ? 'rgba(0,140,70,0.12)' : 'rgba(0,255,136,0.1)',
-        border: isLight ? '1px solid rgba(0,140,70,0.35)' : '1px solid rgba(0,255,136,0.3)',
-        color: isLight ? '#008c46' : '#00ff88',
-        text: 'CLEARED',
-        icon: <ShieldCheck size={11} />
-      }
-    }
-
     return (
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '2px 7px',
-          borderRadius: '4px',
-          fontSize: '0.68rem',
-          background: config.bg,
-          border: config.border,
-          color: config.color,
-          cursor: isPotentialMatch || isMatch ? 'pointer' : 'default',
-          whiteSpace: 'nowrap'
-        }}
-        title={
-          isError
-            ? 'API request failed. Click refresh to retry.'
-            : isPotentialMatch || isMatch
-              ? 'Click to review matches'
-              : `Last checked: ${target?.ofacCheckedAt ? formatDateTime(target.ofacCheckedAt) : 'Never'}`
-        }
-        onClick={(e) => {
-          e.stopPropagation()
-          if (isPotentialMatch || isMatch) handleViewPotentialMatch(entity, vessel)
-        }}
-      >
-        {config.icon}
-        {config.text}
-        <RefreshCw
-          size={9}
-          style={{ marginLeft: '3px', cursor: 'pointer', opacity: 0.55 }}
-          className="hover-spin"
-          onClick={(e) => {
-            e.stopPropagation()
-            onRecheck()
-          }}
-        />
-      </div>
+      <SanctionsBadge
+        status={target?.ofacStatus}
+        checking={checkingId === target?.id}
+        checkedAt={target?.ofacCheckedAt}
+        onReview={() => handleViewPotentialMatch(entity, vessel)}
+        onRecheck={onRecheck}
+      />
     )
   }
 

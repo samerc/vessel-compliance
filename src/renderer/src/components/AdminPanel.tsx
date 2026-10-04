@@ -8,6 +8,7 @@ const FileManager = lazy(() => import('./FileManager'))
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog } from './DialogHost'
+import { PageHeader } from './ui'
 import { ok } from '../utils/ipc'
 
 // ── Section definitions ────────────────────────────────────────────────────────
@@ -1260,10 +1261,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 <button onClick={() => setRoleVesselPopup(null)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
                     <ArrowLeft size={18} /> Back to Settings
                 </button>
-                <header style={{ marginBottom: '24px' }}>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessels with role: {roleVesselPopup.roleName}</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>{roleVesselPopup.vessels.length} vessel{roleVesselPopup.vessels.length !== 1 ? 's' : ''} assigned</p>
-                </header>
+                <PageHeader
+                    icon={<Ship size={26} />}
+                    title={`Vessels with role: ${roleVesselPopup.roleName}`}
+                    subtitle={`${roleVesselPopup.vessels.length} vessel${roleVesselPopup.vessels.length !== 1 ? 's' : ''} assigned`}
+                />
                 {roleVesselPopup.vessels.length === 0 ? (
                     <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                         <Ship size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   FileText, Trash2, Save, ChevronUp, ChevronDown,
-  Tag, X, Plus, Copy, FileDown
+  Tag, X, Plus, Copy, FileDown, Mail
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -10,6 +10,7 @@ import type { DocumentTemplate } from '../../../shared/types'
 import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/types'
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
+import { PageHeader } from './ui'
 import {
   resolveTemplatePlaceholders,
   htmlToPlainText,
@@ -200,27 +201,17 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   }, {})
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-            <FileText size={28} /> Templates
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Create and manage document and email templates with placeholders
-          </p>
-        </div>
-        {canManage && (
-          <button
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            onClick={() => setShowCreate(true)}
-          >
+    <div className="page">
+      <PageHeader
+        icon={<Mail size={26} />}
+        title="Templates"
+        subtitle="Create and manage document and email templates with placeholders"
+        actions={canManage && (
+          <button className="btn-primary" onClick={() => setShowCreate(true)}>
             <Plus size={16} /> New Template
           </button>
         )}
-      </div>
+      />
 
       {/* Category Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>

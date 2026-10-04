@@ -13,6 +13,7 @@ import {
   Filter,
   Inbox,
 } from 'lucide-react'
+import { PageHeader, Badge } from './ui'
 import { useTheme } from '../contexts/ThemeContext'
 import type { Notification } from '../../../shared/types'
 
@@ -164,34 +165,16 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
   })
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: '900px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h1 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>Notifications</h1>
-          {unreadCount > 0 && (
-            <span style={{
-              background: 'var(--danger)',
-              color: '#fff',
-              borderRadius: '12px',
-              padding: '2px 10px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-            }}>
-              {unreadCount}
-            </span>
-          )}
-        </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllRead}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-          >
+    <div className="fade-in page" style={{ maxWidth: '900px' }}>
+      <PageHeader
+        icon={<Bell size={26} />}
+        title={<>Notifications {unreadCount > 0 && <Badge tone="danger">{unreadCount} unread</Badge>}</>}
+        actions={unreadCount > 0 && (
+          <button onClick={handleMarkAllRead} className="btn-secondary">
             <CheckCheck size={15} /> Mark All Read
           </button>
         )}
-      </div>
+      />
 
       {/* Filter Tabs */}
       <div style={{

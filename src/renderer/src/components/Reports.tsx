@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { FileBarChart2, Database, Users, ClipboardCheck, CalendarClock } from 'lucide-react'
+import { PageHeader, Tabs } from './ui'
 import LossRecordReport from './LossRecordReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
 import AssuredReport from './AssuredReport'
@@ -23,51 +24,15 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<ReportTab>('report-builder')
 
   return (
-    <div className="fade-in">
-      {activeTab !== 'report-builder' && (
-        <header style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Reports</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Generate and export compliance and loss reports.
-          </p>
-        </header>
-      )}
+    <div className="fade-in page">
+      <PageHeader icon={<FileBarChart2 size={26} />} title="Reports" subtitle="Generate and export compliance, renewal and loss reports." />
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
-        {TABS.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '10px',
-                border:
-                  activeTab === tab.id
-                    ? '2px solid var(--accent-primary)'
-                    : '1px solid var(--glass-border-color)',
-                background:
-                  activeTab === tab.id
-                    ? 'rgba(var(--accent-primary-rgb, 0,210,255),0.08)'
-                    : 'var(--bg-card)',
-                color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontWeight: activeTab === tab.id ? '600' : '400',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'var(--transition)'
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+      <Tabs
+        style={{ marginBottom: '24px' }}
+        value={activeTab}
+        onChange={setActiveTab}
+        items={TABS.map(t => ({ key: t.id, label: t.label, icon: <t.icon size={16} /> }))}
+      />
 
       {activeTab === 'report-builder' && (
         <Suspense

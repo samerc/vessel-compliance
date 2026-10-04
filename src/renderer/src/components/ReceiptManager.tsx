@@ -3,6 +3,7 @@ import { Receipt, Vessel, VesselAssured } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
+import { PageHeader } from './ui'
 import {
   exportReceiptDocx, ordinal, formatReceiptAmount
 } from '../services/ReceiptExportService'
@@ -126,24 +127,21 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
   const td: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem', borderBottom: '1px solid var(--glass-border-color)' }
 
   return (
-    <div style={{ padding: embedded ? 0 : '32px', maxWidth: embedded ? undefined : '1400px', margin: embedded ? undefined : '0 auto' }}>
+    <div className={embedded ? undefined : 'fade-in page'}>
       {!embedded && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <div>
-            <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-              <ReceiptIcon size={28} /> Receipts
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Payment receipts issued against vessel policies</p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {canManage && <button className="btn-secondary" onClick={() => setShowSettings(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <PageHeader
+          icon={<ReceiptIcon size={26} />}
+          title="Receipts"
+          subtitle="Payment receipts issued against vessel policies"
+          actions={<>
+            {canManage && <button className="btn-secondary" onClick={() => setShowSettings(true)}>
               <Settings size={16} /> Settings
             </button>}
-            <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn-primary" onClick={openCreate}>
               <Plus size={16} /> New Receipt
             </button>
-          </div>
-        </div>
+          </>}
+        />
       )}
 
       {embedded && (

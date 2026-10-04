@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Shield, ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
+import { Ship, ChevronRight, ChevronDown, Hash, Search, Filter, ArrowUpDown, Loader2, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, X, CheckSquare, Square, Download } from 'lucide-react'
 import { Vessel, Fleet, SanctionsMatch, VesselQueryParams, FlagState } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
 import 'flag-icons/css/flag-icons.min.css'
@@ -9,8 +9,8 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
-import { formatDateTime } from '../utils/dateUtils'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { PageHeader, SanctionsBadge } from './ui'
 
 
 import { ok } from '../utils/ipc'
@@ -385,119 +385,15 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
         }
     }
 
-    const OfacBadge = ({ vessel }: { vessel: Vessel }) => {
-        const isChecking = checkingVesselId === vessel.id
-        const isMatch = vessel.ofacStatus === 'MATCH' || vessel.ofacStatus === 'SANCTIONED'
-        const isPotentialMatch = vessel.ofacStatus === 'POTENTIAL_MATCH'
-        const isError = vessel.ofacStatus === 'ERROR'
-        const isPending = !vessel.ofacStatus || vessel.ofacStatus === 'PENDING'
-
-        // Show checking state
-        if (isChecking) {
-            return (
-                <div
-                    style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '2px 10px',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(var(--accent-primary-rgb), 0.1)',
-                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(var(--accent-primary-rgb), 0.3)',
-                        color: 'var(--accent-primary)'
-                    }}
-                >
-                    <Loader2 size={12} className="spinner" />
-                    CHECKING...
-                </div>
-            )
-        }
-
-        let config: { background: string; border: string; color: string; text: string; icon: React.ReactNode }
-
-        if (isPending) {
-            config = {
-                background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)',
-                border: isLight ? '1px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'var(--text-secondary)',
-                text: 'NOT CHECKED',
-                icon: <Shield size={12} opacity={0.5} />
-            }
-        } else if (isError) {
-            config = {
-                background: isLight ? 'rgba(200, 120, 0, 0.15)' : 'rgba(255, 153, 0, 0.1)',
-                border: isLight ? '1px solid rgba(200, 120, 0, 0.4)' : '1px solid rgba(255, 153, 0, 0.3)',
-                color: isLight ? '#b36b00' : '#ff9900',
-                text: 'CHECK FAILED',
-                icon: <Shield size={12} />
-            }
-        } else if (isMatch) {
-            config = {
-                background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
-                border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                color: 'var(--danger)',
-                text: 'SANCTIONED',
-                icon: <ShieldAlert size={12} />
-            }
-        } else if (isPotentialMatch) {
-            config = {
-                background: isLight ? 'rgba(180, 140, 0, 0.15)' : 'rgba(255, 193, 7, 0.1)',
-                border: isLight ? '1px solid rgba(180, 140, 0, 0.4)' : '1px solid rgba(255, 193, 7, 0.3)',
-                color: isLight ? '#997a00' : '#ffc107',
-                text: 'POSSIBLE MATCH',
-                icon: <ShieldAlert size={12} />
-            }
-        } else {
-            config = {
-                background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
-                border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
-                color: isLight ? '#008c46' : '#00ff88',
-                text: 'CLEARED',
-                icon: <ShieldCheck size={12} />
-            }
-        }
-
-        const isClickable = isPotentialMatch || isMatch
-        const handleBadgeClick = (e: React.MouseEvent) => {
-            e.stopPropagation()
-            if (isClickable) {
-                handleViewPotentialMatch(vessel)
-            }
-        }
-
-        return (
-            <div
-                style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.7rem',
-                    background: config.background,
-                    border: config.border,
-                    color: config.color,
-                    cursor: isClickable ? 'pointer' : 'default'
-                }}
-                title={
-                    isError ? 'API request failed. Click refresh to try again.' :
-                        isPotentialMatch ? 'Click to review potential matches' :
-                            `Last checked: ${vessel.ofacCheckedAt ? formatDateTime(vessel.ofacCheckedAt) : 'Never'}`
-                }
-                onClick={handleBadgeClick}
-            >
-                {config.icon}
-                {config.text}
-                <RefreshCw
-                    size={10}
-                    style={{ marginLeft: '4px', cursor: 'pointer', opacity: 0.6 }}
-                    className="hover-spin"
-                    onClick={(e) => { e.stopPropagation(); handleOfacRecheck(vessel); }}
-                />
-            </div>
-        )
-    }
+    const OfacBadge = ({ vessel }: { vessel: Vessel }) => (
+        <SanctionsBadge
+            status={vessel.ofacStatus}
+            checking={checkingVesselId === vessel.id}
+            checkedAt={vessel.ofacCheckedAt}
+            onReview={() => handleViewPotentialMatch(vessel)}
+            onRecheck={() => handleOfacRecheck(vessel)}
+        />
+    )
 
     if (selectedVessel) {
         const handleBack = navigatedExternally && onNavigateBack
@@ -512,23 +408,18 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     }
 
     return (
-        <div className="fade-in">
-            <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Vessel Registry</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Search, filter, and manage all vessels across your fleets.</p>
-                </div>
-                {hasPermission('vessels:create') && !showQuickAdd && (
-                    <button
-                        onClick={() => setShowQuickAdd(true)}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
-                    >
-                        <Plus size={20} />
+        <div className="fade-in page">
+            <PageHeader
+                icon={<Ship size={26} />}
+                title="Vessels"
+                subtitle="Search, filter, and manage all vessels across your fleets."
+                actions={hasPermission('vessels:create') && !showQuickAdd && (
+                    <button onClick={() => setShowQuickAdd(true)} className="btn-primary">
+                        <Plus size={18} />
                         Add Vessel
                     </button>
                 )}
-            </header>
+            />
 
             {showQuickAdd && (
                 <section className="glass-card fade-in" style={{ padding: '24px', marginBottom: '32px', border: '1px solid var(--accent-primary)' }}>

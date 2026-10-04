@@ -108,7 +108,7 @@ Sanctions screening runs entirely within the Electron app — no external API de
 - **OfacService** (`src/renderer/src/services/OfacService.ts`) - thin wrapper calling IPC (unchanged)
 - **SanctionsModal** (`src/renderer/src/components/SanctionsModal.tsx`) - displays potential matches (unchanged)
 - **Status flow**: `PENDING` → `POTENTIAL_MATCH` (yellow, needs review) → `CLEARED` or `MATCH` (user decision)
-- Each component with sanctions badges (VesselManager, AssuredManager, EntityDirectory) has its own `OfacBadge` component that must handle all statuses
+- Sanctions status pills use the shared `SanctionsBadge` (`components/ui/SanctionsBadge.tsx`); the local `OfacBadge` wrappers in VesselManager, EntityDirectory and EntityEditPanel only pass status, checking state and the review/recheck handlers
 - **Loading States**: OfacBadge shows "CHECKING..." spinner during searches
 - **Theme-Aware Colors**: Badge colors adapt for light/dark mode (darker colors in light mode for readability)
 - **Auto-clean toggle**: `ComplianceScheduleSettings.autoMarkCleanOnCheck` — when false, a CLEARED result is not auto-saved (toast only)

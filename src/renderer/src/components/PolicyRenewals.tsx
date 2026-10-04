@@ -7,6 +7,7 @@ import { formatDate, formatDateTime } from '../utils/dateUtils'
 import XLSX from 'xlsx-js-style'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { confirmDialog } from './DialogHost'
+import { PageHeader } from './ui'
 import { ok } from '../utils/ipc'
 
 interface PolicyRenewalsProps {
@@ -868,11 +869,8 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
     const totalWidth = colWidths.reduce((a, b) => a + b, 0)
 
     return (
-        <div className="fade-in">
-            <header style={{ marginBottom: '24px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Policy Renewals</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>View policies expiring in a specific month.</p>
-            </header>
+        <div className="fade-in page">
+            <PageHeader icon={<Calendar size={26} />} title="Renewals" subtitle="Policies expiring in the selected month, with their renewal status." />
 
             {/* ── KPI Row ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>

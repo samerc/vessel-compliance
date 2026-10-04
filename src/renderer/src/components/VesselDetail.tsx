@@ -1057,7 +1057,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                         </div>
                     ) : (
                         <>
-                            <h1 style={{ fontSize: '2.5rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <h1 style={{ fontSize: '1.75rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {vessel.name}
                                 {(() => {
                                     const currentFlag = flagStates.find(f => f.id === selectedFlagStateId)

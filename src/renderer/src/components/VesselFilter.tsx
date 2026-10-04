@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, Ship
 import { Vessel, PolicyType, FlagState, ClassificationSociety, Entity, VesselDynamicPolicy, VesselType } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { PageHeader } from './ui'
 
 interface VesselFilterProps {
     onNavigateToVessel?: (vesselId: string) => void
@@ -568,12 +569,12 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', margin: '-24px', overflow: 'hidden' }}>
 
             {/* Page header */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--glass-border-color)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                <SlidersHorizontal size={20} color="var(--accent-primary)" />
-                <div style={{ flex: 1 }}>
-                    <h1 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '700' }}>Vessel Filter</h1>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>Build a query to find vessels matching specific criteria</p>
-                </div>
+            <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
+                <PageHeader
+                    icon={<SlidersHorizontal size={26} />}
+                    title="Vessel Filter"
+                    subtitle="Build a query to find vessels matching specific criteria"
+                />
             </div>
 
             {/* Body */}

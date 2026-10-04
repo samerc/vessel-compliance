@@ -18,6 +18,7 @@ import {
   ExternalLink,
   UserMinus,
   ChevronsUpDown,
+  Layers,
 } from 'lucide-react'
 import { Fleet, Vessel, Entity, FlagState, VesselDynamicPolicy } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -29,6 +30,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { confirmDialog } from './DialogHost'
+import { PageHeader } from './ui'
 
 interface CustomerGroup {
   entity: Entity
@@ -551,14 +553,9 @@ export default function FleetManager() {
 
   // ------- Main render -------
   return (
-    <div className="fade-in">
+    <div className="fade-in page">
       {/* Header */}
-      <header style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Fleet Management</h1>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          Manage fleets and view vessels by customer.
-        </p>
-      </header>
+      <PageHeader icon={<Layers size={26} />} title="Fleets" subtitle="Manage fleets and view vessels by customer." />
 
       {/* Stats */}
       <div

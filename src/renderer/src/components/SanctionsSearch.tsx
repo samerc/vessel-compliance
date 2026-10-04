@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
+import { PageHeader } from './ui'
 import { ok } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 
@@ -372,25 +373,23 @@ export default function SanctionsSearch() {
     }
 
     return (
-        <div style={{ padding: '24px', height: '100%', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div>
-                    <h1 style={{ margin: 0, fontSize: '1.8rem', color: 'var(--text-primary)' }}>Sanctions Search</h1>
-                    <p style={{ color: 'var(--text-secondary)', marginTop: '8px', marginBottom: 0 }}>
-                        Ad-hoc lookup across global sanctions databases and local SIC list.
-                    </p>
-                </div>
-                <button
-                    onClick={handleUpdateLists}
-                    disabled={updatingLists}
-                    className="btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, cursor: updatingLists ? 'default' : 'pointer', opacity: updatingLists ? 0.7 : 1 }}
-                    title="Download the latest OFAC, EU, UK, UN and ISF sanctions lists"
-                >
-                    {updatingLists ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
-                    {updatingLists ? `Updating ${updateProgress}…` : 'Update Lists'}
-                </button>
-            </div>
+        <div className="fade-in page">
+            <PageHeader
+                icon={<Search size={26} />}
+                title="Sanctions Search"
+                subtitle="Ad-hoc lookup across global sanctions databases and local SIC list."
+                actions={
+                    <button
+                        onClick={handleUpdateLists}
+                        disabled={updatingLists}
+                        className="btn-secondary"
+                        title="Download the latest OFAC, EU, UK, UN and ISF sanctions lists"
+                    >
+                        {updatingLists ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
+                        {updatingLists ? `Updating ${updateProgress}…` : 'Update Lists'}
+                    </button>
+                }
+            />
 
             {/* Tab bar */}
             <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid var(--glass-border-color)', paddingBottom: '0' }}>

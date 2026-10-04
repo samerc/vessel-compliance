@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download, Receipt } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download, Receipt, FileBarChart2 } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -620,7 +620,7 @@ function App(): React.JSX.Element {
             >
               {hasPermission('vessels:view') && navItem('vessels', <Ship size={18} />, 'Vessels')}
               {hasPermission('vessels:view') && navItem('vessel-filter', <SlidersHorizontal size={18} />, 'Vessel Filter')}
-              {hasPermission('fleets:view') && navItem('fleets', <LayoutDashboard size={18} />, 'Fleets')}
+              {hasPermission('fleets:view') && navItem('fleets', <Layers size={18} />, 'Fleets')}
             </NavGroup>
 
             <NavGroup id="compliance" label="Compliance" icon={<ShieldAlert size={14} />}
@@ -652,7 +652,7 @@ function App(): React.JSX.Element {
             <NavGroup id="reports" label="Reports" icon={<BarChart2 size={14} />}
               groupCollapsed={collapsedGroups.has('reports')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
-              {hasPermission('reports:view') && navItem('reports', <ClipboardList size={18} />, 'Reports')}
+              {hasPermission('reports:view') && navItem('reports', <FileBarChart2 size={18} />, 'Reports')}
               {hasPermission('analytics:view') && navItem('analytics', <BarChart2 size={18} />, 'Fleet Analytics')}
               {hasPermission('admin:activityLog') && navItem('activity-log', <ScrollText size={18} />, 'Activity Log')}
             </NavGroup>

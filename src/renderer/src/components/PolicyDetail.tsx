@@ -1291,7 +1291,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           >
             <h1
               style={{
-                fontSize: '1.6rem',
+                fontSize: '1.75rem',
                 margin: 0,
                 display: 'flex',
                 alignItems: 'center',
@@ -1947,7 +1947,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           {activeTab === 'coverage' && (
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
-                <Shield size={18} style={{ color: '#00aac8' }} />
+                <Shield size={18} style={{ color: 'var(--accent-primary)' }} />
                 <span style={cardTitleStyle}>Coverage</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: '8px' }}>
                   Read-only — sourced from linked quotation
@@ -2620,7 +2620,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       {isPIType && (
         <div style={cardStyle}>
           <div style={cardHeaderStyle}>
-            <CreditCard size={18} style={{ color: '#00aac8' }} />
+            <CreditCard size={18} style={{ color: 'var(--accent-primary)' }} />
             <span style={cardTitleStyle}>Blue Cards</span>
             {blueCards.length > 0 && (
               <span
@@ -2675,7 +2675,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      background: '#00aac8',
+                      background: 'var(--accent-primary)',
                       flexShrink: 0
                     }}
                   />
@@ -2980,7 +2980,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   gap: '8px'
                 }}
               >
-                <CreditCard size={20} style={{ color: '#00aac8' }} />
+                <CreditCard size={20} style={{ color: 'var(--accent-primary)' }} />
                 {bcModalMode === 'edit'
                   ? 'Edit Blue Card'
                   : bcModalMode === 'reissue'

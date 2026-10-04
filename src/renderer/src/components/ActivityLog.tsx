@@ -10,6 +10,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { getReportSettings } from '../services/ReportSettingsService'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { PageHeader } from './ui'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   CREATE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
@@ -296,69 +297,39 @@ export default function ActivityLog() {
   }
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: '1400px' }}>
+    <div className="fade-in page">
       {/* Header */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '10px',
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <ScrollText size={20} color="#fff" />
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Activity Log</h1>
-            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              System-wide audit trail
-            </p>
-          </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <PageHeader
+        icon={<ScrollText size={26} />}
+        title="Activity Log"
+        subtitle="System-wide audit trail"
+        actions={<>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               {total} {total === 1 ? 'entry' : 'entries'}
             </span>
             <button
               onClick={handleExportPDF}
-              style={{
-                background: 'transparent', border: '1px solid var(--glass-border-color)',
-                borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
-                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '0.8rem',
-              }}
-              className="hover-effect"
+              className="btn-secondary btn-sm"
               title="Export filtered entries to PDF"
             >
               <FileText size={14} /> Export PDF
             </button>
             <button
               onClick={handleExportExcel}
-              style={{
-                background: 'transparent', border: '1px solid var(--glass-border-color)',
-                borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
-                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '0.8rem',
-              }}
-              className="hover-effect"
+              className="btn-secondary btn-sm"
               title="Export filtered entries to Excel"
             >
               <Table size={14} /> Export Excel
             </button>
             <button
               onClick={() => { loadData(); loadFilters() }}
-              style={{
-                background: 'transparent', border: '1px solid var(--glass-border-color)',
-                borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
-                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '0.8rem',
-              }}
-              className="hover-effect"
+              className="btn-secondary btn-sm"
               title="Refresh"
             >
               <RefreshCw size={14} /> Refresh
             </button>
-          </div>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Filters bar */}
       <div style={{

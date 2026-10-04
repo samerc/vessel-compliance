@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { User, UserGroup, PERMISSION_CATEGORIES } from '../../../shared/types'
-import { Trash2, Shield, KeyRound, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Key, Monitor, Pencil, Save } from 'lucide-react'
+import { Trash2, Shield, KeyRound, ArrowLeftRight, Users, X, Plus, Search, ChevronDown, ChevronRight, Key, Monitor, Pencil, Save, UserCog } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { PageHeader } from './ui'
 import { asArray } from '../utils/ipc'
 
 export default function UserManager() {
@@ -370,11 +371,8 @@ export default function UserManager() {
     }
 
     return (
-        <div className="fade-in">
-            <header style={{ marginBottom: '24px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>System Access</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Manage user accounts, roles, and administrative permissions.</p>
-            </header>
+        <div className="fade-in page">
+            <PageHeader icon={<UserCog size={26} />} title="User Management" subtitle="Manage user accounts, roles, and administrative permissions." />
 
             {/* Stats Strip */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>

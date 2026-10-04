@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, RefreshCw, Eye, ChevronUp, ChevronDown, Download } from 'lucide-react'
+import { Search, RefreshCw, Eye, ChevronUp, ChevronDown, Download, ClipboardList } from 'lucide-react'
+import { PageHeader } from './ui'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -228,13 +229,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   }
 
   return (
-    <div className="fade-in" style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ margin: 0, fontSize: '1.8rem' }}>Condition Surveys</h1>
-        <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          All active condition surveys across all vessels
-        </p>
-      </div>
+    <div className="fade-in page">
+      <PageHeader icon={<ClipboardList size={26} />} title="Surveys" subtitle="All active condition surveys across all vessels" />
 
       {/* By surveyor — searchable dropdown with per-surveyor survey counts */}
       {surveyorCounts.length > 0 && (
