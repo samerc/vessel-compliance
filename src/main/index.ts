@@ -1,4 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain, screen, Menu, utilityProcess } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, Menu, utilityProcess, dialog } from 'electron'
+import type { SicLetterPage, SicEntityInput } from '../shared/types'
 import { join, dirname, resolve, normalize, extname, basename } from 'path'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { access as fsAccess } from 'fs/promises'
@@ -2035,6 +2036,86 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0]
   })
 
+  // SIC letter OCR runs in its own utility process, kept alive between pages (the OCR engine
+  // takes a few seconds to start) and closed after a few idle minutes. Loaded from the ASAR so
+  // tesseract.js / pdf-parse resolve from the installed node_modules.
+  let sicOcrChild: Electron.UtilityProcess | null = null
+  let sicOcrSeq = 0
+  let sicOcrIdle: NodeJS.Timeout | null = null
+  const sicOcrPending = new Map<
+    number,
+    { resolve: (v: SicLetterPage) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
+  >()
+  const sicOcrLangPath = (): string =>
+    app.isPackaged
+      ? join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'tessdata')
+      : join(app.getAppPath(), 'resources', 'tessdata')
+  const sicOcrStop = (): void => {
+    if (sicOcrIdle) clearTimeout(sicOcrIdle)
+    sicOcrIdle = null
+    try {
+      sicOcrChild?.kill()
+    } catch {
+      /* already gone */
+    }
+    sicOcrChild = null
+  }
+  const sicOcrRequest = (req: {
+    filePath: string
+    page: number
+    rotation: number
+  }): Promise<SicLetterPage> => {
+    if (!sicOcrChild) {
+      const asarPath = join(app.getAppPath(), 'out', 'main', 'sicOcr.js')
+      const child = utilityProcess.fork(
+        existsSync(asarPath) ? asarPath : join(__dirname, 'sicOcr.js'),
+        [],
+        {
+          serviceName: 'SIC letter reader',
+          stdio: 'pipe'
+        }
+      )
+      let stderr = ''
+      child.stderr?.on('data', (d: Buffer) => {
+        stderr = (stderr + d.toString()).slice(-2000)
+      })
+      child.on(
+        'message',
+        (m: { id: number; success: boolean; result?: SicLetterPage; error?: string }) => {
+          const p = sicOcrPending.get(m?.id)
+          if (!p) return
+          sicOcrPending.delete(m.id)
+          clearTimeout(p.timer)
+          if (m.success && m.result) p.resolve(m.result)
+          else p.reject(new Error(m.error || 'Could not read the letter'))
+        }
+      )
+      child.on('exit', (code) => {
+        if (sicOcrChild === child) sicOcrChild = null
+        if (sicOcrPending.size) console.error('[sic letter] reader process exited', code, stderr)
+        for (const [id, p] of sicOcrPending) {
+          clearTimeout(p.timer)
+          p.reject(new Error(`The letter reader stopped unexpectedly (code ${code})`))
+          sicOcrPending.delete(id)
+        }
+      })
+      sicOcrChild = child
+    }
+    if (sicOcrIdle) clearTimeout(sicOcrIdle)
+    sicOcrIdle = setTimeout(sicOcrStop, 5 * 60 * 1000)
+    sicOcrIdle.unref()
+    const id = ++sicOcrSeq
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        sicOcrPending.delete(id)
+        reject(new Error('Reading the page timed out'))
+        sicOcrStop()
+      }, 120000)
+      sicOcrPending.set(id, { resolve, reject, timer })
+      sicOcrChild!.postMessage({ id, ...req, langPath: sicOcrLangPath() })
+    })
+  }
+  app.on('before-quit', sicOcrStop)
   safeHandle('word:importDefects', async (event, surveyId: string, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) throw new Error('Invalid file path')
@@ -2255,7 +2336,8 @@ app.whenReady().then(() => {
 
       const matches = data.results
         .map(result => ({
-          id: result.entity.source_id || '',
+          // Unique per person: entries from one SIC letter share their source_id (the letter reference)
+          id: `${result.entity.source}:${result.entity.source_id || ''}:${result.entity.name}`,
           target_type: result.entity.entity_type || 'unknown',
           source: result.entity.source || 'unknown',
           source_id: result.entity.source_id || '',
@@ -2398,6 +2480,106 @@ app.whenReady().then(() => {
     await requirePermission(event, 'admin:settings')
     return sanctionsService.importSicFromFile(filePath)
   })
+
+  // Several entries at once (SIC letter import): one permission check, same fields as sic:addEntity
+  safeHandle('sic:addEntities', async (event, entities: SicEntityInput[]) => {
+    await requirePermission(event, 'compliance:review', 'admin:settings')
+    if (!Array.isArray(entities)) throw new Error('Invalid entries')
+    const ids: number[] = []
+    for (const entity of entities) {
+      if (!entity || typeof entity.name !== 'string' || !entity.name.trim()) continue
+      ids.push(
+        sanctionsService.addSicEntity({
+          source: 'SIC' as const,
+          source_id: entity.sourceId || null,
+          entity_type: entity.entityType || 'individual',
+          name: entity.name.trim(),
+          name_normalized: normalizeText(entity.name),
+          aliases: Array.isArray(entity.aliases)
+            ? entity.aliases.filter((a) => typeof a === 'string' && a.trim())
+            : [],
+          date_of_birth: entity.dateOfBirth || null,
+          nationality: entity.nationality || null,
+          addresses: [],
+          identifications: [],
+          programs: [],
+          vessel_imo: null,
+          remarks: entity.remarks || null,
+          listed_date: entity.listedDate || null,
+          mother_name: entity.motherName || null,
+          father_name: entity.fatherName || null
+        })
+      )
+    }
+    return { count: ids.length, ids }
+  })
+
+  // Arabic -> English name spellings learned from saved letter imports (shared by all users)
+  safeHandle('sic:getNameSpellings', async (event) => {
+    requireSession(event)
+    const raw = await db.getSetting('sic_name_spellings')
+    try {
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  safeHandle('sic:learnNameSpellings', async (event, pairs: Record<string, string>) => {
+    await requirePermission(event, 'compliance:review', 'admin:settings')
+    if (!pairs || typeof pairs !== 'object') return { success: true }
+    const raw = await db.getSetting('sic_name_spellings')
+    let current: Record<string, string> = {}
+    try {
+      current = raw ? JSON.parse(raw) : {}
+    } catch {
+      /* start over */
+    }
+    for (const [ar, en] of Object.entries(pairs)) {
+      if (
+        typeof ar === 'string' &&
+        typeof en === 'string' &&
+        ar.trim() &&
+        en.trim() &&
+        ar.length <= 60 &&
+        en.length <= 60
+      ) {
+        current[ar.trim()] = en.trim()
+      }
+    }
+    await db.setSetting('sic_name_spellings', JSON.stringify(current))
+    return { success: true }
+  })
+
+  safeHandle('sicLetter:pick', async (event) => {
+    requireSession(event)
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Open SIC letters',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Scanned letters', extensions: ['pdf', 'png', 'jpg', 'jpeg'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+    return result.canceled ? [] : result.filePaths
+  })
+
+  // Reads one page of a scanned SIC letter: the page image + the OCR lines with their positions
+  safeHandle(
+    'sicLetter:readPage',
+    async (event, filePath: string, page: number, rotation: number) => {
+      await requirePermission(event, 'compliance:review', 'admin:settings')
+      if (
+        typeof filePath !== 'string' ||
+        !/\.(pdf|png|jpe?g)$/i.test(filePath) ||
+        !existsSync(filePath)
+      ) {
+        throw new Error('Choose a PDF or image file')
+      }
+      return sicOcrRequest({ filePath, page: Number(page) || 0, rotation: Number(rotation) || 0 })
+    }
+  )
 
   // Compliance Schedule Handlers
   safeHandle('compliance:getScheduleSettings', async (event) => {

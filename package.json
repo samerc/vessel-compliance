@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@napi-rs/canvas": "0.1.80",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "docx": "^9.5.1",
@@ -40,6 +41,7 @@
     "mysql2": "^3.16.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "tesseract.js": "^7.0.0",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {

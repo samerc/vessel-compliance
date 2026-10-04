@@ -46,7 +46,7 @@ This is an Electron desktop application for maritime vessel compliance managemen
 - MySQL via mysql2/promise (externalized from Vite bundling)
 - bcryptjs for password hashing, Node `crypto.randomUUID` for ID generation (the `uuid` package was removed)
 - Electron 44 (Node 24). Vite stays on 7 (electron-vite 5 supports up to Vite 7), TypeScript on 5.9 and ESLint on 9 (typescript-eslint / eslint-plugin-react not yet compatible with newer)
-- **Dependency placement**: `dependencies` = only what the MAIN process `require`s at runtime from the installed app (mysql2, better-sqlite3, bcryptjs, jszip, xlsx-js-style, docx, pdf-lib, pdf-parse, mammoth, electron-log, electron-updater, @electron-toolkit/utils). electron-vite externalizes these, so they come from the installer's node_modules: upgrading one only reaches users with a FULL installer, never a hot-update. Renderer-only libs and anything bundled into main (react, tiptap, lucide, jspdf, dompurify, qrcode, flag-icons, fuse.js, xml2js, electron-store) belong in `devDependencies` - they ship inside `out/` (and so in hot-updates), and keeping them out of `dependencies` keeps the installer small
+- **Dependency placement**: `dependencies` = only what the MAIN process `require`s at runtime from the installed app (mysql2, better-sqlite3, bcryptjs, jszip, xlsx-js-style, docx, pdf-lib, pdf-parse, mammoth, electron-log, electron-updater, @electron-toolkit/utils, tesseract.js, @napi-rs/canvas). electron-vite externalizes these, so they come from the installer's node_modules: upgrading one only reaches users with a FULL installer, never a hot-update. Renderer-only libs and anything bundled into main (react, tiptap, lucide, jspdf, dompurify, qrcode, flag-icons, fuse.js, xml2js, electron-store) belong in `devDependencies` - they ship inside `out/` (and so in hot-updates), and keeping them out of `dependencies` keeps the installer small
 - pdf-parse 2.x (pdf.js 5). It runs ONLY inside the defect-import utility process (see Condition Surveys)
 - Vanilla CSS with glassmorphic design system and light/dark theme support
 - jsPDF + xlsx for report exports
@@ -126,6 +126,20 @@ Local sanctions list managed manually within the app (source: Special Investigat
 - **IPC**: `sic:getEntities`, `sic:getEntity`, `sic:addEntity`, `sic:updateEntity`, `sic:deleteEntity`, `sic:import`, `sic:getRemarkTemplates`, `sic:setRemarkTemplates`
 - **UI**: SanctionsSearch page has two tabs — "Search" (existing) + "SIC List" (table with search, Import Excel, Templates, Add Entry). SIC source button (yellow `#ffd43b`) added to search source filters.
 - **Entry modal**: Does not close on outside click. Remark templates as chips above textarea with "Manage Templates" link.
+
+### SIC Letter Import (scanned letters, OCR)
+
+Imports the names listed in scanned SIC letters (image-only PDFs, or photos) instead of typing them:
+- **Entry point**: "Import Letters" in the SIC List tab (same permission as editing SIC entries). Several files can be picked; "Save & next letter" walks through them
+- **OCR process** (`src/main/workers/sicOcr.ts`): Electron utility process kept alive between pages (closed after 5 idle minutes), managed by `sicOcrRequest` in index.ts. pdf-parse `getImage()` extracts the page scan (one image per page; JPEG 2000 scans need pdf.js `wasmUrl` = pdfjs-dist/wasm/), `@napi-rs/canvas` rotates it (ID copies are sideways) and makes the JPEG shown on screen, tesseract.js (ara+eng, LSTM) returns lines + words with boxes. Fully offline
+- **Language data**: `resources/tessdata/{ara,eng}.traineddata` (tessdata_fast, ~5.5 MB), unpacked via `asarUnpack: resources/**`. electron-builder excludes the unused tesseract.js-core builds (non-LSTM, *.wasm.js)
+- **Full installer only**: tesseract.js, @napi-rs/canvas and the language data come from the installer, so this feature never reaches users through a hot-update
+- **Parsing** (`utils/sicLetterParser.ts`, pure): reference + date from the SIC file name (`4737_26_22092026.pdf` -> `4737/26`, 2026-09-22, plus `/G26.139` when printed), letter type (freeze / inquiry / ID circulated). Arabic lists start at the first entry-like line after the subject line and end at the signature/footer; names are usually quoted; details give nationality, mother (والدته), register no., passport. English OFAC-style numbered lists are parsed too. One-person letters name them in the paragraph (للسيد "...")
+- **Arabic-Indic dates are not read** (OCR unreliable): the user types the date of birth
+- **Names** (`utils/arabicNames.ts`): Lebanese naming = first, father, family; the English name is first + family, father separate (like the Excel import). Spelling: learned spellings (`app_settings` key `sic_name_spellings`, learned word by word on save) -> built-in common names -> letter rules
+- **Saved**: English name, aliases = Arabic as written + Arabic without the father's name, remark = letter remark + notes, `source_id` = reference, `listed_date` = letter date. IPC `sic:addEntities`, `sic:getNameSpellings`, `sic:learnNameSpellings`, `sicLetter:pick`, `sicLetter:readPage`
+- **Screen** (`SicLetterImport.tsx`): page with OCR line boxes (green = used by an entry); click a line or drag over words -> new entry, add to the selected entry, or fill one field. Every field stays editable; saved entries are edited in the SIC List as usual
+- **Search**: SIC entries share their letter reference as `source_id`, so search de-duplication and match ids include the name. Fuzzy search folds Arabic spelling variants (أ/إ/آ -> ا, ة -> ه, ى -> ي, harakat) via `foldArabic` (normalize.ts)
 
 ### Scheduled Compliance Checks
 Automated weekly sanctions screening for all entities and vessels:

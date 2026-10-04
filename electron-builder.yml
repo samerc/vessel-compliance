@@ -9,6 +9,12 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # SIC letter OCR uses only the LSTM engine builds (tesseract.js picks one at run time); the
+  # others and the browser builds with embedded wasm (*.wasm.js) are ~35 MB the app never loads
+  - '!node_modules/tesseract.js-core/*.wasm.js'
+  - '!node_modules/tesseract.js-core/tesseract-core.{js,wasm}'
+  - '!node_modules/tesseract.js-core/tesseract-core-simd.{js,wasm}'
+  - '!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.{js,wasm}'
 asarUnpack:
   - resources/**
 win:

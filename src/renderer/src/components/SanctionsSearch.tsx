@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
-import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText, RefreshCw, Loader2 } from 'lucide-react'
+import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText, RefreshCw, Loader2, ScanText } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
+import SicLetterImport from './SicLetterImport'
 import { PageHeader } from './ui'
 import { ok } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
+import { hasArabic } from '../utils/arabicNames'
 
 interface SicEntry {
     id: number
@@ -75,6 +77,8 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
     const [aliasInput, setAliasInput] = useState('')
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
     const [remarkTemplates, setRemarkTemplates] = useState<RemarkTemplate[]>([])
+    // Scanned SIC letters being imported (one after the other)
+    const [letterFiles, setLetterFiles] = useState<string[] | null>(null)
     const [showTemplateManager, setShowTemplateManager] = useState(false)
     const [templateForm, setTemplateForm] = useState<RemarkTemplate>({ label: '', text: '' })
     const [editingTemplateIdx, setEditingTemplateIdx] = useState<number | null>(null)
@@ -756,6 +760,14 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
                             <Upload size={14} /> Import Excel
                         </button>
                         )}
+                        <button
+                            className="btn-secondary"
+                            title="Read scanned SIC letters (PDF or image) and add the names they list"
+                            onClick={async () => { const picked = await window.api.sicLetterPick(); if (Array.isArray(picked) && picked.length) setLetterFiles(picked) }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+                        >
+                            <ScanText size={14} /> Import Letters
+                        </button>
                         <button className="btn-primary" onClick={openAddSic} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
                             <Plus size={14} /> Add Entry
                         </button>
@@ -793,9 +805,12 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
                                         <tr key={entry.id} style={{ borderTop: '1px solid var(--glass-border-color)' }}>
                                             <td style={{ padding: '10px 14px', fontWeight: 600, fontSize: '0.88rem' }}>
                                                 {entry.name}
-                                                {entry.aliases && entry.aliases.length > 0 && (
+                                                {entry.aliases?.filter(a => hasArabic(a)).map((a, i) => (
+                                                    <div key={i} dir="rtl" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '2px', textAlign: 'left' }}>{a}</div>
+                                                ))}
+                                                {entry.aliases?.some(a => !hasArabic(a)) && (
                                                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                                        aka: {entry.aliases.join(', ')}
+                                                        aka: {entry.aliases.filter(a => !hasArabic(a)).join(', ')}
                                                     </div>
                                                 )}
                                             </td>
@@ -847,6 +862,16 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
                         </div>
                     )}
                 </div>
+            )}
+
+            {letterFiles && (
+                <SicLetterImport
+                    files={letterFiles}
+                    existing={sicEntries}
+                    templates={remarkTemplates}
+                    onClose={() => setLetterFiles(null)}
+                    onSaved={loadSicEntries}
+                />
             )}
 
             {/* ============ SIC MODAL ============ */}
@@ -931,7 +956,7 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
                                 {sicForm.aliases.length > 0 && (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
                                         {sicForm.aliases.map((a, i) => (
-                                            <span key={i} style={{
+                                            <span key={i} dir="auto" style={{
                                                 padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem',
                                                 background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
                                                 display: 'flex', alignItems: 'center', gap: '4px'

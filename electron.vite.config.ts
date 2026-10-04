@@ -12,7 +12,8 @@ export default defineConfig({
         input: {
           bootstrap: resolve(__dirname, 'src/main/bootstrap.ts'),
           index: resolve(__dirname, 'src/main/index.ts'),
-          parser: resolve(__dirname, 'src/main/workers/parser.ts')
+          parser: resolve(__dirname, 'src/main/workers/parser.ts'),
+          sicOcr: resolve(__dirname, 'src/main/workers/sicOcr.ts')
         },
         external: ['mysql2', 'mysql2/promise', 'better-sqlite3']
       }

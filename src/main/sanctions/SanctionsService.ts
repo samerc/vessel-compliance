@@ -6,6 +6,7 @@ import { parseUnSanctions } from './parsers/unParser'
 import { parseIsfSanctions } from './parsers/isfParser'
 import { parseSicExcel } from './parsers/sicParser'
 import { parseUkSanctions } from './parsers/ukParser'
+import { foldArabic } from './normalize'
 
 const DATA_SOURCES = {
   OFAC: 'https://www.treasury.gov/ofac/downloads/sdn.xml',
@@ -109,7 +110,8 @@ export class SanctionsService {
   }
 
   private static toSearchable(e: SanctionsEntity): any {
-    return { ...e, aliasesFlat: Array.isArray(e.aliases) ? e.aliases.join(' ') : '' }
+    // Aliases hold the Arabic spelling of SIC names: folded so spelling variants match
+    return { ...e, aliasesFlat: Array.isArray(e.aliases) ? foldArabic(e.aliases.join(' ')) : '' }
   }
 
   // Inverted trigram index over every searched field (see prefilterOverlap)
@@ -200,8 +202,10 @@ export class SanctionsService {
     if (mode === 'fuzzy' || mode === 'both') {
       const fuzzyResults = this.searchFuzzy(query, threshold, options)
       if (mode === 'both') {
-        const exactKeys = new Set(results.map(r => `${r.entity.source}-${r.entity.source_id}`))
-        results.push(...fuzzyResults.filter(r => !exactKeys.has(`${r.entity.source}-${r.entity.source_id}`)))
+        // Name in the key: SIC entries from one letter share their source_id (the letter reference)
+        const key = (r: SearchResult): string => `${r.entity.source}-${r.entity.source_id}-${r.entity.name}`
+        const exactKeys = new Set(results.map(key))
+        results.push(...fuzzyResults.filter(r => !exactKeys.has(key(r))))
       } else {
         results.push(...fuzzyResults)
       }
@@ -225,7 +229,7 @@ export class SanctionsService {
 
   private searchFuzzy(query: string, threshold: number, options: SearchOptions): SearchResult[] {
     if (!this.fuseIndex) return []
-    let fuseResults = this.fuzzyCandidatesSearch(query, options.minScore ?? 0)
+    let fuseResults = this.fuzzyCandidatesSearch(foldArabic(query), options.minScore ?? 0)
     fuseResults = fuseResults.filter(r => (r.score ?? 1) <= threshold)
     if (options.sources && options.sources.length > 0) {
       const srcSet = new Set(options.sources.map(s => s.toUpperCase()))

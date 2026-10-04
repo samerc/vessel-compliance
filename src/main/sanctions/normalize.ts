@@ -52,3 +52,17 @@ export function normalizeEntityType(type: any): string {
   if (typeStr.includes('entity') || typeStr.includes('organization') || typeStr.includes('company')) return 'entity'
   return 'unknown'
 }
+
+/**
+ * Arabic spelling variants folded for matching: hamza forms of alef, alef maqsura, ta marbuta,
+ * short vowels and tatweel ("أحمد" and "احمد" are the same name). Latin text is unchanged.
+ */
+export function foldArabic(text: string): string {
+  return text
+    .replace(/ـ|[ً-ٟ]|ٰ/g, '')
+    .replace(/[آأإٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+}

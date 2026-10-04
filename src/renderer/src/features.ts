@@ -70,6 +70,8 @@ export const FEATURES: Feature[] = [
     description: 'Look up any name or IMO across OFAC, EU, UK, UN, ISF and the SIC list, and update the lists.', keywords: 'ofac un eu uk isf screening lookup' },
   { id: 'sanctions-sic', title: 'SIC list', area: 'Compliance', kind: 'view', permission: 'sanctions:search', target: { tab: 'sanctions-search', sub: 'sic' },
     description: 'Manage the local Special Investigation Commission list: add entries, import Excel, remark templates.', keywords: 'bdl blacklist lebanon' },
+  { id: 'sic-import-letters', title: 'Import SIC letters', area: 'Compliance', kind: 'action', permission: 'compliance:review', target: { tab: 'sanctions-search', sub: 'sic' },
+    description: 'Read scanned SIC letters (PDF or photo): the names they list are found, spelled in English and saved with the Arabic.', keywords: 'ocr scan arabic letter pdf import names freeze inquiry' },
   { id: 'sanctions-report', title: 'Sanctions check report', area: 'Compliance', kind: 'view', permission: 'sanctions:search', target: { tab: 'sanctions-search', sub: 'report' },
     description: 'Screen a name against every list, record a clear or sanctioned decision and export it as PDF.', keywords: 'screening pdf certificate' },
 

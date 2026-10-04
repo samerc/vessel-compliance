@@ -201,6 +201,13 @@ const api = {
   sicImport: (filePath: string) => ipcRenderer.invoke('sic:import', filePath),
   sicGetRemarkTemplates: () => ipcRenderer.invoke('sic:getRemarkTemplates'),
   sicSetRemarkTemplates: (templates: any[]) => ipcRenderer.invoke('sic:setRemarkTemplates', templates),
+  sicAddEntities: (entities: unknown[]) => ipcRenderer.invoke('sic:addEntities', entities),
+  sicGetNameSpellings: () => ipcRenderer.invoke('sic:getNameSpellings'),
+  sicLearnNameSpellings: (pairs: Record<string, string>) =>
+    ipcRenderer.invoke('sic:learnNameSpellings', pairs),
+  sicLetterPick: () => ipcRenderer.invoke('sicLetter:pick'),
+  sicLetterReadPage: (filePath: string, page: number, rotation: number) =>
+    ipcRenderer.invoke('sicLetter:readPage', filePath, page, rotation),
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),

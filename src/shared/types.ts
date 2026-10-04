@@ -1821,3 +1821,30 @@ export interface ReceiptSettings {
   nextSerial: number
   city: string
 }
+
+// SIC letter import (scanned letters read by OCR)
+export interface SicOcrBox { x0: number; y0: number; x1: number; y1: number }
+export interface SicOcrLine { text: string; bbox: SicOcrBox; words: { text: string; bbox: SicOcrBox }[] }
+export interface SicLetterPage {
+  pageCount: number
+  page: number
+  /** data: URL of the page image (rotated when asked) */
+  image: string | null
+  width: number
+  height: number
+  lines: SicOcrLine[]
+}
+
+/** A new SIC list entry (sic:addEntities) */
+export interface SicEntityInput {
+  name: string
+  entityType?: 'individual' | 'entity'
+  sourceId?: string | null
+  aliases?: string[]
+  dateOfBirth?: string | null
+  nationality?: string | null
+  remarks?: string | null
+  listedDate?: string | null
+  motherName?: string | null
+  fatherName?: string | null
+}
