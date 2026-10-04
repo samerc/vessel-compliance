@@ -12367,7 +12367,8 @@ export class MySQLAdapter {
         q.createdBy || null,
         id,
         initialStepId,
-        q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : true,
+        // Outstanding premium notice: on for renewals, off when quoting a new vessel
+        q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : !!q.isRenewal,
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
       ]
     )
@@ -12383,7 +12384,7 @@ export class MySQLAdapter {
       upccEnabled: q.upccEnabled || false,
       referenceNumber: referenceNumber || '',
       outstandingPremiumEnabled:
-        q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : true,
+        q.outstandingPremiumEnabled !== undefined ? q.outstandingPremiumEnabled : !!q.isRenewal,
       nonRefundableType:
         q.nonRefundableType !== undefined ? q.nonRefundableType : 'first_instalment'
     } as Quotation
@@ -13633,9 +13634,14 @@ export class MySQLAdapter {
     const fk = await this.fkOff()
     try {
       // 3. Clone the main quotation row (same content columns as a revision). The renewal
-      //    overrides period/is_renewal and records the expiring premium as previous.
+      //    overrides period/is_renewal and records the expiring premium as previous. A renewal
+      //    always shows the outstanding premium notice (the source may be a new-vessel quote).
       const renewCols = QUOTATION_CONTENT_COLS.filter(
-        (c) => c !== 'period_text' && c !== 'is_renewal' && c !== 'previous_premium_amount'
+        (c) =>
+          c !== 'period_text' &&
+          c !== 'is_renewal' &&
+          c !== 'previous_premium_amount' &&
+          c !== 'outstanding_premium_enabled'
       )
       await fk.execute(
         `
@@ -13643,12 +13649,14 @@ export class MySQLAdapter {
                     id, reference_number, quotation_date, status, title, period_text, is_renewal,
                     revision_number, revision_group_id, is_locked, export_snapshot, created_by,
                     renewed_from_policy_id, renewed_from_policy_number, previous_premium_amount,
+                    outstanding_premium_enabled,
                     ${renewCols.join(', ')}
                 )
                 SELECT
                     ?, ?, CURDATE(), 'draft', NULL, ?, TRUE,
                     0, ?, FALSE, NULL, ?,
                     ?, ?, premium_amount,
+                    TRUE,
                     ${renewCols.join(', ')}
                 FROM quotations WHERE id = ?
             `,
