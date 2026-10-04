@@ -2302,11 +2302,8 @@ function polBuildWarConditionsContent(data: PolicyExportData, content: (Paragrap
     if (!def) continue
     content.push(polBulletP(decodeHtmlEntities(resolveWarText(qc.textOverride || def.text))))
   }
-
-  if (data.warSettings?.tcText) {
-    content.push(polEmptyP())
-    content.push(polNp(data.warSettings.tcText))
-  }
+  // The T&C version is NOT repeated under the conditions: the policy's closing sentence names it
+  // ("The said Vessel is covered subject to {tc_text} - {jwla_code}")
 }
 
 function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
@@ -3138,7 +3135,10 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // War closing text may reference the T&C version / JWLA via {tc_text}, {jwla_code}, {jwla_date}
   // placeholders, resolved from War Settings (same as war conditions / declaration).
   children.push(polEmptyP())
-  let policyClosingText = data.frozen?.policyClosingText || 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.'
+  const isWarPolicy = (data.quotation.quotationTypeCode || '') === 'W'
+  let policyClosingText = data.frozen?.policyClosingText || (isWarPolicy && data.warSettings?.tcText
+    ? 'The said Vessel is covered subject to {tc_text}' + (data.warSettings.jwlaCode ? ' - {jwla_code}' : '')
+    : 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.')
   if (data.warSettings) {
     policyClosingText = policyClosingText
       .replace(/\{tc_text\}/g, data.warSettings.tcText)
