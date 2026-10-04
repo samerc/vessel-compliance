@@ -896,6 +896,7 @@ function App(): React.JSX.Element {
               setShowWhatsNew(false)
             }}
             onViewChangelog={() => setShowChangelog(true)}
+            appVersion={appVersion}
           />
         )}
         {forcePasswordReset && (

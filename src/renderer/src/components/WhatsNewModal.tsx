@@ -7,6 +7,8 @@ import { changelogService } from '../services/ChangelogService'
 interface WhatsNewModalProps {
   onClose: () => void
   onViewChangelog: () => void
+  /** Installed version (package.json); the notes shown must be for this version */
+  appVersion?: string
 }
 
 type ParsedItem =
@@ -67,7 +69,13 @@ function parseNotes(notes: string): ParsedItem[] {
   return items
 }
 
-export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModalProps) {
+/** Version named by the first `## X.Y.Z` heading of a release body, if any */
+function headingVersion(notes: string): string | null {
+  const m = notes.match(/^#{1,3}\s+v?(\d+\.\d+\.\d+)\b/m)
+  return m ? m[1] : null
+}
+
+export default function WhatsNewModal({ onClose, onViewChangelog, appVersion }: WhatsNewModalProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -80,9 +88,15 @@ export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModa
   useEffect(() => {
     changelogService.getChangelogs()
       .then(data => {
-        if (data.length > 0) {
-          const latest = data[0]
-          const parsed = parseNotes(latest.notes || '')
+        // The release for the INSTALLED version (not just the newest one), and only
+        // when its body is really about that version (a stale copy names another)
+        const latest = appVersion
+          ? data.find(r => r.version.replace(/^v/, '') === appVersion)
+          : data[0]
+        if (latest) {
+          const notes = latest.notes || ''
+          const named = headingVersion(notes)
+          const parsed = named && named !== latest.version.replace(/^v/, '') ? [] : parseNotes(notes)
           if (parsed.length > 0) {
             // Strip leading 'v' from tag_name (e.g. 'v5.4.0' → '5.4.0')
             setVersion(latest.version.replace(/^v/, ''))
@@ -98,11 +112,14 @@ export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModa
       })
       .catch(() => loadFallback())
       .finally(() => setLoading(false))
-  }, [])
+  }, [appVersion])
 
   function loadFallback() {
-    const entry = WHATS_NEW[0]
-    if (!entry) return
+    const entry = appVersion ? WHATS_NEW.find(e => e.version === appVersion) : WHATS_NEW[0]
+    if (!entry) {
+      if (appVersion) setVersion(appVersion)
+      return
+    }
     setVersion(entry.version)
     setDate(entry.date)
     setItems(entry.items.map(i => ({ kind: 'tagged' as const, tag: i.tag, text: i.text })))
@@ -170,7 +187,7 @@ export default function WhatsNewModal({ onClose, onViewChangelog }: WhatsNewModa
               <Loader2 size={18} className="spinner" /> Loading release notes…
             </div>
           ) : items.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.88rem' }}>No release notes available.</p>
+            <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.88rem' }}>No release notes for this version yet. Earlier changes are in the release history.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {items.map((item, i) => {

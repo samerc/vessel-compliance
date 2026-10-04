@@ -1670,7 +1670,9 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                     color: doc.annualRenewal ? '#60a5fa' : 'var(--text-secondary)',
                                                     border: doc.annualRenewal ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--table-border)',
                                                     cursor: 'pointer',
-                                                    marginLeft: '4px'
+                                                    marginLeft: '4px',
+                                                    whiteSpace: 'nowrap',
+                                                    display: 'inline-block'
                                                 }}
                                             >{doc.annualRenewal ? 'ANNUAL' : 'ONE-TIME'}</span>
                                         </td>

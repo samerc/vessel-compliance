@@ -554,7 +554,8 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                               ? 'var(--danger)'
                               : survey.totalDefects > 0
                                 ? 'var(--success)'
-                                : 'var(--text-secondary)'
+                                : 'var(--text-secondary)',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {survey.openDefects} open / {survey.totalDefects} total

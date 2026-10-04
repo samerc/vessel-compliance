@@ -361,7 +361,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         padding: '2px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: '700',
         background: isOverdue ? 'rgba(255,77,77,0.15)' : 'rgba(255,165,0,0.15)',
         color: isOverdue ? 'var(--danger)' : '#e6a800',
-        display: 'flex', alignItems: 'center', gap: '3px'
+        display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0
       }}>
         <AlertTriangle size={10} />
         {isOverdue ? `${Math.abs(remaining)}d overdue` : `${remaining}d left`}
@@ -393,7 +393,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
             <span style={{
               padding: '4px 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: '700',
               background: 'rgba(255,77,77,0.15)', color: 'var(--danger)',
-              display: 'flex', alignItems: 'center', gap: '5px'
+              display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap'
             }}>
               <AlertTriangle size={13} /> {overdueCount} overdue
             </span>
