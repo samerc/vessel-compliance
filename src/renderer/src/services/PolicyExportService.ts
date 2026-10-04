@@ -1901,8 +1901,11 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   }
 
   // Broker (c/o …) comes just after the footer with a tiny 3pt gap — unless suppressed.
+  // Only a broker business has a c/o line: a policy issued to a DIRECT client never shows one
+  // (even if a c/o name was typed on the quotation). Customer type not set = legacy, kept as before.
   const brokerName = data.quotation.coName || data.assureds.find(a => a.role?.toLowerCase().includes('broker'))?.name
-  if (brokerName && !(data.policy as any).hideBroker) {
+  const isDirectClient = data.quotation.customerType === 'direct'
+  if (brokerName && !isDirectClient && !(data.policy as any).hideBroker) {
     content.push(polSpacerPts(3))
     content.push(polNpTight(`c/o ${brokerName}`))
   }
