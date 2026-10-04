@@ -1397,7 +1397,6 @@ function polFormatDateUS(dateStr: string | null | undefined): string {
 function polFormatTime(time: string | null | undefined): string {
   if (!time) return ''
   if (time === '12:00') return 'Noon'
-  if (time === '00:00') return 'Midnight'
   return time
 }
 
