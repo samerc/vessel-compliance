@@ -3114,6 +3114,15 @@ export class MySQLAdapter {
                 }
             } catch {}
 
+            // Migration: due_event on survey_defects - a deadline that is an event, not a date
+            // ("Before next sailing", "At next dry dock"), from the survey report's time scale
+            try {
+                const [deCol] = await this.pool.query("SHOW COLUMNS FROM survey_defects LIKE 'due_event'") as any[]
+                if ((deCol as any[]).length === 0) {
+                    await this.pool.query("ALTER TABLE survey_defects ADD COLUMN due_event VARCHAR(255) NULL AFTER due_date")
+                }
+            } catch {}
+
             // Migration: defect_attachments table
             try {
                 await this.pool.query(`CREATE TABLE IF NOT EXISTS defect_attachments (
@@ -6052,7 +6061,7 @@ export class MySQLAdapter {
     async getSurveyDefects(surveyId?: string): Promise<SurveyDefect[]> {
         if (!this.pool) return []
         let sql = `SELECT id, survey_id as surveyId, defect_number as defectNumber,
-                   description, severity, status, due_date as dueDate, notes,
+                   description, severity, status, due_date as dueDate, due_event as dueEvent, notes,
                    closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
                    reopen_reason as reopenReason, created_at as createdAt
                    FROM survey_defects`
@@ -6070,10 +6079,10 @@ export class MySQLAdapter {
         const id = uuidv4()
         await this.pool.execute(
             `INSERT INTO survey_defects
-             (id, survey_id, defect_number, description, severity, status, due_date, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, survey_id, defect_number, description, severity, status, due_date, due_event, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, defect.surveyId, defect.defectNumber, defect.description,
-                defect.severity || null, defect.status || 'OPEN', defect.dueDate || null, defect.notes || null]
+                defect.severity || null, defect.status || 'OPEN', defect.dueDate || null, defect.dueEvent || null, defect.notes || null]
         )
         return { ...defect, id }
     }
@@ -6087,6 +6096,7 @@ export class MySQLAdapter {
         if (updates.severity !== undefined) { fields.push('severity = ?'); values.push(updates.severity) }
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
         if (updates.dueDate !== undefined) { fields.push('due_date = ?'); values.push(updates.dueDate) }
+        if (updates.dueEvent !== undefined) { fields.push('due_event = ?'); values.push(updates.dueEvent || null) }
         if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes) }
         if (updates.closedAt !== undefined) { fields.push('closed_at = ?'); values.push(updates.closedAt) }
         if (updates.closedBy !== undefined) { fields.push('closed_by = ?'); values.push(updates.closedBy) }
@@ -6193,7 +6203,7 @@ export class MySQLAdapter {
                 cs.id as surveyId, cs.survey_date as surveyDate,
                 s.company_name as surveyorName,
                 sd.id as defectId, sd.defect_number as defectNumber, sd.description,
-                sd.severity, sd.due_date as dueDate, sd.created_at as createdAt
+                sd.severity, sd.due_date as dueDate, sd.due_event as dueEvent, sd.created_at as createdAt
             FROM vessels v
             INNER JOIN condition_surveys cs ON cs.vessel_id = v.id
             LEFT JOIN surveyors s ON s.id = cs.surveyor_id

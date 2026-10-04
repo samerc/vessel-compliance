@@ -59,6 +59,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [newDescription, setNewDescription] = useState('')
   const [newSeverity, setNewSeverity] = useState<'Critical' | 'Major' | 'Minor' | 'Observation' | ''>('')
   const [newDueDate, setNewDueDate] = useState('')
+  const [newDueEvent, setNewDueEvent] = useState('')
   const [newNotes, setNewNotes] = useState('')
 
   // Edit defect form
@@ -66,6 +67,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
   const [editDescription, setEditDescription] = useState('')
   const [editSeverity, setEditSeverity] = useState<'Critical' | 'Major' | 'Minor' | 'Observation' | ''>('')
   const [editDueDate, setEditDueDate] = useState('')
+  const [editDueEvent, setEditDueEvent] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
   useEffect(() => {
@@ -124,6 +126,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       severity: newSeverity ? (newSeverity as 'Critical' | 'Major' | 'Minor' | 'Observation') : undefined,
       status: 'OPEN',
       dueDate: newDueDate || undefined,
+      dueEvent: newDueEvent.trim() || undefined,
       notes: newNotes || undefined
     })
 
@@ -131,6 +134,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     setNewDescription('')
     setNewSeverity('')
     setNewDueDate('')
+    setNewDueEvent('')
     setNewNotes('')
     setShowAddForm(false)
     loadDefects()
@@ -143,6 +147,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
     setEditDescription(defect.description)
     setEditSeverity(defect.severity || '')
     setEditDueDate(defect.dueDate || '')
+    setEditDueEvent(defect.dueEvent || '')
     setEditNotes(defect.notes || '')
   }
 
@@ -154,6 +159,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       description: editDescription,
       severity: editSeverity ? (editSeverity as 'Critical' | 'Major' | 'Minor' | 'Observation') : undefined,
       dueDate: editDueDate || null,
+      dueEvent: editDueEvent.trim() || null,
       notes: editNotes || undefined
     })
 
@@ -297,6 +303,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
       'Severity': d.severity || 'Not Set',
       'Status': d.status,
       'Due Date': d.dueDate || '',
+      'Due Event': d.dueEvent || '',
       'Closed By': d.closedBy || '',
       'Closed At': d.closedAt ? formatDate(d.closedAt) : '',
       'Notes': d.notes || ''
@@ -336,6 +343,15 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
 
   return (
     <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-card)', borderRadius: '12px', border: 'var(--glass-border)' }}>
+      {/* Suggestions for the "due event" inputs (deadlines that are events, not dates) */}
+      <datalist id="defect-due-events">
+        <option value="Before next sailing" />
+        <option value="Prior to departure" />
+        <option value="At next dry dock" />
+        <option value="At next port" />
+        <option value="Upon completion of work" />
+        <option value="At next class survey" />
+      </datalist>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -523,6 +539,16 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
               aria-label="Due date"
               style={{ minWidth: '140px' }}
             />
+            <input
+              type="text"
+              list="defect-due-events"
+              placeholder="or due event (e.g. At next dry dock)"
+              value={newDueEvent}
+              onChange={(e) => setNewDueEvent(e.target.value)}
+              aria-label="Due event"
+              title="A deadline that is an event rather than a date"
+              style={{ minWidth: '220px', flex: 1 }}
+            />
           </div>
           <FormattedTextArea
             placeholder="Description *"
@@ -606,6 +632,16 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                       max="2100-12-31"
                       aria-label="Due date"
                       style={{ minWidth: '140px' }}
+                    />
+                    <input
+                      type="text"
+                      list="defect-due-events"
+                      placeholder="or due event (e.g. At next dry dock)"
+                      value={editDueEvent}
+                      onChange={(e) => setEditDueEvent(e.target.value)}
+                      aria-label="Due event"
+                      title="A deadline that is an event rather than a date"
+                      style={{ minWidth: '220px', flex: 1 }}
                     />
                   </div>
                   <FormattedTextArea
@@ -718,6 +754,12 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                     }}>
                       {defect.description}
                     </div>
+                    {defect.dueEvent && !defect.dueDate && (
+                      <div style={{ marginTop: '4px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock size={12} style={{ color: 'var(--text-secondary)' }} />
+                        <span style={{ color: 'var(--text-secondary)' }}>Due: {defect.dueEvent}</span>
+                      </div>
+                    )}
                     {defect.dueDate && (
                       <div style={{
                         marginTop: '4px',

@@ -421,6 +421,8 @@ export interface SurveyDefect {
   severity?: 'Critical' | 'Major' | 'Minor' | 'Observation'
   status: 'OPEN' | 'CLOSED'
   dueDate?: string | null
+  /** Deadline that is an event rather than a date ("Before next sailing", "At next dry dock") */
+  dueEvent?: string | null
   notes?: string
   closedAt?: string
   closedBy?: string

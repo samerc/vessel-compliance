@@ -2088,7 +2088,8 @@ app.whenReady().then(() => {
         description: defect.description,
         severity: defect.severity as any,
         status: 'OPEN',
-        dueDate: defect.dueDate
+        dueDate: defect.dueDate,
+        dueEvent: defect.dueEvent
       })
       importCount++
     }
