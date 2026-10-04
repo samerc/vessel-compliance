@@ -22,7 +22,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
-import { ALT_COLORS } from './shared'
+import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
 

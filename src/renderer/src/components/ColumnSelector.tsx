@@ -2,56 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Settings } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-
-export interface ColumnDef {
-  id: string
-  label: string
-  defaultVisible: boolean
-}
+import type { ColumnDef } from '../utils/useColumnPrefs'
 
 interface ColumnSelectorProps {
   pageKey: string
   allColumns: ColumnDef[]
   visibleColumns: string[]
   onChange: (columns: string[]) => void
-}
-
-export function useColumnPrefs(
-  pageKey: string,
-  allColumns: ColumnDef[]
-): {
-  visibleColumns: string[]
-  setVisibleColumns: (cols: string[]) => void
-  loaded: boolean
-} {
-  const [visibleColumns, setVisibleColumnsState] = useState<string[]>(() =>
-    allColumns.filter((c) => c.defaultVisible).map((c) => c.id)
-  )
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    window.api
-      .columnPrefsGet(pageKey)
-      .then((saved) => {
-        if (saved && Array.isArray(saved)) {
-          // Filter to only valid column IDs
-          const validIds = new Set(allColumns.map((c) => c.id))
-          const filtered = saved.filter((id) => validIds.has(id))
-          if (filtered.length > 0) {
-            setVisibleColumnsState(filtered)
-          }
-        }
-        setLoaded(true)
-      })
-      .catch(() => setLoaded(true))
-  }, [pageKey])
-
-  const setVisibleColumns = (cols: string[]) => {
-    setVisibleColumnsState(cols)
-    window.api.columnPrefsSet(pageKey, cols).catch(() => {})
-  }
-
-  return { visibleColumns, setVisibleColumns, loaded }
 }
 
 export default function ColumnSelector({

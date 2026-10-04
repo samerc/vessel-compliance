@@ -21,7 +21,8 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { getReportSettings } from '../services/ReportSettingsService'
-import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import ColumnSelector from './ColumnSelector'
+import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { PageHeader } from './ui'
 
 const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
@@ -68,12 +69,9 @@ function getModuleColor(module: string) {
   return MODULE_COLORS[module] || '#64748b'
 }
 
-export default function ActivityLog() {
-  const { hasPermission, user } = useAuth()
-  const { theme } = useTheme()
-  const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light' || theme === 'aurora'
-
+// Permission gate first, so the page's hooks always run in the same order
+export default function ActivityLog(): React.JSX.Element {
+  const { hasPermission } = useAuth()
   if (!hasPermission('admin:activityLog')) {
     return (
       <div
@@ -105,6 +103,14 @@ export default function ActivityLog() {
       </div>
     )
   }
+  return <ActivityLogView />
+}
+
+function ActivityLogView(): React.JSX.Element {
+  const { user } = useAuth()
+  const { theme } = useTheme()
+  const { showSuccess, showError } = useToast()
+  const isLight = theme === 'light' || theme === 'aurora'
 
   // Column preferences
   const ACTIVITY_COLUMNS: ColumnDef[] = [

@@ -32,7 +32,8 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
-import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import ColumnSelector from './ColumnSelector'
+import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
 
 function useDebounceValue<T>(value: T, delay: number): T {

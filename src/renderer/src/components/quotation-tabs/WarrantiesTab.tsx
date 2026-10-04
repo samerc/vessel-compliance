@@ -24,7 +24,8 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips, ALT_COLORS } from './shared'
+import { AlternativeScopeChips } from './shared'
+import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 
 export default function WarrantiesTab({

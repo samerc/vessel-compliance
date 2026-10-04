@@ -12,7 +12,8 @@ import {
 } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
-import { AlternativeScopeChips, ALT_COLORS, PickerDropdown, MoneyInput } from './shared'
+import { AlternativeScopeChips, PickerDropdown, MoneyInput } from './shared'
+import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
 
 export default function DeductiblesTab({

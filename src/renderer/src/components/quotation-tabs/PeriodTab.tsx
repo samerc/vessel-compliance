@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel } from '../../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
-import { fmtNiceDate } from './shared'
+import { fmtNiceDate } from './sharedUtils'
 
 export default function PeriodTab({
   quotation,

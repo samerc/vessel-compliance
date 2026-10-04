@@ -15,7 +15,7 @@ import {
 } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
-import { ALT_COLORS } from './shared'
+import { ALT_COLORS } from './sharedUtils'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { asArray, ok } from '../../utils/ipc'

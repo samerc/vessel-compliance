@@ -21,7 +21,8 @@ import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
-import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import ColumnSelector from './ColumnSelector'
+import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
 
 interface FleetDetailProps {

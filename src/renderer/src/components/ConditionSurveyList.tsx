@@ -13,7 +13,8 @@ import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
-import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import ColumnSelector from './ColumnSelector'
+import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import XLSX from 'xlsx-js-style'
 
 interface Props {

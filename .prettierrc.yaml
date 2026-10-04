@@ -2,3 +2,5 @@ singleQuote: true
 semi: false
 printWidth: 100
 trailingComma: none
+# The repo stores LF; with core.autocrlf the working copy can be CRLF. Accept either
+endOfLine: auto

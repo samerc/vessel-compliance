@@ -54,8 +54,9 @@ import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
-import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
-import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { exportCustomerCompliancePDF } from '../services/CustomerComplianceExport'
+import ColumnSelector from './ColumnSelector'
+import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { SanctionsBadge, EmptyState } from './ui'
 
 function jaroWinkler(s1: string, s2: string): number {

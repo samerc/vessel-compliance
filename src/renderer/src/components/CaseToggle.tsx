@@ -1,8 +1,8 @@
-export function toTitleCase(s: string): string {
+function toTitleCase(s: string): string {
   return s.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
 }
 
-export function cycleCase(s: string): string {
+function cycleCase(s: string): string {
   if (!s) return ''
   const upper = s.toUpperCase()
   const title = toTitleCase(s)

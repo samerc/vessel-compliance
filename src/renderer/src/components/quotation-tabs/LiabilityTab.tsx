@@ -8,7 +8,8 @@ import {
   PISectionTexts
 } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
-import { ALT_COLORS, MoneyInput, StrMoneyInput } from './shared'
+import { MoneyInput, StrMoneyInput } from './shared'
+import { ALT_COLORS } from './sharedUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { asArray, ok } from '../../utils/ipc'
 

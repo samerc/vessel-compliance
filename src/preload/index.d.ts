@@ -336,8 +336,8 @@ export interface Api {
     filePath: string
   ) => Promise<{ success: boolean; message?: string; count: number; skipped?: number }>
 
-  themeGet: () => Promise<'light' | 'dark' | 'premium'>
-  themeSet: (theme: 'light' | 'dark' | 'premium') => Promise<void>
+  themeGet: () => Promise<'light' | 'dark' | 'premium' | 'aurora'>
+  themeSet: (theme: 'light' | 'dark' | 'premium' | 'aurora') => Promise<void>
 
   windowGetPreferences: () => Promise<{
     width: number
