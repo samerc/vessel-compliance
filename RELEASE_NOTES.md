@@ -1,89 +1,30 @@
-## 7.6.0
+## 8.1.0
 
-### Entity Documents (Configurable)
-- Entity document types are now configurable in Admin Panel → Entity Document Types
-- Add/edit/reorder/toggle document types with Company/Person/Both scope
-- Existing 4 hardcoded types (CoI, AoA, KYC, ID/Passport) auto-migrated on upgrade
-- All compliance reports, dashboard, and vessel detail use dynamic types
+### New
+- New: Import scanned SIC letters: the app reads the Arabic names, writes them in English and saves the entries for you to check (works offline) [try:sic-import-letters]
+- New: Statement of Account: upload the accounting Excel and get a statement or invoice letter on the company letterhead, in Word or PDF [try:report-statement]
+- New: Search or jump anywhere with Ctrl+K, and a Features page listing everything the app can do [try:features]
+- New: Survey reports: defects imported accurately from Word and PDF reports, time scales become due dates or due events [try:surveys]
+- New: Converter: edit the survey warranty wording for each policy, and set the subjectivity days (default 7)
+- New: Policies: change the section order, subjectivity days and UPCC name of a single policy in Policy Detail [try:policies]
+- New: Additional discounts can be marked "not deducted from the premium", for a discount granted later; placeholders are listed under each discount
+- New: Signed policies, war declarations and signed endorsements re-export exactly the same file every time
 
-### AssuredManager Redesign
-- New: Compact table + slide-in panel layout (replaces expanded row pattern)
-- Panel shows entity details, documents, address, role editing, UBOs with doc scores
-- Entity name editable inline from the panel
+### Improved
+- Improved: Policy documents now match their quotation: hull conditions grouped under Hull and Machinery, Increased Value or both sections, the agreed value chosen in the converter, each alternative's own clause wording, items scoped to other vessels left out
+- Improved: War: the Debit Advice splits the premium into Section 1 and Section 2; same Section 1/2 wording in the editor, quotation and policy
+- Improved: UPCC is now "Upfront Profit Continuity Credit" and its name can be edited per quotation and per policy
+- Improved: A discount placed in the Premium section sits right below the premium
+- Improved: The outstanding premium notice starts unchecked for a new vessel and checked for renewals
+- Improved: Policy screen: compact instalment table, amounts in the policy's own currency
+- Improved: One page header style across the app, clearer buttons and dialogs, better light-mode colours
+- Improved: Faster start-up and lists; the weekly sanctions check now runs on schedule
+- Improved: Electron 44 and security updates, smaller installer
 
-### Quotation Registry
-- New: Excel-based quotation numbering system
-- Reference format: Q/{R|N}/{branch}/{YY}/{serial}
-- Configurable path in Admin Panel → File Paths
-- Reads last serial from Excel, respects manually-added rows
-- Cancelled numbers marked as CANCELLED in Remarks column
-
-### Quotation Workflow
-- New quotations auto-assigned initial workflow step
-- canEdit/canExport step constraints enforced in editor
-- Approved quotations are read-only with green banner
-- Status flow: draft → approved → exported → converted
-- Workflow log visible via History button in editor
-- Step deletion blocked when quotations exist on the step
-
-### Quotation Lock System
-- New: Heartbeat every 2 min keeps lock alive while editing
-- Inactivity detection: after 10 min idle, heartbeat stops
-- Lock expiry reduced from 30 min to 5 min
-- Admin force-unlock button in quotation list actions column
-- Locked quotations fully blocked from opening (not read-only)
-
-### Quotation Export
-- Date always shows today (not creation date)
-- Revision shown as centered "Rev.N" below title
-- Reference includes /RN suffix for revisions
-- Filename: {subject} - {type} Quote {year} - {broker}
-- TBA shown as Registered Owners when no assureds defined
-- Previous premium shown in red with UPCC discount
-- Draft export for users without approve permission
-
-### Premium Features
-- New: Pro-rata premium with auto-detection from period text
-- New: Outstanding premium notice (checkbox + configurable text + bold/underline)
-- New: Full premium in case of loss notice (checkbox + configurable text)
-- Cargo: Rate-based premium with auto-calculation
-- Deductible amounts show thousand separators (MoneyInput)
-- Previous premium and deductible values are now editable
-
-### Credit Advice
-- Broker name + address shown at top from quotation customer
-- Broker excluded from Insured section
-- Commission wording configurable in Policy Settings
-
-### Survey Warranty Templates
-- New: Title field for easy reference
-- New: {surveyor} and {dateofsurvey} placeholders
-- Templates and selected warranties visually separated in editor
-
-### UI/UX Improvements
-- P&I Conditions split into Clauses + Additional Clauses sub-tabs
-- Hull Conditions split into 3 sub-tabs (Conditions, Additional, Custom)
-- Exclusions tab: Select All / Deselect All buttons
-- Deductible row density reduced (previous amounts on second row)
-- Classification change confirmation: Replace or Add Alongside
-- IACS classification always displayed first when dual-classed
-- Sidebar reorganized: Renewals → Business, Calculators → Operations, File Manager → Admin, Fleet Analytics → Reports
-- Theme fixes: isLight check includes aurora theme across all components
-- Dashboard widget grid fixed (no more empty space)
-- Dashboard cards have visible borders in light mode
-
-### File Path Resolution
-- New: Configurable local↔network path mapping for VPN users
-- Auto-detects server vs remote from db-config host
-- Upload blocking for files not on the shared folder
-
-### Other
-- Editable username and full name for users
-- TBA vessel checkbox for cargo quotations
-- Quotation reference numbers include year (Q/P/26/1)
-- Starting serial configurable in Quotation Settings
-- Cargo warranties only visible when cargo clause selected
-- War excess export fixes (interest, sum insured, premiums)
-- Abandoned draft auto-cleanup (created <60s ago + no vessels)
-- Renewal quotations get quotationDate set (visible in list)
-- Period table: fixed double space between time and timezone
+### Fixed
+- Fixed: A failed save now shows an error instead of a success message
+- Fixed: Policy revisions keep every choice made for the policy (limit option, subjectivities, section order and more)
+- Fixed: Subjectivity days were not saved on policies (every policy said 7 days)
+- Fixed: Section-2-only war cover was charged a Section 1 premium in the converter
+- Fixed: Security: permission gaps and unsafe inputs closed
+- Fixed: Many smaller fixes behind the scenes (the whole code base was reviewed and tidied)
