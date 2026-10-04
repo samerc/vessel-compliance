@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Bell,
   MessageCircle,
@@ -41,7 +41,7 @@ const POLICY_TYPES = [
 ]
 const SYSTEM_TYPES = ['workflow_action_needed']
 
-function getTypeIcon(type: string) {
+function getTypeIcon(type: string): React.JSX.Element {
   switch (type) {
     case 'note_reply':
     case 'note_mention':
@@ -110,25 +110,28 @@ export default function NotificationsPage({
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [loading, setLoading] = useState(true)
 
-  const loadData = useCallback(async () => {
-    try {
-      const result = await window.api.notificationsGet({ limit: 100 })
-      if (result && !('error' in result)) {
-        setNotifications(result.data || [])
-        setUnreadCount(result.unreadCount || 0)
+  useEffect(() => {
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const result = await window.api.notificationsGet({ limit: 100 })
+        if (alive && result && !('error' in result)) {
+          setNotifications(result.data || [])
+          setUnreadCount(result.unreadCount || 0)
+        }
+      } catch (err) {
+        console.error('Failed to load notifications:', err)
+      } finally {
+        if (alive) setLoading(false)
       }
-    } catch (err) {
-      console.error('Failed to load notifications:', err)
-    } finally {
-      setLoading(false)
+    }
+    void run()
+    return () => {
+      alive = false
     }
   }, [])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const handleMarkAllRead = async () => {
+  const handleMarkAllRead = async (): Promise<void> => {
     try {
       await window.api.notificationsMarkAllRead()
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
@@ -138,7 +141,7 @@ export default function NotificationsPage({
     }
   }
 
-  const handleClick = async (notif: Notification) => {
+  const handleClick = async (notif: Notification): Promise<void> => {
     if (!notif.isRead) {
       try {
         await window.api.notificationsMarkRead(notif.id)
@@ -155,7 +158,7 @@ export default function NotificationsPage({
     }
   }
 
-  const handleDelete = async (e: React.MouseEvent, notif: Notification) => {
+  const handleDelete = async (e: React.MouseEvent, notif: Notification): Promise<void> => {
     e.stopPropagation()
     try {
       await window.api.notificationsDelete(notif.id)

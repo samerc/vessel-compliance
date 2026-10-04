@@ -92,7 +92,9 @@ export function parseHtmlToParagraphs(
           ? new Paragraph({
               spacing: {
                 after: spacingAfter,
-                ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {})
+                ...(defaultLineSpacing
+                  ? { line: defaultLineSpacing, lineRule: 'auto' as const }
+                  : {})
               },
               alignment: opts?.alignment,
               children: [new TextRun({ text: line, size, font, color })]
@@ -173,7 +175,7 @@ export function parseHtmlToParagraphs(
             italics: seg.italic,
             underline: seg.underline ? {} : undefined,
             rightToLeft: bidirectional || undefined
-          } as any)
+          })
       )
     )
 
@@ -181,7 +183,7 @@ export function parseHtmlToParagraphs(
     return new Paragraph({
       spacing: {
         after: spacingAfter,
-        ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {})
+        ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as const } : {})
       },
       alignment: alignment || opts?.alignment,
       bidirectional: bidirectional || undefined,
@@ -191,7 +193,7 @@ export function parseHtmlToParagraphs(
           ? { indent: { left: indentOffset } }
           : {}),
       children
-    } as any)
+    })
   }
 
   /** Detect if text contains RTL characters (Arabic, Hebrew) */
@@ -212,15 +214,13 @@ export function parseHtmlToParagraphs(
             new Paragraph({
               spacing: {
                 after: spacingAfter,
-                ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {})
+                ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as const } : {})
               },
               alignment: rtl ? AlignmentType.RIGHT : opts?.alignment,
               bidirectional: rtl || undefined,
               ...(indentOffset ? { indent: { left: indentOffset } } : {}),
-              children: [
-                new TextRun({ text, size, font, color, rightToLeft: rtl || undefined } as any)
-              ]
-            } as any)
+              children: [new TextRun({ text, size, font, color, rightToLeft: rtl || undefined })]
+            })
           )
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -275,7 +275,7 @@ export function parseHtmlToParagraphs(
                   bold: true,
                   italics: seg.italic,
                   underline: seg.underline ? {} : undefined
-                } as any)
+                })
             )
             paragraphs.push(
               new Paragraph({
@@ -283,7 +283,7 @@ export function parseHtmlToParagraphs(
                 alignment: align || opts?.alignment,
                 ...(indentOffset ? { indent: { left: indentOffset } } : {}),
                 children
-              } as any)
+              })
             )
           }
         } else if (tag === 'br') {

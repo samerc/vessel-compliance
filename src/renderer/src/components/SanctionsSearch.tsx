@@ -20,14 +20,14 @@ import {
   Loader2,
   ScanText
 } from 'lucide-react'
-import { SanctionsMatch } from '../../../shared/types'
+import { SanctionsMatch, SicEntityInput } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import SanctionsCheckReport from './SanctionsCheckReport'
 import SicLetterImport from './SicLetterImport'
 import { PageHeader } from './ui'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 import { hasArabic } from '../utils/arabicNames'
 
@@ -63,7 +63,10 @@ interface RemarkTemplate {
   text: string
 }
 
-export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {}) {
+export default function SanctionsSearch({
+  subTab,
+  subTabNonce
+}: SubTabProps = {}): React.JSX.Element {
   const { user, hasPermission } = useAuth()
   // Editing the local SIC list (same gate as the server)
   const canEditSic = hasPermission('compliance:review') || hasPermission('admin:settings')
@@ -102,25 +105,19 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
   const [templateForm, setTemplateForm] = useState<RemarkTemplate>({ label: '', text: '' })
   const [editingTemplateIdx, setEditingTemplateIdx] = useState<number | null>(null)
 
-  useEffect(() => {
+  // Follow the user's saved threshold when the user object changes (login / profile save)
+  const [thresholdUser, setThresholdUser] = useState(user)
+  if (user !== thresholdUser) {
+    setThresholdUser(user)
     if (user?.sanctionsThreshold !== undefined) {
       setThreshold(user.sanctionsThreshold)
     }
-  }, [user])
-
-  const loadRemarkTemplates = useCallback(async () => {
-    try {
-      const templates = await (window.api as any).sicGetRemarkTemplates()
-      setRemarkTemplates(Array.isArray(templates) ? templates : [])
-    } catch {
-      /* ignore */
-    }
-  }, [])
+  }
 
   const loadSicEntries = useCallback(async () => {
     setSicLoading(true)
     try {
-      const entries = await (window.api as any).sicGetEntities()
+      const entries = await window.api.sicGetEntities()
       setSicEntries(Array.isArray(entries) ? entries : [])
     } catch {
       /* ignore */
@@ -129,14 +126,41 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
   }, [])
 
   useEffect(() => {
-    loadRemarkTemplates()
-  }, [loadRemarkTemplates])
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const templates = await window.api.sicGetRemarkTemplates()
+        if (alive) setRemarkTemplates(Array.isArray(templates) ? templates : [])
+      } catch {
+        /* ignore */
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
-    if (activeTab === 'sic') loadSicEntries()
-  }, [activeTab, loadSicEntries])
+    if (activeTab !== 'sic') return
+    let alive = true
+    const run = async (): Promise<void> => {
+      setSicLoading(true)
+      try {
+        const entries = await window.api.sicGetEntities()
+        if (alive) setSicEntries(Array.isArray(entries) ? entries : [])
+      } catch {
+        /* ignore */
+      }
+      if (alive) setSicLoading(false)
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [activeTab])
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent): Promise<void> => {
     if (e) e.preventDefault()
     if (!query.trim()) return
 
@@ -146,10 +170,13 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
     setExpandedId(null)
 
     try {
-      const response = await (window.api as any).checkSanctions(query, threshold / 100, sources)
+      const response = await window.api.checkSanctions(query, threshold / 100, sources)
 
       if (response.status === 'ERROR') {
-        setError((response as any).error || 'An error occurred during search')
+        setError(
+          ('error' in response && typeof response.error === 'string' && response.error) ||
+            'An error occurred during search'
+        )
         setResults([])
       } else {
         const filteredMatches = (response.matches || []).filter(
@@ -157,27 +184,29 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
         )
         setResults(filteredMatches)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect to sanctions service')
+    } catch (err) {
+      setError((err instanceof Error && err.message) || 'Failed to connect to sanctions service')
     } finally {
       setIsSearching(false)
     }
   }
 
-  const handleThresholdChange = (newThreshold: number) => {
+  const handleThresholdChange = (newThreshold: number): void => {
     setThreshold(newThreshold)
     if (user) {
-      ;(window.api as any).updateSanctionsThreshold(newThreshold)
+      window.api.updateSanctionsThreshold(newThreshold)
     }
   }
 
-  const toggleSource = (source: string) => {
+  const toggleSource = (source: string): void => {
     setSources((prev) =>
       prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
     )
   }
 
-  const getSourceColor = (source: string) => {
+  const getSourceColor = (
+    source: string
+  ): '#ff6b6b' | '#4dabf7' | '#69db7c' | '#ffd43b' | '#ff922b' | '#e599f7' => {
     switch (source.toLowerCase()) {
       case 'ofac':
         return '#ff6b6b'
@@ -196,7 +225,9 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
     }
   }
 
-  const getScoreColor = (score?: number) => {
+  const getScoreColor = (
+    score?: number
+  ): '#ff6b6b' | 'var(--text-secondary)' | '#ffc107' | 'var(--success)' => {
     if (!score) return 'var(--text-secondary)'
     if (score >= 0.9) return '#ff6b6b'
     if (score >= 0.7) return '#ffc107'
@@ -204,14 +235,14 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
   }
 
   // SIC handlers
-  const openAddSic = () => {
+  const openAddSic = (): void => {
     setEditingSic(null)
     setSicForm({ ...EMPTY_FORM })
     setAliasInput('')
     setShowSicModal(true)
   }
 
-  const openEditSic = (entry: SicEntry) => {
+  const openEditSic = (entry: SicEntry): void => {
     setEditingSic(entry)
     setSicForm({
       name: entry.name,
@@ -229,12 +260,12 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
     setShowSicModal(true)
   }
 
-  const handleSaveSic = async () => {
+  const handleSaveSic = async (): Promise<void> => {
     if (!sicForm.name.trim()) return
     try {
       const payload = {
         name: sicForm.name.trim(),
-        entityType: sicForm.entity_type,
+        entityType: sicForm.entity_type as SicEntityInput['entityType'],
         sourceId: sicForm.source_id || null,
         aliases: sicForm.aliases,
         dateOfBirth: sicForm.date_of_birth || null,
@@ -245,75 +276,75 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
         fatherName: sicForm.father_name || null
       }
       const res = editingSic
-        ? await (window.api as any).sicUpdateEntity(editingSic.id, payload)
-        : await (window.api as any).sicAddEntity(payload)
+        ? await window.api.sicUpdateEntity(editingSic.id, payload)
+        : await window.api.sicAddEntity(payload)
       // safeHandle returns { error: true, message } instead of throwing
-      if (res && res.error) {
+      if (isIpcError(res)) {
         showError(res.message || 'Failed to save SIC entry')
         return
       }
       showSuccess(editingSic ? 'SIC entry updated' : 'SIC entry added')
       setShowSicModal(false)
       await loadSicEntries()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save')
     }
   }
 
-  const handleDeleteSic = async (id: number) => {
+  const handleDeleteSic = async (id: number): Promise<void> => {
     try {
-      const res = await (window.api as any).sicDeleteEntity(id)
-      if (res && res.error) {
+      const res = await window.api.sicDeleteEntity(id)
+      if (isIpcError(res)) {
         showError(res.message || 'Failed to delete')
         return
       }
       showSuccess('SIC entry deleted')
       setDeleteConfirm(null)
       await loadSicEntries()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
-  const handleImportSic = async () => {
+  const handleImportSic = async (): Promise<void> => {
     try {
       const filePath = await window.api.dialogOpenFile()
       if (!filePath) return
-      const importResult = await (window.api as any).sicImport(filePath)
-      if (importResult && importResult.error) {
+      const importResult = await window.api.sicImport(filePath)
+      if (isIpcError(importResult)) {
         showError(importResult.message || 'Failed to import')
         return
       }
       showSuccess(`Imported ${importResult.count} SIC entries`)
       loadSicEntries()
-    } catch (err: any) {
-      showError(err.message || 'Import failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Import failed')
     }
   }
 
-  const addAlias = () => {
+  const addAlias = (): void => {
     const a = aliasInput.trim()
     if (!a || sicForm.aliases.includes(a)) return
     setSicForm((prev) => ({ ...prev, aliases: [...prev.aliases, a] }))
     setAliasInput('')
   }
 
-  const removeAlias = (idx: number) => {
+  const removeAlias = (idx: number): void => {
     setSicForm((prev) => ({ ...prev, aliases: prev.aliases.filter((_, i) => i !== idx) }))
   }
 
-  const openTemplateManager = () => {
+  const openTemplateManager = (): void => {
     setEditingTemplateIdx(null)
     setTemplateForm({ label: '', text: '' })
     setShowTemplateManager(true)
   }
 
-  const startEditTemplate = (t: RemarkTemplate, idx: number) => {
+  const startEditTemplate = (t: RemarkTemplate, idx: number): void => {
     setEditingTemplateIdx(idx)
     setTemplateForm({ label: t.label, text: t.text })
   }
 
-  const saveTemplate = async () => {
+  const saveTemplate = async (): Promise<void> => {
     if (!templateForm.label.trim() || !templateForm.text.trim()) return
     const updated = [...remarkTemplates]
     if (editingTemplateIdx !== null) {
@@ -322,28 +353,28 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
       updated.push({ ...templateForm })
     }
     try {
-      await (window.api as any).sicSetRemarkTemplates(updated)
+      await window.api.sicSetRemarkTemplates(updated)
       setRemarkTemplates(updated)
       setEditingTemplateIdx(null)
       setTemplateForm({ label: '', text: '' })
       showSuccess(editingTemplateIdx !== null ? 'Template updated' : 'Template added')
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save')
     }
   }
 
-  const deleteTemplate = async (idx: number) => {
+  const deleteTemplate = async (idx: number): Promise<void> => {
     const updated = remarkTemplates.filter((_, i) => i !== idx)
     try {
-      ok(await (window.api as any).sicSetRemarkTemplates(updated))
+      ok(await window.api.sicSetRemarkTemplates(updated))
       setRemarkTemplates(updated)
       if (editingTemplateIdx === idx) {
         setEditingTemplateIdx(null)
         setTemplateForm({ label: '', text: '' })
       }
       showSuccess('Template deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
@@ -380,7 +411,7 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
     display: 'block'
   }
 
-  const handleUpdateLists = async () => {
+  const handleUpdateLists = async (): Promise<void> => {
     const SANCTION_SOURCES = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
     setUpdatingLists(true)
     let total = 0
@@ -392,10 +423,12 @@ export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {
         setUpdateProgress(`${src} (${i + 1}/${SANCTION_SOURCES.length})`)
         try {
           const res = await window.api.sanctionsRefresh(src)
-          if (res && ((res as any).error || (res as any).status === 'error')) {
+          // One source was requested, so the result is a single object
+          const single = Array.isArray(res) ? undefined : res
+          if (single && (single.error || single.status === 'error')) {
             failed.push(src)
           } else {
-            total += (res as any)?.count || 0
+            total += single?.count || 0
           }
         } catch {
           failed.push(src)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import {
   AlertCircle,
@@ -33,7 +33,12 @@ import {
   ComplianceCheckResult,
   CustomValidationRule,
   EntityDocumentType,
-  EntityDocument
+  EntityDocument,
+  VesselAssured,
+  EndorsementDueRow,
+  PolicyExpiryRow,
+  SanctionsMatch,
+  VesselDynamicPolicy
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -148,6 +153,25 @@ const EMPTY_RULE_FORM = {
   severity: 'warning'
 }
 
+/**
+ * vessel_assureds row as read here. getVesselAssureds returns only the VesselAssured columns,
+ * so the entity fields below are never set (kept because the alert builder reads them).
+ */
+type AssuredRow = VesselAssured & { entityType?: string; entityName?: string; name?: string }
+
+/** One document/entity/endorsement alert in the Document Alerts tab */
+interface DocAlert {
+  id: string
+  vesselId: string
+  vessel: string
+  document: string
+  category: 'vessel' | 'entity' | 'endorsement'
+  type: 'missing' | 'expired' | 'soon'
+  severity: 'high' | 'critical' | 'medium'
+  message: string
+  date: string
+}
+
 interface ComplianceCenterProps extends SubTabProps {
   onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
   initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
@@ -160,34 +184,25 @@ export default function ComplianceCenter({
   onTabChange,
   subTab,
   subTabNonce
-}: ComplianceCenterProps) {
+}: ComplianceCenterProps): React.JSX.Element {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [docs, setDocs] = useState<VesselDocument[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
-  const [allAssureds, setAllAssureds] = useState<any[]>([])
+  const [allAssureds, setAllAssureds] = useState<AssuredRow[]>([])
   const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
   const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
   const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
   const [docSearch, setDocSearch] = useState('')
-  const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
+  const [endorsementsDue, setEndorsementsDue] = useState<EndorsementDueRow[]>([])
   const [activeTab, setActiveTabRaw] = useState<
     'documents' | 'policies' | 'sanctions' | 'dataQuality'
   >(initialTab || 'documents')
-  const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
+  const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality'): void => {
     setActiveTabRaw(tab)
     onTabChange?.(tab)
   }
-  useRequestedSubTab(
-    subTab,
-    subTabNonce,
-    ['documents', 'policies', 'sanctions', 'dataQuality'] as const,
-    (k) => {
-      setActiveTab(k)
-      if (k === 'dataQuality') loadDataValidation()
-    }
-  )
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
   const { hasPermission } = useAuth()
@@ -197,8 +212,8 @@ export default function ComplianceCenter({
   // Sanctions compliance state
   const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
   const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
-  const [policyAlerts, setPolicyAlerts] = useState<any[]>([])
-  const [policyExpiringSoon, setPolicyExpiringSoon] = useState<any[]>([])
+  const [policyAlerts, setPolicyAlerts] = useState<PolicyExpiryRow[]>([])
+  const [policyExpiringSoon, setPolicyExpiringSoon] = useState<PolicyExpiryRow[]>([])
   const [policyFilter, setPolicyFilter] = useState<'expired' | 'expiring'>('expired')
   const [selectedSanctions, setSelectedSanctions] = useState<Set<string>>(new Set())
   const [expandedResult, setExpandedResult] = useState<string | null>(null)
@@ -238,27 +253,7 @@ export default function ComplianceCenter({
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
   const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM)
 
-  useEffect(() => {
-    loadData()
-    loadSanctionsData()
-    loadPolicyAlerts()
-    loadCustomRules()
-    window.api.getSetting('data_validation_rules').then((raw) => {
-      if (raw) {
-        try {
-          setRuleToggles(JSON.parse(raw))
-        } catch {
-          /* ignore */
-        }
-      }
-    })
-  }, [])
-
-  useEffect(() => {
-    loadSanctionsData()
-  }, [resultsPage, resultsLimit])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       const [vData, dData, tData, edtData, edData, assuredData, endorsements] = await Promise.all([
         window.api.getVessels(),
@@ -269,10 +264,10 @@ export default function ComplianceCenter({
         window.api.getVesselAssureds(),
         window.api.surveyWarrantyGetEndorsementsDue().catch(() => [])
       ])
-      setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
+      setVessels(Array.isArray(vData) ? vData.filter((v) => v.isActive !== false) : [])
       setDocs(Array.isArray(dData) ? dData : [])
       setDocTypes(Array.isArray(tData) ? tData : [])
-      setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t: any) => t.isActive) : [])
+      setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t) => t.isActive) : [])
       setEntityDocs(Array.isArray(edData) ? edData : [])
       setAllAssureds(Array.isArray(assuredData) ? assuredData : [])
       setEndorsementsDue(Array.isArray(endorsements) ? endorsements : [])
@@ -282,9 +277,9 @@ export default function ComplianceCenter({
       setDocs([])
       setDocTypes([])
     }
-  }
+  }, [])
 
-  const loadSanctionsData = async () => {
+  const loadSanctionsData = useCallback(async (): Promise<void> => {
     try {
       const [result, logs] = await Promise.all([
         window.api.complianceGetCheckResultsPaginated({
@@ -306,9 +301,18 @@ export default function ComplianceCenter({
       setResultsTotalPages(0)
       setCheckLogs([])
     }
-  }
+  }, [resultsPage, resultsLimit])
 
-  const loadPolicyAlerts = async () => {
+  const loadCustomRules = useCallback(async (): Promise<void> => {
+    try {
+      const rules = await window.api.validationRulesGetAll()
+      if (Array.isArray(rules)) setCustomRules(rules)
+    } catch {
+      setCustomRules([])
+    }
+  }, [])
+
+  const loadPolicyAlerts = useCallback(async (): Promise<void> => {
     try {
       const [expired, expiring] = await Promise.all([
         window.api.getExpiredActivePolicies(),
@@ -320,9 +324,9 @@ export default function ComplianceCenter({
       setPolicyAlerts([])
       setPolicyExpiringSoon([])
     }
-  }
+  }, [])
 
-  const loadDataValidation = async () => {
+  const loadDataValidation = useCallback(async (): Promise<void> => {
     setValidationLoading(true)
     try {
       const [result, customResults] = await Promise.all([
@@ -343,9 +347,43 @@ export default function ComplianceCenter({
     } finally {
       setValidationLoading(false)
     }
-  }
+  }, [])
 
-  const toggleRule = (ruleId: string) => {
+  useEffect(() => {
+    // Initial loads: every loader sets state only after its IPC call resolves
+    const run = async (): Promise<void> => {
+      await Promise.all([loadData(), loadPolicyAlerts(), loadCustomRules()])
+    }
+    void run()
+    window.api.getSetting('data_validation_rules').then((raw) => {
+      if (raw) {
+        try {
+          setRuleToggles(JSON.parse(raw))
+        } catch {
+          /* ignore */
+        }
+      }
+    })
+  }, [loadData, loadPolicyAlerts, loadCustomRules])
+
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadSanctionsData()
+    }
+    void run()
+  }, [loadSanctionsData])
+
+  useRequestedSubTab(
+    subTab,
+    subTabNonce,
+    ['documents', 'policies', 'sanctions', 'dataQuality'] as const,
+    (k) => {
+      setActiveTab(k)
+      if (k === 'dataQuality') loadDataValidation()
+    }
+  )
+
+  const toggleRule = (ruleId: string): void => {
     setExpandedRules((prev) => {
       const next = new Set(prev)
       if (next.has(ruleId)) next.delete(ruleId)
@@ -354,22 +392,13 @@ export default function ComplianceCenter({
     })
   }
 
-  const toggleRuleEnabled = (ruleId: string) => {
+  const toggleRuleEnabled = (ruleId: string): void => {
     const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
     setRuleToggles(next)
     window.api.setSetting('data_validation_rules', JSON.stringify(next)).then(ok)
   }
 
-  const loadCustomRules = async () => {
-    try {
-      const rules = await window.api.validationRulesGetAll()
-      if (Array.isArray(rules)) setCustomRules(rules)
-    } catch {
-      setCustomRules([])
-    }
-  }
-
-  const handleSaveRule = async () => {
+  const handleSaveRule = async (): Promise<void> => {
     if (!ruleForm.name.trim()) {
       showError('Rule name is required')
       return
@@ -417,33 +446,33 @@ export default function ComplianceCenter({
       setRuleForm(EMPTY_RULE_FORM)
       loadCustomRules()
       loadDataValidation()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to save rule')
+    } catch (e) {
+      showError((e as { message?: string } | null)?.message || 'Failed to save rule')
     }
   }
 
-  const handleDeleteRule = async (id: string) => {
+  const handleDeleteRule = async (id: string): Promise<void> => {
     try {
       await window.api.validationRulesDelete(id)
       showSuccess('Rule deleted')
       loadCustomRules()
       loadDataValidation()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to delete rule')
+    } catch (e) {
+      showError((e as { message?: string } | null)?.message || 'Failed to delete rule')
     }
   }
 
-  const handleToggleCustomRule = async (rule: CustomValidationRule) => {
+  const handleToggleCustomRule = async (rule: CustomValidationRule): Promise<void> => {
     try {
       await window.api.validationRulesUpdate(rule.id, { isEnabled: !rule.isEnabled })
       loadCustomRules()
       loadDataValidation()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to toggle rule')
+    } catch (e) {
+      showError((e as { message?: string } | null)?.message || 'Failed to toggle rule')
     }
   }
 
-  const handleEditRule = (rule: CustomValidationRule) => {
+  const handleEditRule = (rule: CustomValidationRule): void => {
     setEditingRuleId(rule.id)
     setRuleForm({
       name: rule.name,
@@ -457,14 +486,17 @@ export default function ComplianceCenter({
     setShowAddRule(true)
   }
 
-  const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
+  const handleDecideMatch = async (
+    resultId: string,
+    decision: 'sanctioned' | 'cleared'
+  ): Promise<void> => {
     try {
       await window.api.complianceDecideResult(resultId, decision)
       showSuccess(`Match marked as ${decision}`)
       loadSanctionsData()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to decide match:', error)
-      showError(error?.message || 'Failed to update the match')
+      showError((error as { message?: string } | null)?.message || 'Failed to update the match')
     }
   }
 
@@ -472,7 +504,7 @@ export default function ComplianceCenter({
   // Guarded so a second click cannot start a parallel run over the same selection.
   const bulkDecidingRef = useRef(false)
   const [bulkDeciding, setBulkDeciding] = useState(false)
-  const handleBulkDecide = async (decision: 'sanctioned' | 'cleared') => {
+  const handleBulkDecide = async (decision: 'sanctioned' | 'cleared'): Promise<void> => {
     if (bulkDecidingRef.current || selectedSanctions.size === 0) return
     const n = selectedSanctions.size
     const label = decision === 'cleared' ? 'Clear' : 'Sanction'
@@ -501,12 +533,14 @@ export default function ComplianceCenter({
     }
   }
 
-  const getAllAlerts = () => {
+  // Every document/entity alert across the fleet — recomputed only when its inputs change
+  // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
+  const alerts = useMemo((): DocAlert[] => {
     const today = new Date()
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(today.getDate() + 30)
 
-    const alerts: any[] = []
+    const alerts: DocAlert[] = []
 
     vessels.forEach((v) => {
       // Vessel document alerts
@@ -643,29 +677,21 @@ export default function ComplianceCenter({
       )
     }
     return filtered
-  }
-
-  // Every document/entity alert across the fleet — recomputed only when its inputs change
-  // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const alerts = useMemo(
-    () => getAllAlerts(),
-    [
-      vessels,
-      docs,
-      docTypes,
-      entityDocTypes,
-      entityDocs,
-      allAssureds,
-      filter,
-      docSearch,
-      endorsementsDue
-    ]
-  )
+  }, [
+    vessels,
+    docs,
+    docTypes,
+    entityDocTypes,
+    entityDocs,
+    allAssureds,
+    filter,
+    docSearch,
+    endorsementsDue
+  ])
 
   // Group alerts by vessel
   const alertsByVessel = alerts.reduce<
-    Record<string, { vesselId: string; vessel: string; alerts: any[] }>
+    Record<string, { vesselId: string; vessel: string; alerts: DocAlert[] }>
   >((acc, a) => {
     if (!acc[a.vesselId]) acc[a.vesselId] = { vesselId: a.vesselId, vessel: a.vessel, alerts: [] }
     acc[a.vesselId].alerts.push(a)
@@ -676,7 +702,7 @@ export default function ComplianceCenter({
   )
 
   // Group alerts by document type
-  const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: any[] }>>(
+  const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: DocAlert[] }>>(
     (acc, a) => {
       const docKey = a.document.replace(/\s*\(.*\)$/, '') // Strip entity name for grouping
       if (!acc[docKey]) acc[docKey] = { document: docKey, alerts: [] }
@@ -689,13 +715,15 @@ export default function ComplianceCenter({
     (a, b) => b.alerts.length - a.alerts.length
   )
 
-  const handleChangePolicyStatus = async (policyId: string, newStatus: string) => {
+  const handleChangePolicyStatus = async (policyId: string, newStatus: string): Promise<void> => {
     try {
-      await window.api.updateVesselDynamicPolicy(policyId, { status: newStatus } as any)
+      await window.api.updateVesselDynamicPolicy(policyId, {
+        status: newStatus as VesselDynamicPolicy['status']
+      })
       showSuccess(`Policy status changed to ${newStatus}`)
       loadPolicyAlerts()
-    } catch (e: any) {
-      showError(e.message || 'Failed to update policy status')
+    } catch (e) {
+      showError((e as { message?: string }).message || 'Failed to update policy status')
     }
   }
 
@@ -1413,7 +1441,7 @@ export default function ComplianceCenter({
                     </tr>
                   </thead>
                   <tbody>
-                    {activePolicies.map((alert: any, idx: number) => {
+                    {activePolicies.map((alert, idx) => {
                       const endDate = alert.endDate ? new Date(alert.endDate) : null
                       const today = new Date()
                       const diffDays = endDate
@@ -2817,8 +2845,10 @@ export default function ComplianceCenter({
                                 </div>
                                 {(() => {
                                   try {
-                                    const matches = JSON.parse(result.matchDetails || '[]')
-                                    return matches.map((m: any, i: number) => (
+                                    const matches: Partial<SanctionsMatch>[] = JSON.parse(
+                                      result.matchDetails || '[]'
+                                    )
+                                    return matches.map((m, i) => (
                                       <div
                                         key={i}
                                         style={{
@@ -3044,7 +3074,21 @@ export default function ComplianceCenter({
   )
 }
 
-function FilterButton({ active, onClick, label, color, count }: any) {
+interface FilterButtonProps {
+  active: boolean
+  onClick: () => void
+  label: string
+  color?: string
+  count?: number
+}
+
+function FilterButton({
+  active,
+  onClick,
+  label,
+  color,
+  count
+}: FilterButtonProps): React.JSX.Element {
   return (
     <button
       onClick={onClick}

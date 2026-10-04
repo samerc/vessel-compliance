@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
 import {
   Quotation,
@@ -23,8 +23,8 @@ export default function InsuredTab({
   vessels?: Vessel[]
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  updateField: (f: string, v: any) => void
-}) {
+  updateField: (f: string, v: unknown) => void
+}): React.JSX.Element {
   void _vessels
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -48,11 +48,7 @@ export default function InsuredTab({
     quotation.customerType || ''
   )
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     const [a, r, e, qv, g] = await Promise.all([
       window.api.getQuotationAssureds(quotation.id),
       window.api.getAssuredRoles(),
@@ -67,7 +63,15 @@ export default function InsuredTab({
     setGroups(Array.isArray(g) ? g : [])
   }
 
-  const handleAddAssured = async () => {
+  // Initial load, once on mount (loadData reads the latest props).
+  const loadOnMount = useEffectEvent(loadData)
+  useEffect(() => {
+    void (async () => {
+      await loadOnMount()
+    })()
+  }, [])
+
+  const handleAddAssured = async (): Promise<void> => {
     if (!newName.trim()) return
     try {
       await window.api.addQuotationAssured({
@@ -86,12 +90,12 @@ export default function InsuredTab({
       setNewGroupId('')
       showSuccess('Assured added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add assured')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add assured')
     }
   }
 
-  const handleCreateRole = async () => {
+  const handleCreateRole = async (): Promise<void> => {
     if (!newRoleName.trim()) return
     try {
       const created = await window.api.addAssuredRole({ name: newRoleName.trim() })
@@ -100,24 +104,24 @@ export default function InsuredTab({
       setNewRoleName('')
       setShowNewRoleInput(false)
       showSuccess('Role created')
-    } catch (err: any) {
-      showError(err.message || 'Failed to create role')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to create role')
     }
   }
 
-  const handleDeleteAssured = async (id: string) => {
+  const handleDeleteAssured = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Remove this assured from the quotation?'))) return
     await window.api.deleteQuotationAssured(id)
     showSuccess('Assured removed')
     loadData()
   }
 
-  const handleUpdateVesselLabel = async (id: string, label: string) => {
+  const handleUpdateVesselLabel = async (id: string, label: string): Promise<void> => {
     await window.api.updateQuotationAssured(id, { vesselLabel: label || undefined })
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...assureds]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -126,29 +130,29 @@ export default function InsuredTab({
     await window.api.reorderQuotationAssureds(newOrder.map((a) => a.id))
   }
 
-  const handleAddGroup = async (defaultName?: string) => {
+  const handleAddGroup = async (defaultName?: string): Promise<void> => {
     const name = defaultName || newGroupName.trim()
     if (!name) return
     try {
       const result = await window.api.addQuotationAssuredGroup(quotation.id, name)
-      if (result && !(result as any).error) {
+      if (result && !('error' in result && result.error)) {
         setGroups((prev) => [...prev, result])
         setNewGroupName('')
         showSuccess('Group added')
       } else {
         showError('Failed to add group')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to add group')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add group')
     }
   }
 
-  const handleChangeGroup = async (assuredId: string, groupId: string | null) => {
+  const handleChangeGroup = async (assuredId: string, groupId: string | null): Promise<void> => {
     await window.api.updateQuotationAssured(assuredId, { groupId: groupId || undefined })
     loadData()
   }
 
-  const saveCoName = (val: string) => {
+  const saveCoName = (val: string): void => {
     updateField('coName', val || null)
     // Try to match to an entity for customerEntityId
     const matched = entities.find((e) => e.name.toLowerCase().trim() === val.toLowerCase().trim())
@@ -178,7 +182,7 @@ export default function InsuredTab({
     )
     .slice(0, 8)
 
-  const renderAssuredRow = (a: QuotationAssured, _idx: number) => {
+  const renderAssuredRow = (a: QuotationAssured): React.JSX.Element => {
     const i = assureds.indexOf(a)
     return (
       <div
@@ -521,7 +525,7 @@ export default function InsuredTab({
         <button
           onClick={async () => {
             const result = await window.api.addQuotationAssuredGroup(quotation.id, 'ASSURED')
-            if (result && !(result as any).error) {
+            if (result && !('error' in result && result.error)) {
               setGroups([result])
               showSuccess('Group added — assign assureds to groups using the dropdown')
             }
@@ -781,7 +785,7 @@ export default function InsuredTab({
                   >
                     {g.name}
                   </div>
-                  {groupAssureds.map((a, i) => renderAssuredRow(a, i))}
+                  {groupAssureds.map((a) => renderAssuredRow(a))}
                   {groupAssureds.length === 0 && (
                     <p
                       style={{
@@ -813,7 +817,7 @@ export default function InsuredTab({
                 >
                   Ungrouped
                 </div>
-                {assureds.filter((a) => !a.groupId).map((a, i) => renderAssuredRow(a, i))}
+                {assureds.filter((a) => !a.groupId).map((a) => renderAssuredRow(a))}
               </div>
             )}
           </>
@@ -839,7 +843,7 @@ export default function InsuredTab({
                   >
                     {qv.vesselLabel} — {(qv.name || qv.vesselLabel).toUpperCase()}
                   </div>
-                  {vesselAssureds.map((a, i) => renderAssuredRow(a, i))}
+                  {vesselAssureds.map((a) => renderAssuredRow(a))}
                 </div>
               )
             })}
@@ -859,13 +863,13 @@ export default function InsuredTab({
                 >
                   All Vessels
                 </div>
-                {assureds.filter((a) => !a.vesselLabel).map((a, i) => renderAssuredRow(a, i))}
+                {assureds.filter((a) => !a.vesselLabel).map((a) => renderAssuredRow(a))}
               </div>
             )}
           </>
         ) : (
           /* Flat list (single vessel, no groups) */
-          assureds.map((a, i) => renderAssuredRow(a, i))
+          assureds.map((a) => renderAssuredRow(a))
         )}
         {assureds.length === 0 && (
           <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>

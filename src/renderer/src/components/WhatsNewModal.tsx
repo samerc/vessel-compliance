@@ -101,7 +101,7 @@ export default function WhatsNewModal({
   onViewChangelog,
   appVersion,
   onTry
-}: WhatsNewModalProps) {
+}: WhatsNewModalProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -112,6 +112,24 @@ export default function WhatsNewModal({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    function loadFallback(): void {
+      const entry = appVersion ? WHATS_NEW.find((e) => e.version === appVersion) : WHATS_NEW[0]
+      if (!entry) {
+        if (appVersion) setVersion(appVersion)
+        return
+      }
+      setVersion(entry.version)
+      setDate(entry.date)
+      setItems(
+        entry.items.map((i) => ({
+          kind: 'tagged' as const,
+          tag: i.tag,
+          text: i.text,
+          featureId: i.featureId
+        }))
+      )
+    }
+
     changelogService
       .getChangelogs()
       .then((data) => {
@@ -147,26 +165,8 @@ export default function WhatsNewModal({
       .finally(() => setLoading(false))
   }, [appVersion])
 
-  function loadFallback() {
-    const entry = appVersion ? WHATS_NEW.find((e) => e.version === appVersion) : WHATS_NEW[0]
-    if (!entry) {
-      if (appVersion) setVersion(appVersion)
-      return
-    }
-    setVersion(entry.version)
-    setDate(entry.date)
-    setItems(
-      entry.items.map((i) => ({
-        kind: 'tagged' as const,
-        tag: i.tag,
-        text: i.text,
-        featureId: i.featureId
-      }))
-    )
-  }
-
   // Only for features that exist (an old note may name a removed one)
-  const tryButton = (featureId?: string) =>
+  const tryButton = (featureId?: string): React.JSX.Element | null =>
     featureId && onTry && FEATURES.some((f) => f.id === featureId) ? (
       <button
         className="btn-ghost btn-sm"
@@ -255,7 +255,7 @@ export default function WhatsNewModal({
             <Sparkles size={22} color="white" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700' }}>What's New</h2>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700' }}>What&apos;s New</h2>
             {!loading && version && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
                 <span

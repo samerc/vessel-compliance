@@ -30,10 +30,10 @@ export default function TradingTab({
   quotation: Quotation
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   getEffectiveText: (key: keyof PISectionTexts) => string
-}) {
+}): React.JSX.Element {
   const [countries, setCountries] = useState<QuotationExcludedCountry[]>([])
   const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
   const [customTexts, setCustomTexts] = useState<TradingCustomText[]>([])
@@ -44,89 +44,95 @@ export default function TradingTab({
   const [newCountryName, setNewCountryName] = useState('')
   const [newCountryType, setNewCountryType] = useState<'excluded' | 'ddq'>('excluded')
 
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
+
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    const [qc, masterCountries, tpls, custTexts, qv, intros] = await Promise.all([
-      window.api.getQuotationExcludedCountries(quotation.id),
-      window.api.piGetTradingExcludedCountries(),
-      window.api.piGetTradingWarrantyTemplates(),
-      window.api.piGetTradingCustomTexts(),
-      window.api.getQuotationVessels(quotation.id),
-      window.api.tradingGetIntros(quotation.id)
-    ])
-    // A failed load must stop here: treating it as "no countries" would re-seed the
-    // defaults over the quotation's real list
-    if (!Array.isArray(qc)) {
-      showError((qc as any)?.message || 'Failed to load trading countries')
-      return
-    }
-    setQVessels(Array.isArray(qv) ? qv : [])
-    setTradingIntros(Array.isArray(intros) ? intros : [])
-    setCustomTexts(Array.isArray(custTexts) ? custTexts : [])
-    setTemplates(Array.isArray(tpls) ? tpls : [])
-    // Deduplicate by name+listType (legacy data may have duplicates)
-    const seen = new Set<string>()
-    const deduped = qc.filter((c) => {
-      const key = `${c.name}|${c.listType}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    if (deduped.length < qc.length) {
-      await window.api.setQuotationExcludedCountries(
-        quotation.id,
-        deduped.map((c) => ({ name: c.name, listType: c.listType }))
-      )
-      const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
-      setCountries(asArray(refreshed))
-      return
-    }
-    setCountries(qc)
-    if (
-      qc.length === 0 &&
-      Array.isArray(masterCountries) &&
-      masterCountries.length > 0 &&
-      !initRef.current
-    ) {
-      initRef.current = true
-      const typeCode = quotation.quotationTypeCode || 'P'
-      // Filter master countries by exclude_types: null = all types, otherwise check type code
-      const typeFiltered = masterCountries.filter((c: any) => {
-        if (!c.excludeTypes) return true // null = applies to all types
-        return c.excludeTypes.split(',').includes(typeCode)
-      })
-      // Check for type-specific default excluded countries (legacy app_settings override)
-      let countriesToSet: { name: string; listType: string }[] = typeFiltered
-      try {
-        const typeDefaultsRaw = await window.api.getSetting(
-          `default_excluded_countries_${typeCode}`
+    const run = async (): Promise<void> => {
+      const [qc, masterCountries, tpls, custTexts, qv, intros] = await Promise.all([
+        window.api.getQuotationExcludedCountries(quotation.id),
+        window.api.piGetTradingExcludedCountries(),
+        window.api.piGetTradingWarrantyTemplates(),
+        window.api.piGetTradingCustomTexts(),
+        window.api.getQuotationVessels(quotation.id),
+        window.api.tradingGetIntros(quotation.id)
+      ])
+      // A failed load must stop here: treating it as "no countries" would re-seed the
+      // defaults over the quotation's real list
+      if (!Array.isArray(qc)) {
+        showError(
+          (qc as { message?: string } | null)?.message || 'Failed to load trading countries'
         )
-        if (typeDefaultsRaw) {
-          const typeDefaults: { name: string; listType: string }[] = JSON.parse(typeDefaultsRaw)
-          if (typeDefaults.length > 0) {
-            countriesToSet = typeDefaults
-          }
-        }
-      } catch {}
-      // Fallback: For Hull type with no type-specific defaults, use Israel + DDQ only
-      if (countriesToSet === typeFiltered && typeCode === 'H') {
-        countriesToSet = typeFiltered.filter(
-          (c) => c.listType === 'ddq' || c.name.toLowerCase() === 'israel'
-        )
+        return
       }
-      await window.api.setQuotationExcludedCountries(
-        quotation.id,
-        countriesToSet.map((c) => ({ name: c.name, listType: c.listType }))
-      )
-      const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
-      setCountries(asArray(refreshed))
+      setQVessels(Array.isArray(qv) ? qv : [])
+      setTradingIntros(Array.isArray(intros) ? intros : [])
+      setCustomTexts(Array.isArray(custTexts) ? custTexts : [])
+      setTemplates(Array.isArray(tpls) ? tpls : [])
+      // Deduplicate by name+listType (legacy data may have duplicates)
+      const seen = new Set<string>()
+      const deduped = qc.filter((c) => {
+        const key = `${c.name}|${c.listType}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      if (deduped.length < qc.length) {
+        await window.api.setQuotationExcludedCountries(
+          quotation.id,
+          deduped.map((c) => ({ name: c.name, listType: c.listType }))
+        )
+        const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
+        setCountries(asArray(refreshed))
+        return
+      }
+      setCountries(qc)
+      if (
+        qc.length === 0 &&
+        Array.isArray(masterCountries) &&
+        masterCountries.length > 0 &&
+        !initRef.current
+      ) {
+        initRef.current = true
+        const typeCode = quotation.quotationTypeCode || 'P'
+        // Filter master countries by exclude_types: null = all types, otherwise check type code
+        const typeFiltered = masterCountries.filter((c) => {
+          if (!c.excludeTypes) return true // null = applies to all types
+          return c.excludeTypes.split(',').includes(typeCode)
+        })
+        // Check for type-specific default excluded countries (legacy app_settings override)
+        let countriesToSet: { name: string; listType: string }[] = typeFiltered
+        try {
+          const typeDefaultsRaw = await window.api.getSetting(
+            `default_excluded_countries_${typeCode}`
+          )
+          if (typeDefaultsRaw) {
+            const typeDefaults: { name: string; listType: string }[] = JSON.parse(typeDefaultsRaw)
+            if (typeDefaults.length > 0) {
+              countriesToSet = typeDefaults
+            }
+          }
+        } catch {
+          /* no or invalid type-specific defaults: keep the master list */
+        }
+        // Fallback: For Hull type with no type-specific defaults, use Israel + DDQ only
+        if (countriesToSet === typeFiltered && typeCode === 'H') {
+          countriesToSet = typeFiltered.filter(
+            (c) => c.listType === 'ddq' || c.name.toLowerCase() === 'israel'
+          )
+        }
+        await window.api.setQuotationExcludedCountries(
+          quotation.id,
+          countriesToSet.map((c) => ({ name: c.name, listType: c.listType }))
+        )
+        const refreshed = await window.api.getQuotationExcludedCountries(quotation.id)
+        setCountries(asArray(refreshed))
+      }
     }
-  }
+    void run()
+  }, [quotation.id, quotation.quotationTypeCode, reloadKey, showError])
 
-  const removeCountry = async (id: string) => {
+  const removeCountry = async (id: string): Promise<void> => {
     const updated = countries.filter((c) => c.id !== id)
     setCountries(updated)
     await window.api.setQuotationExcludedCountries(
@@ -135,7 +141,7 @@ export default function TradingTab({
     )
   }
 
-  const addCountry = async () => {
+  const addCountry = async (): Promise<void> => {
     if (!newCountryName.trim()) return
     const updated = [
       ...countries,
@@ -150,7 +156,7 @@ export default function TradingTab({
     loadData()
   }
 
-  const toggle = (field: string, val: boolean) => {
+  const toggle = (field: string, val: boolean): void => {
     setQ((p) => ({ ...p, [field]: val }))
     updateField(field, val)
   }
@@ -633,7 +639,7 @@ export default function TradingTab({
             />
             <select
               value={newCountryType}
-              onChange={(e) => setNewCountryType(e.target.value as any)}
+              onChange={(e) => setNewCountryType(e.target.value as 'excluded' | 'ddq')}
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',

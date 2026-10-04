@@ -17,7 +17,8 @@ import {
   LevelFormat,
   Header,
   Footer,
-  PageNumber
+  PageNumber,
+  type ITableCellBorders
 } from 'docx'
 
 // A4 page geometry in DXA (twentieths of a point / twips)
@@ -31,6 +32,15 @@ const FOOTER_DXA = 450 // footer distance from page edge
 const CONTENT_W = PAGE_W_DXA - 2 * MARGIN_LR_DXA // ~10206 DXA usable width
 const TITLE_W = Math.round(CONTENT_W * 0.2)
 const BODY_W = CONTENT_W - TITLE_W
+
+// A section row that remembers its title/content so a targeted discount can rebuild it
+type RowWithSource = TableRow & { __title?: string; __content?: (Paragraph | Table)[] }
+
+// Additional hull condition, or a custom one merged in as a synthetic row
+type HullAddlRow = QuotationHullAdditionalCondition & {
+  __isCustom?: boolean
+  __customTitle?: string
+}
 import {
   Quotation,
   Vessel,
@@ -210,7 +220,7 @@ interface QuotationData {
 async function gatherData(quotation: Quotation): Promise<QuotationData> {
   // Reload quotation from DB to ensure all fields (especially quotationDate) are fresh
   const freshQ = await window.api.getQuotation(quotation.id)
-  if (freshQ && !(freshQ as any).error) {
+  if (freshQ && !('error' in freshQ && freshQ.error)) {
     quotation = { ...quotation, ...freshQ }
   }
 
@@ -309,20 +319,20 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   // Sort assureds by the configured role order (Registered Owners → Managers → …) so every
   // downstream render path (group + legacy, PDF + DOCX) emits them in role order within each vessel.
   const assuredRoleOrder = new Map(
-    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [
+    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r, idx: number) => [
       r.name?.toLowerCase(),
       r.order ?? idx
     ])
   )
   const assuredsSorted = [...(Array.isArray(assureds) ? assureds : [])].sort(
-    (a: any, b: any) =>
+    (a, b) =>
       (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) -
       (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
   )
 
   // Extract IDs and vessel scope / alternative maps from new object return format
   const safeClauseRows = Array.isArray(clauseRows) ? clauseRows : []
-  const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
+  const selectedClauseIds = safeClauseRows.map((r) => r.piClauseId)
   const clauseVesselScopes: Record<string, string[] | null> = {}
   const clauseAltIds: Record<string, (string | null)[]> = {}
   for (const r of safeClauseRows) {
@@ -451,7 +461,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
       : []
   const resolvedWarSettings = snapshot
     ? snapshot.warSettings
-    : warSettingsRaw && !(warSettingsRaw as any).error
+    : warSettingsRaw && !('error' in warSettingsRaw && warSettingsRaw.error)
       ? warSettingsRaw
       : null
 
@@ -478,24 +488,26 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
       try {
         const vcs = await window.api.getVesselClassifications(qv.vesselId)
         const safeVcs = Array.isArray(vcs) ? vcs : []
-        const hasIacs = safeVcs.some((vc: any) => iacsIds.has(vc.classificationSocietyId))
+        const hasIacs = safeVcs.some((vc) => iacsIds.has(vc.classificationSocietyId))
         if (hasIacs) {
           vesselIacsMap[qv.id] = true
         }
         // Resolve classification names from junction table — IACS first
         const sortedVcs = [...safeVcs].sort(
-          (a: any, b: any) =>
+          (a, b) =>
             (iacsIds.has(b.classificationSocietyId) ? 1 : 0) -
             (iacsIds.has(a.classificationSocietyId) ? 1 : 0)
         )
         const classNames = sortedVcs
-          .map((vc: any) => vc.abbreviation || vc.classificationSocietyName)
+          .map((vc) => vc.abbreviation || vc.classificationSocietyName)
           .filter(Boolean)
         if (classNames.length > 0) {
           vesselClassificationNames[qv.vesselId] = classNames.join(', ')
           continue // Junction table is authoritative — don't fall through to stale text field
         }
-      } catch {}
+      } catch {
+        /* fall back to the vessel's text classification below */
+      }
     }
     // Fallback: check the text classification field on the quotation vessel
     const classText = (qv.classification || '').toLowerCase().trim()
@@ -580,8 +592,8 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     discounts: Array.isArray(discountsRaw) ? discountsRaw : [],
     hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
-      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-      .map((sw: any) => {
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map((sw) => {
         let resolved = (sw.text || '')
           .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
           .replace(/\{event\}/g, sw.eventValue || '{event}')
@@ -838,7 +850,7 @@ function vesselName(data: QuotationData): string {
       .filter(Boolean)
   )
   if (fleetIds.size === 1) {
-    const fleet = data.fleets?.find((f: any) => f.id === [...fleetIds][0])
+    const fleet = data.fleets?.find((f) => f.id === [...fleetIds][0])
     if (fleet) return fleet.name
   }
   return data.quotationVessels
@@ -1070,7 +1082,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   )
   const origTextDeductibleTexts = new Set((origData?.textDeductibles || []).map((td) => td.text))
   const origSubjectivityPiIds = new Set(
-    (origData?.subjectivities || []).map((s) => (s as any).piSubjectivityId).filter(Boolean)
+    (origData?.subjectivities || []).map((s) => s.piSubjectivityId).filter(Boolean)
   )
   const origAdditionalClauseIds = new Set(
     (origData?.additionalClauses || [])
@@ -1090,49 +1102,49 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   const RED = 'FF0000'
 
   // Paragraph helpers - 11pt Arial black, line spacing 1.0 (with optional color for change highlighting)
-  const np = (text: string, color?: string) =>
+  const np = (text: string, color?: string): Paragraph =>
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 80, line: 240, lineRule: 'auto' as const },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
     })
 
-  const bp = (text: string, color?: string) =>
+  const bp = (text: string, color?: string): Paragraph =>
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 80, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({ text, size: 22, font: 'Arial', color: color || '000000', bold: true })
       ]
     })
-  const bup = (text: string) =>
+  const bup = (text: string): Paragraph =>
     new Paragraph({
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 80, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({ text, size: 22, font: 'Arial', color: '000000', bold: true, underline: {} })
       ]
     })
 
-  const bulletP = (text: string, color?: string) =>
+  const bulletP = (text: string, color?: string): Paragraph =>
     new Paragraph({
       numbering: { reference: 'dash-bullet', level: 0 },
       alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 40, line: 240, lineRule: 'auto' as const },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
     })
 
   // Strikethrough red bullet for removed items
-  const strikeP = (text: string) =>
+  const strikeP = (text: string): Paragraph =>
     new Paragraph({
       numbering: { reference: 'dash-bullet', level: 0 },
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 40, line: 240, lineRule: 'auto' as const },
       children: [new TextRun({ text, size: 22, font: 'Arial', color: RED, strike: true })]
     })
 
   const emptyParas = new WeakSet<object>()
-  const emptyP = () => {
+  const emptyP = (): Paragraph => {
     const p = new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 40, line: 240, lineRule: 'auto' as const },
       children: []
     })
     emptyParas.add(p as unknown as object)
@@ -1212,7 +1224,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
   // Border helpers for main table
   const thin = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
-  const thinBorders = () => ({ top: thin, bottom: thin, left: thin, right: thin })
+  const thinBorders = (): ITableCellBorders => ({
+    top: thin,
+    bottom: thin,
+    left: thin,
+    right: thin
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     const row = new TableRow({
@@ -1241,8 +1258,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       ]
     })
     // Retain title/content so a discount targeting this section can rebuild it with extra content
-    ;(row as any).__title = title
-    ;(row as any).__content = content
+    ;(row as RowWithSource).__title = title
+    ;(row as RowWithSource).__content = content
     return row
   }
 
@@ -1648,7 +1665,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const vColWidths = showVesselLabel
       ? [vW.label, vW.name, vW.imo, vW.built, vW.gt, vW.flag, vW.type, vClassW]
       : [vW.name + vW.label, vW.imo, vW.built, vW.gt, vW.flag, vW.type, vClassW]
-    const makeVCell = (text: string, header = false, w?: number) =>
+    const makeVCell = (text: string, header = false, w?: number): TableCell =>
       new TableCell({
         ...(w ? { width: { size: w, type: WidthType.DXA } } : {}),
         children: [
@@ -1778,13 +1795,13 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       amountDisplay = baseAmt != null ? formatAmountOnly(baseAmt) : ''
     }
 
-    const resolveSlText = (sl: (typeof data.subLimits)[0]) =>
+    const resolveSlText = (sl: (typeof data.subLimits)[0]): string =>
       sl.text
         .replace('{amount}', formatAmountOnly(sl.amount))
         .replace('{currency}', sl.currency || 'USD')
-    const slPara = (text: string) =>
+    const slPara = (text: string): Paragraph =>
       new Paragraph({
-        spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+        spacing: { after: 0, line: 240, lineRule: 'auto' as const },
         children: [new TextRun({ text, size: 22, font: 'Arial', color: '000000' })]
       })
     const wordSubLimitParas: Paragraph[] = data.subLimits.map((sl) => slPara(resolveSlText(sl)))
@@ -1921,7 +1938,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const clauseRefW = Math.round(BODY_W * 0.32)
     const clauseDescW = BODY_W - clauseRefW
 
-    const makeClauseTable = (clauses: PIClause[], altId?: string | null) =>
+    const makeClauseTable = (clauses: PIClause[], altId?: string | null): Table =>
       new Table({
         width: { size: BODY_W, type: WidthType.DXA },
         columnWidths: [clauseRefW, clauseDescW],
@@ -2128,7 +2145,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const avColonW2 = 200
       const avNameW2 = Math.round(BODY_W * 0.4)
       const avAmtW2 = BODY_W - avNameW2 - avColonW2
-      const avCell2 = (text: string, bold = false, w?: number) =>
+      const avCell2 = (text: string, bold = false, w?: number): TableCell =>
         new TableCell({
           borders: noBorders(),
           width: w ? { size: w, type: WidthType.DXA } : undefined,
@@ -2138,7 +2155,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const avRow2 = (name: string, amount: string) =>
+      const avRow2 = (name: string, amount: string): TableRow =>
         new TableRow({
           children: [
             avCell2(name, false, avNameW2),
@@ -2274,7 +2291,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const avColonW3 = 200
       const avNameW3 = Math.round(BODY_W * 0.4)
       const avAmtW3 = BODY_W - avNameW3 - avColonW3
-      const avCell3 = (text: string, bold = false, w?: number) =>
+      const avCell3 = (text: string, bold = false, w?: number): TableCell =>
         new TableCell({
           borders: noBorders(),
           width: w ? { size: w, type: WidthType.DXA } : undefined,
@@ -2284,7 +2301,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const avRow3 = (name: string, amount: string) =>
+      const avRow3 = (name: string, amount: string): TableRow =>
         new TableRow({
           children: [
             avCell3(name, false, avNameW3),
@@ -2391,7 +2408,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     })
     // Merge custom conditions as synthetic "both"-scoped additional bullets, interleaved by
     // the shared order_index namespace (additional + custom share one gap-free sequence).
-    const _dCustomSynthetic = data.hullCustomConditions.map((cc) => ({
+    const _dCustomSynthetic = data.hullCustomConditions.map((cc): HullAddlRow => ({
       id: cc.id,
       quotationId: data.quotation.id,
       hullAdditionalConditionId: '',
@@ -2402,9 +2419,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       order: cc.order ?? 0,
       __isCustom: true,
       __customTitle: cc.title
-    })) as any[]
-    const ha = [...dBaseHa, ..._dCustomSynthetic].sort(
-      (a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)
+    }))
+    const ha: HullAddlRow[] = [...dBaseHa, ..._dCustomSynthetic].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
     )
     const dAlts = data.hullAlternatives
     if (hc.length > 0 || ha.length > 0) {
@@ -2412,7 +2429,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const condTableW = BODY_W
       const condCol1W = Math.round(condTableW * 0.3)
       const condCol2W = condTableW - condCol1W
-      const noBordersObj = () => ({
+      const noBordersObj = (): ITableCellBorders => ({
         top: { style: BorderStyle.NONE, size: 0 },
         bottom: { style: BorderStyle.NONE, size: 0 },
         left: { style: BorderStyle.NONE, size: 0 },
@@ -2456,7 +2473,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         return sibling?.amount
       }
 
-      const makeCondTable = (conds: typeof hc, vesselFilter?: Set<string>) => {
+      const makeCondTable = (conds: typeof hc, vesselFilter?: Set<string>): Table => {
         const currency = data.quotation.premiumCurrency || 'USD'
         const filteredVessels = vesselFilter
           ? data.quotationVessels.filter((v) => vesselFilter.has(v.id))
@@ -2580,7 +2597,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
       }
 
-      const dGetCondClauseId = (qc: (typeof hc)[0]) => {
+      const dGetCondClauseId = (qc: (typeof hc)[0]): string => {
         const def = data.allHullConditions.find((c) => c.id === qc.hullConditionId)
         return def?.hullClauseId || ''
       }
@@ -2594,7 +2611,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         | { type: 'iv' }
         | { type: 'both' }
         | { type: 'none' } => {
-        if ((qa as any).__isCustom) return { type: 'both' }
+        if (qa.__isCustom) return { type: 'both' }
         const def = data.allHullAdditionalConditions.find(
           (c) => c.id === qa.hullAdditionalConditionId
         )
@@ -2614,12 +2631,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       const dRenderAddlForSection = (
         filterFn: (b: ReturnType<typeof dGetAddlBelonging>) => boolean
-      ) => {
+      ): Paragraph[] => {
         const paras: Paragraph[] = []
         for (const qa of ha) {
           const belonging = dGetAddlBelonging(qa)
           if (!filterFn(belonging)) continue
-          const isCustom = (qa as any).__isCustom
+          const isCustom = qa.__isCustom
           const def = data.allHullAdditionalConditions.find(
             (c) => c.id === qa.hullAdditionalConditionId
           )
@@ -2641,7 +2658,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                 : ''
             )
           const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-          const ttl = isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+          const ttl = isCustom && qa.__customTitle ? `${qa.__customTitle} — ` : ''
           const isNewHullAddl =
             !isCustom &&
             origData &&
@@ -2671,7 +2688,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       // Merge alt-specific + null-scoped conditions, dedup by conditionId (prefer alt-specific)
       // For virtual alts (shared alts rendered for non-override vessels), resolve from the original shared alt
-      const dGetAltCondsResolved = (alt: (typeof dAlts)[0]) => {
+      const dGetAltCondsResolved = (alt: (typeof dAlts)[0]): QuotationHullCondition[] => {
         const realAltId = alt.id.includes('_virtual_') ? alt.id.split('_virtual_')[0] : alt.id
         // Alt-specific conditions: must belong to this alt's clause, exclude IV conditions
         const ownConds = hc.filter(
@@ -2968,7 +2985,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         // Filter additional conditions by clause linkage
         const clauseId = dClauseId
         const filteredHa = ha.filter((qa) => {
-          if ((qa as any).__isCustom) return true
+          if (qa.__isCustom) return true
           const def = data.allHullAdditionalConditions.find(
             (c) => c.id === qa.hullAdditionalConditionId
           )
@@ -2979,7 +2996,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         if (filteredHa.length > 0) {
           hcContent.push(emptyP())
           for (const qa of filteredHa) {
-            const isCustom = (qa as any).__isCustom
+            const isCustom = qa.__isCustom
             const def = data.allHullAdditionalConditions.find(
               (c) => c.id === qa.hullAdditionalConditionId
             )
@@ -3001,8 +3018,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                   : ''
               )
             const scope = vesselScopeSuffix(qa.vesselScope, data.quotationVessels)
-            const ttl =
-              isCustom && (qa as any).__customTitle ? `${(qa as any).__customTitle} — ` : ''
+            const ttl = isCustom && qa.__customTitle ? `${qa.__customTitle} — ` : ''
             const isNewHullAddlInline =
               !isCustom &&
               origData &&
@@ -3208,10 +3224,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         .map((c) => c.name)
     )
     void (origData?.excludedCountries || []).filter((c) => c.listType === 'ddq') // DDQ countries not compared individually
-    const numP = (text: string, level: number, color?: string) =>
+    const numP = (text: string, level: number, color?: string): Paragraph =>
       new Paragraph({
         numbering: { reference: 'trading-numbered', level },
-        spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as any },
+        spacing: { before: level === 0 ? 120 : 0, after: 80, line: 240, lineRule: 'auto' as const },
         children: [new TextRun({ text, size: 22, font: 'Arial', color: color || '000000' })]
       })
     // Per-vessel trading intros (or single shared intro). Separate blocks with a LEADING blank line
@@ -3238,7 +3254,6 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dSharedVessels = data.quotationVessels.filter((v) => !dOverrideVIds.has(v.id))
       if (dSharedVessels.length > 0 && wq.tradingWarrantyIntro) {
         if (!dFirstIntro) tradContent.push(emptyP())
-        dFirstIntro = false
         if (data.quotationVessels.length > 1) {
           const names = dSharedVessels
             .map((v) => `M/V ${(v.name || v.vesselLabel).toUpperCase()}`)
@@ -3293,7 +3308,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           tradContent.push(numP(ddqIntroText, 0))
           tradContent.push(
             new Paragraph({
-              spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 80, line: 240, lineRule: 'auto' as const },
               indent: { left: 720 },
               children: [
                 new TextRun({
@@ -3324,7 +3339,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             tradContent.push(
               new Paragraph({
                 numbering: { reference: 'trading-numbered', level: 1 },
-                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                 children: [
                   new TextRun({ text: stripHtml(txt), size: 22, font: 'Arial', color: '000000' })
                 ]
@@ -3345,7 +3360,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dPiMultiAltW = data.piAlternatives.length > 1
 
     // Export ALL selected warranties regardless of typeScope
-    const renderWarBullets = (warIds: string[], customs: QuotationCustomWarranty[]) => {
+    const renderWarBullets = (
+      warIds: string[],
+      customs: QuotationCustomWarranty[]
+    ): Paragraph[] => {
       const paras: Paragraph[] = []
       for (const wid of warIds) {
         const w = data.allWarranties.find((ww) => ww.id === wid)
@@ -3378,7 +3396,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
 
     // Render removed warranties (from original but not in current) as strikethrough red
-    const renderRemovedWarranties = () => {
+    const renderRemovedWarranties = (): Paragraph[] => {
       if (!origData) return []
       const paras: Paragraph[] = []
       const currentWarIds = new Set(data.selectedWarrantyIds)
@@ -3468,7 +3486,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const dedAmtW = Math.round(BODY_W * 0.2)
     const dedDescW = BODY_W - dedAmtW
 
-    const makeDedTable = (deds: QuotationDeductible[]) => {
+    const makeDedTable = (deds: QuotationDeductible[]): Table => {
       const dedRows: TableRow[] = []
       for (const d of deds) {
         const dScope = vesselScopeSuffix(d.vesselScope, data.quotationVessels)
@@ -3507,7 +3525,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             }
             g.vessels.push(v)
           }
-          const groupSuffix = (vessels: QuotationVessel[]) => {
+          const groupSuffix = (vessels: QuotationVessel[]): string => {
             if (vessels.length === data.quotationVessels.length) return ''
             const names = vessels.map((v) => (v.name || v.vesselLabel).toUpperCase())
             return names.length === 1 ? ` (M/V ${names[0]})` : ` (${names.join(', ')})`
@@ -3988,7 +4006,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     const wUpccPct = wq.upccEnabled ? wq.upccDiscountPercent || 0 : 0
     const wUpccFixedAmt = wq.upccEnabled ? wq.upccDiscountAmount || 0 : 0
     // Apply the generic per-quotation discounts sequentially (after NCB/UPCC)
-    const wApplyExtra = (amt: number) => {
+    const wApplyExtra = (amt: number): number => {
       let r = amt
       for (const d of data.discounts) {
         if (d.discountType === 'amount') r -= d.amount || 0
@@ -3996,7 +4014,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
       return r
     }
-    const wComputePayable = (tech: number, vessel?: any) => {
+    const wComputePayable = (tech: number, vessel?: QuotationVessel): number => {
       const ncbDed = vessel?.ncbExcluded
         ? 0
         : wNcbType === 'amount'
@@ -4046,7 +4064,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const mCols = wHasDiscount ? [mNameW, mPremW, mPayW] : [mNameW, mPremW]
       const mNone = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
       const mLine = { style: BorderStyle.SINGLE, size: 4, color: '999999' }
-      const mBorders = (opts?: { top?: boolean; bottom?: boolean }) => ({
+      const mBorders = (opts?: { top?: boolean; bottom?: boolean }): ITableCellBorders => ({
         top: opts?.top ? mLine : mNone,
         bottom: opts?.bottom ? mLine : mNone,
         left: mNone,
@@ -4061,7 +4079,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           top?: boolean
           bottom?: boolean
         }
-      ) =>
+      ): TableCell =>
         new TableCell({
           borders: mBorders(opts),
           width: { size: w, type: WidthType.DXA },
@@ -4075,7 +4093,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const mSpanRow = (text: string) =>
+      const mSpanRow = (text: string): TableRow =>
         new TableRow({
           children: [
             new TableCell({
@@ -4093,7 +4111,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const mSpacerRow = () =>
+      const mSpacerRow = (): TableRow =>
         new TableRow({
           children: [
             new TableCell({
@@ -4183,7 +4201,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const vpColonW = 200
       const vpNameW = Math.round(BODY_W * 0.4)
       const vpAmtW = BODY_W - vpNameW - vpColonW
-      const vpCell = (text: string, bold = false, w?: number) =>
+      const vpCell = (text: string, bold = false, w?: number): TableCell =>
         new TableCell({
           borders: noBorders(),
           width: w ? { size: w, type: WidthType.DXA } : undefined,
@@ -4193,7 +4211,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const vpRow3 = (name: string, amount: string) =>
+      const vpRow3 = (name: string, amount: string): TableRow =>
         new TableRow({
           children: [
             vpCell(name, true, vpNameW),
@@ -4203,7 +4221,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         })
 
       // Helper: build previous premium annotation in red for per-vessel DOCX
-      const vpPrevRun = (v: QuotationVessel) => {
+      const vpPrevRun = (v: QuotationVessel): TextRun | null => {
         if (v.previousPremium != null && v.previousPremium !== (v.premiumAmount || 0)) {
           return new TextRun({
             text: ` (previously ${formatCurrency(v.previousPremium, wq.premiumCurrency)})`,
@@ -4217,7 +4235,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
       if (wHasDiscount) {
         // Per-vessel format: plain vessels get one line, discount vessels get technical + payable
-        const wHasVDiscount = (v: any) =>
+        const wHasVDiscount = (v: QuotationVessel | undefined): boolean =>
           (wq.ncbEnabled && !v?.ncbExcluded) || (wq.upccEnabled && !v?.upccExcluded)
         const allRows: TableRow[] = []
         for (let vi = 0; vi < data.quotationVessels.length; vi++) {
@@ -4413,7 +4431,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         bold = false,
         align?: typeof AlignmentType.RIGHT,
         w?: number
-      ) =>
+      ): TableCell =>
         new TableCell({
           borders: noBorders(),
           width: w ? { size: w, type: WidthType.DXA } : undefined,
@@ -4424,14 +4442,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             })
           ]
         })
-      const premRow = (label: string, amount: string) =>
+      const premRow = (label: string, amount: string): TableRow =>
         new TableRow({
           children: [
             premCell(label, true, undefined, premLabelW),
             premCell(amount, true, undefined, premAmtW)
           ]
         })
-      const premTable = (rows: TableRow[]) =>
+      const premTable = (rows: TableRow[]): Table =>
         new Table({
           width: { size: BODY_W, type: WidthType.DXA },
           columnWidths: [premLabelW, premAmtW],
@@ -4452,10 +4470,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           // Section 2 only: use lines array for bold table rendering (like other types)
           for (const v of data.quotationVessels) {
             const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
-            const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+            const s2Amt = v.warExcessAmount ?? wq.warExcessAmount ?? 0
             const s2Prem =
-              (v as any).warSection2Premium ??
-              Math.round((((s2Amt - s1Amt) * dpS2Rate) / 100) * 100) / 100
+              v.warSection2Premium ?? Math.round((((s2Amt - s1Amt) * dpS2Rate) / 100) * 100) / 100
             const label =
               data.quotationVessels.length > 1 ? (v.name || v.vesselLabel).toUpperCase() : ''
             lines.push({ label, tech: s2Prem, prev: v.previousSection2Premium ?? undefined })
@@ -4464,12 +4481,11 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const v of data.quotationVessels) {
             const vi = getVesselInfo(v, data.allVessels, data.flagStates)
             const s1Amt = v.agreedValue ?? wq.agreedValue ?? 0
-            const s2Amt = (v as any).warExcessAmount ?? wq.warExcessAmount ?? 0
+            const s2Amt = v.warExcessAmount ?? wq.warExcessAmount ?? 0
             const s1Prem =
-              (v as any).warSection1Premium ?? Math.round(((s1Amt * dpS1Rate) / 100) * 100) / 100
+              v.warSection1Premium ?? Math.round(((s1Amt * dpS1Rate) / 100) * 100) / 100
             const s2Prem =
-              (v as any).warSection2Premium ??
-              Math.round((((s2Amt - s1Amt) * dpS2Rate) / 100) * 100) / 100
+              v.warSection2Premium ?? Math.round((((s2Amt - s1Amt) * dpS2Rate) / 100) * 100) / 100
             if (data.quotationVessels.length > 1) premContent.push(bp(vi.name))
             const dPrevS1 = v.previousSection1Premium
             const dPrevS2 = v.previousSection2Premium
@@ -4582,7 +4598,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                       width: { size: premAmtW, type: WidthType.DXA },
                       children: [
                         new Paragraph({
-                          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                           children: [
                             new TextRun({
                               text: formatCurrency(l.tech, wq.premiumCurrency),
@@ -4785,7 +4801,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           }
           premContent.push(
             new Paragraph({
-              spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 0, line: 240, lineRule: 'auto' as const },
               children: [new TextRun({ text: instText, size: 22, font: 'Arial', color: '000000' })]
             })
           )
@@ -4796,7 +4812,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     if (wq.outstandingPremiumEnabled && wq.outstandingPremiumText) {
       premContent.push(
         new Paragraph({
-          spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 80, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({
               text: wq.outstandingPremiumText,
@@ -4993,7 +5009,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     }
 
     // Helper for cargo clause bullet
-    const cargoBullet = (text: string) =>
+    const cargoBullet = (text: string): Paragraph =>
       new Paragraph({
         spacing: { after: 40 },
         indent: { left: 200, hanging: 200 },
@@ -5072,8 +5088,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   for (const td of targetedDiscounts) {
     const existing = rowMap.get(td.targetSection)
     if (existing) {
-      const base = ((existing as any).__content as (Paragraph | Table)[]) || []
-      const title = ((existing as any).__title as string) || ''
+      const base = (existing as RowWithSource).__content || []
+      const title = (existing as RowWithSource).__title || ''
       rowMap.set(td.targetSection, makeRow(title, [...base, emptyP(), ...td.content]))
     } else {
       rowMap.set(`discount:${td.id}`, makeRow(td.label, td.content))
@@ -5347,7 +5363,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         },
         headers: { default: defaultHeader },
         footers: { default: defaultFooter },
-        children: children as any[]
+        children
       }
     ]
   })
@@ -5363,7 +5379,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
 
 // ==================== Border Helpers ====================
 
-function noBorders() {
+function noBorders(): ITableCellBorders {
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   return { top: none, bottom: none, left: none, right: none }
 }

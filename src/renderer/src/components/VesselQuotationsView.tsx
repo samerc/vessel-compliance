@@ -4,7 +4,7 @@ import { Plus, RefreshCcw, ChevronDown, FileText, Loader2, ExternalLink, Users }
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Vessel } from '../../../shared/types'
+import { Vessel, VesselQuotationRow, QuotationType } from '../../../shared/types'
 import { formatDate } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 
@@ -13,7 +13,7 @@ interface VesselQuotationsViewProps {
   onNavigateToQuotation: (quotationId: string) => void
 }
 
-const typeColor = (code?: string) => {
+const typeColor = (code?: string | null): string => {
   switch (code) {
     case 'P':
       return '#00aac8'
@@ -35,11 +35,11 @@ const typeColor = (code?: string) => {
 export default function VesselQuotationsView({
   vessel,
   onNavigateToQuotation
-}: VesselQuotationsViewProps) {
-  const [quotations, setQuotations] = useState<any[]>([])
+}: VesselQuotationsViewProps): React.JSX.Element {
+  const [quotations, setQuotations] = useState<VesselQuotationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showTypeMenu, setShowTypeMenu] = useState(false)
-  const [quotationTypes, setQuotationTypes] = useState<any[]>([])
+  const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
   const [creating, setCreating] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -47,15 +47,41 @@ export default function VesselQuotationsView({
   const { user } = useAuth()
   const isLight = theme === 'light' || theme === 'aurora'
 
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadQuotations = (): void => setReloadKey((k) => k + 1)
+
   useEffect(() => {
-    loadQuotations()
-    loadQuotationTypes()
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const rows = await window.api.vesselGetQuotations(vessel.id)
+        setQuotations(Array.isArray(rows) ? rows : [])
+      } catch {
+        setQuotations([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    void run()
+  }, [vessel.id, reloadKey])
+
+  useEffect(() => {
+    const loadQuotationTypes = async (): Promise<void> => {
+      try {
+        const types = await window.api.getQuotationTypes()
+        setQuotationTypes(Array.isArray(types) ? types : [])
+      } catch {
+        setQuotationTypes([])
+      }
+    }
+    void loadQuotationTypes()
   }, [vessel.id])
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!showTypeMenu) return
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent): void => {
       if (menuRef.current?.contains(e.target as Node)) return
       if (dropdownRef.current?.contains(e.target as Node)) return
       setShowTypeMenu(false)
@@ -67,54 +93,33 @@ export default function VesselQuotationsView({
     }
   }, [showTypeMenu])
 
-  const loadQuotations = async () => {
-    setLoading(true)
-    try {
-      const rows = await window.api.vesselGetQuotations(vessel.id)
-      setQuotations(Array.isArray(rows) ? rows : [])
-    } catch {
-      setQuotations([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadQuotationTypes = async () => {
-    try {
-      const types = await window.api.getQuotationTypes()
-      setQuotationTypes(Array.isArray(types) ? types : [])
-    } catch {
-      setQuotationTypes([])
-    }
-  }
-
-  const handleNewQuotation = async (typeCode: string, includeFleet = false) => {
+  const handleNewQuotation = async (typeCode: string, includeFleet = false): Promise<void> => {
     setShowTypeMenu(false)
     setCreating(true)
     try {
-      const qt = quotationTypes.find((t: any) => t.code === typeCode)
+      const qt = quotationTypes.find((t) => t.code === typeCode)
       if (!qt) throw new Error('Quotation type not found')
 
       const q = await window.api.addQuotation({
         quotationTypeId: qt.id,
         createdBy: user?.username
-      } as any)
-      if (!q || (q as any).error) throw new Error('Failed to create quotation')
+      })
+      if (!q || (q as { error?: unknown }).error) throw new Error('Failed to create quotation')
 
       // Determine which vessels to add
       const flagStates = await window.api.getFlagStates()
-      let vesselsToAdd: any[] = [vessel]
+      let vesselsToAdd: Vessel[] = [vessel]
       if (includeFleet && vessel.fleetId) {
         const allVessels = await window.api.getVessels()
         vesselsToAdd = (Array.isArray(allVessels) ? allVessels : []).filter(
-          (v: any) => v.isActive && v.fleetId === vessel.fleetId
+          (v) => v.isActive && v.fleetId === vessel.fleetId
         )
       }
 
       for (let i = 0; i < vesselsToAdd.length; i++) {
         const v = vesselsToAdd[i]
         const flagName = v.flagStateId
-          ? (Array.isArray(flagStates) ? flagStates : []).find((f: any) => f.id === v.flagStateId)
+          ? (Array.isArray(flagStates) ? flagStates : []).find((f) => f.id === v.flagStateId)
               ?.name || ''
           : ''
         await window.api.addQuotationVessel({
@@ -138,7 +143,7 @@ export default function VesselQuotationsView({
         const allEntities = await window.api.getEntities()
         const assuredRoles = await window.api.getAssuredRoles()
         const roleOrder = new Map(
-          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [
+          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r, idx): [string, number] => [
             r.name?.toLowerCase(),
             r.order ?? idx
           ])
@@ -150,18 +155,17 @@ export default function VesselQuotationsView({
           const vLabel = `V${i + 1}`
           const vassureds = await window.api.getVesselAssureds(v.id)
           const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-            .filter((va: any) => !existingEntityIds.has(`${va.entityId}:${vLabel}`))
+            .filter((va) => !existingEntityIds.has(`${va.entityId}:${vLabel}`))
             .sort(
-              (a: any, b: any) =>
+              (a, b) =>
                 (roleOrder.get(a.role?.toLowerCase()) ?? 999) -
                 (roleOrder.get(b.role?.toLowerCase()) ?? 999)
             )
           for (const va of toAdd) {
-            const entity = allEntities.find((e: any) => e.id === va.entityId)
+            const entity = allEntities.find((e) => e.id === va.entityId)
             if (!entity) continue
             if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-              if (!q.coName)
-                ok(await window.api.updateQuotation(q.id, { coName: entity.name } as any))
+              if (!q.coName) ok(await window.api.updateQuotation(q.id, { coName: entity.name }))
               continue
             }
             await window.api.addQuotationAssured({
@@ -181,14 +185,14 @@ export default function VesselQuotationsView({
 
       showSuccess(`Quotation created`)
       onNavigateToQuotation(q.id)
-    } catch (err: any) {
-      showError(err.message || 'Failed to create quotation')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to create quotation')
     } finally {
       setCreating(false)
     }
   }
 
-  const formatPremium = (amount: number | null, currency: string | null) => {
+  const formatPremium = (amount: number | null, currency: string | null): string => {
     if (!amount) return ''
     const cur = currency || 'USD'
     if (amount >= 1000000) return `${cur} ${(amount / 1000000).toFixed(1)}M`
@@ -196,7 +200,10 @@ export default function VesselQuotationsView({
     return `${cur} ${amount.toLocaleString()}`
   }
 
-  const getStatusStyle = (status: string | null, workflowColor: string | null) => {
+  const getStatusStyle = (
+    status: string | null,
+    workflowColor: string | null
+  ): { background: string; color: string; border: string } => {
     if (workflowColor) {
       return {
         background: workflowColor + '22',
@@ -252,7 +259,10 @@ export default function VesselQuotationsView({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ position: 'relative' }} ref={menuRef}>
             <button
-              onClick={() => setShowTypeMenu(!showTypeMenu)}
+              onClick={() => {
+                if (!showTypeMenu) setMenuRect(menuRef.current?.getBoundingClientRect() ?? null)
+                setShowTypeMenu(!showTypeMenu)
+              }}
               disabled={creating}
               style={{
                 display: 'flex',
@@ -276,7 +286,7 @@ export default function VesselQuotationsView({
             {showTypeMenu &&
               quotationTypes.length > 0 &&
               (() => {
-                const rect = menuRef.current?.getBoundingClientRect()
+                const rect = menuRect
                 return createPortal(
                   <div
                     ref={dropdownRef}
@@ -305,7 +315,7 @@ export default function VesselQuotationsView({
                     >
                       Vessel Only
                     </div>
-                    {quotationTypes.map((qt: any) => (
+                    {quotationTypes.map((qt) => (
                       <button
                         key={qt.id}
                         onClick={() => handleNewQuotation(qt.code)}
@@ -372,7 +382,7 @@ export default function VesselQuotationsView({
                         >
                           Fleet
                         </div>
-                        {quotationTypes.map((qt: any) => (
+                        {quotationTypes.map((qt) => (
                           <button
                             key={`fleet-${qt.id}`}
                             onClick={() => handleNewQuotation(qt.code, true)}
@@ -468,7 +478,7 @@ export default function VesselQuotationsView({
               marginTop: '4px'
             }}
           >
-            Click "New Quotation" to create one
+            Click &quot;New Quotation&quot; to create one
           </p>
         </div>
       ) : (

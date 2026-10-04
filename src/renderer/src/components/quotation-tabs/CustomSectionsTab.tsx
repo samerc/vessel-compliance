@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, Pencil, Save } from 'lucide-react
 import { Quotation, QuotationCustomSection } from '../../../../shared/types'
 import RichTextEditor from '../RichTextEditor'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { isIpcError } from '../../utils/ipc'
 
 export default function CustomSectionsTab({
   quotation,
@@ -14,22 +15,25 @@ export default function CustomSectionsTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [sections, setSections] = useState<QuotationCustomSection[]>([])
   const [newTitle, setNewTitle] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editText, setEditText] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
-    const result = await window.api.getQuotationCustomSections(quotation.id)
-    setSections(Array.isArray(result) ? result : [])
-  }
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const handleAdd = async () => {
+  useEffect(() => {
+    const loadData = async (): Promise<void> => {
+      const result = await window.api.getQuotationCustomSections(quotation.id)
+      setSections(Array.isArray(result) ? result : [])
+    }
+    loadData()
+  }, [quotation.id, reloadKey])
+  const reload = (): void => setReloadKey((k) => k + 1)
+
+  const handleAdd = async (): Promise<void> => {
     if (!newTitle.trim()) return
     try {
       const result = await window.api.addQuotationCustomSection({
@@ -38,29 +42,29 @@ export default function CustomSectionsTab({
         text: '',
         order: sections.length
       })
-      if ((result as any).error) {
-        showError((result as any).message)
+      if (isIpcError(result)) {
+        showError(result.message as string)
         return
       }
       setNewTitle('')
       showSuccess('Section added')
-      loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add section')
+      reload()
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add section')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.deleteQuotationCustomSection(id)
       showSuccess('Section deleted')
-      loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+      reload()
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete')
     }
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (): Promise<void> => {
     if (!editingId || !editTitle.trim()) return
     try {
       await window.api.updateQuotationCustomSection(editingId, {
@@ -69,13 +73,13 @@ export default function CustomSectionsTab({
       })
       showSuccess('Section updated')
       setEditingId(null)
-      loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+      reload()
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update')
     }
   }
 
-  const handleMove = async (index: number, dir: 'up' | 'down') => {
+  const handleMove = async (index: number, dir: 'up' | 'down'): Promise<void> => {
     const newSections = [...sections]
     const swapIdx = dir === 'up' ? index - 1 : index + 1
     if (swapIdx < 0 || swapIdx >= newSections.length) return
@@ -83,12 +87,12 @@ export default function CustomSectionsTab({
     setSections(newSections)
     try {
       await window.api.reorderQuotationCustomSections(newSections.map((s) => s.id))
-    } catch (err: any) {
-      showError(err.message || 'Failed to reorder')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to reorder')
     }
   }
 
-  const startEdit = (section: QuotationCustomSection) => {
+  const startEdit = (section: QuotationCustomSection): void => {
     setEditingId(section.id)
     setEditTitle(section.title)
     setEditText(section.text || '')

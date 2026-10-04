@@ -11,7 +11,7 @@ export interface IpcErrorValue {
 }
 
 export function isIpcError(r: unknown): r is IpcErrorValue {
-  return !!r && typeof r === 'object' && (r as any).error === true
+  return !!r && typeof r === 'object' && (r as { error?: unknown }).error === true
 }
 
 /** Throw if an IPC call resolved with { error: true }; otherwise pass the value through. */
@@ -21,6 +21,8 @@ export function ok<T>(r: T): T {
 }
 
 /** List loads: an IPC error value (or anything non-array) becomes [] instead of crashing render. */
-export function asArray<T = any>(r: unknown): T[] {
+export function asArray<T>(r: readonly T[] | IpcErrorValue | null | undefined): T[]
+export function asArray<T = unknown>(r: unknown): T[]
+export function asArray<T>(r: unknown): T[] {
   return Array.isArray(r) ? (r as T[]) : []
 }

@@ -27,7 +27,67 @@ import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { PageHeader } from './ui'
 import { asArray } from '../utils/ipc'
 
-export default function UserManager() {
+interface UsersPageData {
+  users: User[] | null
+  groupNameMap: Record<string, string> | null
+  userGroupMap: Record<string, string[]> | null
+  userPermCounts: Record<string, number> | null
+}
+
+/** Loads users, group names and per-user group IDs / permission counts. A failed step leaves
+ *  its field null so the caller keeps the previous value (same as the old progressive loader). */
+async function fetchUsersPageData(): Promise<UsersPageData> {
+  const out: UsersPageData = {
+    users: null,
+    groupNameMap: null,
+    userGroupMap: null,
+    userPermCounts: null
+  }
+  try {
+    const data = await window.api.getUsers()
+    out.users = asArray(data)
+
+    // Load groups for name mapping
+    try {
+      const groups = await window.api.rbacGetGroups()
+      if (Array.isArray(groups)) {
+        const nameMap: Record<string, string> = {}
+        for (const g of groups) {
+          nameMap[g.id] = g.name
+        }
+        out.groupNameMap = nameMap
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // Load group IDs and permission counts per user
+    const gMap: Record<string, string[]> = {}
+    const pMap: Record<string, number> = {}
+    await Promise.all(
+      data.map(async (u: User) => {
+        try {
+          const [gIds, resolved] = await Promise.all([
+            window.api.rbacGetUserGroupIds(u.id),
+            window.api.rbacResolveUserPermissions(u.id)
+          ])
+          gMap[u.id] = Array.isArray(gIds) ? gIds : []
+          pMap[u.id] = Array.isArray(resolved) ? resolved.length : 0
+        } catch {
+          gMap[u.id] = []
+          pMap[u.id] = 0
+        }
+      })
+    )
+    out.userGroupMap = gMap
+    out.userPermCounts = pMap
+  } catch (err) {
+    console.error('Failed to load users', err)
+  }
+  return out
+}
+
+export default function UserManager(): React.JSX.Element {
   const { resetPassword, user: currentUser, hasPermission } = useAuth()
   const canManageUsers = hasPermission('admin:users')
   const { showSuccess, showError } = useToast()
@@ -80,7 +140,43 @@ export default function UserManager() {
   const [showOverrideDropdown, setShowOverrideDropdown] = useState(false)
   const [collapsedOverrideCats, setCollapsedOverrideCats] = useState<Set<string>>(new Set())
 
-  const handleSaveUser = async (userId: string) => {
+  // ... (rest of component)
+  const [loading, setLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    role: 'user' as 'admin' | 'user'
+  })
+  const [error, setError] = useState('')
+
+  const applyUsersData = (d: UsersPageData): void => {
+    if (d.users) setUsers(d.users)
+    if (d.groupNameMap) setGroupNameMap(d.groupNameMap)
+    if (d.userGroupMap) setUserGroupMap(d.userGroupMap)
+    if (d.userPermCounts) setUserPermCounts(d.userPermCounts)
+    setLoading(false)
+  }
+
+  const loadUsers = async (): Promise<void> => {
+    applyUsersData(await fetchUsersPageData())
+  }
+
+  useEffect(() => {
+    let alive = true
+    void fetchUsersPageData().then((d) => {
+      if (!alive) return
+      if (d.users) setUsers(d.users)
+      if (d.groupNameMap) setGroupNameMap(d.groupNameMap)
+      if (d.userGroupMap) setUserGroupMap(d.userGroupMap)
+      if (d.userPermCounts) setUserPermCounts(d.userPermCounts)
+      setLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleSaveUser = async (userId: string): Promise<void> => {
     if (!editUsername.trim()) {
       showError('Username is required')
       return
@@ -93,12 +189,12 @@ export default function UserManager() {
       showSuccess('User updated')
       setEditingUserId(null)
       loadUsers()
-    } catch (e: any) {
-      showError(e.message || 'Failed to update user')
+    } catch (e) {
+      showError((e instanceof Error ? e.message : '') || 'Failed to update user')
     }
   }
 
-  const handleResetPassword = async (username: string) => {
+  const handleResetPassword = async (username: string): Promise<void> => {
     setConfirmation({
       show: true,
       title: 'Reset Password?',
@@ -113,74 +209,15 @@ export default function UserManager() {
           } else {
             setError(result.message || 'Failed to reset password')
           }
-        } catch (err: any) {
-          setError(err.message)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err))
         }
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
   }
 
-  // ... (rest of component)
-  const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    role: 'user' as 'admin' | 'user'
-  })
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  const loadUsers = async () => {
-    try {
-      const data = await window.api.getUsers()
-      setUsers(asArray(data))
-
-      // Load groups for name mapping
-      try {
-        const groups = await window.api.rbacGetGroups()
-        if (Array.isArray(groups)) {
-          const nameMap: Record<string, string> = {}
-          for (const g of groups) {
-            nameMap[g.id] = g.name
-          }
-          setGroupNameMap(nameMap)
-        }
-      } catch {
-        /* ignore */
-      }
-
-      // Load group IDs and permission counts per user
-      const gMap: Record<string, string[]> = {}
-      const pMap: Record<string, number> = {}
-      await Promise.all(
-        data.map(async (u: User) => {
-          try {
-            const [gIds, resolved] = await Promise.all([
-              window.api.rbacGetUserGroupIds(u.id),
-              window.api.rbacResolveUserPermissions(u.id)
-            ])
-            gMap[u.id] = Array.isArray(gIds) ? gIds : []
-            pMap[u.id] = Array.isArray(resolved) ? resolved.length : 0
-          } catch {
-            gMap[u.id] = []
-            pMap[u.id] = 0
-          }
-        })
-      )
-      setUserGroupMap(gMap)
-      setUserPermCounts(pMap)
-    } catch (err) {
-      console.error('Failed to load users', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     setConfirmation({
       show: true,
       title: 'Delete User?',
@@ -194,7 +231,7 @@ export default function UserManager() {
     })
   }
 
-  const handleToggleRole = async (u: User) => {
+  const handleToggleRole = async (u: User): Promise<void> => {
     if (u.id === currentUser?.id) {
       showError('You cannot change your own role')
       return
@@ -209,15 +246,15 @@ export default function UserManager() {
           await window.api.updateUserRole(u.id, newRole)
           showSuccess(`${u.username} is now ${newRole.toUpperCase()}`)
           loadUsers()
-        } catch (err: any) {
-          showError(err.message || 'Failed to update role')
+        } catch (err) {
+          showError((err instanceof Error ? err.message : '') || 'Failed to update role')
         }
         setConfirmation((prev) => ({ ...prev, show: false }))
       }
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setError('')
 
@@ -238,13 +275,13 @@ export default function UserManager() {
       } else {
         setError(result.message || 'Failed to create user')
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
   // ── Groups & Permissions Modal ──────────────────────────────────────────────
-  const openGroupsModal = async (userId: string) => {
+  const openGroupsModal = async (userId: string): Promise<void> => {
     setGroupsModalUserId(userId)
     setOverrideSearch('')
     setShowOverrideDropdown(false)
@@ -259,13 +296,13 @@ export default function UserManager() {
       setUserGroupIds(Array.isArray(gIds) ? gIds : [])
       setUserOverrides(Array.isArray(overrides) ? overrides : [])
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to load group data')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to load group data')
       setGroupsModalUserId(null)
     }
   }
 
-  const closeGroupsModal = () => {
+  const closeGroupsModal = (): void => {
     setGroupsModalUserId(null)
     setAllGroups([])
     setUserGroupIds([])
@@ -273,7 +310,7 @@ export default function UserManager() {
     setResolvedPerms([])
   }
 
-  const handleToggleUserGroup = async (groupId: string) => {
+  const handleToggleUserGroup = async (groupId: string): Promise<void> => {
     if (!groupsModalUserId) return
     const next = userGroupIds.includes(groupId)
       ? userGroupIds.filter((id) => id !== groupId)
@@ -284,14 +321,14 @@ export default function UserManager() {
       // Refresh resolved permissions
       const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to update groups')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update groups')
       const gIds = await window.api.rbacGetUserGroupIds(groupsModalUserId)
       setUserGroupIds(Array.isArray(gIds) ? gIds : [])
     }
   }
 
-  const handleAddOverride = async (permKey: string, granted: boolean) => {
+  const handleAddOverride = async (permKey: string, granted: boolean): Promise<void> => {
     if (!groupsModalUserId) return
     // Don't add if already overridden
     if (userOverrides.some((o) => o.permissionKey === permKey)) return
@@ -303,14 +340,14 @@ export default function UserManager() {
       await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
       const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to save override')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save override')
       const overrides = await window.api.rbacGetUserPermissionOverrides(groupsModalUserId)
       setUserOverrides(Array.isArray(overrides) ? overrides : [])
     }
   }
 
-  const handleToggleOverrideGranted = async (permKey: string) => {
+  const handleToggleOverrideGranted = async (permKey: string): Promise<void> => {
     if (!groupsModalUserId) return
     const next = userOverrides.map((o) =>
       o.permissionKey === permKey ? { ...o, granted: !o.granted } : o
@@ -320,12 +357,12 @@ export default function UserManager() {
       await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
       const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to save override')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save override')
     }
   }
 
-  const handleRemoveOverride = async (permKey: string) => {
+  const handleRemoveOverride = async (permKey: string): Promise<void> => {
     if (!groupsModalUserId) return
     const next = userOverrides.filter((o) => o.permissionKey !== permKey)
     setUserOverrides(next)
@@ -333,8 +370,8 @@ export default function UserManager() {
       await window.api.rbacSetUserPermissionOverrides(groupsModalUserId, next)
       const resolved = await window.api.rbacResolveUserPermissions(groupsModalUserId)
       setResolvedPerms(Array.isArray(resolved) ? resolved : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to remove override')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to remove override')
     }
   }
 
@@ -380,7 +417,8 @@ export default function UserManager() {
     if (!u.lastAppVersion) return max
     return parseVersionKey(u.lastAppVersion) > parseVersionKey(max) ? u.lastAppVersion : max
   }, '0.0.0')
-  const isOldVersion = (v?: string) => !!v && parseVersionKey(v) < parseVersionKey(currentVersion)
+  const isOldVersion = (v?: string): boolean =>
+    !!v && parseVersionKey(v) < parseVersionKey(currentVersion)
   const adminCount = users.filter((u) => u.role === 'admin').length
   const regularCount = users.filter((u) => u.role === 'user').length
   const onLatestCount = users.filter((u) => u.lastAppVersion === currentVersion).length
@@ -398,7 +436,7 @@ export default function UserManager() {
   const groupColor = isLight ? '#4f46e5' : '#a5b4fc'
   const groupBg = isLight ? 'rgba(79,70,229,0.1)' : 'rgba(99,102,241,0.1)'
 
-  const getVersionColor = (v?: string) => {
+  const getVersionColor = (v?: string): { color: string; bg: string; border: string } => {
     if (!v)
       return {
         color: 'var(--text-secondary)',
@@ -610,8 +648,10 @@ export default function UserManager() {
                   try {
                     await window.api.adminForcePasswordResetAll()
                     showSuccess('All users will be required to reset their password on next login')
-                  } catch (err: any) {
-                    showError(err.message || 'Failed to force password reset')
+                  } catch (err) {
+                    showError(
+                      (err instanceof Error ? err.message : '') || 'Failed to force password reset'
+                    )
                   }
                   setConfirmation((prev) => ({ ...prev, show: false }))
                 }
@@ -1073,8 +1113,10 @@ export default function UserManager() {
                                       showSuccess(
                                         `${user.username} will be required to change password on next login`
                                       )
-                                    } catch (err: any) {
-                                      showError(err.message || 'Failed')
+                                    } catch (err) {
+                                      showError(
+                                        (err instanceof Error ? err.message : '') || 'Failed'
+                                      )
                                     }
                                     setConfirmation((prev) => ({ ...prev, show: false }))
                                   }

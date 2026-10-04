@@ -45,7 +45,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-export default function SurveyorDirectory() {
+export default function SurveyorDirectory(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -97,66 +97,92 @@ export default function SurveyorDirectory() {
   const [formNotes, setFormNotes] = useState('')
 
   // ── Data loading ─────────────────────────────────────────────────────────────
-  const loadSurveyors = async () => {
-    setIsLoading(true)
-    try {
-      const params: SurveyorQueryParams = {
-        page,
-        limit,
-        search: debouncedSearch || undefined,
-        country: filterCountry !== 'all' ? filterCountry : undefined,
-        sortField: sortBy === 'name' ? 'companyName' : 'country',
-        sortOrder: 'asc'
-      }
-      const result = await window.api.getSurveyorsPaginated(params)
-      setSurveyors(Array.isArray(result?.data) ? result.data : [])
-      setTotal(result?.total ?? 0)
-      setTotalPages(result?.totalPages ?? 1)
-    } catch (error: any) {
-      showError(error.message || 'Failed to load surveyors')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadRelatedData = async () => {
-    try {
-      const [surveys, defects, vs, types, all] = await Promise.all([
-        window.api.getConditionSurveys(),
-        window.api.getSurveyDefects(),
-        window.api.getVessels(),
-        window.api.getConditionSurveyTypes(),
-        window.api.getSurveyors()
-      ])
-      setAllSurveys(Array.isArray(surveys) ? surveys : [])
-      setAllDefects(Array.isArray(defects) ? defects : [])
-      setVessels(Array.isArray(vs) ? vs : [])
-      setSurveyTypes(Array.isArray(types) ? types : [])
-      const allSafe = Array.isArray(all) ? all : []
-      setAllSurveyorCount(allSafe.length)
-      setAllCountries([...new Set(allSafe.map((s) => s.country).filter(Boolean))].sort())
-    } catch {
-      // non-critical
-    }
-  }
-
-  useEffect(() => {
-    loadSurveyors()
-  }, [page, limit, debouncedSearch, filterCountry, sortBy])
-  useEffect(() => {
+  // Back to page 1 whenever the search, filter, sort or page size changes
+  const filterKey = JSON.stringify([debouncedSearch, filterCountry, sortBy, limit])
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
     setPage(1)
-  }, [debouncedSearch, filterCountry, sortBy, limit])
+  }
+
+  // loadSurveyors() / loadRelatedData() re-run the loading effects below
+  const [surveyorsKey, setSurveyorsKey] = useState(0)
+  const [relatedKey, setRelatedKey] = useState(0)
+  const loadSurveyors = (): void => setSurveyorsKey((k) => k + 1)
+  const loadRelatedData = (): void => setRelatedKey((k) => k + 1)
+
   useEffect(() => {
-    loadRelatedData()
-  }, [])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const params: SurveyorQueryParams = {
+          page,
+          limit,
+          search: debouncedSearch || undefined,
+          country: filterCountry !== 'all' ? filterCountry : undefined,
+          sortField: sortBy === 'name' ? 'companyName' : 'country',
+          sortOrder: 'asc'
+        }
+        const result = await window.api.getSurveyorsPaginated(params)
+        if (!alive) return
+        setSurveyors(Array.isArray(result?.data) ? result.data : [])
+        setTotal(result?.total ?? 0)
+        setTotalPages(result?.totalPages ?? 1)
+      } catch (error) {
+        if (alive)
+          showError((error instanceof Error && error.message) || 'Failed to load surveyors')
+      } finally {
+        if (alive) setIsLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [page, limit, debouncedSearch, filterCountry, sortBy, showError, surveyorsKey])
+
+  useEffect(() => {
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const [surveys, defects, vs, types, all] = await Promise.all([
+          window.api.getConditionSurveys(),
+          window.api.getSurveyDefects(),
+          window.api.getVessels(),
+          window.api.getConditionSurveyTypes(),
+          window.api.getSurveyors()
+        ])
+        if (!alive) return
+        setAllSurveys(Array.isArray(surveys) ? surveys : [])
+        setAllDefects(Array.isArray(defects) ? defects : [])
+        setVessels(Array.isArray(vs) ? vs : [])
+        setSurveyTypes(Array.isArray(types) ? types : [])
+        const allSafe = Array.isArray(all) ? all : []
+        setAllSurveyorCount(allSafe.length)
+        setAllCountries([...new Set(allSafe.map((s) => s.country).filter(Boolean))].sort())
+      } catch {
+        // non-critical
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [relatedKey])
+
+  // "Days since last survey" is counted from when the page was opened
+  const [now] = useState(() => Date.now())
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const getSurveyorSurveys = (surveyorId: string) =>
+  const getSurveyorSurveys = (surveyorId: string): ConditionSurvey[] =>
     allSurveys
       .filter((s) => s.surveyorId === surveyorId)
       .sort((a, b) => b.surveyDate.localeCompare(a.surveyDate))
 
-  const getSurveyStatus = (surveyId: string) => {
+  const getSurveyStatus = (
+    surveyId: string
+  ): { label: string; color: 'open' | 'closed'; open: number; closed: number } => {
     const defects = allDefects.filter((d) => d.surveyId === surveyId)
     if (defects.length === 0)
       return { label: 'NO DEFECTS', color: 'closed' as const, open: 0, closed: 0 }
@@ -166,14 +192,15 @@ export default function SurveyorDirectory() {
     return { label: 'OPEN', color: 'open' as const, open, closed }
   }
 
-  const getVesselName = (vesselId: string) => vessels.find((v) => v.id === vesselId)?.name ?? '—'
+  const getVesselName = (vesselId: string): string =>
+    vessels.find((v) => v.id === vesselId)?.name ?? '—'
 
-  const getSurveyTypeName = (surveyType: string) => {
+  const getSurveyTypeName = (surveyType: string): string => {
     const found = surveyTypes.find((t) => t.id === surveyType || t.name === surveyType)
     return found?.name ?? surveyType
   }
 
-  const getSurveyCount = (surveyorId: string) =>
+  const getSurveyCount = (surveyorId: string): number =>
     allSurveys.filter((s) => s.surveyorId === surveyorId).length
 
   const openSurveysCount = useMemo(() => {
@@ -184,7 +211,7 @@ export default function SurveyorDirectory() {
   }, [allSurveys, allDefects])
 
   // ── Form handlers ────────────────────────────────────────────────────────────
-  const resetForm = () => {
+  const resetForm = (): void => {
     setFormCompanyName('')
     setFormCountry('')
     setFormContactPerson('')
@@ -193,12 +220,12 @@ export default function SurveyorDirectory() {
     setEditingId(null)
   }
 
-  const openAddModal = () => {
+  const openAddModal = (): void => {
     resetForm()
     setShowModal(true)
   }
 
-  const openEditModal = (s: Surveyor) => {
+  const openEditModal = (s: Surveyor): void => {
     setEditingId(s.id)
     setFormCompanyName(s.companyName)
     setFormCountry(s.country)
@@ -208,12 +235,12 @@ export default function SurveyorDirectory() {
     setShowModal(true)
   }
 
-  const closeModal = () => {
+  const closeModal = (): void => {
     setShowModal(false)
     resetForm()
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!formCompanyName.trim() || !formCountry.trim()) return
     setIsSubmitting(true)
     try {
@@ -235,14 +262,14 @@ export default function SurveyorDirectory() {
       closeModal()
       loadSurveyors()
       loadRelatedData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to save surveyor')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to save surveyor')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDelete = async (surveyor: Surveyor) => {
+  const handleDelete = async (surveyor: Surveyor): Promise<void> => {
     if (
       !(await confirmDialog(
         `Delete ${surveyor.companyName}? This will fail if they are referenced in any surveys.`
@@ -255,8 +282,11 @@ export default function SurveyorDirectory() {
       showSuccess('Surveyor deleted')
       loadSurveyors()
       loadRelatedData()
-    } catch (error: any) {
-      showError(error.message || 'Cannot delete surveyor: referenced in existing surveys.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) ||
+          'Cannot delete surveyor: referenced in existing surveys.'
+      )
     }
   }
 
@@ -267,7 +297,11 @@ export default function SurveyorDirectory() {
   const openColor = isLight ? '#b45309' : '#f59e0b'
   const openBg = isLight ? 'rgba(180,83,9,0.1)' : 'rgba(245,158,11,0.1)'
 
-  const StatusPill = ({ status }: { status: ReturnType<typeof getSurveyStatus> }) => (
+  const StatusPill = ({
+    status
+  }: {
+    status: ReturnType<typeof getSurveyStatus>
+  }): React.JSX.Element => (
     <span
       style={{
         display: 'inline-flex',
@@ -446,7 +480,7 @@ export default function SurveyorDirectory() {
         </select>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
+          onChange={(e) => setSortBy(e.target.value as 'name' | 'country')}
           style={{ padding: '7px 10px', fontSize: '0.82rem' }}
         >
           <option value="name">Sort by Name</option>
@@ -1014,7 +1048,7 @@ export default function SurveyorDirectory() {
                 const lastSurveyDate =
                   selectedSurveys.length > 0 ? selectedSurveys[0].surveyDate : null
                 const daysSince = lastSurveyDate
-                  ? Math.floor((Date.now() - new Date(lastSurveyDate).getTime()) / 86400000)
+                  ? Math.floor((now - new Date(lastSurveyDate).getTime()) / 86400000)
                   : null
                 const sinceLabel =
                   daysSince === null

@@ -11,7 +11,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import { AlternativeScopeChips } from './shared'
 import VesselScopeChips from '../VesselScopeChips'
-import { ok } from '../../utils/ipc'
+import { ok, isIpcError, type IpcErrorValue } from '../../utils/ipc'
 
 const DEADLINE_PRESETS = [
   'prior inception',
@@ -34,7 +34,7 @@ export default function SurveyWarrantiesTab({
   showError: (m: string) => void
   piAlternatives?: QuotationPIAlternative[]
   qVessels?: QuotationVessel[]
-}) {
+}): React.JSX.Element {
   const [items, setItems] = useState<QuotationSurveyWarranty[]>([])
   const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
   const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
@@ -44,24 +44,31 @@ export default function SurveyWarrantiesTab({
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
+  // Bump reloadKey to reload the list after a change
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
   useEffect(() => {
-    loadData()
-  }, [quotation.id])
-
-  const loadData = async () => {
-    try {
-      const [w, t, s] = await Promise.all([
-        window.api.quotationSurveyWarrantyGetAll(quotation.id),
-        window.api.surveyWarrantyTemplateGetAll(),
-        window.api.surveyWarrantyTemplateSetGetAll()
-      ])
-      if (Array.isArray(w)) setItems(w)
-      if (Array.isArray(t)) setTemplates(t)
-      if (Array.isArray(s)) setSets(s)
-    } catch (e: any) {
-      showError(e.message)
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const [w, t, s] = await Promise.all([
+          window.api.quotationSurveyWarrantyGetAll(quotation.id),
+          window.api.surveyWarrantyTemplateGetAll(),
+          window.api.surveyWarrantyTemplateSetGetAll()
+        ])
+        if (!alive) return
+        if (Array.isArray(w)) setItems(w)
+        if (Array.isArray(t)) setTemplates(t)
+        if (Array.isArray(s)) setSets(s)
+      } catch (e) {
+        if (alive) showError(e instanceof Error ? e.message : String(e))
+      }
     }
-  }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [quotation.id, reloadKey, showError])
 
   const extractPlaceholders = (text: string): string[] => {
     const matches = text.match(/\{[^}]+\}/g)
@@ -73,31 +80,30 @@ export default function SurveyWarrantiesTab({
     if (item.deadlineValue) resolved = resolved.replace(/\{deadline\}/g, item.deadlineValue)
     if (item.daysValue) resolved = resolved.replace(/\{days\}/g, item.daysValue)
     if (item.eventValue) resolved = resolved.replace(/\{event\}/g, item.eventValue)
-    if ((item as any).surveyorValue)
-      resolved = resolved.replace(/\{surveyor\}/g, (item as any).surveyorValue)
-    if ((item as any).dateOfSurveyValue)
-      resolved = resolved.replace(/\{dateofsurvey\}/g, (item as any).dateOfSurveyValue)
+    if (item.surveyorValue) resolved = resolved.replace(/\{surveyor\}/g, item.surveyorValue)
+    if (item.dateOfSurveyValue)
+      resolved = resolved.replace(/\{dateofsurvey\}/g, item.dateOfSurveyValue)
     return resolved
   }
 
-  const addFromTemplate = async (template: SurveyWarrantyTemplate) => {
+  const addFromTemplate = async (template: SurveyWarrantyTemplate): Promise<void> => {
     try {
       const result = (await window.api.quotationSurveyWarrantyAdd({
         quotationId: quotation.id,
         templateId: template.id,
         text: template.text
-      })) as any
-      if (result?.error) {
-        showError(result.message)
+      })) as QuotationSurveyWarranty | IpcErrorValue
+      if (isIpcError(result)) {
+        showError(result.message || '')
         return
       }
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const applySet = async (set: SurveyWarrantyTemplateSet) => {
+  const applySet = async (set: SurveyWarrantyTemplateSet): Promise<void> => {
     try {
       for (const tid of set.templateIds) {
         const tmpl = templates.find((t) => t.id === tid)
@@ -114,67 +120,67 @@ export default function SurveyWarrantiesTab({
       }
       showSuccess(`Applied set "${set.name}"`)
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const addCustom = async () => {
+  const addCustom = async (): Promise<void> => {
     if (!customText.trim()) return
     try {
       const result = (await window.api.quotationSurveyWarrantyAdd({
         quotationId: quotation.id,
         text: customText.trim(),
         customText: customText.trim()
-      })) as any
-      if (result?.error) {
-        showError(result.message)
+      })) as QuotationSurveyWarranty | IpcErrorValue
+      if (isIpcError(result)) {
+        showError(result.message || '')
         return
       }
       setCustomText('')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const updateItem = async (id: string, data: Partial<QuotationSurveyWarranty>) => {
+  const updateItem = async (id: string, data: Partial<QuotationSurveyWarranty>): Promise<void> => {
     try {
       await window.api.quotationSurveyWarrantyUpdate(id, data)
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...data } : i)))
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const deleteItem = async (id: string) => {
+  const deleteItem = async (id: string): Promise<void> => {
     try {
       await window.api.quotationSurveyWarrantyDelete(id)
       setItems((prev) => prev.filter((i) => i.id !== id))
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const updateItemVesselScope = async (id: string, scope: string[] | null) => {
+  const updateItemVesselScope = async (id: string, scope: string[] | null): Promise<void> => {
     try {
-      await window.api.quotationSurveyWarrantyUpdate(id, { vesselScope: scope } as any)
+      await window.api.quotationSurveyWarrantyUpdate(id, { vesselScope: scope })
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, vesselScope: scope } : i)))
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const updateItemAltId = async (id: string, altId: string | null) => {
+  const updateItemAltId = async (id: string, altId: string | null): Promise<void> => {
     try {
       await window.api.updateQuotationItemAlternativeId('quotation_survey_warranties', id, altId)
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, alternativeId: altId } : i)))
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const reorder = async (idx: number, dir: -1 | 1) => {
+  const reorder = async (idx: number, dir: -1 | 1): Promise<void> => {
     const arr = [...items]
     const [item] = arr.splice(idx, 1)
     arr.splice(idx + dir, 0, item)
@@ -184,12 +190,12 @@ export default function SurveyWarrantiesTab({
         quotation.id,
         arr.map((a, i) => ({ ...a, order: i }))
       )
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const placeholderColor = (p: string) => {
+  const placeholderColor = (p: string): { bg: string; text: string } => {
     if (p === '{deadline}')
       return { bg: 'rgba(var(--accent-primary-rgb), 0.15)', text: 'var(--accent-primary)' }
     if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
@@ -596,10 +602,8 @@ export default function SurveyWarrantiesTab({
                         </span>
                         <input
                           type="text"
-                          value={(item as any).surveyorValue || ''}
-                          onChange={(e) =>
-                            updateItem(item.id, { surveyorValue: e.target.value } as any)
-                          }
+                          value={item.surveyorValue || ''}
+                          onChange={(e) => updateItem(item.id, { surveyorValue: e.target.value })}
                           placeholder="e.g. Lloyd's Register"
                           style={{
                             flex: 1,
@@ -627,9 +631,9 @@ export default function SurveyWarrantiesTab({
                         </span>
                         <input
                           type="text"
-                          value={(item as any).dateOfSurveyValue || ''}
+                          value={item.dateOfSurveyValue || ''}
                           onChange={(e) =>
-                            updateItem(item.id, { dateOfSurveyValue: e.target.value } as any)
+                            updateItem(item.id, { dateOfSurveyValue: e.target.value })
                           }
                           placeholder="e.g. January 2026"
                           style={{

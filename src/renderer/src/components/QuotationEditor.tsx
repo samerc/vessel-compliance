@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useEffectEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
@@ -76,6 +76,17 @@ import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
 import { ok } from '../utils/ipc'
 
+// A safeHandle IPC call resolved with { error, message } instead of the value
+const hasIpcError = (r: unknown): boolean =>
+  !!r && typeof r === 'object' && !!(r as { error?: unknown }).error
+const ipcMessage = (r: unknown): string | undefined => {
+  const m = r && typeof r === 'object' ? (r as { message?: unknown }).message : undefined
+  return typeof m === 'string' ? m : undefined
+}
+
+// Quotation list rows (getQuotations) also carry the vessel count
+type QuotationRowWithCount = Quotation & { vesselCount?: number }
+
 const statusColors: Record<string, { bg: string; text: string }> = {
   draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
   sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
@@ -113,7 +124,7 @@ type EditorTab =
   | 'cargoSpecial'
   | 'cargoLaw'
 
-type TabDef = { key: EditorTab; label: string; icon: any; types?: string[] }
+type TabDef = { key: EditorTab; label: string; icon: typeof Ship; types?: string[] }
 
 const allTabs: TabDef[] = [
   { key: 'vessel', label: 'Vessel', icon: Ship },
@@ -173,7 +184,7 @@ export default function QuotationEditor({
   onNavigateToPolicySetup,
   policyContext,
   onReturnToPolicy
-}: QuotationEditorProps) {
+}: QuotationEditorProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<EditorTab>('vessel')
   const [q, setQ] = useState<Quotation>(quotation)
   // policyTypes removed — type shown as badge, not editable
@@ -193,6 +204,9 @@ export default function QuotationEditor({
   >([])
   const [showStepMenu, setShowStepMenu] = useState(false)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
+  // Anchor positions of the step / actions menus, measured when the menu is opened
+  const [stepMenuRect, setStepMenuRect] = useState<DOMRect | null>(null)
+  const [actionsRect, setActionsRect] = useState<DOMRect | null>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
   const stepMenuRef = useRef<HTMLButtonElement>(null)
   const [stepComment, setStepComment] = useState('')
@@ -229,10 +243,11 @@ export default function QuotationEditor({
   const canExport = hasPermission('quotations:export')
 
   // Lock quotation on mount, heartbeat while active, unlock on unmount
-  const lastActivity = useRef(Date.now())
+  const lastActivity = useRef(0)
   const heartbeatActive = useRef(true)
   useEffect(() => {
     let mounted = true
+    lastActivity.current = Date.now()
     ;(async () => {
       try {
         const result = await window.api.quotationLock(quotation.id)
@@ -241,7 +256,9 @@ export default function QuotationEditor({
           setIsLockedByOther(true)
           setLockedByName(result.lockedByName || 'another user')
         }
-      } catch {}
+      } catch {
+        /* lock is best-effort: the server still enforces it on save */
+      }
     })()
 
     // Heartbeat: ping every 2 min while user is active
@@ -259,7 +276,7 @@ export default function QuotationEditor({
     }, HEARTBEAT_MS)
 
     // Track user activity
-    const onActivity = () => {
+    const onActivity = (): void => {
       lastActivity.current = Date.now()
       // If was idle and came back, try to re-lock
       if (!heartbeatActive.current) {
@@ -294,34 +311,34 @@ export default function QuotationEditor({
   const isApproved = q.status === 'approved' || q.status === 'exported' || q.status === 'converted'
   const canEdit = hasPermission('quotations:edit') && !isLockedByOther && stepCanEdit && !isApproved
 
-  useEffect(() => {
-    loadMasterData()
-  }, [])
-
   // Reload quotation vessels when vessel list changes
+  const quotationId = quotation.id
   useEffect(() => {
     if (vesselVersion === 0) return
     window.api
-      .getQuotationVessels(quotation.id)
+      .getQuotationVessels(quotationId)
       .then((qv) => {
         setQVessels(Array.isArray(qv) ? qv : [])
       })
       .catch(() => {})
-  }, [vesselVersion])
+  }, [vesselVersion, quotationId])
 
-  // Track recent item view
-  useEffect(() => {
+  // Track recent item view (once per quotation; label from the props at that time)
+  const addRecentItem = useEffectEvent((): void => {
     const label = quotation.referenceNumber || 'Quotation'
-    const sublabel = (quotation as any).quotationTypeName || undefined
+    const sublabel = quotation.quotationTypeName || undefined
     window.api
       .recentItemsAdd('quotation', quotation.id, label, sublabel)
       .then(() => {
         window.dispatchEvent(new Event('recent-item-added'))
       })
       .catch(() => {})
-  }, [quotation.id])
+  })
+  useEffect(() => {
+    addRecentItem()
+  }, [quotationId])
 
-  const loadMasterData = async () => {
+  const loadMasterData = async (): Promise<void> => {
     const [fullQ, , v, gt, sv, qv] = await Promise.all([
       window.api.getQuotation(quotation.id),
       window.api.getPolicyTypes(),
@@ -330,9 +347,9 @@ export default function QuotationEditor({
       window.api.piGetSanctionsVersions(),
       window.api.getQuotationVessels(quotation.id)
     ])
-    if (fullQ && (fullQ as any).error) {
+    if (fullQ && hasIpcError(fullQ)) {
       // Keep the list row we were opened with rather than replacing it with an error object
-      showError((fullQ as any).message || 'Failed to load the full quotation')
+      showError(ipcMessage(fullQ) || 'Failed to load the full quotation')
     } else if (fullQ) {
       // Set war defaults on first load (non-refundable 25%)
       if (fullQ.quotationTypeCode === 'W' && !fullQ.nonRefundableType && !fullQ.premiumAmount) {
@@ -342,7 +359,7 @@ export default function QuotationEditor({
           await window.api.updateQuotation(fullQ.id, {
             nonRefundableType: 'percentage',
             nonRefundablePercent: 25
-          } as any)
+          })
         )
       }
       setQ(fullQ)
@@ -380,10 +397,18 @@ export default function QuotationEditor({
     // policyTypes removed
     setVessels(Array.isArray(v) ? v : [])
     setQVessels(Array.isArray(qv) ? qv : [])
-    if (gt && !(gt as any).error && Object.keys(gt).length > 0)
+    if (gt && !hasIpcError(gt) && Object.keys(gt).length > 0)
       setGlobalTexts({ ...DEFAULT_SECTION_TEXTS, ...gt })
     setSanctionsVersions(Array.isArray(sv) ? sv : [])
   }
+
+  // Initial load, once on mount (loadMasterData sets state only after its first await)
+  const loadMasterDataOnMount = useEffectEvent(loadMasterData)
+  useEffect(() => {
+    void (async () => {
+      await loadMasterDataOnMount()
+    })()
+  }, [])
 
   const getEffectiveText = (key: keyof PISectionTexts): string => {
     return String(
@@ -393,7 +418,7 @@ export default function QuotationEditor({
 
   const isLocked = q.isLocked === true
 
-  const openDeleteModal = async () => {
+  const openDeleteModal = async (): Promise<void> => {
     const groupId = q.revisionGroupId || q.id
     let count = 1
     try {
@@ -404,53 +429,53 @@ export default function QuotationEditor({
     setDeleteModal({ show: true, revisionCount: count, deleteMode: 'single' })
   }
 
-  const handleDeleteFromEditor = async () => {
+  const handleDeleteFromEditor = async (): Promise<void> => {
     if (!deleteModal) return
     try {
       if (deleteModal.deleteMode === 'all' && deleteModal.revisionCount > 1) {
         const groupId = q.revisionGroupId || q.id
-        const result = (await window.api.deleteQuotationGroup(groupId)) as any
-        if (result?.error) {
-          showError(result.message || 'Failed to delete')
+        const result: unknown = await window.api.deleteQuotationGroup(groupId)
+        if (hasIpcError(result)) {
+          showError(ipcMessage(result) || 'Failed to delete')
           return
         }
         showSuccess('All revisions moved to recycle bin')
       } else {
-        const result = (await window.api.deleteQuotation(q.id)) as any
-        if (result?.error) {
-          showError(result.message || 'Failed to delete')
+        const result: unknown = await window.api.deleteQuotation(q.id)
+        if (hasIpcError(result)) {
+          showError(ipcMessage(result) || 'Failed to delete')
           return
         }
         showSuccess('Quotation moved to recycle bin')
       }
       setDeleteModal(null)
       onBack()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete quotation')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete quotation')
     }
   }
 
-  const handleCreateRevision = async () => {
+  const handleCreateRevision = async (): Promise<void> => {
     try {
       const newRev = await window.api.createQuotationRevision(q.id)
-      if ((newRev as any)?.error) {
-        showError((newRev as any).message || 'Failed to create revision')
+      if (hasIpcError(newRev)) {
+        showError(ipcMessage(newRev) || 'Failed to create revision')
         return
       }
       showSuccess(`Revision R${newRev.revisionNumber} created`)
       // Load full quotation data and switch to it
       const fullRev = await window.api.getQuotation(newRev.id)
       if (fullRev && onOpenQuotation) onOpenQuotation(fullRev)
-    } catch (err: any) {
-      showError(err.message || 'Failed to create revision')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to create revision')
     }
   }
 
-  const handleMoveToStep = async (stepId: string, comment?: string) => {
+  const handleMoveToStep = async (stepId: string, comment?: string): Promise<void> => {
     try {
       const result = await window.api.workflowMoveQuotation(q.id, stepId, comment)
-      if ((result as any)?.error || (result as any)?.success === false) {
-        showError((result as any).message || 'Failed to move')
+      if (hasIpcError(result) || result?.success === false) {
+        showError(ipcMessage(result) || 'Failed to move')
         return
       }
       showSuccess('Workflow step updated')
@@ -459,7 +484,7 @@ export default function QuotationEditor({
       setStepComment('')
       // Reload quotation to get updated step
       const fullQ = await window.api.getQuotation(q.id)
-      if (fullQ && !(fullQ as any).error) {
+      if (fullQ && !hasIpcError(fullQ)) {
         setQ(fullQ)
         // Reload reachable steps
         const steps = await window.api.workflowGetReachableSteps(fullQ.id)
@@ -467,12 +492,12 @@ export default function QuotationEditor({
         const log = await window.api.workflowGetQuotationLog(fullQ.id)
         setWorkflowLog(Array.isArray(log) ? log : [])
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to move to step')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to move to step')
     }
   }
 
-  const handleReloadFromSettings = async () => {
+  const handleReloadFromSettings = async (): Promise<void> => {
     try {
       // Clear export snapshot
       if (q.exportSnapshot) {
@@ -482,13 +507,13 @@ export default function QuotationEditor({
       const masterCountries = await window.api.piGetTradingExcludedCountries()
       if (Array.isArray(masterCountries) && masterCountries.length > 0) {
         const typeCode = q.quotationTypeCode || 'P'
-        const filtered = masterCountries.filter((c: any) => {
+        const filtered = masterCountries.filter((c) => {
           if (!c.excludeTypes) return true // null = all types
           return c.excludeTypes.split(',').includes(typeCode)
         })
         await window.api.setQuotationExcludedCountries(
           q.id,
-          filtered.map((c: any) => ({
+          filtered.map((c) => ({
             name: c.name,
             listType: c.listType
           }))
@@ -496,12 +521,12 @@ export default function QuotationEditor({
       }
       // Reload quotation to pick up fresh settings
       const fullQ = await window.api.getQuotation(q.id)
-      if (fullQ && !(fullQ as any).error) {
+      if (fullQ && !hasIpcError(fullQ)) {
         setQ({ ...fullQ, exportSnapshot: undefined })
       }
       showSuccess('Reloaded texts and data from settings')
-    } catch (err: any) {
-      showError(err.message || 'Failed to reload from settings')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to reload from settings')
     }
   }
 
@@ -522,23 +547,22 @@ export default function QuotationEditor({
         // P&I alternatives may have per-alternative premiums
         try {
           const piAlts = await window.api.piGetQuotationAlternatives(quotation.id)
-          if (
-            Array.isArray(piAlts) &&
-            piAlts.length > 0 &&
-            piAlts.some((a: any) => a.premiumAmount)
-          )
+          if (Array.isArray(piAlts) && piAlts.length > 0 && piAlts.some((a) => a.premiumAmount))
             hasPremium = true
-        } catch {}
+        } catch {
+          /* best-effort check */
+        }
       }
       if (!hasPremium && typeCode === 'H') {
         // Hull alternatives or value options may have premiums
         try {
           const hullAlts = await window.api.hullGetQuotationAlternatives(quotation.id)
-          if (Array.isArray(hullAlts) && hullAlts.some((a: any) => a.premiumAmount))
-            hasPremium = true
+          if (Array.isArray(hullAlts) && hullAlts.some((a) => a.premiumAmount)) hasPremium = true
           const valOpts = await window.api.hullGetAgreedValueOptions(quotation.id)
-          if (Array.isArray(valOpts) && valOpts.some((o: any) => o.premiumAmount)) hasPremium = true
-        } catch {}
+          if (Array.isArray(valOpts) && valOpts.some((o) => o.premiumAmount)) hasPremium = true
+        } catch {
+          /* best-effort check */
+        }
       }
       if (!hasPremium) {
         // Check per-vessel premiums (including war excess section premiums)
@@ -546,17 +570,21 @@ export default function QuotationEditor({
           const qv = await window.api.getQuotationVessels(quotation.id)
           if (
             Array.isArray(qv) &&
-            qv.some((v: any) => v.premiumAmount || v.warSection1Premium || v.warSection2Premium)
+            qv.some((v) => v.premiumAmount || v.warSection1Premium || v.warSection2Premium)
           )
             hasPremium = true
-        } catch {}
+        } catch {
+          /* best-effort check */
+        }
       }
       if (!hasPremium && typeCode === 'P') {
         // Check LOL alternative premiums
         try {
           const lolOpts = await window.api.lolGetOptions(quotation.id)
-          if (Array.isArray(lolOpts) && lolOpts.some((o: any) => o.premiumAmount)) hasPremium = true
-        } catch {}
+          if (Array.isArray(lolOpts) && lolOpts.some((o) => o.premiumAmount)) hasPremium = true
+        } catch {
+          /* best-effort check */
+        }
       }
       if (!hasPremium) {
         warnings.push('Premium amount is not set')
@@ -609,9 +637,11 @@ export default function QuotationEditor({
       let hasPerVesselValue = false
       try {
         const qv = await window.api.getQuotationVessels(quotation.id)
-        if (Array.isArray(qv) && qv.some((v: any) => v.agreedValue != null && v.agreedValue > 0))
+        if (Array.isArray(qv) && qv.some((v) => v.agreedValue != null && v.agreedValue > 0))
           hasPerVesselValue = true
-      } catch {}
+      } catch {
+        /* best-effort check */
+      }
       if (!hasPerVesselValue) warnings.push('Sum Insured is not set')
     }
 
@@ -627,7 +657,11 @@ export default function QuotationEditor({
     return warnings
   }
 
-  const doExport = async (quotation: Quotation, _format: 'pdf' | 'word', successMsg: string) => {
+  const doExport = async (
+    quotation: Quotation,
+    _format: 'pdf' | 'word',
+    successMsg: string
+  ): Promise<void> => {
     await exportQuotationToWord(quotation)
     // Mark as exported if approved
     if (
@@ -635,9 +669,11 @@ export default function QuotationEditor({
       (quotation.referenceNumber && !quotation.referenceNumber.startsWith('DRAFT-'))
     ) {
       try {
-        ok(await window.api.updateQuotation(quotation.id, { status: 'exported' } as any))
+        ok(await window.api.updateQuotation(quotation.id, { status: 'exported' }))
         setQ((prev) => ({ ...prev, status: 'exported' }))
-      } catch {}
+      } catch {
+        /* the export itself succeeded; the status update is best-effort */
+      }
     }
     showSuccess(successMsg)
   }
@@ -655,7 +691,7 @@ export default function QuotationEditor({
     return true
   }
 
-  const handleExportWithDraftCheck = async (format: 'pdf' | 'word') => {
+  const handleExportWithDraftCheck = async (format: 'pdf' | 'word'): Promise<void> => {
     const canApprove = hasPermission('quotations:approve')
     if (isDraft && canApprove) {
       // User can approve — show choice: draft or approve & export
@@ -676,12 +712,12 @@ export default function QuotationEditor({
     if (!ok) return
     try {
       await doExport(q, format, `${format.toUpperCase()} exported`)
-    } catch (err: any) {
-      showError(err.message || `${format.toUpperCase()} export failed`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || `${format.toUpperCase()} export failed`)
     }
   }
 
-  const handleApproveAndExport = async (format: 'pdf' | 'word') => {
+  const handleApproveAndExport = async (format: 'pdf' | 'word'): Promise<void> => {
     // One approval at a time: a double click must not assign two registry numbers
     if (approvingRef.current) return
     approvingRef.current = true
@@ -690,7 +726,7 @@ export default function QuotationEditor({
       // First move to Approved step
       const steps = await window.api.workflowGetReachableSteps(q.id)
       const approvedStep = (Array.isArray(steps) ? steps : []).find(
-        (s: any) => s.name.toLowerCase() === 'approved'
+        (s) => s.name.toLowerCase() === 'approved'
       )
       if (approvedStep) {
         ok(await window.api.workflowMoveQuotation(q.id, approvedStep.id))
@@ -700,7 +736,7 @@ export default function QuotationEditor({
       }
       // Reload quotation to get updated reference
       const fullQ = await window.api.getQuotation(q.id)
-      if (fullQ && !(fullQ as any).error) {
+      if (fullQ && !hasIpcError(fullQ)) {
         setQ(fullQ)
         // Reload reachable steps
         const newSteps = await window.api.workflowGetReachableSteps(fullQ.id)
@@ -708,8 +744,8 @@ export default function QuotationEditor({
         // Export with updated data
         await doExport(fullQ, format, `Approved and ${format.toUpperCase()} exported`)
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to approve and export')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to approve and export')
     } finally {
       approvingRef.current = false
       setApproving(false)
@@ -717,16 +753,16 @@ export default function QuotationEditor({
     setShowDraftExportModal(null)
   }
 
-  const handleExportAsDraft = async (format: 'pdf' | 'word') => {
+  const handleExportAsDraft = async (format: 'pdf' | 'word'): Promise<void> => {
     setShowDraftExportModal(null)
     try {
       await doExport(q, format, `${format.toUpperCase()} exported (as draft)`)
-    } catch (err: any) {
-      showError(err.message || `${format.toUpperCase()} export failed`)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || `${format.toUpperCase()} export failed`)
     }
   }
 
-  const handleExportWarningProceed = async () => {
+  const handleExportWarningProceed = async (): Promise<void> => {
     if (!exportWarnings) return
     const { format, action } = exportWarnings
     setExportWarnings(null)
@@ -738,20 +774,20 @@ export default function QuotationEditor({
     } else {
       try {
         await doExport(q, format, `${format.toUpperCase()} exported`)
-      } catch (err: any) {
-        showError(err.message || `${format.toUpperCase()} export failed`)
+      } catch (err) {
+        showError((err instanceof Error && err.message) || `${format.toUpperCase()} export failed`)
       }
     }
   }
 
-  const updateField = async (field: string, value: any) => {
+  const updateField = async (field: string, value: unknown): Promise<void> => {
     if (isLocked || !canEdit) return
     try {
-      ok(await window.api.updateQuotation(q.id, { [field]: value } as any))
+      ok(await window.api.updateQuotation(q.id, { [field]: value } as Partial<Quotation>))
       setQ((prev) => ({ ...prev, [field]: value }))
       hasEdited.current = true
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
@@ -761,12 +797,12 @@ export default function QuotationEditor({
   const piAltTabs: EditorTab[] = ['conditions', 'warranties', 'deductibles', 'exclusions']
   const showPIAltBar = isPIType && piAltTabs.includes(activeTab)
 
-  const handleAddPIAlternatives = async () => {
+  const handleAddPIAlternatives = async (): Promise<void> => {
     if (isLocked || !canEdit) return
     try {
       const a1 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 1')
       const a2 = await window.api.piAddQuotationAlternative(q.id, 'Alternative 2')
-      if ((a1 as any)?.error || (a2 as any)?.error) {
+      if (hasIpcError(a1) || hasIpcError(a2)) {
         showError('Failed to create alternatives')
         return
       }
@@ -775,27 +811,27 @@ export default function QuotationEditor({
       setPiAlternatives([a1, a2])
       setSelectedPIAltId(a1.id)
       showSuccess('Alternatives created')
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const handleAddPIAlternative = async () => {
+  const handleAddPIAlternative = async (): Promise<void> => {
     if (isLocked) return
     try {
       const label = `Alternative ${piAlternatives.length + 1}`
       const a = await window.api.piAddQuotationAlternative(q.id, label)
-      if ((a as any)?.error) {
-        showError((a as any).message)
+      if (hasIpcError(a)) {
+        showError(ipcMessage(a) ?? '')
         return
       }
       setPiAlternatives((prev) => [...prev, a])
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const handleRemoveLastPIAlternative = async () => {
+  const handleRemoveLastPIAlternative = async (): Promise<void> => {
     if (isLocked || !canEdit || piAlternatives.length < 2) return
     try {
       if (piAlternatives.length === 2) {
@@ -811,17 +847,17 @@ export default function QuotationEditor({
         if (selectedPIAltId === last.id) setSelectedPIAltId(null)
         showSuccess('Alternative removed')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const _handleRenamePIAlternative = async (id: string, label: string) => {
+  const _handleRenamePIAlternative = async (id: string, label: string): Promise<void> => {
     try {
       await window.api.piUpdateQuotationAlternative(id, { label })
       setPiAlternatives((prev) => prev.map((a) => (a.id === id ? { ...a, label } : a)))
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
   void _handleRenamePIAlternative
@@ -829,7 +865,7 @@ export default function QuotationEditor({
   // statusColors used for future status display
   void statusColors
 
-  const handleBack = async () => {
+  const handleBack = async (): Promise<void> => {
     // If draft quotation with no edits, created very recently, and has no vessels — delete it (abandoned creation)
     if (isDraft && !hasEdited.current) {
       const createdAt = q.createdAt ? new Date(q.createdAt).getTime() : 0
@@ -1126,7 +1162,12 @@ export default function QuotationEditor({
             <div style={{ position: 'relative' }}>
               <button
                 ref={stepMenuRef}
-                onClick={() => reachableSteps.length > 0 && setShowStepMenu(!showStepMenu)}
+                onClick={() => {
+                  if (reachableSteps.length > 0) {
+                    setStepMenuRect(stepMenuRef.current?.getBoundingClientRect() ?? null)
+                    setShowStepMenu(!showStepMenu)
+                  }
+                }}
                 style={{
                   padding: '4px 12px',
                   borderRadius: '6px',
@@ -1162,8 +1203,8 @@ export default function QuotationEditor({
                     <div
                       style={{
                         position: 'fixed',
-                        top: (stepMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
-                        left: stepMenuRef.current?.getBoundingClientRect().left || 0,
+                        top: (stepMenuRect?.bottom || 0) + 4,
+                        left: stepMenuRect?.left || 0,
                         zIndex: 9999,
                         backgroundColor: isLight ? '#ffffff' : '#1a1d28',
                         border: `1px solid ${isLight ? '#d0d0d0' : 'rgba(255,255,255,0.1)'}`,
@@ -1487,7 +1528,10 @@ export default function QuotationEditor({
           {/* Actions dropdown */}
           <div style={{ position: 'relative' }} ref={actionsRef}>
             <button
-              onClick={() => setShowActionsMenu(!showActionsMenu)}
+              onClick={() => {
+                setActionsRect(actionsRef.current?.getBoundingClientRect() ?? null)
+                setShowActionsMenu(!showActionsMenu)
+              }}
               className="btn-secondary btn-sm"
             >
               <MoreHorizontal size={16} /> Actions
@@ -1502,10 +1546,8 @@ export default function QuotationEditor({
                   <div
                     style={{
                       position: 'fixed',
-                      top: (actionsRef.current?.getBoundingClientRect().bottom || 0) + 4,
-                      right:
-                        window.innerWidth -
-                        (actionsRef.current?.getBoundingClientRect().right || 0),
+                      top: (actionsRect?.bottom || 0) + 4,
+                      right: window.innerWidth - (actionsRect?.right || 0),
                       zIndex: 9999,
                       background: isLight ? '#ffffff' : '#1a1d28',
                       border: '1px solid var(--glass-border-color)',
@@ -2579,8 +2621,8 @@ function CopyFromQuotationModal({
   onCopied: () => void
   showError: (msg: string) => void
   isLight: boolean
-}) {
-  const [allQuotations, setAllQuotations] = useState<Quotation[]>([])
+}): React.JSX.Element {
+  const [allQuotations, setAllQuotations] = useState<QuotationRowWithCount[]>([])
   const [searchText, setSearchText] = useState('')
   const [sourceId, setSourceId] = useState<string | null>(null)
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set())
@@ -2611,7 +2653,7 @@ function CopyFromQuotationModal({
   }, [quotation.id])
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false)
       }
@@ -2632,7 +2674,7 @@ function CopyFromQuotationModal({
 
   const selectedQuotation = allQuotations.find((q) => q.id === sourceId)
 
-  const toggleSection = (key: string) => {
+  const toggleSection = (key: string): void => {
     setSelectedSections((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -2641,20 +2683,22 @@ function CopyFromQuotationModal({
     })
   }
 
-  const handleCopy = async () => {
+  const handleCopy = async (): Promise<void> => {
     if (!sourceId || selectedSections.size === 0) return
     setLoading(true)
     try {
       await window.api.copyQuotationSections(quotation.id, sourceId, Array.from(selectedSections))
       onCopied()
-    } catch (err: any) {
-      showError(err.message || 'Failed to copy sections')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to copy sections')
     } finally {
       setLoading(false)
     }
   }
 
-  const typeColor = (code?: string) => {
+  const typeColor = (
+    code?: string
+  ): '#00aac8' | '#6464ff' | '#ff64c8' | '#ffb020' | '#44cc88' | '#ff8c00' | '#888' => {
     switch (code) {
       case 'P':
         return '#00aac8'
@@ -2889,9 +2933,7 @@ function CopyFromQuotationModal({
                         }}
                       >
                         - {fq.vesselName}
-                        {((fq as any).vesselCount || 0) > 1
-                          ? ` +${(fq as any).vesselCount - 1}`
-                          : ''}
+                        {(fq.vesselCount || 0) > 1 ? ` +${(fq.vesselCount ?? 0) - 1}` : ''}
                       </span>
                     )}
                   </div>

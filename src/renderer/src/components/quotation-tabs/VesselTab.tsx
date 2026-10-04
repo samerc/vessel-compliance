@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   Trash2,
@@ -10,7 +10,17 @@ import {
   Check,
   X
 } from 'lucide-react'
-import { Quotation, Vessel, QuotationVessel } from '../../../../shared/types'
+import {
+  Quotation,
+  Vessel,
+  QuotationVessel,
+  FlagState,
+  ClassificationSociety,
+  VesselType,
+  Entity,
+  QuotationAssured,
+  AssuredRole
+} from '../../../../shared/types'
 import { ok } from '../../utils/ipc'
 import { confirmDialog } from '../DialogHost'
 
@@ -24,6 +34,48 @@ const EMPTY_NEW_VESSEL = {
   vesselType: '',
   classification: '',
   callSign: ''
+}
+
+async function fetchLookupLists(): Promise<{
+  flagStates: FlagState[]
+  classSocieties: ClassificationSociety[]
+  vesselTypes: VesselType[]
+}> {
+  const [fs, cs, vt] = await Promise.all([
+    window.api.getFlagStates().catch(() => []),
+    window.api.getClassificationSocieties().catch(() => []),
+    window.api.getVesselTypes().catch(() => [])
+  ])
+  return {
+    flagStates: Array.isArray(fs) ? fs : [],
+    classSocieties: Array.isArray(cs) ? cs : [],
+    vesselTypes: Array.isArray(vt) ? vt : []
+  }
+}
+
+// Resolve classification names from junction table for all linked vessels
+async function fetchClassificationNames(
+  qVessels: QuotationVessel[],
+  classSocieties: ClassificationSociety[]
+): Promise<Record<string, string>> {
+  const classMap: Record<string, string> = {}
+  for (const v of qVessels) {
+    if (!v.vesselId) continue
+    try {
+      const vcs = await window.api.getVesselClassifications(v.vesselId)
+      const names = (Array.isArray(vcs) ? vcs : [])
+        .map(
+          (vc) =>
+            vc.classificationSocietyName ||
+            classSocieties.find((c) => c.id === vc.classificationSocietyId)?.name
+        )
+        .filter(Boolean)
+      if (names.length > 0) classMap[v.vesselId] = names.join(', ')
+    } catch {
+      /* ignore */
+    }
+  }
+  return classMap
 }
 
 export default function VesselTab({
@@ -42,7 +94,7 @@ export default function VesselTab({
   isLight?: boolean
   onVesselsChanged?: () => void
   setQ?: (fn: (p: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [addMode, setAddMode] = useState<'existing' | 'new' | 'fleet'>('existing')
@@ -55,9 +107,9 @@ export default function VesselTab({
   const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
   const [classDropdownOpen, setClassDropdownOpen] = useState(false)
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
-  const [flagStatesLocal, setFlagStatesLocal] = useState<any[]>([])
-  const [classSocietiesLocal, setClassSocietiesLocal] = useState<any[]>([])
-  const [vesselTypesLocal, setVesselTypesLocal] = useState<any[]>([])
+  const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
+  const [classSocietiesLocal, setClassSocietiesLocal] = useState<ClassificationSociety[]>([])
+  const [vesselTypesLocal, setVesselTypesLocal] = useState<VesselType[]>([])
   const [availableFleets, setAvailableFleets] = useState<
     { id: string; name: string; vesselCount: number }[]
   >([])
@@ -65,54 +117,47 @@ export default function VesselTab({
   const [addingFleet, setAddingFleet] = useState(false)
   const [vesselClassNames, setVesselClassNames] = useState<Record<string, string>>({})
 
+  // Loads in three steps (vessels, lookup lists, classification names) so the list shows first.
+  // isAlive lets the mount effect drop results after unmount.
+  const loadData = useCallback(
+    async (isAlive: () => boolean = () => true): Promise<void> => {
+      const qv = await window.api.getQuotationVessels(quotation.id)
+      if (!isAlive()) return
+      const safeQV = Array.isArray(qv) ? qv : []
+      setQVessels(safeQV)
+      const { flagStates, classSocieties, vesselTypes } = await fetchLookupLists()
+      if (!isAlive()) return
+      setFlagStatesLocal(flagStates)
+      setClassSocietiesLocal(classSocieties)
+      setVesselTypesLocal(vesselTypes)
+      const classMap = await fetchClassificationNames(safeQV, classSocieties)
+      if (!isAlive()) return
+      setVesselClassNames(classMap)
+    },
+    [quotation.id]
+  )
+
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    const qv = await window.api.getQuotationVessels(quotation.id)
-    const safeQV = Array.isArray(qv) ? qv : []
-    setQVessels(safeQV)
-    const [fs, cs, vt] = await Promise.all([
-      window.api.getFlagStates().catch(() => []),
-      window.api.getClassificationSocieties().catch(() => []),
-      window.api.getVesselTypes().catch(() => [])
-    ])
-    setFlagStatesLocal(Array.isArray(fs) ? fs : [])
-    const safeCS = Array.isArray(cs) ? cs : []
-    setClassSocietiesLocal(safeCS)
-    setVesselTypesLocal(Array.isArray(vt) ? vt : [])
-    // Resolve classification names from junction table for all linked vessels
-    const classMap: Record<string, string> = {}
-    for (const v of safeQV) {
-      if (!v.vesselId) continue
-      try {
-        const vcs = await window.api.getVesselClassifications(v.vesselId)
-        const names = (Array.isArray(vcs) ? vcs : [])
-          .map(
-            (vc: any) =>
-              vc.classificationSocietyName ||
-              safeCS.find((c: any) => c.id === vc.classificationSocietyId)?.name
-          )
-          .filter(Boolean)
-        if (names.length > 0) classMap[v.vesselId] = names.join(', ')
-      } catch {
-        /* ignore */
-      }
+    let alive = true
+    const run = async (): Promise<void> => {
+      await loadData(() => alive)
     }
-    setVesselClassNames(classMap)
-  }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [loadData])
 
-  const nextLabel = (list: QuotationVessel[]) => `V${list.length + 1}`
+  const nextLabel = (list: QuotationVessel[]): string => `V${list.length + 1}`
 
   const resolveClassification = async (vesselId: string): Promise<string> => {
     try {
       const vcs = await window.api.getVesselClassifications(vesselId)
       const names = (Array.isArray(vcs) ? vcs : [])
         .map(
-          (vc: any) =>
+          (vc) =>
             vc.classificationSocietyName ||
-            classSocietiesLocal.find((c: any) => c.id === vc.classificationSocietyId)?.name
+            classSocietiesLocal.find((c) => c.id === vc.classificationSocietyId)?.name
         )
         .filter(Boolean)
       if (names.length > 0) return names.join(', ')
@@ -122,14 +167,14 @@ export default function VesselTab({
     return ''
   }
 
-  const handleAddExisting = async () => {
+  const handleAddExisting = async (): Promise<void> => {
     if (!selectedVesselId) return
     try {
       const vLabel = nextLabel(qVessels)
       const v = vessels.find((vv) => vv.id === selectedVesselId)
-      const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+      const flagStates: FlagState[] = await window.api.getFlagStates().catch(() => [])
       const flagName = v?.flagStateId
-        ? flagStates.find((f: any) => f.id === v.flagStateId)?.name || ''
+        ? flagStates.find((f) => f.id === v.flagStateId)?.name || ''
         : ''
       const classifName =
         (await resolveClassification(selectedVesselId)) || v?.classificationSociety
@@ -160,7 +205,7 @@ export default function VesselTab({
           window.api.getAssuredRoles()
         ])
         const roleOrder = new Map(
-          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [
+          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r, idx): [string, number] => [
             r.name?.toLowerCase(),
             r.order ?? idx
           ])
@@ -187,7 +232,7 @@ export default function VesselTab({
           // c/o role → set as broker, not as an assured
           if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
             if (!quotation.coName) {
-              ok(await window.api.updateQuotation(quotation.id, { coName: entity.name } as any))
+              ok(await window.api.updateQuotation(quotation.id, { coName: entity.name }))
             }
             continue
           }
@@ -209,7 +254,7 @@ export default function VesselTab({
         try {
           const dynPolicies = await window.api.getVesselDynamicPolicies(selectedVesselId)
           const matching = (Array.isArray(dynPolicies) ? dynPolicies : []).find(
-            (p: any) =>
+            (p) =>
               p.status === 'active' &&
               p.policyTypeId === quotation.quotationTypeId &&
               p.customerEntityId
@@ -220,7 +265,7 @@ export default function VesselTab({
                 customerEntityId: matching.customerEntityId,
                 customerType: matching.customerType,
                 coName: matching.customerName
-              } as any)
+              })
             )
           }
         } catch {
@@ -235,12 +280,12 @@ export default function VesselTab({
       showSuccess(`Vessel added${assuredsAdded > 0 ? ` — ${assuredsAdded} assured(s) loaded` : ''}`)
       loadData()
       if (onVesselsChanged) onVesselsChanged()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add vessel')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add vessel')
     }
   }
 
-  const handleAddNew = async () => {
+  const handleAddNew = async (): Promise<void> => {
     if (!newData.name.trim()) return
     try {
       await window.api.addQuotationVessel({
@@ -262,12 +307,12 @@ export default function VesselTab({
       showSuccess('Vessel added')
       loadData()
       if (onVesselsChanged) onVesselsChanged()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add vessel')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add vessel')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     if (
       !(await confirmDialog(
         'Remove this vessel from the quotation? Its premium and vessel-specific items are removed too.'
@@ -280,7 +325,7 @@ export default function VesselTab({
     if (onVesselsChanged) onVesselsChanged()
   }
 
-  const startEdit = (qv: QuotationVessel) => {
+  const startEdit = (qv: QuotationVessel): void => {
     setShowAddForm(false)
     setEditingId(qv.id)
     setEditData({
@@ -296,7 +341,7 @@ export default function VesselTab({
     })
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (): Promise<void> => {
     if (!editingId) return
     try {
       await window.api.updateQuotationVessel(editingId, {
@@ -309,28 +354,28 @@ export default function VesselTab({
         vesselType: editData.vesselType || undefined,
         classification: editData.classification || undefined,
         callSign: editData.callSign || undefined
-      } as any)
+      })
       setEditingId(null)
       showSuccess('Vessel details updated')
       loadData()
       if (onVesselsChanged) onVesselsChanged()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update vessel')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update vessel')
     }
   }
 
   // Re-sync the stored snapshot from the linked registry vessel (the values shown/exported are the
   // per-quotation snapshot, not live registry data).
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
-      const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+      const flagStates: FlagState[] = await window.api.getFlagStates().catch(() => [])
       let synced = 0
       for (const qv of qVessels) {
         if (!qv.vesselId) continue
         const v = vessels.find((vv) => vv.id === qv.vesselId)
         if (!v) continue
         const flagName = v.flagStateId
-          ? flagStates.find((f: any) => f.id === v.flagStateId)?.name || ''
+          ? flagStates.find((f) => f.id === v.flagStateId)?.name || ''
           : ''
         const classifName =
           (await resolveClassification(qv.vesselId)) || v.classificationSociety || ''
@@ -344,7 +389,7 @@ export default function VesselTab({
           vesselType: v.vesselType,
           classification: classifName,
           callSign: v.callSign
-        } as any)
+        })
         synced++
       }
       await loadData()
@@ -354,12 +399,12 @@ export default function VesselTab({
           : 'No registry-linked vessels to refresh'
       )
       if (onVesselsChanged) onVesselsChanged()
-    } catch (err: any) {
-      showError(err.message || 'Failed to refresh')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to refresh')
     }
   }
 
-  const loadFleets = async () => {
+  const loadFleets = async (): Promise<void> => {
     const fleets = await window.api.getFleets().catch(() => [])
     const fleetsArr = Array.isArray(fleets) ? fleets : []
     const withCounts = fleetsArr
@@ -372,7 +417,7 @@ export default function VesselTab({
     setAvailableFleets(withCounts)
   }
 
-  const handleAddFleet = async (fleetId: string) => {
+  const handleAddFleet = async (fleetId: string): Promise<void> => {
     const fleet = availableFleets.find((f) => f.id === fleetId)
     if (!fleet) return
     setAddingFleet(true)
@@ -389,11 +434,11 @@ export default function VesselTab({
         return
       }
 
-      const flagStates: any[] = await window.api.getFlagStates().catch(() => [])
+      const flagStates: FlagState[] = await window.api.getFlagStates().catch(() => [])
       const skipAssureds = quotation.quotationTypeCode === 'C'
-      let allEntities: any[] = []
-      let existingQAssureds: any[] = []
-      let assuredRoles: any[] = []
+      let allEntities: Entity[] = []
+      let existingQAssureds: QuotationAssured[] = []
+      let assuredRoles: AssuredRole[] = []
       let roleOrder = new Map<string, number>()
       if (!skipAssureds) {
         ;[allEntities, existingQAssureds, assuredRoles] = await Promise.all([
@@ -402,7 +447,7 @@ export default function VesselTab({
           window.api.getAssuredRoles()
         ])
         roleOrder = new Map(
-          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [
+          (Array.isArray(assuredRoles) ? assuredRoles : []).map((r, idx): [string, number] => [
             r.name?.toLowerCase(),
             r.order ?? idx
           ])
@@ -419,7 +464,7 @@ export default function VesselTab({
       for (const v of newVessels) {
         const vLabel = `V${currentCount + 1}`
         const flagName = v.flagStateId
-          ? flagStates.find((f: any) => f.id === v.flagStateId)?.name || ''
+          ? flagStates.find((f) => f.id === v.flagStateId)?.name || ''
           : ''
         await window.api.addQuotationVessel({
           quotationId: quotation.id,
@@ -458,7 +503,7 @@ export default function VesselTab({
             // c/o role → set as broker, not as an assured
             if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
               if (!quotation.coName) {
-                ok(await window.api.updateQuotation(quotation.id, { coName: entity.name } as any))
+                ok(await window.api.updateQuotation(quotation.id, { coName: entity.name }))
               }
               continue
             }
@@ -486,7 +531,7 @@ export default function VesselTab({
           const fleetVesselIds = new Set(newVessels.map((v) => v.id))
           const customerCounts = new Map<
             string,
-            { count: number; name: string; type: string | null }
+            { count: number; name: string; type: Quotation['customerType'] | null }
           >()
           for (const p of Array.isArray(allDynPolicies) ? allDynPolicies : []) {
             if (
@@ -508,13 +553,15 @@ export default function VesselTab({
             const [topId, top] = [...customerCounts.entries()].sort(
               (a, b) => b[1].count - a[1].count
             )[0]
-            ok(
-              await window.api.updateQuotation(quotation.id, {
-                customerEntityId: topId,
-                customerType: top.type,
-                coName: top.name
-              } as any)
-            )
+            // customerType may be null (clears it); Partial<Quotation> only allows undefined
+            const updates: Omit<Partial<Quotation>, 'customerType'> & {
+              customerType?: Quotation['customerType'] | null
+            } = {
+              customerEntityId: topId,
+              customerType: top.type,
+              coName: top.name
+            }
+            ok(await window.api.updateQuotation(quotation.id, updates as Partial<Quotation>))
           }
         } catch {
           /* non-critical */
@@ -534,14 +581,14 @@ export default function VesselTab({
       )
       loadData()
       if (onVesselsChanged) onVesselsChanged()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add fleet vessels')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add fleet vessels')
     } finally {
       setAddingFleet(false)
     }
   }
 
-  const handleMoveVessel = async (vesselId: string, direction: 'up' | 'down') => {
+  const handleMoveVessel = async (vesselId: string, direction: 'up' | 'down'): Promise<void> => {
     const idx = qVessels.findIndex((v) => v.id === vesselId)
     if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
@@ -917,7 +964,7 @@ export default function VesselTab({
                       const q = newData.flag.toLowerCase()
                       const filtered = flagStatesLocal
                         .filter(
-                          (f: any) =>
+                          (f) =>
                             f.name?.toLowerCase().includes(q) ||
                             f.iso3Code?.toLowerCase().includes(q)
                         )
@@ -939,7 +986,7 @@ export default function VesselTab({
                             boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                           }}
                         >
-                          {filtered.map((f: any) => (
+                          {filtered.map((f) => (
                             <div
                               key={f.id}
                               onMouseDown={() => {
@@ -1000,7 +1047,7 @@ export default function VesselTab({
                     (() => {
                       const q = newData.vesselType.toLowerCase()
                       const filtered = vesselTypesLocal
-                        .filter((t: any) => t.name?.toLowerCase().includes(q))
+                        .filter((t) => t.name?.toLowerCase().includes(q))
                         .slice(0, 10)
                       return filtered.length > 0 ? (
                         <div
@@ -1019,7 +1066,7 @@ export default function VesselTab({
                             boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                           }}
                         >
-                          {filtered.map((t: any) => (
+                          {filtered.map((t) => (
                             <div
                               key={t.id}
                               onMouseDown={() => {
@@ -1069,7 +1116,7 @@ export default function VesselTab({
                     (() => {
                       const q = newData.classification.toLowerCase()
                       const filtered = classSocietiesLocal
-                        .filter((c: any) => c.name?.toLowerCase().includes(q))
+                        .filter((c) => c.name?.toLowerCase().includes(q))
                         .slice(0, 10)
                       return filtered.length > 0 ? (
                         <div
@@ -1088,7 +1135,7 @@ export default function VesselTab({
                             boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                           }}
                         >
-                          {filtered.map((c: any) => (
+                          {filtered.map((c) => (
                             <div
                               key={c.id}
                               onMouseDown={() => {
@@ -1144,7 +1191,7 @@ export default function VesselTab({
 
       {qVessels.length === 0 && !showAddForm && (
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>
-          No vessels added yet. Click "Add Vessel" to begin.
+          No vessels added yet. Click &quot;Add Vessel&quot; to begin.
         </p>
       )}
 
@@ -1368,7 +1415,7 @@ export default function VesselTab({
               checked={quotation.anyOtherVessel || false}
               onChange={(e) => {
                 window.api
-                  .updateQuotation(quotation.id, { anyOtherVessel: e.target.checked } as any)
+                  .updateQuotation(quotation.id, { anyOtherVessel: e.target.checked })
                   .then(ok)
                 setQ?.((p) => ({ ...p, anyOtherVessel: e.target.checked }))
               }}

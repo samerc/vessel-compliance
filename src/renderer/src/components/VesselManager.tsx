@@ -65,7 +65,7 @@ export default function VesselManager({
   onNavigateToQuotation?: (quotationId: string) => void
   openCreate?: boolean
   onCreateConsumed?: () => void
-} = {}) {
+} = {}): React.JSX.Element {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [fleets, setFleets] = useState<Fleet[]>([])
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
@@ -107,10 +107,23 @@ export default function VesselManager({
   })
   const [isAdding, setIsAdding] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  // Open the quick-add form when the parent requests it (adjust state during render on prop change)
+  const [prevOpenCreate, setPrevOpenCreate] = useState<boolean | undefined>(undefined)
+  if (openCreate !== prevOpenCreate) {
+    setPrevOpenCreate(openCreate)
+    if (openCreate && hasPermission('vessels:create')) setShowQuickAdd(true)
+  }
+  // Latest parent callbacks, so the effects below do not re-run when the parent re-renders
+  const onCreateConsumedRef = useRef(onCreateConsumed)
+  const onClearInitialVesselRef = useRef(onClearInitialVessel)
+  const initialVesselSectionRef = useRef(initialVesselSection)
   useEffect(() => {
-    if (!openCreate) return
-    if (hasPermission('vessels:create')) setShowQuickAdd(true)
-    onCreateConsumed?.()
+    onCreateConsumedRef.current = onCreateConsumed
+    onClearInitialVesselRef.current = onClearInitialVessel
+    initialVesselSectionRef.current = initialVesselSection
+  })
+  useEffect(() => {
+    if (openCreate) onCreateConsumedRef.current?.()
   }, [openCreate])
 
   // Add-form fleet combo trigger position (dropdown rendered via portal to avoid clipping)
@@ -157,7 +170,7 @@ export default function VesselManager({
 
   // Load initial fleets
   useEffect(() => {
-    const loadStaticData = async () => {
+    const loadStaticData = async (): Promise<void> => {
       const [fData, fsData] = await Promise.all([
         window.api.getFleets(),
         window.api.getFlagStates()
@@ -172,7 +185,7 @@ export default function VesselManager({
   useEffect(() => {
     if (initialVesselId) {
       // Capture section NOW (synchronously) before the async gap clears it
-      const sectionToApply = initialVesselSection
+      const sectionToApply = initialVesselSectionRef.current
       ;(async () => {
         const allVessels = await window.api.getVessels()
         const vessel = Array.isArray(allVessels)
@@ -183,48 +196,66 @@ export default function VesselManager({
           setNavigatedExternally(true)
           setSelectedVessel(vessel)
         }
-        if (onClearInitialVessel) onClearInitialVessel()
+        onClearInitialVesselRef.current?.()
       })()
     }
   }, [initialVesselId])
 
-  // Load vessels when params change
-  useEffect(() => {
-    loadData()
-  }, [page, limit, debouncedSearch, fleetFilter, statusFilter, sortField, sortOrder])
-
-  const loadData = async () => {
-    setIsLoading(true)
-    try {
-      const params: VesselQueryParams = {
-        page,
-        limit,
-        search: debouncedSearch,
-        fleetId: fleetFilter,
-        status: statusFilter,
-        sortField,
-        sortOrder
-      }
-
-      // @ts-ignore - API exposed in preload
-      const result = await window.api.getVesselsPaginated(params)
-      setVessels(Array.isArray(result?.data) ? result.data : [])
-      setTotal(result?.total ?? 0)
-      setTotalPages(result?.totalPages ?? 1)
-    } catch (error: any) {
-      console.error('Failed to load vessels:', error)
-      showError('Failed to load vessels')
-    } finally {
-      setIsLoading(false)
-    }
+  // Reset page when filters change (adjust state during render, before the load effect runs)
+  const filterKey = JSON.stringify([debouncedSearch, fleetFilter, statusFilter, limit])
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    setPage(1)
   }
 
-  // Reset page when filters change
+  // Load vessels when params change (bump reloadKey to reload with the same params)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
   useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, fleetFilter, statusFilter, limit])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const params: VesselQueryParams = {
+          page,
+          limit,
+          search: debouncedSearch,
+          fleetId: fleetFilter,
+          status: statusFilter,
+          sortField,
+          sortOrder
+        }
 
-  const handleAddVessel = async (e: React.FormEvent) => {
+        const result = await window.api.getVesselsPaginated(params)
+        if (!alive) return
+        setVessels(Array.isArray(result?.data) ? result.data : [])
+        setTotal(result?.total ?? 0)
+        setTotalPages(result?.totalPages ?? 1)
+      } catch (error) {
+        console.error('Failed to load vessels:', error)
+        if (alive) showError('Failed to load vessels')
+      } finally {
+        if (alive) setIsLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [
+    page,
+    limit,
+    debouncedSearch,
+    fleetFilter,
+    statusFilter,
+    sortField,
+    sortOrder,
+    reloadKey,
+    showError
+  ])
+
+  const handleAddVessel = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newVessel.name || !newVessel.imo) return
 
@@ -266,7 +297,7 @@ export default function VesselManager({
           vesselId: vessel.id
         })
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Add vessel error:', error)
       showError('An unexpected error occurred')
     } finally {
@@ -274,12 +305,12 @@ export default function VesselManager({
     }
   }
 
-  const handleUpdateFleet = async (vesselId: string, fleetId: string) => {
+  const handleUpdateFleet = async (vesselId: string, fleetId: string): Promise<void> => {
     await window.api.updateVessel(vesselId, { fleetId: fleetId })
     loadData()
   }
 
-  const toggleSort = (field: 'name' | 'imoNumber') => {
+  const toggleSort = (field: 'name' | 'imoNumber'): void => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
     } else {
@@ -288,7 +319,7 @@ export default function VesselManager({
     }
   }
 
-  const handleOfacRecheck = async (vessel: Vessel) => {
+  const handleOfacRecheck = async (vessel: Vessel): Promise<void> => {
     setCheckingVesselId(vessel.id)
     try {
       const result = await OfacService.checkSanctions(vessel.name)
@@ -312,14 +343,16 @@ export default function VesselManager({
           vesselId: vessel.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Sanctions check failed. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error ? error.message : '') || 'Sanctions check failed. Please try again.'
+      )
     } finally {
       setCheckingVesselId(null)
     }
   }
 
-  const handleMarkClean = async () => {
+  const handleMarkClean = async (): Promise<void> => {
     if (sanctionsModal.vesselId) {
       await window.api.updateVessel(sanctionsModal.vesselId, {
         ofacStatus: 'CLEARED',
@@ -330,7 +363,7 @@ export default function VesselManager({
     loadData()
   }
 
-  const handleConfirmMatch = async () => {
+  const handleConfirmMatch = async (): Promise<void> => {
     if (sanctionsModal.vesselId) {
       await window.api.updateVessel(sanctionsModal.vesselId, {
         ofacStatus: 'MATCH',
@@ -342,7 +375,7 @@ export default function VesselManager({
   }
 
   // Bulk operations
-  const toggleSelectVessel = (vesselId: string) => {
+  const toggleSelectVessel = (vesselId: string): void => {
     setSelectedVesselIds((prev) => {
       const next = new Set(prev)
       if (next.has(vesselId)) next.delete(vesselId)
@@ -351,7 +384,7 @@ export default function VesselManager({
     })
   }
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (): void => {
     if (selectedVesselIds.size === vessels.length) {
       setSelectedVesselIds(new Set())
     } else {
@@ -359,7 +392,7 @@ export default function VesselManager({
     }
   }
 
-  const handleCreateFleetAndAssign = async () => {
+  const handleCreateFleetAndAssign = async (): Promise<void> => {
     if (!newFleetName.trim()) return
     try {
       const created = ok(await window.api.addFleet({ name: newFleetName.trim() }))
@@ -367,24 +400,24 @@ export default function VesselManager({
       setNewFleetName('')
       setNewFleetInput(false)
       await handleBulkAssignFleet(created.id)
-    } catch (err: any) {
-      showError(err.message || 'Failed to create fleet')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to create fleet')
     }
   }
 
-  const handleBulkAssignFleet = async (fleetId: string) => {
+  const handleBulkAssignFleet = async (fleetId: string): Promise<void> => {
     try {
       await window.api.bulkAssignFleet([...selectedVesselIds], fleetId)
       showSuccess(`Assigned ${selectedVesselIds.size} vessel(s) to fleet`)
       setSelectedVesselIds(new Set())
       setBulkFleetDropdown(false)
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to assign fleet')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to assign fleet')
     }
   }
 
-  const handleBulkChangeStatus = async (isActive: boolean) => {
+  const handleBulkChangeStatus = async (isActive: boolean): Promise<void> => {
     try {
       await window.api.bulkSetVesselStatus([...selectedVesselIds], isActive)
       showSuccess(
@@ -392,12 +425,12 @@ export default function VesselManager({
       )
       setSelectedVesselIds(new Set())
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update status')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update status')
     }
   }
 
-  const handleBulkExport = () => {
+  const handleBulkExport = (): void => {
     const selected = vessels.filter((v) => selectedVesselIds.has(v.id))
     if (selected.length === 0) return
     // Build CSV content
@@ -423,7 +456,7 @@ export default function VesselManager({
     showSuccess(`Exported ${selected.length} vessel(s)`)
   }
 
-  const handleViewPotentialMatch = async (vessel: Vessel) => {
+  const handleViewPotentialMatch = async (vessel: Vessel): Promise<void> => {
     setCheckingVesselId(vessel.id)
     try {
       const result = await OfacService.checkSanctions(vessel.name)
@@ -435,14 +468,17 @@ export default function VesselManager({
           vesselId: vessel.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to load sanctions data. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error ? error.message : '') ||
+          'Failed to load sanctions data. Please try again.'
+      )
     } finally {
       setCheckingVesselId(null)
     }
   }
 
-  const OfacBadge = ({ vessel }: { vessel: Vessel }) => (
+  const OfacBadge = ({ vessel }: { vessel: Vessel }): React.JSX.Element => (
     <SanctionsBadge
       status={vessel.ofacStatus}
       checking={checkingVesselId === vessel.id}
@@ -830,7 +866,7 @@ export default function VesselManager({
           <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Status:</span>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
             style={{
               padding: '10px',
               borderRadius: '8px',

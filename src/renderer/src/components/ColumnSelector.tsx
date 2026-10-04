@@ -15,8 +15,9 @@ export default function ColumnSelector({
   allColumns,
   visibleColumns,
   onChange
-}: ColumnSelectorProps) {
+}: ColumnSelectorProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const ref = useRef<HTMLDivElement>(null)
@@ -26,7 +27,7 @@ export default function ColumnSelector({
   // Close on click outside
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       const target = e.target as Node
       if (
         ref.current &&
@@ -42,7 +43,7 @@ export default function ColumnSelector({
 
   const visibleSet = new Set(visibleColumns)
 
-  const toggle = (colId: string) => {
+  const toggle = (colId: string): void => {
     const newSet = new Set(visibleColumns)
     if (newSet.has(colId)) {
       // Don't allow hiding all columns
@@ -56,7 +57,7 @@ export default function ColumnSelector({
     onChange(ordered)
   }
 
-  const resetDefaults = () => {
+  const resetDefaults = (): void => {
     const defaults = allColumns.filter((c) => c.defaultVisible).map((c) => c.id)
     onChange(defaults)
   }
@@ -67,7 +68,13 @@ export default function ColumnSelector({
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         ref={btnRef}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (!open) {
+            const r = btnRef.current?.getBoundingClientRect()
+            setPos({ top: r ? r.bottom + 4 : 0, left: r ? Math.max(8, r.right - 200) : 0 })
+          }
+          setOpen(!open)
+        }}
         className="btn-secondary"
         style={{
           padding: '6px 8px',
@@ -116,14 +123,8 @@ export default function ColumnSelector({
             ref={dropdownRef}
             style={{
               position: 'fixed',
-              top: (() => {
-                const r = btnRef.current?.getBoundingClientRect()
-                return r ? r.bottom + 4 : 0
-              })(),
-              left: (() => {
-                const r = btnRef.current?.getBoundingClientRect()
-                return r ? Math.max(8, r.right - 200) : 0
-              })(),
+              top: pos.top,
+              left: pos.left,
               padding: '10px',
               minWidth: '200px',
               maxHeight: '320px',

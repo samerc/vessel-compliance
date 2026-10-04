@@ -18,7 +18,7 @@ export default function SanctionsModal({
   onClose,
   onMarkClean,
   onConfirmMatch
-}: SanctionsModalProps) {
+}: SanctionsModalProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const modalRef = useRef<HTMLDivElement>(null)
@@ -34,7 +34,7 @@ export default function SanctionsModal({
     const last = focusable[focusable.length - 1]
     first?.focus()
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onClose()
         return
@@ -58,7 +58,7 @@ export default function SanctionsModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const getSourceLabel = (source: string) => {
+  const getSourceLabel = (source: string): string => {
     switch (source.toLowerCase()) {
       case 'ofac':
         return 'OFAC (US)'
@@ -71,7 +71,7 @@ export default function SanctionsModal({
     }
   }
 
-  const getSourceColor = (source: string) => {
+  const getSourceColor = (source: string): '#ff6b6b' | '#4dabf7' | '#69db7c' | '#ffd43b' => {
     switch (source.toLowerCase()) {
       case 'ofac':
         return '#ff6b6b'

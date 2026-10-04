@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import {
   Quotation,
   QuotationInstalment,
@@ -18,7 +18,7 @@ import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './sharedUtils'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { asArray, ok } from '../../utils/ipc'
+import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
 
 /** Parse periodText to extract number of months. Returns null if unparseable. */
@@ -45,13 +45,13 @@ export default function PremiumTab({
   getEffectiveText
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
   getEffectiveText: (key: keyof PISectionTexts) => string
-}) {
+}): React.JSX.Element {
   const [instalments, setInstalments] = useState<QuotationInstalment[]>([])
   const [instalmentDefaults, setInstalmentDefaults] = useState<InstalmentDefaults>({})
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
@@ -76,78 +76,12 @@ export default function PremiumTab({
   const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
   const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
 
-  const loadDiscounts = async () => {
+  const loadDiscounts = async (): Promise<void> => {
     const d = await window.api.quotationDiscountGetByQuotation(quotation.id)
     setDiscounts(Array.isArray(d) ? d : [])
   }
 
-  useEffect(() => {
-    loadInstalments()
-    loadDiscounts()
-    loadVessels()
-    window.api.piGetInstalmentDefaults().then((d) => setInstalmentDefaults(d || {}))
-    // Populate outstanding premium text if enabled but empty (new quotation default)
-    if (quotation.outstandingPremiumEnabled && !quotation.outstandingPremiumText) {
-      Promise.all([window.api.piGetSectionTexts(), window.api.getSetting('policyExportSettings')])
-        .then(([globalTexts, policyRaw]) => {
-          const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-            (t: any) => t.key === 'outstandingPremiumDefaultText'
-          )?.value
-          const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
-          const text =
-            qDefault || pDefault || 'All outstanding premium to be settled prior inception'
-          setQ((p) => ({ ...p, outstandingPremiumText: text }))
-          updateField('outstandingPremiumText', text)
-        })
-        .catch(() => {})
-    }
-    window.api
-      .premiumGetTextTemplates()
-      .then((res) => {
-        const all = Array.isArray(res) ? res : []
-        setNcbTemplates(all.filter((t) => t.type === 'ncb'))
-        setUpccTemplates(all.filter((t) => t.type === 'upcc'))
-      })
-      .catch(() => {})
-    if (quotation.quotationTypeCode === 'H') {
-      window.api
-        .hullGetQuotationAlternatives(quotation.id)
-        .then((a) => setHullAlternatives(Array.isArray(a) ? a : []))
-      window.api.hullGetClauses().then((c) => setHullClauses(Array.isArray(c) ? c : []))
-      window.api
-        .hullGetAgreedValueOptions(quotation.id)
-        .then((o) => setValueOptions(Array.isArray(o) ? o : []))
-        .catch(() => {})
-      window.api
-        .hullGetAltVesselPremiums(quotation.id)
-        .then((rows) => {
-          const m: Record<string, number> = {}
-          for (const r of Array.isArray(rows) ? rows : [])
-            if (r.premiumAmount != null)
-              m[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
-          setAltVesselPrems(m)
-        })
-        .catch(() => {})
-    }
-    if (quotation.quotationTypeCode === 'P') {
-      window.api
-        .piGetQuotationAlternatives(quotation.id)
-        .then((a) => setPiAlternatives(Array.isArray(a) ? a : []))
-      window.api
-        .lolGetOptions(quotation.id)
-        .then((o) => setLolOptions(Array.isArray(o) ? o : []))
-        .catch(() => {})
-    }
-    if (quotation.quotationTypeCode === 'W') {
-      window.api
-        .warGetSettings()
-        .then((s) => {
-          if (s && !(s as any).error) setWarSettings(s)
-        })
-        .catch(() => {})
-    }
-  }, [])
-  const loadInstalments = async () => {
+  const loadInstalments = async (): Promise<void> => {
     const insts = await window.api.getQuotationInstalments(quotation.id)
     if (Array.isArray(insts) && insts.length === 0 && (quotation.numInstalments || 1) >= 1) {
       // Auto-create instalment records on first load
@@ -156,11 +90,11 @@ export default function PremiumTab({
     }
     setInstalments(insts)
   }
-  const loadVessels = async () => {
+  const loadVessels = async (): Promise<void> => {
     setQVessels(asArray(await window.api.getQuotationVessels(quotation.id)))
   }
 
-  const updateAlternativePremium = async (altId: string, amount: number | null) => {
+  const updateAlternativePremium = async (altId: string, amount: number | null): Promise<void> => {
     await window.api.hullUpdateQuotationAlternative(altId, { premiumAmount: amount })
     setHullAlternatives((prev) =>
       prev.map((a) => (a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
@@ -174,7 +108,10 @@ export default function PremiumTab({
     updateField('premiumAmount', newTotal || null)
   }
 
-  const updatePIAlternativePremium = async (altId: string, amount: number | null) => {
+  const updatePIAlternativePremium = async (
+    altId: string,
+    amount: number | null
+  ): Promise<void> => {
     ok(await window.api.piUpdateQuotationAlternative(altId, { premiumAmount: amount }))
     setPiAlternatives((prev) =>
       prev.map((a) => (a.id === altId ? { ...a, premiumAmount: amount || undefined } : a))
@@ -182,7 +119,11 @@ export default function PremiumTab({
   }
 
   // Fleet hull matrix: set a vessel's premium under an alternative; adapter recomputes the alt total.
-  const updateAltVesselPremium = async (altId: string, vesselId: string, amount: number | null) => {
+  const updateAltVesselPremium = async (
+    altId: string,
+    vesselId: string,
+    amount: number | null
+  ): Promise<void> => {
     setAltVesselPrems((prev) => ({ ...prev, [`${altId}:${vesselId}`]: amount || 0 }))
     const newAltTotal = await window.api.hullSetAltVesselPremium(altId, vesselId, amount)
     setHullAlternatives((prev) =>
@@ -208,7 +149,7 @@ export default function PremiumTab({
     return knownDefaults[count]?.[index]
   }
 
-  const handleSaveInstalments = async (count: number) => {
+  const handleSaveInstalments = async (count: number): Promise<void> => {
     const adminDays = instalmentDefaults[String(count)]
     const countChanged = count !== instalments.length
     const insts: { instalmentNumber: number; daysFromInception: number }[] = []
@@ -264,10 +205,85 @@ export default function PremiumTab({
     }
   }
 
+  // Initial load, once on mount (the event reads the latest props/state when it runs)
+  const loadOnMount = useEffectEvent((): void => {
+    loadInstalments()
+    loadDiscounts()
+    loadVessels()
+    window.api.piGetInstalmentDefaults().then((d) => setInstalmentDefaults(d || {}))
+    // Populate outstanding premium text if enabled but empty (new quotation default)
+    if (quotation.outstandingPremiumEnabled && !quotation.outstandingPremiumText) {
+      Promise.all([window.api.piGetSectionTexts(), window.api.getSetting('policyExportSettings')])
+        .then(([globalTexts, policyRaw]) => {
+          const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
+            (t: { key: string; value?: string }) => t.key === 'outstandingPremiumDefaultText'
+          )?.value
+          const pDefault = policyRaw ? JSON.parse(policyRaw).outstandingPremiumDefaultText : null
+          const text =
+            qDefault || pDefault || 'All outstanding premium to be settled prior inception'
+          setQ((p) => ({ ...p, outstandingPremiumText: text }))
+          updateField('outstandingPremiumText', text)
+        })
+        .catch(() => {})
+    }
+    window.api
+      .premiumGetTextTemplates()
+      .then((res) => {
+        const all = Array.isArray(res) ? res : []
+        setNcbTemplates(all.filter((t) => t.type === 'ncb'))
+        setUpccTemplates(all.filter((t) => t.type === 'upcc'))
+      })
+      .catch(() => {})
+    if (quotation.quotationTypeCode === 'H') {
+      window.api
+        .hullGetQuotationAlternatives(quotation.id)
+        .then((a) => setHullAlternatives(Array.isArray(a) ? a : []))
+      window.api.hullGetClauses().then((c) => setHullClauses(Array.isArray(c) ? c : []))
+      window.api
+        .hullGetAgreedValueOptions(quotation.id)
+        .then((o) => setValueOptions(Array.isArray(o) ? o : []))
+        .catch(() => {})
+      window.api
+        .hullGetAltVesselPremiums(quotation.id)
+        .then((rows) => {
+          const m: Record<string, number> = {}
+          for (const r of Array.isArray(rows) ? rows : [])
+            if (r.premiumAmount != null)
+              m[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+          setAltVesselPrems(m)
+        })
+        .catch(() => {})
+    }
+    if (quotation.quotationTypeCode === 'P') {
+      window.api
+        .piGetQuotationAlternatives(quotation.id)
+        .then((a) => setPiAlternatives(Array.isArray(a) ? a : []))
+      window.api
+        .lolGetOptions(quotation.id)
+        .then((o) => setLolOptions(Array.isArray(o) ? o : []))
+        .catch(() => {})
+    }
+    if (quotation.quotationTypeCode === 'W') {
+      window.api
+        .warGetSettings()
+        .then((s) => {
+          if (s && !isIpcError(s)) setWarSettings(s)
+        })
+        .catch(() => {})
+    }
+  })
+  useEffect(() => {
+    // every state update in loadOnMount happens after an await / in a .then callback
+    void (async () => {
+      await Promise.resolve()
+      loadOnMount()
+    })()
+  }, [])
+
   // Pro-rata: auto-detect from periodText
   const isCargo = quotation.quotationTypeCode === 'C'
   const proRataDetectRan = useRef(false)
-  useEffect(() => {
+  const detectProRata = useEffectEvent((): void => {
     if (isCargo || proRataDetectRan.current) return
     proRataDetectRan.current = true
     const months = parsePeriodMonths(quotation.periodText)
@@ -284,18 +300,21 @@ export default function PremiumTab({
       setQ((p) => ({ ...p, isProRata: false }))
       updateField('isProRata', false)
     }
+  })
+  useEffect(() => {
+    detectProRata()
   }, [quotation.periodText])
 
   const proRataMonths = Math.max(
     0,
     quotation.proRataMonths || parsePeriodMonths(quotation.periodText) || 0
   )
-  const computeProRata = (annual: number) =>
+  const computeProRata = (annual: number): number =>
     proRataMonths > 0 ? Math.round((annual / 12) * proRataMonths * 100) / 100 : 0
 
   const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled || discounts.length > 0
   // Apply the generic per-quotation discounts sequentially (after NCB/UPCC) to an amount
-  const applyExtraDiscounts = (amt: number) => {
+  const applyExtraDiscounts = (amt: number): number => {
     let r = amt
     for (const d of discounts) {
       if (d.discountType === 'amount') r -= d.amount || 0
@@ -323,7 +342,7 @@ export default function PremiumTab({
       : quotation.premiumAmount || 0
 
   // Per-vessel payable respecting NCB/UPCC exclusion flags
-  const vesselPayable = (v: (typeof qVessels)[0]) => {
+  const vesselPayable = (v: (typeof qVessels)[0]): number => {
     const tech = v.premiumAmount || 0
     const nd = v.ncbExcluded ? 0 : ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
     const an = tech - nd
@@ -345,8 +364,10 @@ export default function PremiumTab({
     vesselId: string,
     amount: number | null,
     field: string = 'premiumAmount'
-  ) => {
-    await window.api.updateQuotationVessel(vesselId, { [field]: amount } as any)
+  ): Promise<void> => {
+    await window.api.updateQuotationVessel(vesselId, {
+      [field]: amount
+    } as Partial<QuotationVessel>)
     setQVessels((prev) =>
       prev.map((v) => (v.id === vesselId ? { ...v, [field]: amount || undefined } : v))
     )
@@ -361,9 +382,13 @@ export default function PremiumTab({
     }
   }
 
-  const updateInstalment = async (index: number, field: string, value: any) => {
+  const updateInstalment = async (
+    index: number,
+    field: 'daysFromInception' | 'instalmentNumber',
+    value: number
+  ): Promise<void> => {
     const updated = [...instalments]
-    ;(updated[index] as any)[field] = value
+    updated[index][field] = value
     await window.api.setQuotationInstalments(
       quotation.id,
       updated.map((i) => ({
@@ -378,11 +403,11 @@ export default function PremiumTab({
   // Fleet quotes get a per-vessel breakdown under each alternative (matrix); the alternative
   // total is the sum of its vessels. Single-vessel quotes keep one input per alternative.
   const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-  const fmtAmt = (n: number) =>
+  const fmtAmt = (n: number): string =>
     n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const perVesselAlts = isMultiVessel && !hullAlternatives.some((a) => a.vesselScopeId)
   // Payable (after NCB/UPCC) for an arbitrary technical amount + vessel exclusion flags
-  const payableFor = (tech: number, v: (typeof qVessels)[0]) => {
+  const payableFor = (tech: number, v: (typeof qVessels)[0]): number => {
     const nd = v.ncbExcluded ? 0 : ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
     const an = tech - nd
     const ud = v.upccExcluded ? 0 : upccType === 'amount' ? upccFixedAmt : (an * upccPct) / 100
@@ -390,19 +415,19 @@ export default function PremiumTab({
   }
   // Instalment amount (editor only): payable (or premium when no discount) ÷ number of instalments
   const numInst = quotation.numInstalments || 1
-  const instFor = (tech: number, v: (typeof qVessels)[0]) =>
+  const instFor = (tech: number, v: (typeof qVessels)[0]): number =>
     (hasDiscount ? payableFor(tech, v) : tech) / numInst
   const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
   // Payable (after NCB/UPCC + extra discounts) for a plain technical amount, no per-vessel exclusions.
   // Used for single-vessel alternative rows (P&I alternatives) where premium lives on each alternative.
-  const payablePlain = (tech: number) => {
+  const payablePlain = (tech: number): number => {
     const nd = ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
     const an = tech - nd
     const ud = upccType === 'amount' ? upccFixedAmt : (an * upccPct) / 100
     return applyExtraDiscounts(an - ud)
   }
-  const instPlain = (tech: number) => (hasDiscount ? payablePlain(tech) : tech) / numInst
-  const renderHullAltPremiums = () => (
+  const instPlain = (tech: number): number => (hasDiscount ? payablePlain(tech) : tech) / numInst
+  const renderHullAltPremiums = (): React.JSX.Element => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
       {hullAlternatives.map((alt, idx) => {
         const clause = hullClauses.find((c) => c.id === alt.hullClauseId)
@@ -982,7 +1007,7 @@ export default function PremiumTab({
                         onBlur={(val) =>
                           window.api.updateQuotationVessel(v.id, {
                             warSection1Premium: val || null
-                          } as any)
+                          })
                         }
                         placeholder={`Auto: ${s1Prem.toLocaleString()}`}
                         style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }}
@@ -1023,7 +1048,7 @@ export default function PremiumTab({
                         onBlur={(val) =>
                           window.api.updateQuotationVessel(v.id, {
                             warSection2Premium: val || null
-                          } as any)
+                          })
                         }
                         placeholder={`Auto: ${s2Prem.toLocaleString()}`}
                         style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }}
@@ -1493,7 +1518,7 @@ export default function PremiumTab({
           onChange={(e) => {
             const raw = e.target.value.replace(/\D/g, '')
             if (raw === '') {
-              setQ((p) => ({ ...p, numInstalments: undefined as any }))
+              setQ((p) => ({ ...p, numInstalments: undefined }))
               return
             }
             const v = Math.max(1, Math.min(12, parseInt(raw) || 1))
@@ -1607,7 +1632,7 @@ export default function PremiumTab({
                     onBlur={(val) =>
                       window.api.updateQuotationVessel(v.id, {
                         warSection1Premium: val || null
-                      } as any)
+                      })
                     }
                     placeholder={`Auto: ${s1Prem.toLocaleString()}`}
                     style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }}
@@ -1648,7 +1673,7 @@ export default function PremiumTab({
                     onBlur={(val) =>
                       window.api.updateQuotationVessel(v.id, {
                         warSection2Premium: val || null
-                      } as any)
+                      })
                     }
                     placeholder={`Auto: ${s2Prem.toLocaleString()}`}
                     style={{ width: '140px', fontSize: '0.85rem', textAlign: 'right' }}
@@ -1741,12 +1766,16 @@ export default function PremiumTab({
                   {qVessels.map((v) => {
                     const vPrem = v.premiumAmount || 0
                     const vPayable = vesselPayable(v)
-                    const toggleExclusion = async (field: 'ncbExcluded' | 'upccExcluded') => {
+                    const toggleExclusion = async (
+                      field: 'ncbExcluded' | 'upccExcluded'
+                    ): Promise<void> => {
                       const newVal = !v[field]
                       setQVessels((prev) =>
                         prev.map((pv) => (pv.id === v.id ? { ...pv, [field]: newVal } : pv))
                       )
-                      await window.api.updateQuotationVessel(v.id, { [field]: newVal } as any)
+                      await window.api.updateQuotationVessel(v.id, {
+                        [field]: newVal
+                      } as Partial<QuotationVessel>)
                     }
                     return (
                       <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
@@ -1968,7 +1997,7 @@ export default function PremiumTab({
         (technicalPremium > 0 ||
           (piMultiAlt && piAlternatives.some((a) => (a.premiumAmount || 0) > 0))) &&
         (() => {
-          const computePayable = (tech: number) => {
+          const computePayable = (tech: number): number => {
             const nd = ncbType === 'amount' ? ncbFixedAmt : (tech * ncbPct) / 100
             const an = tech - nd
             const ud = upccType === 'amount' ? upccFixedAmt : (an * upccPct) / 100
@@ -1995,7 +2024,7 @@ export default function PremiumTab({
             .join(' + ')
           const anyMultiAlt = hullMultiAlt || piMultiAlt || valueOptions.length > 0
           const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-          const fmt = (n: number) =>
+          const fmt = (n: number): string =>
             n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           return (
             <div
@@ -2506,7 +2535,7 @@ export default function PremiumTab({
                 amount: null,
                 text: ''
               })
-              if (created && !(created as any).error) setDiscounts((prev) => [...prev, created])
+              if (created && !isIpcError(created)) setDiscounts((prev) => [...prev, created])
             }}
           >
             <Plus size={14} /> Add Discount
@@ -2520,11 +2549,11 @@ export default function PremiumTab({
           </p>
         ) : (
           discounts.map((d, idx) => {
-            const patch = (u: Partial<QuotationDiscount>) =>
+            const patch = (u: Partial<QuotationDiscount>): void =>
               setDiscounts((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...u } : x)))
-            const save = (u: Partial<QuotationDiscount>) =>
+            const save = (u: Partial<QuotationDiscount>): Promise<void> =>
               window.api.quotationDiscountUpdate(d.id, u)
-            const move = async (dir: -1 | 1) => {
+            const move = async (dir: -1 | 1): Promise<void> => {
               const j = idx + dir
               if (j < 0 || j >= discounts.length) return
               const arr = [...discounts]
@@ -3011,7 +3040,8 @@ export default function PremiumTab({
                     window.api.getSetting('policyExportSettings')
                   ])
                   const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-                    (t: any) => t.key === 'outstandingPremiumDefaultText'
+                    (t: { key: string; value?: string }) =>
+                      t.key === 'outstandingPremiumDefaultText'
                   )?.value
                   const pDefault = policyRaw
                     ? JSON.parse(policyRaw).outstandingPremiumDefaultText
@@ -3020,7 +3050,9 @@ export default function PremiumTab({
                     qDefault || pDefault || 'All outstanding premium to be settled prior inception'
                   setQ((p) => ({ ...p, outstandingPremiumText: text }))
                   updateField('outstandingPremiumText', text)
-                } catch {}
+                } catch {
+                  /* settings unavailable: leave the text empty for the user to fill */
+                }
               }
             }}
             style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
@@ -3119,7 +3151,7 @@ export default function PremiumTab({
                       window.api.getSetting('policyExportSettings')
                     ])
                     const qDefault = (Array.isArray(globalTexts) ? globalTexts : []).find(
-                      (t: any) => t.key === 'fullPremiumLossDefaultText'
+                      (t: { key: string; value?: string }) => t.key === 'fullPremiumLossDefaultText'
                     )?.value
                     const pDefault = policyRaw
                       ? JSON.parse(policyRaw).fullPremiumLossDefaultText
@@ -3128,7 +3160,9 @@ export default function PremiumTab({
                       qDefault || pDefault || 'Full annual premium payable in case of loss.'
                     setQ((p) => ({ ...p, fullPremiumLossText: text }))
                     updateField('fullPremiumLossText', text)
-                  } catch {}
+                  } catch {
+                    /* settings unavailable: leave the text empty for the user to fill */
+                  }
                 }
               }}
               style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}

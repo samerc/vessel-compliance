@@ -13,7 +13,7 @@ export default function NotesTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [notes, setNotes] = useState<QuotationNote[]>([])
   const [newTitle, setNewTitle] = useState('')
   const [newContent, setNewContent] = useState('')
@@ -24,9 +24,20 @@ export default function NotesTab({
   const [mentionAnchorEl, setMentionAnchorEl] = useState<HTMLTextAreaElement | null>(null)
   const { user } = useAuth()
 
+  // Bumped after a note or reply is added to reload the list
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
-    loadData()
-  }, [])
+    let alive = true
+    const loadData = async (): Promise<void> => {
+      const raw = await window.api.getQuotationNotes(quotation.id)
+      if (alive) setNotes(Array.isArray(raw) ? raw : [])
+    }
+    void loadData()
+    return () => {
+      alive = false
+    }
+  }, [quotation.id, reloadKey])
   useEffect(() => {
     window.api
       .notificationsGetUsernames()
@@ -37,19 +48,14 @@ export default function NotesTab({
         // Fallback: try getUsers if available
         window.api
           .getUsers?.()
-          .then((users: any[]) =>
-            setAllUsers(users.map((u) => ({ id: u.id, username: u.username })))
-          )
+          .then((users) => setAllUsers(users.map((u) => ({ id: u.id, username: u.username }))))
           .catch(() => {})
       })
   }, [])
 
-  const loadData = async () => {
-    const raw = await window.api.getQuotationNotes(quotation.id)
-    setNotes(Array.isArray(raw) ? raw : [])
-  }
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newTitle.trim()) return
     await window.api.addQuotationNote({
       quotationId: quotation.id,
@@ -63,7 +69,7 @@ export default function NotesTab({
     loadData()
   }
 
-  const handleReply = async (parentNoteId: string) => {
+  const handleReply = async (parentNoteId: string): Promise<void> => {
     if (!replyContent.trim()) return
     await window.api.addQuotationNote({
       quotationId: quotation.id,
@@ -78,14 +84,17 @@ export default function NotesTab({
     loadData()
   }
 
-  const handleUpdate = async (id: string, updates: { title?: string; content?: string }) => {
+  const handleUpdate = async (
+    id: string,
+    updates: { title?: string; content?: string }
+  ): Promise<void> => {
     await window.api.updateQuotationNote(id, updates)
   }
 
   const handleMentionInput = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
     setter: (v: string) => void
-  ) => {
+  ): void => {
     const val = e.target.value
     setter(val)
     // Check for @mention
@@ -101,7 +110,7 @@ export default function NotesTab({
     }
   }
 
-  const insertMention = (username: string, setter: (v: string) => void, getter: string) => {
+  const insertMention = (username: string, setter: (v: string) => void, getter: string): void => {
     if (!mentionAnchorEl) return
     const cursorPos = mentionAnchorEl.selectionStart || 0
     const textBefore = getter.slice(0, cursorPos)
@@ -133,7 +142,10 @@ export default function NotesTab({
     }
   }
 
-  const renderMentionDropdown = (setter: (v: string) => void, getter: string) => {
+  const renderMentionDropdown = (
+    setter: (v: string) => void,
+    getter: string
+  ): React.JSX.Element | null => {
     if (mentionQuery === null || filteredUsers.length === 0) return null
     return (
       <div
@@ -170,7 +182,7 @@ export default function NotesTab({
     )
   }
 
-  const highlightMentions = (text: string) => {
+  const highlightMentions = (text: string): React.ReactNode => {
     if (!text) return text
     const parts = text.split(/(@\w+)/g)
     return parts.map((part, i) =>
@@ -184,7 +196,7 @@ export default function NotesTab({
     )
   }
 
-  const formatTime = (dateStr?: string | null) => {
+  const formatTime = (dateStr?: string | null): string => {
     if (!dateStr) return ''
     const d = new Date(dateStr)
     const now = new Date()

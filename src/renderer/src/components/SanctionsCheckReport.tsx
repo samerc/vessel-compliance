@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import {
@@ -29,7 +29,7 @@ const SOURCES: { code: string; label: string }[] = [
 
 type Decision = 'CLEARED' | 'SANCTIONED' | null
 
-export default function SanctionsCheckReport() {
+export default function SanctionsCheckReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -57,7 +57,7 @@ export default function SanctionsCheckReport() {
 
   useEffect(() => {
     if (!pickerOpen) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -65,7 +65,7 @@ export default function SanctionsCheckReport() {
   }, [pickerOpen])
 
   // Reset results when the subject changes
-  const resetResults = () => {
+  const resetResults = (): void => {
     setResults(null)
     setDecision(null)
     setCheckedAt(null)
@@ -79,7 +79,7 @@ export default function SanctionsCheckReport() {
 
   const anyPotential = results ? results.some((r) => r.status === 'POTENTIAL_MATCH') : false
 
-  const runCheck = async () => {
+  const runCheck = async (): Promise<void> => {
     const query = subjectName.trim()
     if (!query) {
       showError('Enter a name or pick an entity to screen')
@@ -88,7 +88,7 @@ export default function SanctionsCheckReport() {
     setRunning(true)
     resetResults()
     try {
-      const resp = await (window.api as any).checkSanctions(
+      const resp = await window.api.checkSanctions(
         query,
         threshold / 100,
         SOURCES.map((s) => s.code)
@@ -111,7 +111,7 @@ export default function SanctionsCheckReport() {
     }
   }
 
-  const handleExport = async () => {
+  const handleExport = async (): Promise<void> => {
     if (!results || !checkedAt) return
     if (!decision) {
       showError('Clear or sanction the subject before exporting')
@@ -139,7 +139,7 @@ export default function SanctionsCheckReport() {
             ofacStatus: decision === 'SANCTIONED' ? 'MATCH' : 'CLEARED',
             ofacCheckedAt: checkedAt.toISOString(),
             ofacMatchFound: decision === 'SANCTIONED'
-          } as any)
+          })
           .catch(() => {})
       }
       await exportPdf({

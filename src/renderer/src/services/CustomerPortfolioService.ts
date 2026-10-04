@@ -5,6 +5,7 @@ import { formatDateLong } from '../utils/dateUtils'
 
 // ── Palette (matches ReportServiceV2) ────────────────────────────────────────
 type RGB = [number, number, number]
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 const C: Record<string, RGB> = {
   navy: [10, 22, 40],
   navyMid: [22, 46, 80],
@@ -27,10 +28,10 @@ const W = 210
 const MARGIN = 12
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const isExpired = (d: string | null | undefined) =>
+const isExpired = (d: string | null | undefined): boolean =>
   !!d && new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
 
-const isExpiringSoon = (d: string | null | undefined) => {
+const isExpiringSoon = (d: string | null | undefined): boolean => {
   if (!d) return false
   const today = new Date(new Date().setHours(0, 0, 0, 0))
   const threshold = new Date(today)
@@ -47,7 +48,7 @@ function docStatus(hasFile: boolean, expiry: string | null | undefined): string 
 }
 
 // ── Page chrome ──────────────────────────────────────────────────────────────
-function drawPageHeader(doc: jsPDF, companyName: string, primary: RGB) {
+function drawPageHeader(doc: jsPDF, companyName: string, primary: RGB): void {
   doc.setFillColor(...C.navy)
   doc.rect(0, 0, W, 14, 'F')
   doc.setFillColor(...C.accent)
@@ -68,7 +69,7 @@ function drawPageHeader(doc: jsPDF, companyName: string, primary: RGB) {
   doc.text('CONFIDENTIAL', W - MARGIN, 9, { align: 'right' })
 }
 
-function drawPageFooter(doc: jsPDF, pageNum: number, total: number, companyName: string) {
+function drawPageFooter(doc: jsPDF, pageNum: number, total: number, companyName: string): void {
   const H = doc.internal.pageSize.getHeight()
   doc.setDrawColor(...C.bgMid)
   doc.setLineWidth(0.3)
@@ -81,7 +82,7 @@ function drawPageFooter(doc: jsPDF, pageNum: number, total: number, companyName:
   doc.text(`Page ${pageNum} / ${total}`, W - MARGIN, H - 7, { align: 'right' })
 }
 
-function drawSectionLabel(doc: jsPDF, y: number, text: string) {
+function drawSectionLabel(doc: jsPDF, y: number, text: string): void {
   doc.setFillColor(...C.navy)
   doc.rect(MARGIN, y, W - MARGIN * 2, 8, 'F')
   doc.setTextColor(...C.white)
@@ -113,18 +114,18 @@ export async function exportCustomerPortfolioPDF(
   const flagStates = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
   const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
 
-  const customerVessels = vessels.filter((v: any) => v.isActive && v.customerId === customerId)
+  const customerVessels = vessels.filter((v) => v.isActive && v.customerId === customerId)
   if (customerVessels.length === 0) return
 
   // Batch-fetch custom doc types, policies, and warranties per vessel
   const [customDocResults, policyResults, warrantyResults] = await Promise.all([
-    Promise.all(customerVessels.map((v: any) => window.api.getVesselCustomDocTypes(v.id))),
-    Promise.all(customerVessels.map((v: any) => window.api.getVesselDynamicPolicies(v.id))),
-    Promise.all(customerVessels.map((v: any) => window.api.surveyWarrantyGetByVessel(v.id)))
+    Promise.all(customerVessels.map((v) => window.api.getVesselCustomDocTypes(v.id))),
+    Promise.all(customerVessels.map((v) => window.api.getVesselDynamicPolicies(v.id))),
+    Promise.all(customerVessels.map((v) => window.api.surveyWarrantyGetByVessel(v.id)))
   ])
 
   const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
-  const flagMap = new Map(flagStates.map((f: any) => [f.id, f]))
+  const flagMap = new Map(flagStates.map((f) => [f.id, f]))
 
   // Build per-vessel compliance data
   interface VesselPortfolioRow {
@@ -154,18 +155,18 @@ export async function exportCustomerPortfolioPDF(
 
   for (let i = 0; i < customerVessels.length; i++) {
     const vessel = customerVessels[i]
-    const vesselDocs = allVesselDocs.filter((d: any) => d.vesselId === vessel.id)
-    const customTypes = allCustomDocTypes.filter((t: any) => t.vesselId === vessel.id)
+    const vesselDocs = allVesselDocs.filter((d) => d.vesselId === vessel.id)
+    const customTypes = allCustomDocTypes.filter((t) => t.vesselId === vessel.id)
     const policies = Array.isArray(policyResults[i]) ? policyResults[i] : []
 
     // Compliance counts
     const allTypes = [
-      ...docTypes.map((t: any) => {
-        const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
+      ...docTypes.map((t) => {
+        const d = vesselDocs.find((v) => v.documentTypeId === t.id)
         return { required: d ? d.required : t.required, doc: d }
       }),
-      ...(customTypes as any[]).map((t: any) => {
-        const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
+      ...customTypes.map((t) => {
+        const d = vesselDocs.find((v) => v.documentTypeId === t.id)
         return { required: true, doc: d }
       })
     ].filter((t) => t.required)
@@ -191,7 +192,7 @@ export async function exportCustomerPortfolioPDF(
     totalRequired += reqCount
 
     // Policy types for this vessel
-    const activePolicies = (policies as any[]).filter((p: any) => p.status === 'active')
+    const activePolicies = policies.filter((p) => p.status === 'active')
     const ptNames: string[] = []
     for (const p of activePolicies) {
       const ptName = p.policyTypeName || ''
@@ -204,7 +205,7 @@ export async function exportCustomerPortfolioPDF(
     vesselRows.push({
       name: vessel.name,
       imo: vessel.imoNumber || '',
-      flag: fs ? `${(fs as any).name}` : '—',
+      flag: fs ? `${fs.name}` : '—',
       type: vessel.vesselType || '—',
       built: vessel.builtYear
         ? vessel.rebuiltYear
@@ -233,7 +234,7 @@ export async function exportCustomerPortfolioPDF(
   const openWarranties: OpenWarrantyRow[] = []
   for (let i = 0; i < customerVessels.length; i++) {
     const wArr = Array.isArray(warrantyResults[i]) ? warrantyResults[i] : []
-    for (const w of wArr as any[]) {
+    for (const w of wArr) {
       if (w.status === 'completed' || w.status === 'waived') continue
       let deadline = ''
       if (w.deadlineType === 'days' && w.deadlineDays != null) {
@@ -252,7 +253,7 @@ export async function exportCustomerPortfolioPDF(
   }
 
   // Customer entity info
-  const customerEntity = entities.find((e: any) => e.id === customerId) as any
+  const customerEntity = entities.find((e) => e.id === customerId)
 
   // ── Build PDF ────────────────────────────────────────────────────────────────
   const s = await getReportSettings()
@@ -379,18 +380,18 @@ export async function exportCustomerPortfolioPDF(
     styles: {
       fontSize: 8,
       cellPadding: { top: 4, bottom: 4, left: 3, right: 2 },
-      lineColor: C.bgMid as any,
+      lineColor: C.bgMid,
       lineWidth: 0.25,
       overflow: 'linebreak',
       textColor: C.textPri
     },
-    alternateRowStyles: { fillColor: C.bgLight as any },
+    alternateRowStyles: { fillColor: C.bgLight },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
     }
   })
 
-  y = (doc as any).lastAutoTable.finalY + 8
+  y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
 
   // ── Policy coverage summary ────────────────────────────────────────────────
   const pageH = doc.internal.pageSize.getHeight()
@@ -434,16 +435,16 @@ export async function exportCustomerPortfolioPDF(
       styles: {
         fontSize: 8.5,
         cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
-        lineColor: C.bgMid as any,
+        lineColor: C.bgMid,
         lineWidth: 0.25,
         textColor: C.textPri
       },
-      alternateRowStyles: { fillColor: C.bgLight as any },
+      alternateRowStyles: { fillColor: C.bgLight },
       didDrawPage: (data) => {
         if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
       }
     })
-    y = (doc as any).lastAutoTable.finalY + 8
+    y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
   } else {
     doc.setFont('helvetica', 'italic')
     doc.setFontSize(8.5)
@@ -512,17 +513,17 @@ export async function exportCustomerPortfolioPDF(
     styles: {
       fontSize: 8,
       cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
-      lineColor: C.bgMid as any,
+      lineColor: C.bgMid,
       lineWidth: 0.25,
       textColor: C.textPri
     },
-    alternateRowStyles: { fillColor: C.bgLight as any },
+    alternateRowStyles: { fillColor: C.bgLight },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
     }
   })
 
-  y = (doc as any).lastAutoTable.finalY + 8
+  y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
 
   // ── Open warranties ────────────────────────────────────────────────────────
   if (openWarranties.length > 0) {
@@ -572,12 +573,12 @@ export async function exportCustomerPortfolioPDF(
       styles: {
         fontSize: 8,
         cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
-        lineColor: C.bgMid as any,
+        lineColor: C.bgMid,
         lineWidth: 0.25,
         overflow: 'linebreak',
         textColor: C.textPri
       },
-      alternateRowStyles: { fillColor: C.bgLight as any },
+      alternateRowStyles: { fillColor: C.bgLight },
       didDrawPage: (data) => {
         if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
       }
@@ -585,7 +586,7 @@ export async function exportCustomerPortfolioPDF(
   }
 
   // ── Page footers ───────────────────────────────────────────────────────────
-  const totalPages = (doc.internal as any).getNumberOfPages()
+  const totalPages = doc.getNumberOfPages()
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i)
     drawPageFooter(doc, i, totalPages, s.companyName)

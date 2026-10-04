@@ -28,7 +28,7 @@ function MoneyInput({
   onChange: (val: number | undefined) => void
   onBlur?: (val: number | undefined) => void
   style?: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
 
@@ -44,7 +44,7 @@ function MoneyInput({
         setRaw(value != null && value !== 0 ? String(value) : '')
       }}
       onChange={(e) => {
-        const v = e.target.value.replace(/[^0-9.,\-]/g, '')
+        const v = e.target.value.replace(/[^0-9.,-]/g, '')
         setRaw(v)
         onChange(parseNum(v))
       }}
@@ -64,24 +64,27 @@ export default function SumInsuredTab({
   setQ
 }: {
   quotation: Quotation
-  updateField: (field: string, value: any) => void
+  updateField: (field: string, value: unknown) => void
   setQ: (fn: (q: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
 
+  const quotationId = quotation.id
   useEffect(() => {
     ;(async () => {
       try {
         const [s, qv] = await Promise.all([
           window.api.warGetSettings(),
-          window.api.getQuotationVessels(quotation.id)
+          window.api.getQuotationVessels(quotationId)
         ])
-        if (s && !(s as any).error) setWarSettings(s)
+        if (s && !('error' in s && s.error)) setWarSettings(s)
         setQVessels(Array.isArray(qv) ? qv : [])
-      } catch {}
+      } catch {
+        /* settings/vessels are optional: the tab falls back to quotation-level values */
+      }
     })()
-  }, [])
+  }, [quotationId])
 
   const getEffectiveRate = (): number | undefined => {
     if (quotation.premiumRate != null) return quotation.premiumRate
@@ -96,7 +99,7 @@ export default function SumInsuredTab({
   }
 
   // Set per-vessel premiums based on each vessel's sum insured × rate
-  const syncPerVesselPremiums = (rate: number, vessels?: QuotationVessel[]) => {
+  const syncPerVesselPremiums = (rate: number, vessels?: QuotationVessel[]): void => {
     const vList = vessels || qVessels
     if (vList.length < 2) return
     const hasPerVessel = vList.some((v) => v.agreedValue != null && v.agreedValue > 0)
@@ -104,11 +107,11 @@ export default function SumInsuredTab({
     for (const v of vList) {
       const si = v.agreedValue ?? quotation.agreedValue ?? 0
       const vPrem = Math.round(((si * rate) / 100) * 100) / 100
-      window.api.updateQuotationVessel(v.id, { premiumAmount: vPrem } as any)
+      window.api.updateQuotationVessel(v.id, { premiumAmount: vPrem })
     }
   }
 
-  const handleRateChange = (rate: number | undefined) => {
+  const handleRateChange = (rate: number | undefined): void => {
     const sumInsured = getEffectiveSumInsured()
     setQ((q) => {
       const updated = { ...q, premiumRate: rate }
@@ -126,7 +129,7 @@ export default function SumInsuredTab({
     }
   }
 
-  const handlePremiumChange = (premium: number | undefined) => {
+  const handlePremiumChange = (premium: number | undefined): void => {
     const sumInsured = getEffectiveSumInsured()
     setQ((q) => {
       const updated = { ...q, premiumAmount: premium }
@@ -144,7 +147,7 @@ export default function SumInsuredTab({
     }
   }
 
-  const handleSumInsuredChange = (val: number | undefined) => {
+  const handleSumInsuredChange = (val: number | undefined): void => {
     const rate = getEffectiveRate()
     setQ((q) => {
       const updated = { ...q, agreedValue: val }
@@ -254,7 +257,7 @@ export default function SumInsuredTab({
                   )
                 }
                 onBlur={(val) => {
-                  window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null } as any)
+                  window.api.updateQuotationVessel(v.id, { agreedValue: val ?? null })
                   // Recalculate premium from per-vessel values × rate
                   const rate = getEffectiveRate()
                   if (rate) {
@@ -273,7 +276,7 @@ export default function SumInsuredTab({
                       for (const qv of updatedVessels) {
                         const si = qv.agreedValue ?? quotation.agreedValue ?? 0
                         const vPrem = Math.round(((si * rate) / 100) * 100) / 100
-                        window.api.updateQuotationVessel(qv.id, { premiumAmount: vPrem } as any)
+                        window.api.updateQuotationVessel(qv.id, { premiumAmount: vPrem })
                       }
                     }
                   }
@@ -563,7 +566,7 @@ export default function SumInsuredTab({
                       onBlur={(val) =>
                         window.api.updateQuotationVessel(v.id, {
                           warExcessAmount: val ?? null
-                        } as any)
+                        })
                       }
                       style={{
                         width: '160px',

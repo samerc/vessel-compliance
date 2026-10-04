@@ -21,12 +21,12 @@ export default function LiabilityTab({
   getEffectiveText
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
   getEffectiveText: (key: keyof PISectionTexts) => string
-}) {
+}): React.JSX.Element {
   const [subLimits, setSubLimits] = useState<QuotationSubLimit[]>([])
   const [templates, setTemplates] = useState<
     import('../../../../shared/types').PISubLimitTemplate[]
@@ -48,29 +48,41 @@ export default function LiabilityTab({
   const [newCurrency, setNewCurrency] = useState('USD')
   const [showStandardText, setShowStandardText] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
-    const [sl, tmpl, qv] = await Promise.all([
-      window.api.getQuotationSubLimits(quotation.id),
-      window.api.piGetSubLimitTemplates(),
-      window.api.getQuotationVessels(quotation.id)
-    ])
-    setSubLimits(asArray(sl))
-    setTemplates(Array.isArray(tmpl) ? tmpl : [])
-    setQVessels(Array.isArray(qv) ? qv : [])
-    if (quotation.quotationTypeCode === 'P') {
-      const [alts, lolOpts] = await Promise.all([
-        window.api.piGetQuotationAlternatives(quotation.id),
-        window.api.lolGetOptions(quotation.id)
-      ])
-      setPiAlts(Array.isArray(alts) ? alts : [])
-      setLolOptions(Array.isArray(lolOpts) ? lolOpts : [])
-    }
-  }
+  const [reloadKey, setReloadKey] = useState(0)
+  const quotationId = quotation.id
+  const typeCode = quotation.quotationTypeCode
 
-  const handleAddSubLimit = async () => {
+  // Loads on mount and again whenever loadData() bumps reloadKey.
+  useEffect(() => {
+    let alive = true
+    const run = async (): Promise<void> => {
+      const [sl, tmpl, qv] = await Promise.all([
+        window.api.getQuotationSubLimits(quotationId),
+        window.api.piGetSubLimitTemplates(),
+        window.api.getQuotationVessels(quotationId)
+      ])
+      if (!alive) return
+      setSubLimits(asArray(sl))
+      setTemplates(Array.isArray(tmpl) ? tmpl : [])
+      setQVessels(Array.isArray(qv) ? qv : [])
+      if (typeCode === 'P') {
+        const [alts, lolOpts] = await Promise.all([
+          window.api.piGetQuotationAlternatives(quotationId),
+          window.api.lolGetOptions(quotationId)
+        ])
+        if (!alive) return
+        setPiAlts(Array.isArray(alts) ? alts : [])
+        setLolOptions(Array.isArray(lolOpts) ? lolOpts : [])
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [quotationId, typeCode, reloadKey])
+  const loadData = (): void => setReloadKey((k) => k + 1)
+
+  const handleAddSubLimit = async (): Promise<void> => {
     if (!newText.trim()) return
     await window.api.addQuotationSubLimit({
       quotationId: quotation.id,
@@ -85,7 +97,7 @@ export default function LiabilityTab({
     loadData()
   }
 
-  const applyTemplate = (templateId: string) => {
+  const applyTemplate = (templateId: string): void => {
     const t = templates.find((x) => x.id === templateId)
     if (!t) return
     setNewText(t.textTemplate)

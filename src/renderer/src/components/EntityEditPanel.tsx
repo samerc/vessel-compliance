@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useEffectEvent } from 'react'
 import {
   Building2,
   User,
@@ -35,7 +35,7 @@ import SanctionsModal from './SanctionsModal'
 import { CaseToggleBtn } from './CaseToggle'
 import { confirmDialog } from './DialogHost'
 import { SanctionsBadge } from './ui'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 
 interface EntityEditPanelProps {
   /** The entity being edited (entity-level fields only — vessel-specific bits stay in the parent). */
@@ -71,7 +71,7 @@ export default function EntityEditPanel({
   showCommissions = true,
   editing,
   onEditingChange
-}: EntityEditPanelProps) {
+}: EntityEditPanelProps): React.JSX.Element | null {
   const { showError, showSuccess } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -97,7 +97,7 @@ export default function EntityEditPanel({
   // ── Core fields edit (controlled by parent when `editing` prop is supplied) ──────
   const [editingInternal, setEditingInternal] = useState(false)
   const editingCore = editing !== undefined ? editing : editingInternal
-  const setEditingCore = (v: boolean) => {
+  const setEditingCore = (v: boolean): void => {
     if (onEditingChange) onEditingChange(v)
     else setEditingInternal(v)
   }
@@ -142,7 +142,7 @@ export default function EntityEditPanel({
   const [isAddingUBO, setIsAddingUBO] = useState(false)
 
   // ── Load ───────────────────────────────────────────────────────────────────────
-  const loadEntityData = async () => {
+  const loadEntityData = async (): Promise<void> => {
     try {
       const [ents, dts, allDocs, addrs, allUbos] = await Promise.all([
         window.api.getEntities(),
@@ -154,7 +154,7 @@ export default function EntityEditPanel({
       const entList = Array.isArray(ents) ? ents : []
       setEntities(entList)
       setEntity(entList.find((e) => e.id === entityId) || null)
-      setDocTypes(Array.isArray(dts) ? dts.filter((t: any) => t.isActive) : [])
+      setDocTypes(Array.isArray(dts) ? dts.filter((t) => t.isActive) : [])
       const safeDocs = Array.isArray(allDocs) ? allDocs : []
       const safeUbos = Array.isArray(allUbos) ? allUbos : []
       setDocs(safeDocs)
@@ -165,7 +165,11 @@ export default function EntityEditPanel({
       // Only check this entity's docs + its UBOs' docs to bound the number of fs calls.
       const relevantEntityIds = new Set<string>([
         entityId,
-        ...safeUbos.filter((u: any) => u.entityId === entityId).map((u: any) => u.uboEntityId)
+        // NOTE: EntityUBO has no `entityId` (it is `assuredEntityId`), so this matches nothing
+        // and UBO documents are not existence-checked. Kept as is (lint-only change).
+        ...safeUbos
+          .filter((u) => (u as EntityUBO & { entityId?: string }).entityId === entityId)
+          .map((u) => u.uboEntityId)
       ])
       const fstatus: Record<string, boolean> = {}
       const withFile = safeDocs.filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
@@ -191,17 +195,17 @@ export default function EntityEditPanel({
         ])
         setCommissions(
           Array.isArray(co)
-            ? co.map((o: any) => ({
+            ? co.map((o) => ({
                 policyTypeId: o.policyTypeId,
                 commissionPercent: o.commissionPercent
               }))
             : []
         )
         if (Array.isArray(pt))
-          setPolicyTypes(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
+          setPolicyTypes(pt.map((t) => ({ id: t.id, name: t.name, code: t.code })))
         if (Array.isArray(cd)) {
           const m: Record<string, number> = {}
-          for (const d of cd as any[]) m[d.policyTypeId] = d.commissionPercent
+          for (const d of cd) m[d.policyTypeId] = d.commissionPercent
           setCommDefaults(m)
         }
       } catch {
@@ -210,25 +214,34 @@ export default function EntityEditPanel({
     }
   }
 
-  useEffect(() => {
+  // On (re)selecting an entity: close any open editors, then load its data
+  const resetForEntity = useEffectEvent((): void => {
     setEditingCore(false)
     setShowAddAddress(false)
     setEditingAddress(null)
     setNewUBOName('')
     setSelectedUBOId(null)
-    loadEntityData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  })
+  const loadForEntity = useEffectEvent(loadEntityData)
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      resetForEntity()
+      await loadForEntity()
+    }
+    void run()
   }, [entityId])
 
   // Reload the panel's own data AND notify the parent to refresh aggregate lists.
-  const refresh = () => {
+  const refresh = (): void => {
     loadEntityData()
     onChanged()
   }
 
   // Populate the edit form from the entity whenever edit mode is (re)entered — the Edit
   // trigger lives in the parent's header, so this seeds the form for controlled editing.
-  useEffect(() => {
+  const [prevEditingCore, setPrevEditingCore] = useState(editingCore)
+  if (editingCore !== prevEditingCore) {
+    setPrevEditingCore(editingCore)
     if (editingCore && entity) {
       setForm({
         name: entity.name,
@@ -238,11 +251,10 @@ export default function EntityEditPanel({
         phone: entity.phone || ''
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingCore])
+  }
 
   // ── Core field handlers ─────────────────────────────────────────────────────────
-  const handleSaveCore = async () => {
+  const handleSaveCore = async (): Promise<void> => {
     if (!entity || !form.name.trim()) return
     setSavingCore(true)
     try {
@@ -256,15 +268,15 @@ export default function EntityEditPanel({
       showSuccess('Entity updated')
       setEditingCore(false)
       refresh()
-    } catch (e: any) {
-      showError(e.message || 'Failed to update entity')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to update entity')
     } finally {
       setSavingCore(false)
     }
   }
 
   // ── Sanctions handlers ──────────────────────────────────────────────────────────
-  const handleOfacRecheck = async (ent: Entity) => {
+  const handleOfacRecheck = async (ent: Entity): Promise<void> => {
     setCheckingId(ent.id)
     try {
       const result = await OfacService.checkSanctions(ent.name)
@@ -287,14 +299,16 @@ export default function EntityEditPanel({
           entityId: ent.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Sanctions check failed. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) || 'Sanctions check failed. Please try again.'
+      )
     } finally {
       setCheckingId(null)
     }
   }
 
-  const handleViewPotentialMatch = async (ent: Entity) => {
+  const handleViewPotentialMatch = async (ent: Entity): Promise<void> => {
     setCheckingId(ent.id)
     try {
       const result = await OfacService.checkSanctions(ent.name)
@@ -306,14 +320,17 @@ export default function EntityEditPanel({
           entityId: ent.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to load sanctions data. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) ||
+          'Failed to load sanctions data. Please try again.'
+      )
     } finally {
       setCheckingId(null)
     }
   }
 
-  const handleMarkClean = async () => {
+  const handleMarkClean = async (): Promise<void> => {
     if (sanctionsModal.entityId) {
       await window.api.updateEntity(sanctionsModal.entityId, {
         ofacStatus: 'CLEARED',
@@ -324,7 +341,7 @@ export default function EntityEditPanel({
     refresh()
   }
 
-  const handleConfirmMatch = async () => {
+  const handleConfirmMatch = async (): Promise<void> => {
     if (sanctionsModal.entityId) {
       await window.api.updateEntity(sanctionsModal.entityId, {
         ofacStatus: 'MATCH',
@@ -336,7 +353,11 @@ export default function EntityEditPanel({
   }
 
   // ── Document handlers ───────────────────────────────────────────────────────────
-  const handleClickUploadDoc = async (eId: string, documentTypeId: string, label: string) => {
+  const handleClickUploadDoc = async (
+    eId: string,
+    documentTypeId: string,
+    label: string
+  ): Promise<void> => {
     try {
       const filePath = await window.api.dialogOpenFileAny()
       if (!filePath) return
@@ -348,12 +369,16 @@ export default function EntityEditPanel({
       await window.api.upsertEntityDocument({ entityId: eId, documentTypeId, filePath })
       showSuccess(`${label} uploaded successfully`)
       refresh()
-    } catch (error: any) {
-      showError(error.message || `Failed to upload ${label}`)
+    } catch (error) {
+      showError((error instanceof Error && error.message) || `Failed to upload ${label}`)
     }
   }
 
-  const handleDropEntityDoc = async (e: React.DragEvent, eId: string, documentTypeId: string) => {
+  const handleDropEntityDoc = async (
+    e: React.DragEvent,
+    eId: string,
+    documentTypeId: string
+  ): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
     const files = e.dataTransfer.files
@@ -373,18 +398,18 @@ export default function EntityEditPanel({
     refresh()
   }
 
-  const handleDeleteDoc = async (eId: string, documentTypeId: string) => {
+  const handleDeleteDoc = async (eId: string, documentTypeId: string): Promise<void> => {
     try {
       await window.api.deleteEntityDocument(eId, documentTypeId)
       showSuccess('Document removed')
       refresh()
-    } catch (error: any) {
-      showError(error.message || 'Failed to remove document')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to remove document')
     }
   }
 
   // ── Address handlers ─────────────────────────────────────────────────────────────
-  const resetAddrForm = () =>
+  const resetAddrForm = (): void =>
     setAddrForm({
       label: '',
       addressLine1: '',
@@ -394,7 +419,7 @@ export default function EntityEditPanel({
       postalCode: ''
     })
 
-  const handleSaveAddress = async () => {
+  const handleSaveAddress = async (): Promise<void> => {
     if (!entity || !addrForm.label.trim() || !addrForm.addressLine1.trim()) return
     try {
       if (editingAddress) {
@@ -417,8 +442,8 @@ export default function EntityEditPanel({
           country: addrForm.country.trim() || undefined,
           postalCode: addrForm.postalCode.trim() || undefined
         })
-        if (res && (res as any).error) {
-          showError((res as any).message || 'Failed to add')
+        if (isIpcError(res)) {
+          showError(res.message || 'Failed to add')
           return
         }
         showSuccess('Address added')
@@ -427,22 +452,22 @@ export default function EntityEditPanel({
       setEditingAddress(null)
       resetAddrForm()
       refresh()
-    } catch (e: any) {
-      showError(e.message || 'Failed to save address')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to save address')
     }
   }
 
-  const handleDeleteAddress = async (addrId: string) => {
+  const handleDeleteAddress = async (addrId: string): Promise<void> => {
     try {
       await window.api.deleteEntityAddress(addrId)
       showSuccess('Address deleted')
       refresh()
-    } catch (e: any) {
-      showError(e.message || 'Failed to delete address')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to delete address')
     }
   }
 
-  const startEditAddress = (addr: EntityAddress) => {
+  const startEditAddress = (addr: EntityAddress): void => {
     setEditingAddress(addr)
     setAddrForm({
       label: addr.label,
@@ -456,7 +481,7 @@ export default function EntityEditPanel({
   }
 
   // ── UBO handlers ────────────────────────────────────────────────────────────────
-  const handleAddUBO = async () => {
+  const handleAddUBO = async (): Promise<void> => {
     if (!entity || !newUBOName.trim()) return
     setIsAddingUBO(true)
     try {
@@ -484,14 +509,14 @@ export default function EntityEditPanel({
       setSelectedUBOId(null)
       showSuccess('UBO added successfully')
       refresh()
-    } catch (error: any) {
-      showError(error.message || 'Failed to add UBO. Please try again.')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to add UBO. Please try again.')
     } finally {
       setIsAddingUBO(false)
     }
   }
 
-  const handleLinkExistingUBO = async (uboEntityId: string) => {
+  const handleLinkExistingUBO = async (uboEntityId: string): Promise<void> => {
     if (!entity) return
     setIsAddingUBO(true)
     try {
@@ -500,14 +525,14 @@ export default function EntityEditPanel({
       setSelectedUBOId(null)
       showSuccess('UBO linked successfully')
       refresh()
-    } catch (error: any) {
-      showError(error.message || 'Failed to link UBO.')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to link UBO.')
     } finally {
       setIsAddingUBO(false)
     }
   }
 
-  const handleDeleteUBO = async (uboEntityId: string) => {
+  const handleDeleteUBO = async (uboEntityId: string): Promise<void> => {
     if (!entity) return
     const ok = await confirmDialog('Are you sure you want to remove this UBO?', {
       title: 'Remove UBO?'
@@ -517,8 +542,8 @@ export default function EntityEditPanel({
       await window.api.deleteEntityUBO({ assuredEntityId: entity.id, uboEntityId })
       showSuccess('UBO removed successfully')
       refresh()
-    } catch (error: any) {
-      showError(error.message || 'Failed to remove UBO.')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to remove UBO.')
     }
   }
 
@@ -540,7 +565,7 @@ export default function EntityEditPanel({
     )
     .slice(0, 8)
 
-  const getDocScore = (eId: string, entityType: string) => {
+  const getDocScore = (eId: string, entityType: string): { have: number; total: number } => {
     const applicable = docTypes.filter(
       (t) => t.isRequired && (t.entityScope === 'both' || t.entityScope === entityType)
     )
@@ -557,7 +582,7 @@ export default function EntityEditPanel({
   }
 
   // ── Sub-components ──────────────────────────────────────────────────────────────
-  const OfacBadge = ({ ent }: { ent: Entity }) => (
+  const renderOfacBadge = (ent: Entity): React.JSX.Element => (
     <SanctionsBadge
       status={ent.ofacStatus}
       checking={checkingId === ent.id}
@@ -567,7 +592,7 @@ export default function EntityEditPanel({
     />
   )
 
-  const DocRow = ({ ent }: { ent: Entity }) => {
+  const renderDocRow = (ent: Entity): React.JSX.Element => {
     const applicable = docTypes.filter(
       (t) => t.entityScope === 'both' || t.entityScope === ent.type
     )
@@ -748,7 +773,9 @@ export default function EntityEditPanel({
                   </label>
                   <select
                     value={form.type}
-                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as any }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
+                    }
                     style={{ width: '100%', padding: '8px 10px' }}
                   >
                     <option value="company">Company</option>
@@ -851,13 +878,13 @@ export default function EntityEditPanel({
 
       {/* Sanctions */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--table-border)' }}>
-        <OfacBadge ent={entity} />
+        {renderOfacBadge(entity)}
       </div>
 
       {/* Documents */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)' }}>
         <div style={{ ...sectionLabel, marginBottom: '10px' }}>Documents</div>
-        <DocRow ent={entity} />
+        {renderDocRow(entity)}
       </div>
 
       {/* Addresses */}
@@ -1133,10 +1160,8 @@ export default function EntityEditPanel({
                   </button>
                 )}
               </div>
-              <OfacBadge ent={ubo} />
-              <div style={{ marginTop: '8px' }}>
-                <DocRow ent={ubo} />
-              </div>
+              {renderOfacBadge(ubo)}
+              <div style={{ marginTop: '8px' }}>{renderDocRow(ubo)}</div>
             </div>
           )
         })}
@@ -1224,7 +1249,7 @@ export default function EntityEditPanel({
               {!selectedUBOId && (
                 <select
                   value={newUBOType}
-                  onChange={(e) => setNewUBOType(e.target.value as any)}
+                  onChange={(e) => setNewUBOType(e.target.value as 'company' | 'person')}
                   style={{
                     width: '90px',
                     padding: '6px',

@@ -90,16 +90,16 @@ export function UpdateNotification(): React.ReactElement | null {
     }
   }, [])
 
-  const handleInstall = () => {
+  const handleInstall = (): void => {
     window.api.updateQuitAndInstall()
   }
 
-  const handleDismiss = () => {
+  const handleDismiss = (): void => {
     setDismissed(true)
     setShowPreview(false)
   }
 
-  const handleCheckForUpdates = () => {
+  const handleCheckForUpdates = (): void => {
     window.api.updateCheckForUpdates()
   }
 
@@ -157,7 +157,7 @@ export function UpdateNotification(): React.ReactElement | null {
                     textDecoration: 'underline'
                   }}
                 >
-                  <Sparkles size={12} /> What's New in v{updateState.info.version}
+                  <Sparkles size={12} /> What&apos;s New in v{updateState.info.version}
                 </button>
               )}
             </div>
@@ -323,7 +323,7 @@ export function UpdateNotification(): React.ReactElement | null {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                    What's New in v{updateState.info.version}
+                    What&apos;s New in v{updateState.info.version}
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     {updateState.type === 'downloading'

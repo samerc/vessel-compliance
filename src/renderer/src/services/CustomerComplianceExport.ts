@@ -1,7 +1,17 @@
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import autoTable, { type RowInput } from 'jspdf-autotable'
 import { getReportSettings } from './ReportSettingsService'
 import { formatDate } from '../utils/dateUtils'
+import type {
+  DocumentType,
+  Vessel,
+  VesselAssured,
+  VesselCustomDocType,
+  VesselDocument
+} from '../../../shared/types'
+
+// vessels:getAssureds returns no names today, so the assured column reads '—' (see report)
+type AssuredWithName = VesselAssured & { entityName?: string; name?: string }
 
 // Customer compliance rows and the per-customer PDF (used by the Reports tab and the Entity Directory)
 
@@ -26,9 +36,9 @@ export interface CustomerGroup {
   vessels: CustomerVesselRow[]
 }
 
-const isExpired = (d: string | null | undefined) =>
+const isExpired = (d: string | null | undefined): boolean =>
   !!d && new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
-const isExpiringSoon = (d: string | null | undefined) => {
+const isExpiringSoon = (d: string | null | undefined): boolean => {
   if (!d) return false
   const today = new Date(new Date().setHours(0, 0, 0, 0))
   const exp = new Date(d)
@@ -45,30 +55,30 @@ function docStatus(hasFile: boolean, expiry: string | null | undefined): string 
 }
 
 export function buildVesselRow(
-  vessel: any,
-  docTypes: any[],
-  allVesselDocs: any[],
-  allAssureds: any[],
-  allCustomDocTypes: any[],
+  vessel: Vessel,
+  docTypes: DocumentType[],
+  allVesselDocs: VesselDocument[],
+  allAssureds: AssuredWithName[],
+  allCustomDocTypes: VesselCustomDocType[],
   relevantPolicyTypeIds?: string[]
 ): CustomerVesselRow {
   const vesselDocs = allVesselDocs.filter((d) => d.vesselId === vessel.id)
   const customTypes = allCustomDocTypes.filter((t) => t.vesselId === vessel.id)
 
   // Filter doc types by policy type tags if we know which policy types are relevant
-  const isDocRelevant = (dt: any) => {
+  const isDocRelevant = (dt: DocumentType): boolean => {
     if (!relevantPolicyTypeIds || relevantPolicyTypeIds.length === 0) return true
     if (!dt.policyTypeIds || dt.policyTypeIds.length === 0) return true // no tags = all types
     return dt.policyTypeIds.some((ptId: string) => relevantPolicyTypeIds.includes(ptId))
   }
 
   const allTypes = [
-    ...docTypes.filter(isDocRelevant).map((t: any) => {
-      const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
+    ...docTypes.filter(isDocRelevant).map((t) => {
+      const d = vesselDocs.find((v) => v.documentTypeId === t.id)
       return { name: t.name, required: d ? d.required : t.required, doc: d }
     }),
-    ...(customTypes as any[]).map((t: any) => {
-      const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
+    ...customTypes.map((t) => {
+      const d = vesselDocs.find((v) => v.documentTypeId === t.id)
       return { name: `${t.name} (Custom)`, required: true, doc: d }
     })
   ].filter((t) => t.required)
@@ -190,7 +200,7 @@ export async function exportCustomerCompliancePDF(
   )
   doc.text(`Date: ${formatDate(new Date())}`, 14, titleY + 16)
 
-  const bodyRows: any[][] = vesselRows.map((v) => {
+  const bodyRows: RowInput[] = vesselRows.map((v) => {
     const pctColor: [number, number, number] =
       v.pct === 100 ? [0, 140, 70] : v.missing > 0 ? [192, 0, 0] : [180, 83, 9]
     return [

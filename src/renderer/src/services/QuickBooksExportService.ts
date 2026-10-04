@@ -1,5 +1,17 @@
 import XLSX from 'xlsx-js-style'
 import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
+import type {
+  HullAltVesselPremium,
+  PIClause,
+  PIDeductible,
+  Quotation,
+  QuotationDeductible,
+  QuotationDiscount,
+  QuotationSubjectivity,
+  QuotationVessel
+} from '../../../shared/types'
+
+type QuotationWarrantyRow = Awaited<ReturnType<typeof window.api.getQuotationWarranties>>[number]
 
 // ── Column descriptions (Row 1) ─────────────────────────────────────────────
 const HEADER_DESCRIPTIONS = [
@@ -171,11 +183,14 @@ function formatWithCommas(n: number | undefined | null): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function encodeDeductibles(deductibles: any[], allDeductibleDefs: any[]): string {
+function encodeDeductibles(
+  deductibles: QuotationDeductible[],
+  allDeductibleDefs: PIDeductible[]
+): string {
   if (!deductibles.length) return '--'
   return deductibles
     .map((d) => {
-      const def = allDeductibleDefs.find((dd: any) => dd.id === d.piDeductibleId)
+      const def = allDeductibleDefs.find((dd) => dd.id === d.piDeductibleId)
       const code = def?.letterCode || '?'
       const amount = (d.amount || 0) / 1000
       const amtStr = amount === Math.floor(amount) ? String(amount) : amount.toFixed(1)
@@ -184,18 +199,21 @@ function encodeDeductibles(deductibles: any[], allDeductibleDefs: any[]): string
     .join('')
 }
 
-function getConditionsSummary(quotation: any, clauses: any[]): string {
+// `code` is not on PIClause; kept as the original lookup (falls back to name)
+type ClauseLike = PIClause & { code?: string }
+
+function getConditionsSummary(quotation: Quotation | null, clauses: ClauseLike[]): string {
   if (!quotation) return '--'
   if (quotation.quotationTypeCode === 'H') {
     return clauses[0]?.name || clauses[0]?.code || '--'
   }
-  const codes = clauses.map((c: any) => c.code || c.name).filter(Boolean)
+  const codes = clauses.map((c) => c.code || c.name).filter(Boolean)
   return codes.length > 0 ? codes.join(', ') : '--'
 }
 
-function getInterestLabel(typeCode: string, typeName: string): string {
+function getInterestLabel(typeCode: string | null, typeName: string | null): string {
   const codeMap: Record<string, string> = { P: 'P&I', H: 'H&M', W: 'WAR', C: 'CARGO' }
-  return codeMap[typeCode] || typeName || '--'
+  return (typeCode != null && codeMap[typeCode]) || typeName || '--'
 }
 
 // ── Main export function ────────────────────────────────────────────────────
@@ -203,7 +221,7 @@ function getInterestLabel(typeCode: string, typeName: string): string {
 export async function exportPolicyToQuickBooks(policyId: string): Promise<void> {
   // 1. Load policy data
   const policy = await window.api.policyGetById(policyId)
-  if (!policy || (policy as any).error) throw new Error('Policy not found')
+  if (!policy || (policy as { error?: unknown }).error) throw new Error('Policy not found')
 
   const [instalments, addresses] = await Promise.all([
     window.api.policyGetInstalments(policyId),
@@ -213,16 +231,16 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   const safeAddresses = Array.isArray(addresses) ? addresses : []
 
   // 2. Load quotation data if linked
-  let quotation: any = null
-  let qDeductibles: any[] = []
-  let qWarranties: any[] = []
-  let qSubjectivities: any[] = []
-  let qClauses: any[] = []
-  let deductibleDefs: any[] = []
+  let quotation: Quotation | null = null
+  let qDeductibles: QuotationDeductible[] = []
+  let qWarranties: QuotationWarrantyRow[] = []
+  let qSubjectivities: QuotationSubjectivity[] = []
+  let qClauses: PIClause[] = []
+  let deductibleDefs: PIDeductible[] = []
   // This policy's own technical premium (one policy per vessel) — null = fall back to quotation
   let vesselTech: number | null = null
-  let qVessel: any = null
-  let qDiscounts: any[] = []
+  let qVessel: QuotationVessel | null = null
+  let qDiscounts: QuotationDiscount[] = []
 
   if (policy.quotationId) {
     try {
@@ -240,7 +258,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
       qSubjectivities = Array.isArray(subs) ? subs : []
       qClauses = Array.isArray(cls) ? cls : []
       deductibleDefs = Array.isArray(dedDefs) ? dedDefs : []
-      if (q && !(q as any).error) {
+      if (q && !(q as { error?: unknown }).error) {
         const isHull = q.quotationTypeCode === 'H'
         const [qvs, piAlts, hullAlts, lols, avp, disc] = await Promise.all([
           window.api.getQuotationVessels(policy.quotationId),
@@ -259,11 +277,11 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
         const vessels = Array.isArray(qvs) ? qvs : []
         qDiscounts = Array.isArray(disc) ? disc : []
         qVessel =
-          vessels.find((v: any) => v.vesselId === policy.vesselId) ||
+          vessels.find((v) => v.vesselId === policy.vesselId) ||
           (vessels.length === 1 ? vessels[0] : null)
         if (qVessel) {
           const altVesselPrems: Record<string, number> = {}
-          for (const r of (Array.isArray(avp) ? avp : []) as any[]) {
+          for (const r of (Array.isArray(avp) ? avp : []) as HullAltVesselPremium[]) {
             if (r.premiumAmount != null)
               altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
           }
@@ -279,7 +297,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
             },
             qVessel,
             policy.selectedAlternativeId || '',
-            (policy as any).selected_lol_option_id || ''
+            policy.selectedLolOptionId || ''
           )
         }
       }
@@ -289,11 +307,10 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   }
 
   // 4. Resolve entity addresses
-  const ownerAddr = safeAddresses.find((a: any) => a.role?.toLowerCase().includes('owner'))
-  const managerAddr = safeAddresses.find((a: any) => a.role?.toLowerCase().includes('manager'))
+  const ownerAddr = safeAddresses.find((a) => a.role?.toLowerCase().includes('owner'))
+  const managerAddr = safeAddresses.find((a) => a.role?.toLowerCase().includes('manager'))
   const otherAddrs = safeAddresses.filter(
-    (a: any) =>
-      !a.role?.toLowerCase().includes('owner') && !a.role?.toLowerCase().includes('manager')
+    (a) => !a.role?.toLowerCase().includes('owner') && !a.role?.toLowerCase().includes('manager')
   )
 
   // 5. Compute fields
@@ -313,11 +330,11 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   const ncbApplies = !!quotation?.ncbEnabled && !qVessel?.ncbExcluded
   const ncbPct = !ncbApplies
     ? '--'
-    : quotation.ncbDiscountType === 'amount'
+    : quotation?.ncbDiscountType === 'amount'
       ? quotation.ncbDiscountAmount
         ? formatWithCommas(quotation.ncbDiscountAmount)
         : '--'
-      : quotation.ncbDiscountPercent
+      : quotation?.ncbDiscountPercent
         ? `${quotation.ncbDiscountPercent}%`
         : '--'
 
@@ -378,7 +395,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
     policy.vesselName || '', // Class
     ownerAddr?.entityName || '', // Shipping Address Line 1 — owners
     managerAddr?.entityName || '', // Shipping Address Line 2 — managers
-    otherAddrs.map((a: any) => a.entityName).join(', ') || '', // Shipping Address Line 3
+    otherAddrs.map((a) => a.entityName).join(', ') || '', // Shipping Address Line 3
     '',
     '',
     '',

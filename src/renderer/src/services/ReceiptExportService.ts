@@ -17,7 +17,7 @@ import {
 } from 'docx'
 import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
 import { numberToWords } from '../utils/numberToWords'
-import { Receipt } from '../../../shared/types'
+import type { PISectionTexts, Receipt } from '../../../shared/types'
 
 const FONT = 'Arial'
 const FONT_SIZE = 22 // 11pt
@@ -116,7 +116,7 @@ async function loadLogoAsBuffer(
   }
 }
 
-function downloadBlob(blob: Blob, filename: string) {
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = window.document.createElement('a')
   a.href = url
@@ -151,23 +151,21 @@ function labelValueRow(label: string, value: string, opts?: { valueBold?: boolea
         borders: cellBorders,
         margins: { top: 80, bottom: 80, left: 0, right: 0 },
         // Multi-line values (e.g. the BEING section) render one paragraph per line
-        children: value
-          .split('\n')
-          .map(
-            (line) =>
-              new Paragraph({
-                spacing: { after: 0 },
-                children: [
-                  new TextRun({
-                    text: line,
-                    bold: opts?.valueBold,
-                    size: FONT_SIZE,
-                    font: FONT,
-                    color: '000000'
-                  })
-                ]
-              })
-          )
+        children: value.split('\n').map(
+          (line) =>
+            new Paragraph({
+              spacing: { after: 0 },
+              children: [
+                new TextRun({
+                  text: line,
+                  bold: opts?.valueBold,
+                  size: FONT_SIZE,
+                  font: FONT,
+                  color: '000000'
+                })
+              ]
+            })
+        )
       })
     ]
   })
@@ -186,7 +184,7 @@ export async function buildReceiptBlob(
   let headerHtml = ''
   let headerSpacing: number | undefined
   try {
-    const st = (await window.api.piGetSectionTexts()) as any
+    const st: PISectionTexts | null | undefined = await window.api.piGetSectionTexts()
     headerHtml = st?.docHeader || ''
     headerSpacing = st?.docHeaderSpacing || undefined
   } catch {
@@ -365,13 +363,13 @@ export async function buildReceiptBlob(
           headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
         footers:
           footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
-        children: children as any[]
+        children
       }
     ]
   })
 
   const blob = await Packer.toBlob(document)
-  const safeNum = receipt.receiptNumber.replace(/[\/\\]/g, '-')
+  const safeNum = receipt.receiptNumber.replace(/[/\\]/g, '-')
   const vName = receipt.vesselName ? ` - ${receipt.vesselName}` : ''
   return { blob, fileName: `Receipt ${safeNum}${vName}.docx` }
 }

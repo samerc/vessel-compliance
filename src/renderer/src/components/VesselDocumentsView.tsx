@@ -34,11 +34,11 @@ interface Props {
   onReload?: () => void
 }
 
-const isExpired = (d: string | null | undefined) => {
+const isExpired = (d: string | null | undefined): boolean => {
   if (!d) return false
   return new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
 }
-const isExpiringSoon = (d: string | null | undefined) => {
+const isExpiringSoon = (d: string | null | undefined): boolean => {
   if (!d) return false
   const today = new Date(new Date().setHours(0, 0, 0, 0))
   const exp = new Date(d)
@@ -52,7 +52,7 @@ const isExpiringSoon = (d: string | null | undefined) => {
 const annualShortCycle = (
   expiryDate: string | null | undefined,
   receivedDate: string | null | undefined
-) => {
+): boolean => {
   if (!expiryDate || !receivedDate) return false
   const span =
     (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
@@ -77,7 +77,11 @@ function getDocStatus(
   return 'compliant'
 }
 
-export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload }: Props) {
+export default function VesselDocumentsView({
+  vessel,
+  dynamicPolicies,
+  onReload
+}: Props): React.JSX.Element {
   const { theme } = useTheme()
   const { user, hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -88,20 +92,16 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   const [preferredPIPolicyId, setPreferredPIPolicyId] = useState<string | undefined>(undefined)
 
   // Auto-select first P&I policy with an end date if none selected
-  useEffect(() => {
-    if (piPolicies.length > 0 && !preferredPIPolicyId) {
-      const withDate = piPolicies.find((pp) => pp.endDate)
-      if (withDate) setPreferredPIPolicyId(withDate.policy.id)
-    }
-  }, [piPolicies, preferredPIPolicyId])
+  const selectedPIPolicyId =
+    preferredPIPolicyId || piPolicies.find((pp) => pp.endDate)?.policy.id || undefined
 
   // Resolve P&I expiry from dynamic policies first, fall back to legacy vessel field
   const effectivePolicyExpiry = useMemo(
     () =>
-      resolveEffectivePolicyExpiry(dynamicPolicies || [], preferredPIPolicyId) ||
+      resolveEffectivePolicyExpiry(dynamicPolicies || [], selectedPIPolicyId) ||
       vessel.policyExpiryDate ||
       undefined,
-    [dynamicPolicies, vessel.policyExpiryDate, preferredPIPolicyId]
+    [dynamicPolicies, vessel.policyExpiryDate, selectedPIPolicyId]
   )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -119,42 +119,52 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
   const [newCustomName, setNewCustomName] = useState('')
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
 
-  const loadData = async () => {
-    const [types, docs, customTypes] = await Promise.all([
-      window.api.getDocumentTypes(),
-      window.api.getVesselDocuments(vessel.id),
-      window.api.getVesselCustomDocTypes(vessel.id)
-    ])
-    const sorted = [...types].sort((a, b) => {
-      const dA = docs.find((d: VesselDocument) => d.documentTypeId === a.id)
-      const dB = docs.find((d: VesselDocument) => d.documentTypeId === b.id)
-      const rA = dA ? dA.required : a.required
-      const rB = dB ? dB.required : b.required
-      if (rA !== rB) return rA ? -1 : 1
-      return a.order - b.order
-    })
-    setDocTypes(sorted)
-    setVesselDocs(docs)
-    setCustomDocTypes(customTypes)
-    const status: Record<string, boolean> = {}
-    const withFile = docs.filter((d: VesselDocument) => d.filePath)
-    try {
-      const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
-      if (Array.isArray(exists))
-        withFile.forEach((d: VesselDocument, i: number) => {
-          status[d.documentTypeId] = exists[i]
-        })
-    } catch {
-      /* unknown = shown as present */
-    }
-    setFileStatus(status)
-  }
+  // Bumping reloadKey re-runs the load effect below
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
   useEffect(() => {
-    loadData()
-  }, [vessel.id])
+    let alive = true
+    const run = async (): Promise<void> => {
+      const [types, docs, customTypes] = await Promise.all([
+        window.api.getDocumentTypes(),
+        window.api.getVesselDocuments(vessel.id),
+        window.api.getVesselCustomDocTypes(vessel.id)
+      ])
+      const sorted = [...types].sort((a, b) => {
+        const dA = docs.find((d: VesselDocument) => d.documentTypeId === a.id)
+        const dB = docs.find((d: VesselDocument) => d.documentTypeId === b.id)
+        const rA = dA ? dA.required : a.required
+        const rB = dB ? dB.required : b.required
+        if (rA !== rB) return rA ? -1 : 1
+        return a.order - b.order
+      })
+      if (!alive) return
+      setDocTypes(sorted)
+      setVesselDocs(docs)
+      setCustomDocTypes(customTypes)
+      const status: Record<string, boolean> = {}
+      const withFile = docs.filter((d: VesselDocument) => d.filePath)
+      try {
+        const exists = await window.api.fsExistsMany(
+          withFile.map((d: VesselDocument) => d.filePath!)
+        )
+        if (Array.isArray(exists))
+          withFile.forEach((d: VesselDocument, i: number) => {
+            status[d.documentTypeId] = exists[i]
+          })
+      } catch {
+        /* unknown = shown as present */
+      }
+      if (alive) setFileStatus(status)
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [vessel.id, reloadKey])
 
-  const uploadDoc = async (docTypeId: string, filePath: string) => {
+  const uploadDoc = async (docTypeId: string, filePath: string): Promise<void> => {
     setUploadingId(docTypeId)
     try {
       const validation = await window.api.fileTypesValidateFile(filePath)
@@ -187,7 +197,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     }
   }
 
-  const handleDrop = async (e: React.DragEvent, docTypeId: string) => {
+  const handleDrop = async (e: React.DragEvent, docTypeId: string): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverId(null)
@@ -198,13 +208,13 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     await uploadDoc(docTypeId, filePath)
   }
 
-  const handleClickUpload = async (docTypeId: string) => {
+  const handleClickUpload = async (docTypeId: string): Promise<void> => {
     const filePath = await window.api.dialogOpenFileAny()
     if (!filePath) return
     await uploadDoc(docTypeId, filePath)
   }
 
-  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0]
     if (!file || !pendingDocTypeId.current) return
     const filePath = window.api.getFilePath(file)
@@ -213,7 +223,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     pendingDocTypeId.current = null
   }
 
-  const handleToggleRequired = async (docTypeId: string) => {
+  const handleToggleRequired = async (docTypeId: string): Promise<void> => {
     const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
     const docType = docTypes.find((t) => t.id === docTypeId)
     if (existing) {
@@ -232,24 +242,24 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     loadData()
   }
 
-  const handleUnlinkFile = async (doc: VesselDocument) => {
+  const handleUnlinkFile = async (doc: VesselDocument): Promise<void> => {
     if (!(await confirmDialog('Unlink this file? The record will remain.'))) return
     await window.api.upsertVesselDocument({ ...doc, filePath: '' })
     loadData()
     onReload?.()
   }
 
-  const handleDuplicate = async (doc: VesselDocument) => {
+  const handleDuplicate = async (doc: VesselDocument): Promise<void> => {
     try {
       await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
       showSuccess('Document duplicated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to duplicate')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to duplicate')
     }
   }
 
-  const handleAddCustom = async (e: React.FormEvent) => {
+  const handleAddCustom = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newCustomName.trim()) return
     await window.api.addVesselCustomDocType({
@@ -263,7 +273,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     loadData()
   }
 
-  const handleDeleteCustomType = async (id: string) => {
+  const handleDeleteCustomType = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this custom document type?'))) return
     await window.api.deleteVesselCustomDocType(id)
     loadData()
@@ -338,7 +348,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
     isCustom = false,
     annualRenewal = false,
     description?: string
-  ) => {
+  ): React.JSX.Element => {
     const hasFile = !!doc?.filePath
     const fileExists = fileStatus[id] !== false
     // Annual docs inherit the P&I policy expiry; fall back to the stored expiry date
@@ -866,9 +876,14 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
               <button
                 onClick={async () => {
                   console.log('[View] Opening:', doc!.filePath)
-                  const res: any = await window.api.fsOpen(doc!.filePath)
+                  // fsOpen may resolve with an error object or a shell error string
+                  const res: unknown = await window.api.fsOpen(doc!.filePath)
                   console.log('[View] Result:', res)
-                  if (res?.error) showError(res.message || `Cannot open: ${doc!.filePath}`)
+                  if (res && typeof res === 'object' && 'error' in res && res.error)
+                    showError(
+                      ('message' in res && typeof res.message === 'string' && res.message) ||
+                        `Cannot open: ${doc!.filePath}`
+                    )
                   else if (typeof res === 'string' && res) showError(`Failed to open: ${res}`)
                 }}
                 className="btn-secondary"
@@ -993,7 +1008,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
           ? '#c00000'
           : '#ff4d4d'
 
-  const sectionHeader = (title: string, count: number) => (
+  const sectionHeader = (title: string, count: number): React.JSX.Element => (
     <div
       style={{
         display: 'flex',
@@ -1057,7 +1072,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
             P&I policy for annual docs:
           </span>
           <select
-            value={preferredPIPolicyId || ''}
+            value={selectedPIPolicyId || ''}
             onChange={(e) => setPreferredPIPolicyId(e.target.value || undefined)}
             style={{
               flex: 1,

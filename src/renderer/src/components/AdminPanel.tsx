@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useEffectEvent, useRef, lazy, Suspense } from 'react'
 import {
   Plus,
   Trash2,
@@ -48,7 +48,8 @@ import {
   PERMISSION_CATEGORIES,
   NotificationGroup,
   NOTIFICATION_EVENT_TYPES,
-  EntityDocumentType
+  EntityDocumentType,
+  SanctionsRefreshResult
 } from '../../../shared/types'
 import {
   REPORT_SETTINGS_DEFAULTS,
@@ -92,7 +93,7 @@ export default function AdminPanel({
   isAdmin?: boolean
   onNavigateToVessel?: (vesselId: string) => void
   onNavigate?: (target: NavTarget) => void
-} & SubTabProps) {
+} & SubTabProps): React.JSX.Element {
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [newName, setNewName] = useState('')
   const [newDescription, setNewDescription] = useState('')
@@ -112,6 +113,7 @@ export default function AdminPanel({
   const [editEdtScope, setEditEdtScope] = useState<'company' | 'person' | 'both'>('both')
   const [editEdtRequired, setEditEdtRequired] = useState(true)
   const dragEdtIndex = useRef<number | null>(null)
+  const [draggingEdtIndex, setDraggingEdtIndex] = useState<number | null>(null)
   const [dragOverEdtIndex, setDragOverEdtIndex] = useState<number | null>(null)
 
   const [roles, setRoles] = useState<AssuredRole[]>([])
@@ -149,10 +151,14 @@ export default function AdminPanel({
   } | null>(null)
 
   // Sidebar navigation
-  const [activeSection, setActiveSection] = useState<string>('docTypes')
-  useEffect(() => {
+  const [activeSection, setActiveSection] = useState<string>(() => subTab || 'docTypes')
+  // A sub-tab requested from outside (nonce changes on every request)
+  const subTabRequest = `${subTab ?? ''}|${subTabNonce ?? ''}`
+  const [prevSubTabRequest, setPrevSubTabRequest] = useState(subTabRequest)
+  if (prevSubTabRequest !== subTabRequest) {
+    setPrevSubTabRequest(subTabRequest)
     if (subTab) setActiveSection(subTab)
-  }, [subTab, subTabNonce])
+  }
   const [userSectionAccess, setUserSectionAccess] = useState<string[]>([])
 
   const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -255,25 +261,7 @@ export default function AdminPanel({
   const [dailyAlertsLastRun, setDailyAlertsLastRun] = useState<string | null>(null)
   const [dailyAlertsRunning, setDailyAlertsRunning] = useState(false)
 
-  useEffect(() => {
-    loadData()
-    loadFileTypeSettings()
-    loadConfigPath()
-    loadComplianceSettings()
-    loadGraceSettings()
-    loadReportSettings()
-    loadUserGroups()
-    loadLastBackupDate()
-    loadLogRetention()
-    loadNotifGroups()
-    loadDailyAlerts()
-    window.api
-      .getUserSectionAccess()
-      .then(setUserSectionAccess)
-      .catch(() => {})
-  }, [])
-
-  const handleToggleUserSection = async (sectionId: string) => {
+  const handleToggleUserSection = async (sectionId: string): Promise<void> => {
     const next = userSectionAccess.includes(sectionId)
       ? userSectionAccess.filter((id) => id !== sectionId)
       : [...userSectionAccess, sectionId]
@@ -283,7 +271,7 @@ export default function AdminPanel({
   }
 
   // ── User Groups ──────────────────────────────────────────────────────────────
-  const loadUserGroups = async () => {
+  const loadUserGroups = async (): Promise<void> => {
     try {
       const data = await window.api.rbacGetGroups()
       if (Array.isArray(data)) setUserGroups(data)
@@ -293,19 +281,18 @@ export default function AdminPanel({
   }
 
   // ── Notification Groups ────────────────────────────────────────────────────
-  const loadNotifGroups = async () => {
+  const loadNotifGroups = async (): Promise<void> => {
     try {
       const data = await window.api.notifGroupGetAll()
       if (Array.isArray(data)) setNotifGroups(data)
       const users = await window.api.getUsers()
-      if (Array.isArray(users))
-        setAllUsers(users.map((u: any) => ({ id: u.id, username: u.username })))
+      if (Array.isArray(users)) setAllUsers(users.map((u) => ({ id: u.id, username: u.username })))
     } catch {
       /* ignore */
     }
   }
 
-  const handleAddNotifGroup = async (e: React.FormEvent) => {
+  const handleAddNotifGroup = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newNotifGroupName.trim()) return
     try {
@@ -317,29 +304,29 @@ export default function AdminPanel({
       setNewNotifGroupDesc('')
       await loadNotifGroups()
       showSuccess('Notification group created')
-    } catch (err: any) {
-      showError(err?.message || 'Failed to create group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to create group')
     }
   }
 
-  const handleDeleteNotifGroup = async (id: string) => {
+  const handleDeleteNotifGroup = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this notification group?'))) return
     try {
       await window.api.notifGroupDelete(id)
       if (selectedNotifGroupId === id) setSelectedNotifGroupId(null)
       await loadNotifGroups()
       showSuccess('Group deleted')
-    } catch (err: any) {
-      showError(err?.message || 'Failed to delete group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to delete group')
     }
   }
 
-  const handleSelectNotifGroup = async (groupId: string) => {
+  const handleSelectNotifGroup = async (groupId: string): Promise<void> => {
     setSelectedNotifGroupId(groupId)
     setNotifGroupTab('members')
     try {
       const members = await window.api.notifGroupGetMembers(groupId)
-      setNotifGroupMembers(Array.isArray(members) ? members.map((m: any) => m.id) : [])
+      setNotifGroupMembers(Array.isArray(members) ? members.map((m) => m.id) : [])
       const subs = await window.api.notifGroupGetSubscriptions(groupId)
       setNotifGroupSubs(Array.isArray(subs) ? subs : [])
     } catch {
@@ -347,7 +334,7 @@ export default function AdminPanel({
     }
   }
 
-  const handleToggleNotifMember = async (userId: string) => {
+  const handleToggleNotifMember = async (userId: string): Promise<void> => {
     if (!selectedNotifGroupId) return
     const next = notifGroupMembers.includes(userId)
       ? notifGroupMembers.filter((id) => id !== userId)
@@ -356,12 +343,12 @@ export default function AdminPanel({
     try {
       await window.api.notifGroupSetMembers(selectedNotifGroupId, next)
       await loadNotifGroups()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to update members')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to update members')
     }
   }
 
-  const handleToggleNotifSub = async (eventType: string) => {
+  const handleToggleNotifSub = async (eventType: string): Promise<void> => {
     if (!selectedNotifGroupId) return
     const next = notifGroupSubs.includes(eventType)
       ? notifGroupSubs.filter((et) => et !== eventType)
@@ -370,12 +357,12 @@ export default function AdminPanel({
     try {
       await window.api.notifGroupSetSubscriptions(selectedNotifGroupId, next)
       await loadNotifGroups()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to update subscriptions')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to update subscriptions')
     }
   }
 
-  const handleUpdateNotifGroup = async (id: string) => {
+  const handleUpdateNotifGroup = async (id: string): Promise<void> => {
     if (!editNotifGroupName.trim()) return
     try {
       await window.api.notifGroupUpdate(
@@ -386,12 +373,12 @@ export default function AdminPanel({
       setEditingNotifGroupId(null)
       await loadNotifGroups()
       showSuccess('Group updated')
-    } catch (err: any) {
-      showError(err?.message || 'Failed to update group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to update group')
     }
   }
 
-  const handleReorderNotifGroup = async (index: number, direction: -1 | 1) => {
+  const handleReorderNotifGroup = async (index: number, direction: -1 | 1): Promise<void> => {
     const newList = [...notifGroups]
     const target = index + direction
     if (target < 0 || target >= newList.length) return
@@ -399,13 +386,13 @@ export default function AdminPanel({
     setNotifGroups(newList)
     try {
       await window.api.notifGroupReorder(newList.map((g) => g.id))
-    } catch (err: any) {
-      showError(err?.message || 'Failed to reorder')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to reorder')
     }
   }
 
   // ── Daily Alerts ──────────────────────────────────────────────────────────
-  const loadDailyAlerts = async () => {
+  const loadDailyAlerts = async (): Promise<void> => {
     try {
       const [enabled, time, docDays, policyDays, blueCardDays, warrantyDays, lastRun] =
         await Promise.all([
@@ -429,28 +416,28 @@ export default function AdminPanel({
     }
   }
 
-  const saveDailyAlertSetting = async (key: string, value: string) => {
+  const saveDailyAlertSetting = async (key: string, value: string): Promise<void> => {
     try {
       await window.api.setSetting(key, value)
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save setting')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to save setting')
     }
   }
 
-  const handleDailyAlertsRunNow = async () => {
+  const handleDailyAlertsRunNow = async (): Promise<void> => {
     setDailyAlertsRunning(true)
     try {
       await window.api.dailyAlertsRunNow()
       showSuccess('Daily alert check completed')
       await loadDailyAlerts()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to run daily alerts')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to run daily alerts')
     } finally {
       setDailyAlertsRunning(false)
     }
   }
 
-  const loadLastBackupDate = async () => {
+  const loadLastBackupDate = async (): Promise<void> => {
     try {
       const date = await window.api.dbGetLastBackupDate()
       setLastBackupDate(date || null)
@@ -459,7 +446,7 @@ export default function AdminPanel({
     }
   }
 
-  const loadLogRetention = async () => {
+  const loadLogRetention = async (): Promise<void> => {
     try {
       const days = await window.api.activityGetRetention()
       setLogRetentionDays(typeof days === 'number' ? days : 365)
@@ -470,7 +457,7 @@ export default function AdminPanel({
     }
   }
 
-  const handleSaveRetention = async (days: number) => {
+  const handleSaveRetention = async (days: number): Promise<void> => {
     setSavingRetention(true)
     try {
       setLogRetentionDays(days)
@@ -483,14 +470,14 @@ export default function AdminPanel({
         showSuccess(`Retention set to ${days === 0 ? 'never delete' : days + ' days'}`)
       }
       await loadLogRetention()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save retention setting')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to save retention setting')
     } finally {
       setSavingRetention(false)
     }
   }
 
-  const handleCleanNow = async () => {
+  const handleCleanNow = async (): Promise<void> => {
     setCleaningLog(true)
     try {
       const result = await window.api.activityCleanup()
@@ -500,14 +487,14 @@ export default function AdminPanel({
         showSuccess('No old entries to clean')
       }
       await loadLogRetention()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to clean activity log')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to clean activity log')
     } finally {
       setCleaningLog(false)
     }
   }
 
-  const handleBackup = async () => {
+  const handleBackup = async (): Promise<void> => {
     setBackupInProgress(true)
     try {
       const result = await window.api.dbBackup()
@@ -517,14 +504,14 @@ export default function AdminPanel({
         showSuccess('Database backup saved successfully')
         loadLastBackupDate()
       }
-    } catch (err: any) {
-      showError(err?.message || 'Backup failed')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Backup failed')
     } finally {
       setBackupInProgress(false)
     }
   }
 
-  const handleRestore = async () => {
+  const handleRestore = async (): Promise<void> => {
     setShowRestoreConfirm(false)
     setRestoreInProgress(true)
     try {
@@ -534,14 +521,14 @@ export default function AdminPanel({
       } else if (result?.success) {
         showSuccess('Database restored successfully. Please reload the application.')
       }
-    } catch (err: any) {
-      showError(err?.message || 'Restore failed')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Restore failed')
     } finally {
       setRestoreInProgress(false)
     }
   }
 
-  const handleAddGroup = async (e: React.FormEvent) => {
+  const handleAddGroup = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newGroupName.trim()) return
     try {
@@ -549,20 +536,21 @@ export default function AdminPanel({
         newGroupName.trim(),
         newGroupDescription.trim() || undefined
       )
-      if ((result as any)?.error) {
-        showError((result as any).message || 'Failed to add group')
+      const addErr = result as { error?: unknown; message?: string } | null
+      if (addErr?.error) {
+        showError(addErr.message || 'Failed to add group')
         return
       }
       setNewGroupName('')
       setNewGroupDescription('')
       loadUserGroups()
       showSuccess('Group created')
-    } catch (err: any) {
-      showError(err.message || 'Failed to add group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to add group')
     }
   }
 
-  const handleDeleteGroup = async (id: string) => {
+  const handleDeleteGroup = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this group? Users in this group will lose its permissions.')))
       return
     try {
@@ -573,18 +561,18 @@ export default function AdminPanel({
       }
       loadUserGroups()
       showSuccess('Group deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to delete group')
     }
   }
 
-  const startEditingGroup = (g: UserGroup) => {
+  const startEditingGroup = (g: UserGroup): void => {
     setEditingGroupId(g.id)
     setEditGroupName(g.name)
     setEditGroupDescription(g.description || '')
   }
 
-  const saveGroupEdit = async (id: string) => {
+  const saveGroupEdit = async (id: string): Promise<void> => {
     if (!editGroupName.trim()) return
     try {
       await window.api.rbacUpdateGroup(
@@ -595,12 +583,12 @@ export default function AdminPanel({
       setEditingGroupId(null)
       loadUserGroups()
       showSuccess('Group updated')
-    } catch (err: any) {
-      showError(err.message || 'Failed to update group')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to update group')
     }
   }
 
-  const handleSelectGroup = async (groupId: string) => {
+  const handleSelectGroup = async (groupId: string): Promise<void> => {
     if (selectedGroupId === groupId) {
       setSelectedGroupId(null)
       setGroupPermissions([])
@@ -615,15 +603,15 @@ export default function AdminPanel({
     }
   }
 
-  const handleToggleGroupPermission = async (groupId: string, permKey: string) => {
+  const handleToggleGroupPermission = async (groupId: string, permKey: string): Promise<void> => {
     const next = groupPermissions.includes(permKey)
       ? groupPermissions.filter((k) => k !== permKey)
       : [...groupPermissions, permKey]
     setGroupPermissions(next)
     try {
       await window.api.rbacSetGroupPermissions(groupId, next)
-    } catch (err: any) {
-      showError(err.message || 'Failed to save permissions')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to save permissions')
       // reload to revert
       const perms = await window.api.rbacGetGroupPermissions(groupId)
       setGroupPermissions(Array.isArray(perms) ? perms : [])
@@ -633,7 +621,7 @@ export default function AdminPanel({
   const handleToggleCategoryAll = async (
     groupId: string,
     categoryPerms: readonly { key: string; label: string }[]
-  ) => {
+  ): Promise<void> => {
     const keys = categoryPerms.map((p) => p.key)
     const allSelected = keys.every((k) => groupPermissions.includes(k))
     const next = allSelected
@@ -642,14 +630,14 @@ export default function AdminPanel({
     setGroupPermissions(next)
     try {
       await window.api.rbacSetGroupPermissions(groupId, next)
-    } catch (err: any) {
-      showError(err.message || 'Failed to save permissions')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Failed to save permissions')
       const perms = await window.api.rbacGetGroupPermissions(groupId)
       setGroupPermissions(Array.isArray(perms) ? perms : [])
     }
   }
 
-  const togglePermCategory = (catKey: string) => {
+  const togglePermCategory = (catKey: string): void => {
     setCollapsedPermCategories((prev) => {
       const next = new Set(prev)
       if (next.has(catKey)) next.delete(catKey)
@@ -658,7 +646,7 @@ export default function AdminPanel({
     })
   }
 
-  const loadConfigPath = async () => {
+  const loadConfigPath = async (): Promise<void> => {
     try {
       const path = await window.api.setupGetConfigPath()
       if (path) setConfigPath(path)
@@ -667,16 +655,16 @@ export default function AdminPanel({
     }
   }
 
-  const loadComplianceSettings = async () => {
+  const loadComplianceSettings = async (): Promise<void> => {
     try {
       const settings = await window.api.complianceGetScheduleSettings()
-      if (settings && !(settings as any).error) setComplianceSettings(settings)
+      if (settings && !(settings as { error?: unknown }).error) setComplianceSettings(settings)
     } catch {
       /* ignore */
     }
   }
 
-  const handleSaveComplianceSettings = async () => {
+  const handleSaveComplianceSettings = async (): Promise<void> => {
     setSavingCompliance(true)
     try {
       const result = await window.api.complianceSetScheduleSettings(complianceSettings)
@@ -686,14 +674,14 @@ export default function AdminPanel({
       } else {
         showError(result.message || 'Failed to save settings')
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to save settings')
+    } catch (error) {
+      showError((error as { message?: string } | null)?.message || 'Failed to save settings')
     } finally {
       setSavingCompliance(false)
     }
   }
 
-  const handleRunManualCheck = async () => {
+  const handleRunManualCheck = async (): Promise<void> => {
     setRunningManualCheck(true)
     setCheckProgress(null)
     const unsubscribe = window.api.onComplianceCheckProgress((data) => {
@@ -710,8 +698,10 @@ export default function AdminPanel({
       } else {
         showError(result.message || 'Failed to start compliance check')
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to start compliance check')
+    } catch (error) {
+      showError(
+        (error as { message?: string } | null)?.message || 'Failed to start compliance check'
+      )
     } finally {
       unsubscribe()
       setRunningManualCheck(false)
@@ -719,7 +709,7 @@ export default function AdminPanel({
     }
   }
 
-  const loadGraceSettings = async () => {
+  const loadGraceSettings = async (): Promise<void> => {
     try {
       const grace = await window.api.getSetting('annual_grace_days')
       if (grace) setAnnualGraceDays(parseInt(grace) || 90)
@@ -728,30 +718,32 @@ export default function AdminPanel({
     }
   }
 
-  const loadReportSettings = async () => {
+  const loadReportSettings = async (): Promise<void> => {
     const settings = await window.api.reportSettingsGet()
     setReportSettings({ ...REPORT_SETTINGS_DEFAULTS, ...settings })
   }
 
-  const handleSaveReportSettings = async () => {
+  const handleSaveReportSettings = async (): Promise<void> => {
     setSavingReportSettings(true)
     try {
       await window.api.reportSettingsSet(reportSettings)
       showSuccess('Report settings saved')
-    } catch (error: any) {
-      showError(error.message || 'Failed to save report settings')
+    } catch (error) {
+      showError((error as { message?: string } | null)?.message || 'Failed to save report settings')
     } finally {
       setSavingReportSettings(false)
     }
   }
 
-  const handleSaveGraceSettings = async () => {
+  const handleSaveGraceSettings = async (): Promise<void> => {
     setSavingGrace(true)
     try {
       await window.api.setSetting('annual_grace_days', String(annualGraceDays))
       showSuccess('Settings saved')
-    } catch (error: any) {
-      showError(error.message || 'Failed to save reminder settings')
+    } catch (error) {
+      showError(
+        (error as { message?: string } | null)?.message || 'Failed to save reminder settings'
+      )
     } finally {
       setSavingGrace(false)
     }
@@ -759,7 +751,7 @@ export default function AdminPanel({
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     await loadDocTypes()
     await loadEntityDocTypes()
     await loadRoles()
@@ -769,12 +761,12 @@ export default function AdminPanel({
     await loadPolicyTypes()
   }
 
-  const loadPolicyTypes = async () => {
+  const loadPolicyTypes = async (): Promise<void> => {
     const data = await window.api.getPolicyTypes()
     setPolicyTypes(Array.isArray(data) ? data : [])
   }
 
-  const handleAddPolicyType = async (e: React.FormEvent) => {
+  const handleAddPolicyType = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newPolicyType.trim()) return
     await window.api.addPolicyType(newPolicyType.trim(), newPolicyTypeCode.trim() || undefined)
@@ -784,7 +776,7 @@ export default function AdminPanel({
     showSuccess('Policy type added')
   }
 
-  const handleDeletePolicyType = async (id: string) => {
+  const handleDeletePolicyType = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this policy type? It will be removed from all vessels.')))
       return
     await window.api.deletePolicyType(id)
@@ -792,13 +784,13 @@ export default function AdminPanel({
     showSuccess('Policy type deleted')
   }
 
-  const startEditingPolicyType = (pt: PolicyType) => {
+  const startEditingPolicyType = (pt: PolicyType): void => {
     setEditingPolicyTypeId(pt.id)
     setEditPolicyTypeName(pt.name)
     setEditPolicyTypeCode(pt.code || '')
   }
 
-  const savePolicyTypeEdit = async (id: string) => {
+  const savePolicyTypeEdit = async (id: string): Promise<void> => {
     if (!editPolicyTypeName.trim()) return
     await window.api.updatePolicyType(id, {
       name: editPolicyTypeName.trim(),
@@ -809,7 +801,7 @@ export default function AdminPanel({
     showSuccess('Policy type updated')
   }
 
-  const handleMovePolicyType = async (index: number, direction: 'up' | 'down') => {
+  const handleMovePolicyType = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...policyTypes]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -819,13 +811,13 @@ export default function AdminPanel({
   }
 
   // --- Classification Societies ---
-  const loadClassSocieties = async () => {
+  const loadClassSocieties = async (): Promise<void> => {
     const data = await window.api.getClassificationSocieties()
     const safe = Array.isArray(data) ? data : []
     setClassSocieties([...safe].sort((a, b) => a.name.localeCompare(b.name)))
   }
 
-  const handleAddClassSociety = async (e: React.FormEvent) => {
+  const handleAddClassSociety = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newClassName.trim()) return
     await window.api.addClassificationSociety({
@@ -841,14 +833,14 @@ export default function AdminPanel({
     showSuccess('Classification society added')
   }
 
-  const handleDeleteClassSociety = async (id: string) => {
+  const handleDeleteClassSociety = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this classification society?'))) return
     await window.api.deleteClassificationSociety(id)
     loadClassSocieties()
     showSuccess('Classification society deleted')
   }
 
-  const handleMoveClassSociety = async (index: number, direction: 'up' | 'down') => {
+  const handleMoveClassSociety = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...classSocieties]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -857,7 +849,7 @@ export default function AdminPanel({
     await window.api.reorderClassificationSocieties(newOrder.map((c) => c.id))
   }
 
-  const saveClassSocietyEdit = async (id: string) => {
+  const saveClassSocietyEdit = async (id: string): Promise<void> => {
     if (!editClassName.trim()) return
     await window.api.updateClassificationSociety(id, {
       name: editClassName.trim(),
@@ -870,12 +862,12 @@ export default function AdminPanel({
   }
 
   // --- Vessel Types ---
-  const loadVesselTypes = async () => {
+  const loadVesselTypes = async (): Promise<void> => {
     const data = await window.api.getVesselTypes()
     setVesselTypes(Array.isArray(data) ? data : [])
   }
 
-  const handleAddVesselType = async (e: React.FormEvent) => {
+  const handleAddVesselType = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newVesselTypeName.trim()) return
     await window.api.addVesselType({
@@ -889,14 +881,14 @@ export default function AdminPanel({
     showSuccess('Vessel type added')
   }
 
-  const handleDeleteVesselType = async (id: string) => {
+  const handleDeleteVesselType = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this vessel type?'))) return
     await window.api.deleteVesselType(id)
     loadVesselTypes()
     showSuccess('Vessel type deleted')
   }
 
-  const handleMoveVesselType = async (index: number, direction: 'up' | 'down') => {
+  const handleMoveVesselType = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...vesselTypes]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -905,7 +897,7 @@ export default function AdminPanel({
     await window.api.reorderVesselTypes(newOrder.map((v) => v.id))
   }
 
-  const saveVesselTypeEdit = async (id: string) => {
+  const saveVesselTypeEdit = async (id: string): Promise<void> => {
     if (!editVesselTypeName.trim()) return
     await window.api.updateVesselType(id, {
       name: editVesselTypeName.trim(),
@@ -917,7 +909,7 @@ export default function AdminPanel({
   }
 
   // --- Policy Type Characteristics & Conditions ---
-  const loadPolicyTypeDetails = async (policyTypeId: string) => {
+  const loadPolicyTypeDetails = async (policyTypeId: string): Promise<void> => {
     const [chars, conds] = await Promise.all([
       window.api.getPolicyTypeCharacteristics(policyTypeId),
       window.api.getPolicyTypeConditions(policyTypeId)
@@ -926,7 +918,7 @@ export default function AdminPanel({
     setPtConditions(conds)
   }
 
-  const toggleExpandPolicyType = async (ptId: string) => {
+  const toggleExpandPolicyType = async (ptId: string): Promise<void> => {
     if (expandedPolicyTypeId === ptId) {
       setExpandedPolicyTypeId(null)
     } else {
@@ -935,7 +927,7 @@ export default function AdminPanel({
     }
   }
 
-  const handleAddCharacteristic = async (e: React.FormEvent) => {
+  const handleAddCharacteristic = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newCharName.trim() || !expandedPolicyTypeId) return
     await window.api.addPolicyTypeCharacteristic({
@@ -952,14 +944,14 @@ export default function AdminPanel({
     showSuccess('Characteristic added')
   }
 
-  const handleDeleteCharacteristic = async (id: string) => {
+  const handleDeleteCharacteristic = async (id: string): Promise<void> => {
     if (!expandedPolicyTypeId) return
     await window.api.deletePolicyTypeCharacteristic(id)
     loadPolicyTypeDetails(expandedPolicyTypeId)
     showSuccess('Characteristic deleted')
   }
 
-  const handleAddCondition = async (e: React.FormEvent) => {
+  const handleAddCondition = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newCondName.trim() || !expandedPolicyTypeId) return
     await window.api.addPolicyTypeCondition({
@@ -972,14 +964,14 @@ export default function AdminPanel({
     showSuccess('Condition added')
   }
 
-  const handleDeleteCondition = async (id: string) => {
+  const handleDeleteCondition = async (id: string): Promise<void> => {
     if (!expandedPolicyTypeId) return
     await window.api.deletePolicyTypeCondition(id)
     loadPolicyTypeDetails(expandedPolicyTypeId)
     showSuccess('Condition deleted')
   }
 
-  const loadDocTypes = async () => {
+  const loadDocTypes = async (): Promise<void> => {
     const raw = await window.api.getDocumentTypes()
     const data = Array.isArray(raw) ? raw : []
 
@@ -1013,12 +1005,12 @@ export default function AdminPanel({
   }
 
   // --- Entity Document Types ---
-  const loadEntityDocTypes = async () => {
+  const loadEntityDocTypes = async (): Promise<void> => {
     const data = await window.api.getEntityDocumentTypes()
     setEntityDocTypes(Array.isArray(data) ? data : [])
   }
 
-  const handleAddEntityDocType = async (e: React.FormEvent) => {
+  const handleAddEntityDocType = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newEdtName.trim()) return
     await window.api.addEntityDocumentType({
@@ -1036,7 +1028,7 @@ export default function AdminPanel({
     await loadEntityDocTypes()
   }
 
-  const handleDeleteEntityDocType = async (id: string) => {
+  const handleDeleteEntityDocType = async (id: string): Promise<void> => {
     if (
       await confirmDialog(
         'Delete this entity document type? All uploaded entity documents of this type will be removed.'
@@ -1047,7 +1039,7 @@ export default function AdminPanel({
     }
   }
 
-  const saveEdtEdit = async (id: string) => {
+  const saveEdtEdit = async (id: string): Promise<void> => {
     if (!editEdtName.trim()) return
     await window.api.updateEntityDocumentType(id, {
       name: editEdtName,
@@ -1059,19 +1051,20 @@ export default function AdminPanel({
     await loadEntityDocTypes()
   }
 
-  const handleEdtToggleActive = async (id: string, isActive: boolean) => {
+  const handleEdtToggleActive = async (id: string, isActive: boolean): Promise<void> => {
     await window.api.updateEntityDocumentType(id, { isActive: !isActive })
     await loadEntityDocTypes()
   }
 
-  const handleEdtDragStart = (index: number) => {
+  const handleEdtDragStart = (index: number): void => {
     dragEdtIndex.current = index
+    setDraggingEdtIndex(index)
   }
-  const handleEdtDragOver = (e: React.DragEvent, index: number) => {
+  const handleEdtDragOver = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     setDragOverEdtIndex(index)
   }
-  const handleEdtDrop = async (e: React.DragEvent, dropIndex: number) => {
+  const handleEdtDrop = async (e: React.DragEvent, dropIndex: number): Promise<void> => {
     e.preventDefault()
     setDragOverEdtIndex(null)
     if (dragEdtIndex.current === null || dragEdtIndex.current === dropIndex) return
@@ -1079,23 +1072,24 @@ export default function AdminPanel({
     const [moved] = reordered.splice(dragEdtIndex.current, 1)
     reordered.splice(dropIndex, 0, moved)
     dragEdtIndex.current = null
+    setDraggingEdtIndex(null)
     for (let i = 0; i < reordered.length; i++) {
       await window.api.updateEntityDocumentType(reordered[i].id, { orderIndex: i + 1 })
     }
     await loadEntityDocTypes()
   }
 
-  const loadRoles = async () => {
+  const loadRoles = async (): Promise<void> => {
     const data = await window.api.getAssuredRoles()
     setRoles(Array.isArray(data) ? data : [])
   }
 
-  const loadSurveyTypes = async () => {
+  const loadSurveyTypes = async (): Promise<void> => {
     const data = await window.api.getConditionSurveyTypes()
     setSurveyTypes(Array.isArray(data) ? data : [])
   }
 
-  const handleAddDocType = async (e: React.FormEvent) => {
+  const handleAddDocType = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newName.trim()) return
     await window.api.addDocumentType({
@@ -1114,28 +1108,30 @@ export default function AdminPanel({
     await loadDocTypes()
   }
 
-  const handleDeleteDocType = async (id: string) => {
+  const handleDeleteDocType = async (id: string): Promise<void> => {
     if (await confirmDialog('Delete this document type? It will be removed from all vessels.')) {
       await window.api.deleteDocumentType(id)
       await loadDocTypes()
     }
   }
 
-  const handleDocDragStart = (index: number) => {
+  const handleDocDragStart = (index: number): void => {
     dragDocIndex.current = index
+    setDraggingDocIndex(index)
   }
 
-  const handleDocDragOver = (e: React.DragEvent, index: number) => {
+  const handleDocDragOver = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     if (dragOverDocIndex !== index) setDragOverDocIndex(index)
   }
 
-  const handleDocDrop = async (e: React.DragEvent, targetIndex: number) => {
+  const handleDocDrop = async (e: React.DragEvent, targetIndex: number): Promise<void> => {
     e.preventDefault()
     setDragOverDocIndex(null)
     const fromIndex = dragDocIndex.current
     if (fromIndex === null || fromIndex === targetIndex) return
     dragDocIndex.current = null
+    setDraggingDocIndex(null)
 
     const reordered = [...docTypes]
     const [moved] = reordered.splice(fromIndex, 1)
@@ -1153,21 +1149,23 @@ export default function AdminPanel({
     }
   }
 
-  const handleRoleDragStart = (index: number) => {
+  const handleRoleDragStart = (index: number): void => {
     dragRoleIndex.current = index
+    setDraggingRoleIndex(index)
   }
 
-  const handleRoleDragOver = (e: React.DragEvent, index: number) => {
+  const handleRoleDragOver = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     if (dragOverRoleIndex !== index) setDragOverRoleIndex(index)
   }
 
-  const handleRoleDrop = async (e: React.DragEvent, targetIndex: number) => {
+  const handleRoleDrop = async (e: React.DragEvent, targetIndex: number): Promise<void> => {
     e.preventDefault()
     setDragOverRoleIndex(null)
     const fromIndex = dragRoleIndex.current
     if (fromIndex === null || fromIndex === targetIndex) return
     dragRoleIndex.current = null
+    setDraggingRoleIndex(null)
 
     const reordered = [...roles]
     const [moved] = reordered.splice(fromIndex, 1)
@@ -1180,7 +1178,7 @@ export default function AdminPanel({
     await window.api.reorderAssuredRoles(reordered.map((r) => r.id))
   }
 
-  const handleAddRole = async (e: React.FormEvent) => {
+  const handleAddRole = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newRole.trim()) return
     if (roles.some((r) => r.name.toLowerCase() === newRole.trim().toLowerCase())) {
@@ -1192,7 +1190,7 @@ export default function AdminPanel({
     await loadRoles()
   }
 
-  const handleDeleteRole = async (id: string) => {
+  const handleDeleteRole = async (id: string): Promise<void> => {
     if (
       await confirmDialog(
         'Delete this role? Existing vessel assignments will keep the name but the role will be removed from suggestions.'
@@ -1208,13 +1206,13 @@ export default function AdminPanel({
     vessels: { id: string; name: string; imoNumber: string }[]
   } | null>(null)
 
-  const handleShowRoleVessels = async (role: AssuredRole) => {
+  const handleShowRoleVessels = async (role: AssuredRole): Promise<void> => {
     if ((role.vesselCount || 0) === 0) return
     const vessels = await window.api.getVesselsByRole(role.name)
     setRoleVesselPopup({ roleName: role.name, vessels: Array.isArray(vessels) ? vessels : [] })
   }
 
-  const handleAddSurveyType = async (e: React.FormEvent) => {
+  const handleAddSurveyType = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newSurveyType.trim()) return
     await window.api.addConditionSurveyType(newSurveyType)
@@ -1222,7 +1220,7 @@ export default function AdminPanel({
     await loadSurveyTypes()
   }
 
-  const handleDeleteSurveyType = async (id: string) => {
+  const handleDeleteSurveyType = async (id: string): Promise<void> => {
     if (await confirmDialog('Delete this survey type? Existing surveys will keep their type.')) {
       await window.api.deleteConditionSurveyType(id)
       await loadSurveyTypes()
@@ -1238,17 +1236,20 @@ export default function AdminPanel({
   // Drag-to-reorder state
   const dragDocIndex = useRef<number | null>(null)
   const dragRoleIndex = useRef<number | null>(null)
+  // Mirrors of the refs for rendering (refs must not be read during render)
+  const [draggingDocIndex, setDraggingDocIndex] = useState<number | null>(null)
+  const [draggingRoleIndex, setDraggingRoleIndex] = useState<number | null>(null)
   const [dragOverDocIndex, setDragOverDocIndex] = useState<number | null>(null)
   const [dragOverRoleIndex, setDragOverRoleIndex] = useState<number | null>(null)
 
-  const startEditingDoc = (doc: DocumentType) => {
+  const startEditingDoc = (doc: DocumentType): void => {
     setEditingDocId(doc.id)
     setEditDocName(doc.name)
     setEditDocDescription(doc.description || '')
     setEditDocPolicyTypeIds(doc.policyTypeIds || [])
   }
 
-  const saveDocEdit = async (id: string) => {
+  const saveDocEdit = async (id: string): Promise<void> => {
     if (!editDocName.trim()) return
     ok(
       await window.api.updateDocumentType(id, {
@@ -1261,38 +1262,39 @@ export default function AdminPanel({
     await loadDocTypes()
   }
 
-  const startEditingRole = (role: AssuredRole) => {
+  const startEditingRole = (role: AssuredRole): void => {
     setEditingRoleId(role.id)
     setEditRoleName(role.name)
   }
 
-  const saveRoleEdit = async (id: string) => {
+  const saveRoleEdit = async (id: string): Promise<void> => {
     if (!editRoleName.trim()) return
     await window.api.updateAssuredRole(id, { name: editRoleName })
     setEditingRoleId(null)
     await loadRoles()
   }
 
-  const handleToggleDocRequired = async (doc: DocumentType) => {
+  const handleToggleDocRequired = async (doc: DocumentType): Promise<void> => {
     ok(await window.api.updateDocumentType(doc.id, { required: !doc.required }))
     await loadDocTypes()
   }
 
-  const handleToggleAnnualRenewal = async (doc: DocumentType) => {
+  const handleToggleAnnualRenewal = async (doc: DocumentType): Promise<void> => {
     await window.api.updateDocumentType(doc.id, { annualRenewal: !doc.annualRenewal })
     await loadDocTypes()
   }
 
-  const loadFileTypeSettings = async () => {
+  const loadFileTypeSettings = async (): Promise<void> => {
     const settings = await window.api.fileTypesGetSettings()
-    if (!settings || (settings as any).error) {
-      showError((settings as any)?.message || 'Failed to load file type settings')
+    const settingsErr = settings as { error?: unknown; message?: string } | null
+    if (!settings || settingsErr?.error) {
+      showError(settingsErr?.message || 'Failed to load file type settings')
       return
     }
     setFileTypeSettings(settings)
   }
 
-  const handleAddAllowedExt = async (e: React.FormEvent) => {
+  const handleAddAllowedExt = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newAllowedExt.trim()) return
 
@@ -1318,7 +1320,7 @@ export default function AdminPanel({
     setTimeout(() => setFileTypeStatus(''), 3000)
   }
 
-  const handleAddBlockedExt = async (e: React.FormEvent) => {
+  const handleAddBlockedExt = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newBlockedExt.trim()) return
 
@@ -1344,7 +1346,7 @@ export default function AdminPanel({
     setTimeout(() => setFileTypeStatus(''), 3000)
   }
 
-  const handleRemoveAllowedExt = async (ext: string) => {
+  const handleRemoveAllowedExt = async (ext: string): Promise<void> => {
     const updated = {
       ...fileTypeSettings,
       allowedExtensions: fileTypeSettings.allowedExtensions.filter((e) => e !== ext)
@@ -1356,7 +1358,7 @@ export default function AdminPanel({
     setTimeout(() => setFileTypeStatus(''), 3000)
   }
 
-  const handleRemoveBlockedExt = async (ext: string) => {
+  const handleRemoveBlockedExt = async (ext: string): Promise<void> => {
     const updated = {
       ...fileTypeSettings,
       blockedExtensions: fileTypeSettings.blockedExtensions.filter((e) => e !== ext)
@@ -1368,7 +1370,7 @@ export default function AdminPanel({
     setTimeout(() => setFileTypeStatus(''), 3000)
   }
 
-  const handleBrowseConfigFile = async () => {
+  const handleBrowseConfigFile = async (): Promise<void> => {
     const filePath = await window.api.setupSelectConfigFile()
     if (filePath) {
       const result = await window.api.setupLoadConfigFromFile(filePath)
@@ -1380,7 +1382,7 @@ export default function AdminPanel({
     }
   }
 
-  const handleBrowseConfigDir = async () => {
+  const handleBrowseConfigDir = async (): Promise<void> => {
     const dir = await window.api.setupSelectDirectory()
     if (dir) {
       const result = await window.api.setupLoadConfigFromDir(dir)
@@ -1391,6 +1393,30 @@ export default function AdminPanel({
       }
     }
   }
+
+  // Initial load, once on mount (the loaders read the latest state).
+  const loadOnMount = useEffectEvent((): void => {
+    loadData()
+    loadFileTypeSettings()
+    loadConfigPath()
+    loadComplianceSettings()
+    loadGraceSettings()
+    loadReportSettings()
+    loadUserGroups()
+    loadLastBackupDate()
+    loadLogRetention()
+    loadNotifGroups()
+    loadDailyAlerts()
+    window.api
+      .getUserSectionAccess()
+      .then(setUserSectionAccess)
+      .catch(() => {})
+  })
+  useEffect(() => {
+    void (async () => {
+      loadOnMount()
+    })()
+  }, [])
 
   // Full-page view for vessels by role
   if (roleVesselPopup) {
@@ -1677,7 +1703,10 @@ export default function AdminPanel({
             const grantable = sidebarSections.filter((s) => !s.adminOnly)
             const adminSystemSections = sidebarSections.filter((s) => s.adminOnly)
 
-            const renderBtn = (sec: (typeof sidebarSections)[0], isDanger = false) => {
+            const renderBtn = (
+              sec: (typeof sidebarSections)[0],
+              isDanger = false
+            ): React.JSX.Element => {
               const isActive = effectiveSection === sec.id
               return (
                 <button
@@ -1719,7 +1748,10 @@ export default function AdminPanel({
               )
             }
 
-            const groupLabel = (text: string, color = 'var(--text-secondary)') => (
+            const groupLabel = (
+              text: string,
+              color = 'var(--text-secondary)'
+            ): React.JSX.Element => (
               <div
                 style={{
                   padding: '8px 16px 2px',
@@ -1733,7 +1765,7 @@ export default function AdminPanel({
                 {text}
               </div>
             )
-            const divider = (key: string) => (
+            const divider = (key: string): React.JSX.Element => (
               <div
                 key={key}
                 style={{
@@ -2154,11 +2186,13 @@ export default function AdminPanel({
                         onDrop={(e) => handleDocDrop(e, index)}
                         onDragEnd={() => {
                           dragDocIndex.current = null
+                          setDraggingDocIndex(null)
+                          setDraggingDocIndex(null)
                           setDragOverDocIndex(null)
                         }}
                         style={{
                           borderBottom: '1px solid var(--table-border)',
-                          opacity: dragDocIndex.current === index ? 0.5 : 1,
+                          opacity: draggingDocIndex === index ? 0.5 : 1,
                           background:
                             dragOverDocIndex === index
                               ? 'rgba(var(--accent-primary-rgb), 0.1)'
@@ -2595,11 +2629,13 @@ export default function AdminPanel({
                         onDrop={(e) => handleEdtDrop(e, index)}
                         onDragEnd={() => {
                           dragEdtIndex.current = null
+                          setDraggingEdtIndex(null)
+                          setDraggingEdtIndex(null)
                           setDragOverEdtIndex(null)
                         }}
                         style={{
                           borderBottom: '1px solid var(--table-border)',
-                          opacity: dragEdtIndex.current === index ? 0.5 : 1,
+                          opacity: draggingEdtIndex === index ? 0.5 : 1,
                           background:
                             dragOverEdtIndex === index
                               ? 'rgba(var(--accent-primary-rgb), 0.1)'
@@ -2917,11 +2953,13 @@ export default function AdminPanel({
                         onDrop={(e) => handleRoleDrop(e, index)}
                         onDragEnd={() => {
                           dragRoleIndex.current = null
+                          setDraggingRoleIndex(null)
+                          setDraggingRoleIndex(null)
                           setDragOverRoleIndex(null)
                         }}
                         style={{
                           borderBottom: '1px solid var(--table-border)',
-                          opacity: dragRoleIndex.current === index ? 0.5 : 1,
+                          opacity: draggingRoleIndex === index ? 0.5 : 1,
                           background:
                             dragOverRoleIndex === index
                               ? 'rgba(var(--accent-primary-rgb), 0.1)'
@@ -3495,7 +3533,8 @@ export default function AdminPanel({
                 <strong>How it works:</strong> The system will check all entities
                 {complianceSettings.includeVessels ? ' and vessels' : ''} against sanctions lists.
                 Matches above {complianceSettings.threshold}% confidence will be flagged as
-                "Potential Match" for review. Results can be viewed in the Compliance Center.
+                &quot;Potential Match&quot; for review. Results can be viewed in the Compliance
+                Center.
               </div>
             </section>
           )}
@@ -3761,7 +3800,7 @@ export default function AdminPanel({
                 </p>
                 {CUSTOMIZABLE_REPORTS.map((report) => {
                   const texts = getReportText(reportSettings, report.key)
-                  const setReportText = (field: 'intro' | 'end', value: string) =>
+                  const setReportText = (field: 'intro' | 'end', value: string): void =>
                     setReportSettings((prev) => ({
                       ...prev,
                       reportTexts: {
@@ -4378,8 +4417,8 @@ export default function AdminPanel({
                     setLoadingDbHealth(true)
                     try {
                       const result = await window.api.getDatabaseHealth()
-                      if (!result || (result as any).error)
-                        throw new Error((result as any)?.message)
+                      const healthErr = result as { error?: unknown; message?: string } | null
+                      if (!result || healthErr?.error) throw new Error(healthErr?.message)
                       setDbHealth(result)
                     } catch {
                       showError('Failed to load database health')
@@ -5455,7 +5494,9 @@ export default function AdminPanel({
                               />
                               <select
                                 value={newCharType}
-                                onChange={(e) => setNewCharType(e.target.value as any)}
+                                onChange={(e) =>
+                                  setNewCharType(e.target.value as typeof newCharType)
+                                }
                                 style={{
                                   padding: '4px 8px',
                                   borderRadius: '4px',
@@ -6645,18 +6686,22 @@ export default function AdminPanel({
   )
 }
 
+type HotUpdateInfo = Awaited<ReturnType<typeof window.api.hotUpdateGetInfo>>
+type SanctionsStatus = Awaited<ReturnType<typeof window.api.sanctionsGetStatus>>
+type SanctionsSourceStatus = SanctionsStatus['sources'][number]
+
 function FilePathSettingsSection({
   showSuccess,
   showError
 }: {
   showSuccess: (m: string) => void
   showError: (m: string) => void
-}) {
+}): React.JSX.Element {
   const [localPath, setLocalPath] = useState('')
   const [networkPath, setNetworkPath] = useState('')
   const [isRemote, setIsRemote] = useState(false)
   const [registryPath, setRegistryPath] = useState('')
-  const [hotUpdateInfo, setHotUpdateInfo] = useState<any>(null)
+  const [hotUpdateInfo, setHotUpdateInfo] = useState<HotUpdateInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -6673,21 +6718,22 @@ function FilePathSettingsSection({
         setRegistryPath(regPath || '')
         setHotUpdateInfo(huInfo)
       } catch {
+        /* settings stay empty; the form still works */
       } finally {
         setLoading(false)
       }
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       await window.api.filePathSetSettings({
         localPath: localPath.trim(),
         networkPath: networkPath.trim()
       })
       showSuccess('File path settings saved')
-    } catch (e: any) {
-      showError(e.message || 'Failed to save')
+    } catch (e) {
+      showError((e as { message?: string } | null)?.message || 'Failed to save')
     }
   }
 
@@ -6821,8 +6867,8 @@ function FilePathSettingsSection({
               try {
                 await window.api.quotationRegistrySetPath(registryPath.trim())
                 showSuccess('Registry path saved')
-              } catch (e: any) {
-                showError(e.message || 'Failed')
+              } catch (e) {
+                showError((e as { message?: string } | null)?.message || 'Failed')
               }
             }}
             style={{ padding: '6px 16px', fontSize: '0.8rem' }}
@@ -6907,8 +6953,8 @@ function FilePathSettingsSection({
                 } else {
                   showSuccess('Already up to date')
                 }
-              } catch (e: any) {
-                showError(e.message || 'Check failed')
+              } catch (e) {
+                showError((e as { message?: string } | null)?.message || 'Check failed')
               }
             }}
             style={{ padding: '6px 14px', fontSize: '0.78rem' }}
@@ -6922,8 +6968,8 @@ function FilePathSettingsSection({
                 await window.api.hotUpdateClearCache()
                 showSuccess('Cache cleared — app will use built-in version on restart')
                 setHotUpdateInfo(await window.api.hotUpdateGetInfo())
-              } catch (e: any) {
-                showError(e.message || 'Failed')
+              } catch (e) {
+                showError((e as { message?: string } | null)?.message || 'Failed')
               }
             }}
             style={{ padding: '6px 14px', fontSize: '0.78rem', color: 'var(--danger)' }}
@@ -6942,13 +6988,13 @@ function SanctionsDataSection({
 }: {
   showSuccess: (m: string) => void
   showError: (m: string) => void
-}) {
-  const [status, setStatus] = useState<{ sources: any[]; totalEntities: number } | null>(null)
+}): React.JSX.Element {
+  const [status, setStatus] = useState<SanctionsStatus | null>(null)
   const [refreshing, setRefreshing] = useState<string | null>(null) // source name or 'ALL'
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  const loadStatus = async () => {
+  const loadStatus = async (): Promise<void> => {
     try {
       const s = await window.api.sanctionsGetStatus()
       setStatus(s)
@@ -6957,16 +7003,23 @@ function SanctionsDataSection({
     }
   }
 
+  const loadStatusOnMount = useEffectEvent(loadStatus)
   useEffect(() => {
-    loadStatus()
+    void (async () => {
+      await loadStatusOnMount()
+    })()
   }, [])
 
-  const handleRefresh = async (source?: string) => {
+  const handleRefresh = async (source?: string): Promise<void> => {
     const label = source || 'ALL'
     setRefreshing(label)
     try {
       if (source) {
-        const result = (await window.api.sanctionsRefreshSource(source)) as any
+        const result = (await window.api.sanctionsRefreshSource(
+          source
+        )) as SanctionsRefreshResult & {
+          message?: string
+        }
         if (result?.error || result?.status === 'error') {
           showError(`${source}: ${result.message || result.error || 'Unknown error'}`)
         } else {
@@ -6975,25 +7028,23 @@ function SanctionsDataSection({
       } else {
         const results = await window.api.sanctionsRefresh()
         const arr = Array.isArray(results) ? results : [results]
-        const errors = arr.filter((r: any) => r.status === 'error')
-        const total = arr.reduce((s: number, r: any) => s + (r.count || 0), 0)
+        const errors = arr.filter((r) => r.status === 'error')
+        const total = arr.reduce((s: number, r) => s + (r.count || 0), 0)
         if (errors.length > 0) {
-          showError(
-            `${errors.length} source(s) failed: ${errors.map((e: any) => e.source).join(', ')}`
-          )
+          showError(`${errors.length} source(s) failed: ${errors.map((e) => e.source).join(', ')}`)
         } else {
           showSuccess(`All sources refreshed — ${total.toLocaleString()} entities loaded`)
         }
       }
       await loadStatus()
-    } catch (err: any) {
-      showError(err.message || 'Refresh failed')
+    } catch (err) {
+      showError((err as { message?: string } | null)?.message || 'Refresh failed')
     } finally {
       setRefreshing(null)
     }
   }
 
-  const formatDate = (d: string | null) => {
+  const formatDate = (d: string | null | undefined): string => {
     if (!d) return '—'
     const dt = new Date(d)
     return isNaN(dt.getTime())
@@ -7070,10 +7121,10 @@ function SanctionsDataSection({
             { source: 'ISF' },
             { source: 'SIC' }
           ]
-        ).map((src: any) => {
+        ).map((src: Partial<SanctionsSourceStatus> & { source: string }) => {
           const color = sourceColors[src.source] || 'var(--accent-primary)'
           const isRefreshing = refreshing === src.source || refreshing === 'ALL'
-          const hasData = src.entityCount > 0
+          const hasData = (src.entityCount ?? 0) > 0
           return (
             <div
               key={src.source}

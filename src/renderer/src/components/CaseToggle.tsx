@@ -1,3 +1,4 @@
+import React from 'react'
 function toTitleCase(s: string): string {
   return s.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase())
 }
@@ -26,7 +27,7 @@ export function CaseToggleBtn({
 }: {
   value: string
   onChange: (v: string) => void
-}) {
+}): React.JSX.Element | null {
   if (!value.trim()) return null
   const label = cycleCaseLabel(value)
   return (

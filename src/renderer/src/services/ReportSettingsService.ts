@@ -54,7 +54,7 @@ export async function getReportSettings(): Promise<ReportSettings> {
   const data = await window.api.reportSettingsGet()
   // A failed load returns defaults for this export but is NOT cached (so the next export
   // retries) — and the error object's fields must never be merged into the settings
-  if (!data || (data as any).error) return { ...REPORT_SETTINGS_DEFAULTS }
+  if (!data || 'error' in data) return { ...REPORT_SETTINGS_DEFAULTS }
   cache = { ...REPORT_SETTINGS_DEFAULTS, ...data }
   return cache
 }

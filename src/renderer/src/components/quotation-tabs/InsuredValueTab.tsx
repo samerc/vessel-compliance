@@ -7,9 +7,9 @@ export default function InsuredValueTab({
   setQ
 }: {
   quotation: Quotation
-  updateField: (field: string, value: any) => void
+  updateField: (field: string, value: unknown) => void
   setQ: (fn: (prev: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   return (
     <div>
       <h3 style={{ fontSize: '1rem', marginBottom: '16px' }}>Insured Value</h3>

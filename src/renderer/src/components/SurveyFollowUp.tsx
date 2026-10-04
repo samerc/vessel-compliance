@@ -17,12 +17,27 @@ import {
 } from 'lucide-react'
 import { PageHeader, Badge } from './ui'
 import XLSX from 'xlsx-js-style'
-import { SurveyWarranty, SurveyWarrantyReminder, WarrantyStatus } from '../../../shared/types'
+import {
+  SurveyWarranty,
+  SurveyWarrantyReminder,
+  WarrantyStatus,
+  EndorsementDueRow
+} from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateOrDash } from '../utils/dateUtils'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
+
+// Endorsement rows; snake_case fallbacks are read defensively for older rows
+type EndorsementRow = EndorsementDueRow & {
+  id?: string
+  vessel_id?: string
+  vessel_name?: string
+  endorsement_reminder_date?: string
+  survey_date?: string
+  survey_type?: string | null
+}
 
 interface SurveyFollowUpProps extends SubTabProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -72,14 +87,14 @@ export default function SurveyFollowUp({
   onNavigateToVessel,
   subTab,
   subTabNonce
-}: SurveyFollowUpProps) {
+}: SurveyFollowUpProps): React.JSX.Element {
   const { user } = useAuth()
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light' || theme === 'aurora'
 
   const [warranties, setWarranties] = useState<SurveyWarranty[]>([])
-  const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
+  const [endorsementsDue, setEndorsementsDue] = useState<EndorsementRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
   const [activeTab, setActiveTab] = useState<'warranties' | 'endorsements'>('warranties')
@@ -127,7 +142,7 @@ export default function SurveyFollowUp({
   // Complete form
   const [completeNotes, setCompleteNotes] = useState('')
 
-  const toggleSort = (field: string) => {
+  const toggleSort = (field: string): void => {
     if (wSortField === field) {
       const next = wSortDir === 'asc' ? 'desc' : 'asc'
       setWSortDir(next)
@@ -147,7 +162,7 @@ export default function SurveyFollowUp({
     const th = (e.target as HTMLElement).closest('th')
     if (!th) return
     resizingCol.current = { key, startX: e.clientX, startW: th.offsetWidth }
-    const onMove = (me: MouseEvent) => {
+    const onMove = (me: MouseEvent): void => {
       if (!resizingCol.current) return
       const newW = Math.max(
         50,
@@ -159,7 +174,7 @@ export default function SurveyFollowUp({
         return next
       })
     }
-    const onUp = () => {
+    const onUp = (): void => {
       resizingCol.current = null
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
@@ -168,7 +183,7 @@ export default function SurveyFollowUp({
     document.addEventListener('mouseup', onUp)
   }, [])
 
-  const SortHeader = ({ field, label }: { field: string; label: string }) => (
+  const SortHeader = ({ field, label }: { field: string; label: string }): React.JSX.Element => (
     <div
       style={{
         display: 'flex',
@@ -185,7 +200,7 @@ export default function SurveyFollowUp({
     </div>
   )
 
-  const ResizeHandle = ({ colKey }: { colKey: string }) => (
+  const ResizeHandle = ({ colKey }: { colKey: string }): React.JSX.Element => (
     <div
       onMouseDown={(e) => startResize(colKey, e)}
       style={{
@@ -200,32 +215,33 @@ export default function SurveyFollowUp({
     />
   )
 
-  const loadData = async () => {
-    setIsLoading(true)
-    try {
-      const [ws, eds] = await Promise.all([
-        window.api.surveyWarrantyGetAll(),
-        window.api.surveyWarrantyGetUnsentEndorsements()
-      ])
-      if (ws && (ws as any).error) {
-        showError('Failed to load warranties: ' + (ws as any).message)
-        setWarranties([])
-      } else {
-        setWarranties(Array.isArray(ws) ? ws : [])
-      }
-      setEndorsementsDue(Array.isArray(eds) ? eds : [])
-    } catch (err: any) {
-      showError('Failed to load data: ' + (err.message || err))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  const [reloadKey, setReloadKey] = useState(0)
   useEffect(() => {
+    const loadData = async (): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const [ws, eds] = await Promise.all([
+          window.api.surveyWarrantyGetAll(),
+          window.api.surveyWarrantyGetUnsentEndorsements()
+        ])
+        if (isIpcError(ws)) {
+          showError('Failed to load warranties: ' + ws.message)
+          setWarranties([])
+        } else {
+          setWarranties(Array.isArray(ws) ? ws : [])
+        }
+        setEndorsementsDue(Array.isArray(eds) ? eds : [])
+      } catch (err) {
+        showError('Failed to load data: ' + ((err instanceof Error && err.message) || err))
+      } finally {
+        setIsLoading(false)
+      }
+    }
     loadData()
-  }, [])
+  }, [reloadKey, showError])
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
-  const handleBulkMarkDone = async () => {
+  const handleBulkMarkDone = async (): Promise<void> => {
     for (const id of selectedIds) {
       const w = warranties.find((ww) => ww.id === id)
       if (w && w.status === 'pending') {
@@ -237,7 +253,7 @@ export default function SurveyFollowUp({
     loadData()
   }
 
-  const handleBulkComplete = async () => {
+  const handleBulkComplete = async (): Promise<void> => {
     for (const id of selectedIds) {
       const w = warranties.find((ww) => ww.id === id)
       if (w && (w.status === 'pending' || w.status === 'survey_done')) {
@@ -249,17 +265,17 @@ export default function SurveyFollowUp({
     loadData()
   }
 
-  const handleMarkEndorsementIssued = async (surveyId: string) => {
+  const handleMarkEndorsementIssued = async (surveyId: string): Promise<void> => {
     try {
       await window.api.updateConditionSurveyEndorsement(surveyId, true)
       showSuccess('Endorsement marked as issued')
       loadData()
-    } catch (err: any) {
-      showError('Failed to update: ' + (err.message || err))
+    } catch (err) {
+      showError('Failed to update: ' + ((err instanceof Error && err.message) || err))
     }
   }
 
-  const exportExcel = () => {
+  const exportExcel = (): void => {
     const data = allFiltered.map((w) => ({
       Vessel: w.vesselName || '',
       Description: w.description || '',
@@ -276,14 +292,14 @@ export default function SurveyFollowUp({
     showSuccess('Exported to Excel')
   }
 
-  const calcDeadlineStr = (w: SurveyWarranty) => {
+  const calcDeadlineStr = (w: SurveyWarranty): string => {
     if (!w.inceptionDate || !w.deadlineDays) return ''
     const d = new Date(w.inceptionDate)
     d.setDate(d.getDate() + w.deadlineDays)
     return d.toISOString().split('T')[0]
   }
 
-  const loadHistory = async (warrantyId: string) => {
+  const loadHistory = async (warrantyId: string): Promise<void> => {
     try {
       const data = await window.api.surveyWarrantyGetReminders(warrantyId)
       setReminderHistory((prev) => ({ ...prev, [warrantyId]: Array.isArray(data) ? data : [] }))
@@ -292,7 +308,7 @@ export default function SurveyFollowUp({
     }
   }
 
-  const toggleHistory = async (warrantyId: string) => {
+  const toggleHistory = async (warrantyId: string): Promise<void> => {
     if (expandedReminderId === warrantyId) {
       setExpandedReminderId(null)
     } else {
@@ -301,17 +317,17 @@ export default function SurveyFollowUp({
     }
   }
 
-  const handleMarkSurveyDone = async (w: SurveyWarranty) => {
+  const handleMarkSurveyDone = async (w: SurveyWarranty): Promise<void> => {
     try {
       await window.api.surveyWarrantyUpdate(w.id, { status: 'survey_done' })
       showSuccess('Marked as Survey Carried Out')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed')
     }
   }
 
-  const handleComplete = async () => {
+  const handleComplete = async (): Promise<void> => {
     if (!completeFor) return
     try {
       ok(
@@ -325,12 +341,12 @@ export default function SurveyFollowUp({
       setCompleteFor(null)
       setCompleteNotes('')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed')
     }
   }
 
-  const handleWaive = async () => {
+  const handleWaive = async (): Promise<void> => {
     if (!waiveFor || !waiveReason.trim()) {
       showError('Waiver reason is required')
       return
@@ -341,12 +357,12 @@ export default function SurveyFollowUp({
       setWaiveFor(null)
       setWaiveReason('')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed')
     }
   }
 
-  const openLogReminder = (w: SurveyWarranty) => {
+  const openLogReminder = (w: SurveyWarranty): void => {
     setLogReminderFor(w)
     setReminderSentAt(new Date().toISOString().split('T')[0])
     setReminderChannel('email')
@@ -355,7 +371,7 @@ export default function SurveyFollowUp({
     setReminderNextDate('')
   }
 
-  const handleLogReminder = async () => {
+  const handleLogReminder = async (): Promise<void> => {
     if (!logReminderFor || !reminderSentAt) {
       showError('Sent date is required')
       return
@@ -374,8 +390,8 @@ export default function SurveyFollowUp({
       await loadHistory(logReminderFor.id)
       setLogReminderFor(null)
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed')
     }
   }
 
@@ -474,7 +490,7 @@ export default function SurveyFollowUp({
     overflowY: 'auto'
   }
 
-  const renderUrgencyPill = (w: SurveyWarranty) => {
+  const renderUrgencyPill = (w: SurveyWarranty): React.JSX.Element | null => {
     if (w.deadlineType !== 'days' || !w.deadlineDays || !w.inceptionDate) return null
     if (w.status !== 'pending' && w.status !== 'survey_done') return null
     const remaining = daysRemaining(calcDeadlineDate(w.inceptionDate, w.deadlineDays))
@@ -1368,7 +1384,8 @@ export default function SurveyFollowUp({
       {activeTab === 'endorsements' &&
         (() => {
           const dueTodayYmd = new Date().toISOString().split('T')[0]
-          const remYmd = (v: any) => (v ? new Date(v).toISOString().split('T')[0] : '')
+          const remYmd = (v: string | null | undefined): string =>
+            v ? new Date(v).toISOString().split('T')[0] : ''
           return (
             <div className="glass-card" style={{ padding: '20px' }}>
               <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -1444,7 +1461,7 @@ export default function SurveyFollowUp({
                     </tr>
                   </thead>
                   <tbody>
-                    {endorsementsDue.map((e: any, idx: number) => {
+                    {endorsementsDue.map((e, idx: number) => {
                       const isDue =
                         remYmd(e.endorsementReminderDate || e.endorsement_reminder_date) <=
                         dueTodayYmd
@@ -1551,7 +1568,7 @@ export default function SurveyFollowUp({
                           <td style={{ padding: '8px 10px' }}>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               <button
-                                onClick={() => handleMarkEndorsementIssued(e.surveyId || e.id)}
+                                onClick={() => handleMarkEndorsementIssued(e.surveyId || e.id!)}
                                 className="btn-primary"
                                 style={{
                                   fontSize: '0.78rem',
@@ -1566,7 +1583,7 @@ export default function SurveyFollowUp({
                               </button>
                               {onNavigateToVessel && (
                                 <button
-                                  onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id)}
+                                  onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id!)}
                                   className="btn-secondary"
                                   style={{
                                     fontSize: '0.78rem',
@@ -1638,7 +1655,7 @@ export default function SurveyFollowUp({
                 <label style={labelStyle}>Channel</label>
                 <select
                   value={reminderChannel}
-                  onChange={(e) => setReminderChannel(e.target.value as any)}
+                  onChange={(e) => setReminderChannel(e.target.value as typeof reminderChannel)}
                   style={inputStyle}
                 >
                   <option value="email">Email</option>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Plus,
   Trash2,
@@ -62,7 +62,10 @@ import {
   PremiumTextTemplate,
   SurveyWarrantyTemplate,
   SurveyWarrantyTemplateSet,
-  TradingCustomText
+  TradingCustomText,
+  CargoClause,
+  CargoClauseSet,
+  CargoInstituteClause
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { sanitizeHtml } from '../utils/sanitize'
@@ -103,6 +106,12 @@ type SettingsTab =
   | 'cargoSpecial'
   | 'cargoLaw'
 
+/** IPC results that may be a legacy { error: true, message } value. */
+interface IpcResultLike {
+  error?: unknown
+  message?: string
+}
+
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war' | 'cargo'
 
 const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
@@ -113,7 +122,10 @@ const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
   { id: 'cargo', label: 'Cargo', color: '#32b886' }
 ]
 
-const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
+const CATEGORY_TABS: Record<
+  SettingsCategory,
+  { id: SettingsTab; label: string; icon: React.ReactNode }[]
+> = {
   general: [
     { id: 'quotationTypes', label: 'Quotation Types', icon: <List size={15} /> },
     { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
@@ -157,7 +169,7 @@ const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; 
   ]
 }
 
-export default function QuotationSettings() {
+export default function QuotationSettings(): React.JSX.Element {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('general')
   const [activeTab, setActiveTab] = useState<SettingsTab>('subjectivities')
   const { showSuccess, showError } = useToast()
@@ -166,7 +178,7 @@ export default function QuotationSettings() {
   const isLight = theme === 'light' || theme === 'aurora'
   const canSettings = hasPermission('quotations:settings')
 
-  const handleCategoryChange = (cat: SettingsCategory) => {
+  const handleCategoryChange = (cat: SettingsCategory): void => {
     setActiveCategory(cat)
     setActiveTab(CATEGORY_TABS[cat][0].id)
   }
@@ -503,7 +515,7 @@ function CollapsibleStandardTexts({
 }: {
   fields: { key: keyof PISectionTexts; label: string; rows?: number }[]
   showSuccess: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [texts, setTexts] = useState<PISectionTexts>({})
   const [loaded, setLoaded] = useState(false)
@@ -518,7 +530,7 @@ function CollapsibleStandardTexts({
     })()
   }, [open, loaded])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     await window.api.piSetSectionTexts(texts)
     showSuccess('Standard texts saved')
   }
@@ -587,7 +599,7 @@ function CollapsibleStandardTexts({
 
 // ==================== Quotation Types Tab ====================
 
-function QuotationTypesTab({ showSuccess, showError }: TabProps) {
+function QuotationTypesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [types, setTypes] = useState<QuotationType[]>([])
   const [newName, setNewName] = useState('')
   const [newCode, setNewCode] = useState('')
@@ -598,52 +610,57 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
   const [currentSeq, setCurrentSeq] = useState('')
   const [registryPath, setRegistryPath] = useState('')
 
-  useEffect(() => {
-    load()
-    loadSeq()
-    loadRegistry()
-  }, [])
-  const load = async () => {
+  const load = useCallback(async (): Promise<void> => {
     const res = await window.api.getQuotationTypes()
     setTypes(Array.isArray(res) ? res : [])
-  }
-  const loadSeq = async () => {
+  }, [])
+  const loadSeq = useCallback(async (): Promise<void> => {
     try {
       const cur = await window.api.getSetting('real_quotation_seq')
       const start = await window.api.getSetting('quotation_start_seq')
       setCurrentSeq(cur || '0')
       setStartSeq(start || '')
-    } catch {}
-  }
-  const loadRegistry = async () => {
+    } catch {
+      /* settings unavailable: keep the empty defaults */
+    }
+  }, [])
+  const loadRegistry = useCallback(async (): Promise<void> => {
     try {
       const path = await window.api.quotationRegistryGetPath()
       setRegistryPath(path || '')
-    } catch {}
-  }
-  const saveRegistryPath = async () => {
+    } catch {
+      /* no registry configured */
+    }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await Promise.all([load(), loadSeq(), loadRegistry()])
+    }
+    void run()
+  }, [load, loadSeq, loadRegistry])
+  const saveRegistryPath = async (): Promise<void> => {
     try {
       await window.api.quotationRegistrySetPath(registryPath.trim())
       showSuccess('Registry path saved')
-    } catch (e: any) {
-      showError(e.message || 'Failed')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed')
     }
   }
-  const browseRegistry = async () => {
+  const browseRegistry = async (): Promise<void> => {
     const path = await window.api.quotationRegistryBrowse()
     if (path) setRegistryPath(path)
   }
-  const saveStartSeq = async () => {
+  const saveStartSeq = async (): Promise<void> => {
     try {
       await window.api.setSetting('quotation_start_seq', startSeq.trim() || '0')
       showSuccess('Starting serial number saved')
       loadSeq()
-    } catch (e: any) {
-      showError(e.message || 'Failed')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed')
     }
   }
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newName.trim() || !newCode.trim()) return
     try {
       await window.api.addQuotationType({
@@ -654,12 +671,12 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
       setNewName('')
       setNewCode('')
       load()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const handleSave = async (id: string) => {
+  const handleSave = async (id: string): Promise<void> => {
     try {
       await window.api.updateQuotationType(id, {
         name: editName.trim(),
@@ -668,22 +685,22 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
       showSuccess('Updated')
       setEditId(null)
       load()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.deleteQuotationType(id)
       showSuccess('Deleted')
       load()
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed')
     }
   }
 
-  const moveType = async (index: number, dir: -1 | 1) => {
+  const moveType = async (index: number, dir: -1 | 1): Promise<void> => {
     const arr = [...types]
     const target = index + dir
     if (target < 0 || target >= arr.length) return
@@ -1006,7 +1023,7 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Clauses Tab ====================
 
-function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
+function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
   const [clauses, setClauses] = useState<PIClause[]>([])
   const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
   const [newNumber, setNewNumber] = useState('')
@@ -1026,17 +1043,19 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
   const [setDescOverrides, setSetDescOverrides] = useState<Record<string, string>>({})
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [c, s] = await Promise.all([window.api.piGetClauses(), window.api.piGetClauseSets()])
     setClauses(c)
     setClauseSets(s)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newName.trim() || !newNumber.trim()) return
     try {
@@ -1053,12 +1072,12 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
       setNewCargo(false)
       showSuccess('Clause added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add clause')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add clause')
     }
   }
 
-  const startEdit = (c: PIClause) => {
+  const startEdit = (c: PIClause): void => {
     setEditingId(c.id)
     setEditNumber(String(c.clauseNumber))
     setEditName(c.name)
@@ -1066,7 +1085,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
     setEditCargo(c.isCargoRelated)
   }
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string): Promise<void> => {
     try {
       await window.api.piUpdateClause(id, {
         clauseNumber: parseInt(editNumber),
@@ -1077,18 +1096,18 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
       setEditingId(null)
       showSuccess('Clause updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     await window.api.piDeleteClause(id)
     showSuccess('Clause deleted')
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...clauses]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -1097,7 +1116,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
     await window.api.piReorderClauses(newOrder.map((c) => c.id))
   }
 
-  const handleSaveSet = async () => {
+  const handleSaveSet = async (): Promise<void> => {
     if (!setName.trim() || setClauseIds.size === 0) return
     try {
       const activeOverrides: Record<string, string> = {}
@@ -1126,12 +1145,12 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
       setSetDescOverrides({})
       setEditingSetId(null)
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save set')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save set')
     }
   }
 
-  const startEditSet = (set: PIClauseSet) => {
+  const startEditSet = (set: PIClauseSet): void => {
     setEditingSetId(set.id)
     setSetName(set.name)
     setSetClauseIds(new Set(set.clauseIds || []))
@@ -1139,7 +1158,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
     setShowSetForm(true)
   }
 
-  const handleDeleteSet = async (id: string) => {
+  const handleDeleteSet = async (id: string): Promise<void> => {
     await window.api.piDeleteClauseSet(id)
     showSuccess('Clause set deleted')
     loadData()
@@ -1679,7 +1698,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Warranties Tab ====================
 
-function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
+function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
   const [warranties, setWarranties] = useState<PIWarranty[]>([])
   const [tags, setTags] = useState<PIWarrantyTag[]>([])
   const [warrantySets, setWarrantySets] = useState<PIWarrantySet[]>([])
@@ -1714,10 +1733,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [w, t, s] = await Promise.all([
       window.api.piGetWarranties(),
       window.api.piGetWarrantyTags(),
@@ -1726,9 +1742,15 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     setWarranties(Array.isArray(w) ? w : [])
     setTags(Array.isArray(t) ? t : [])
     setWarrantySets(Array.isArray(s) ? s : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     await window.api.piAddWarranty({
@@ -1748,7 +1770,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     loadData()
   }
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string): Promise<void> => {
     await window.api.piUpdateWarranty(id, {
       text: editText,
       isCargoRelated: editCargoRelated,
@@ -1762,10 +1784,10 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
   }
 
   const dragWarrantySettingsRef = useRef<string | null>(null)
-  const handleWarrantySettingsDragStart = (warrantyId: string) => {
+  const handleWarrantySettingsDragStart = (warrantyId: string): void => {
     dragWarrantySettingsRef.current = warrantyId
   }
-  const handleWarrantySettingsDrop = async (targetId: string) => {
+  const handleWarrantySettingsDrop = async (targetId: string): Promise<void> => {
     const dragId = dragWarrantySettingsRef.current
     dragWarrantySettingsRef.current = null
     if (!dragId || dragId === targetId) return
@@ -1779,7 +1801,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     await window.api.piReorderWarranties(newOrder.map((w) => w.id))
   }
 
-  const handleAddTag = async () => {
+  const handleAddTag = async (): Promise<void> => {
     if (!newTagName.trim()) return
     await window.api.piAddWarrantyTag(newTagName.trim())
     setNewTagName('')
@@ -1787,18 +1809,22 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     loadData()
   }
 
-  const handleSaveTag = async (id: string) => {
+  const handleSaveTag = async (id: string): Promise<void> => {
     await window.api.piUpdateWarrantyTag(id, editTagName)
     setEditingTagId(null)
     showSuccess('Tag updated')
     loadData()
   }
 
-  const toggleTagId = (tagId: string, current: string[], setter: (ids: string[]) => void) => {
+  const toggleTagId = (tagId: string, current: string[], setter: (ids: string[]) => void): void => {
     setter(current.includes(tagId) ? current.filter((t) => t !== tagId) : [...current, tagId])
   }
 
-  const tagChip = (tagId: string, selected: boolean, onClick: () => void) => {
+  const tagChip = (
+    tagId: string,
+    selected: boolean,
+    onClick: () => void
+  ): React.JSX.Element | null => {
     const tag = tags.find((t) => t.id === tagId)
     if (!tag) return null
     return (
@@ -1821,7 +1847,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
   }
 
   // Warranty set handlers
-  const handleSaveSet = async () => {
+  const handleSaveSet = async (): Promise<void> => {
     if (!setName.trim() || setWarrantyIds.size === 0) return
     try {
       if (editingSetId) {
@@ -1842,16 +1868,16 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
       setEditingSetId(null)
       setSetDefaultSelected(false)
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save set')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save set')
     }
   }
 
   // Import handler
-  const handleImport = async () => {
+  const handleImport = async (): Promise<void> => {
     const lines = importText
       .split('\n')
-      .map((l) => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
+      .map((l) => l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
       .filter((l) => l.length > 0)
     if (lines.length === 0) return
     for (const line of lines) {
@@ -1870,14 +1896,14 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
     loadData()
   }
 
-  const toggleBulkSelect = (id: string) => {
+  const toggleBulkSelect = (id: string): void => {
     const n = new Set(bulkSelected)
     n.has(id) ? n.delete(id) : n.add(id)
     setBulkSelected(n)
   }
-  const bulkSelectAll = () => setBulkSelected(new Set(warranties.map((w) => w.id)))
-  const bulkDeselectAll = () => setBulkSelected(new Set())
-  const bulkAssignTag = async (tagId: string) => {
+  const bulkSelectAll = (): void => setBulkSelected(new Set(warranties.map((w) => w.id)))
+  const bulkDeselectAll = (): void => setBulkSelected(new Set())
+  const bulkAssignTag = async (tagId: string): Promise<void> => {
     const toUpdate = warranties.filter(
       (w) => bulkSelected.has(w.id) && !(w.tagIds || []).includes(tagId)
     )
@@ -1894,7 +1920,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
       loadData()
     }
   }
-  const bulkRemoveTag = async (tagId: string) => {
+  const bulkRemoveTag = async (tagId: string): Promise<void> => {
     const toUpdate = warranties.filter(
       (w) => bulkSelected.has(w.id) && (w.tagIds || []).includes(tagId)
     )
@@ -1911,7 +1937,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
       loadData()
     }
   }
-  const bulkToggleCargo = async (value: boolean) => {
+  const bulkToggleCargo = async (value: boolean): Promise<void> => {
     const toUpdate = warranties.filter((w) => bulkSelected.has(w.id) && w.isCargoRelated !== value)
     for (const w of toUpdate) {
       await window.api.piUpdateWarranty(w.id, {
@@ -1926,7 +1952,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
       loadData()
     }
   }
-  const bulkToggleDefault = async (value: boolean) => {
+  const bulkToggleDefault = async (value: boolean): Promise<void> => {
     const toUpdate = warranties.filter((w) => bulkSelected.has(w.id) && w.defaultSelected !== value)
     for (const w of toUpdate) {
       await window.api.piUpdateWarranty(w.id, {
@@ -1970,8 +1996,9 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
           <Tag size={14} /> Warranty Tags
         </h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-          Tags let you categorize warranties into groups (e.g. "Cargo", "Navigation"). Tagged
-          warranties appear under their own tab in the quotation editor.
+          Tags let you categorize warranties into groups (e.g. &quot;Cargo&quot;,
+          &quot;Navigation&quot;). Tagged warranties appear under their own tab in the quotation
+          editor.
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
           {tags.map((tag) => (
@@ -2134,7 +2161,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
         </div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
           Sets are named groups of warranties that can be quickly applied to a quotation. Sets
-          marked "Default" are automatically selected when creating new quotations.
+          marked &quot;Default&quot; are automatically selected when creating new quotations.
         </p>
         {showSetForm && (
           <div
@@ -2982,7 +3009,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                 {
                   importText
                     .split('\n')
-                    .map((l) => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
+                    .map((l) => l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219]+/, '').trim())
                     .filter((l) => l.length > 0).length
                 }{' '}
                 warranties detected
@@ -3013,7 +3040,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Deductibles Tab ====================
 
-function DeductiblesTab({ showSuccess }: TabProps) {
+function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
   const [deductibles, setDeductibles] = useState<PIDeductible[]>([])
   const [textDeds, setTextDeds] = useState<PITextDeductible[]>([])
   const [newTitle, setNewTitle] = useState('')
@@ -3036,19 +3063,22 @@ function DeductiblesTab({ showSuccess }: TabProps) {
   const [editTextDedText, setEditTextDedText] = useState('')
   const [editTextDefault, setEditTextDefault] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [d, td] = await Promise.all([
       window.api.piGetDeductibles(),
       window.api.piGetTextDeductibles()
     ])
     setDeductibles(Array.isArray(d) ? d : [])
     setTextDeds(Array.isArray(td) ? td : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newTitle.trim()) return
     await window.api.piAddDeductible({
@@ -3070,7 +3100,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string): Promise<void> => {
     await window.api.piUpdateDeductible(id, {
       title: editTitle,
       letterCode: editCode || undefined,
@@ -3083,7 +3113,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...deductibles]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -3092,7 +3122,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     await window.api.piReorderDeductibles(newOrder.map((d) => d.id))
   }
 
-  const handleAddTextDed = async (e: React.FormEvent) => {
+  const handleAddTextDed = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newTextTitle.trim()) return
     await window.api.piAddTextDeductible({
@@ -3107,7 +3137,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const saveTextEdit = async (id: string) => {
+  const saveTextEdit = async (id: string): Promise<void> => {
     await window.api.piUpdateTextDeductible(id, {
       title: editTextTitle,
       text: editTextDedText,
@@ -3118,7 +3148,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const handleTextMove = async (index: number, direction: 'up' | 'down') => {
+  const handleTextMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...textDeds]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -3430,8 +3460,8 @@ function DeductiblesTab({ showSuccess }: TabProps) {
       <section className="glass-card" style={{ padding: '20px' }}>
         <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>Text Deductibles</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-          Predefined text blocks that appear below the deductibles table. Mark as "Default" to
-          auto-include in new quotations.
+          Predefined text blocks that appear below the deductibles table. Mark as
+          &quot;Default&quot; to auto-include in new quotations.
         </p>
         <form onSubmit={handleAddTextDed} style={{ marginBottom: '16px' }}>
           <input
@@ -3666,7 +3696,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
 
 // ==================== Exclusions Tab ====================
 
-function ExclusionsTab({ showSuccess, isLight }: TabProps) {
+function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
   const [exclusions, setExclusions] = useState<PIExclusion[]>([])
   const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
   const [newText, setNewText] = useState('')
@@ -3687,16 +3717,19 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     accentColor: 'var(--accent-primary)'
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [ex, vt] = await Promise.all([window.api.piGetExclusions(), window.api.getVesselTypes()])
     setExclusions(Array.isArray(ex) ? ex : [])
     setVesselTypes(Array.isArray(vt) ? vt : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     await window.api.piAddExclusion({
@@ -3711,7 +3744,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     loadData()
   }
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string): Promise<void> => {
     await window.api.piUpdateExclusion(id, {
       text: editText,
       isCargoRelated: editCargoRelated,
@@ -3722,7 +3755,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...exclusions]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -3731,20 +3764,20 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     await window.api.piReorderExclusions(newOrder.map((e) => e.id))
   }
 
-  const toggleVT = (vtId: string, current: string[], setter: (ids: string[]) => void) => {
+  const toggleVT = (vtId: string, current: string[], setter: (ids: string[]) => void): void => {
     setter(current.includes(vtId) ? current.filter((id) => id !== vtId) : [...current, vtId])
   }
 
-  const toggleBulkSelect = (id: string) => {
+  const toggleBulkSelect = (id: string): void => {
     const n = new Set(bulkSelected)
     if (n.has(id)) n.delete(id)
     else n.add(id)
     setBulkSelected(n)
   }
-  const bulkSelectAll = () => setBulkSelected(new Set(exclusions.map((e) => e.id)))
-  const bulkDeselectAll = () => setBulkSelected(new Set())
+  const bulkSelectAll = (): void => setBulkSelected(new Set(exclusions.map((e) => e.id)))
+  const bulkDeselectAll = (): void => setBulkSelected(new Set())
 
-  const bulkToggleCargo = async (value: boolean) => {
+  const bulkToggleCargo = async (value: boolean): Promise<void> => {
     const toUpdate = exclusions.filter((e) => bulkSelected.has(e.id) && e.isCargoRelated !== value)
     for (const e of toUpdate) {
       await window.api.piUpdateExclusion(e.id, {
@@ -3759,7 +3792,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     }
   }
 
-  const bulkAssignVT = async (vtId: string) => {
+  const bulkAssignVT = async (vtId: string): Promise<void> => {
     const toUpdate = exclusions.filter(
       (e) => bulkSelected.has(e.id) && !(e.vesselTypeIds || []).includes(vtId)
     )
@@ -3776,7 +3809,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     }
   }
 
-  const bulkRemoveVT = async (vtId: string) => {
+  const bulkRemoveVT = async (vtId: string): Promise<void> => {
     const toUpdate = exclusions.filter(
       (e) => bulkSelected.has(e.id) && (e.vesselTypeIds || []).includes(vtId)
     )
@@ -3793,10 +3826,10 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     }
   }
 
-  const handleImport = async () => {
+  const handleImport = async (): Promise<void> => {
     const lines = importText
       .split('\n')
-      .map((l) => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim())
+      .map((l) => l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim())
       .filter((l) => l.length > 0)
     if (lines.length === 0) return
     for (const line of lines) {
@@ -3808,7 +3841,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
     loadData()
   }
 
-  const vtChip = (vtId: string, active: boolean, onClick: () => void) => {
+  const vtChip = (vtId: string, active: boolean, onClick: () => void): React.JSX.Element | null => {
     const vt = vesselTypes.find((v) => v.id === vtId)
     if (!vt) return null
     return (
@@ -4288,7 +4321,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
 
 // ==================== Sub-Limits Tab ====================
 
-function SubLimitsTab({ showSuccess }: TabProps) {
+function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [templates, setTemplates] = useState<PISubLimitTemplate[]>([])
   const [newTemplate, setNewTemplate] = useState('')
   const [newCurrency, setNewCurrency] = useState('USD')
@@ -4296,14 +4329,17 @@ function SubLimitsTab({ showSuccess }: TabProps) {
   const [editTemplate, setEditTemplate] = useState('')
   const [editCurrency, setEditCurrency] = useState('USD')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     setTemplates(await window.api.piGetSubLimitTemplates())
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newTemplate.trim()) return
     await window.api.piAddSubLimitTemplate({
@@ -4318,7 +4354,7 @@ function SubLimitsTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...templates]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -4529,7 +4565,7 @@ function SubLimitsTab({ showSuccess }: TabProps) {
 
 // ==================== Additional Clauses Tab (includes Sets) ====================
 
-function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
+function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [clauses, setClauses] = useState<PIAdditionalClause[]>([])
   const [newTitle, setNewTitle] = useState('')
   const [newCode, setNewCode] = useState('')
@@ -4547,26 +4583,29 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
   const [editSetOrder, setEditSetOrder] = useState<string[]>([]) // ordered IDs of clauses in the set
   const [editSetDefault, setEditSetDefault] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [c, s] = await Promise.all([
       window.api.piGetAdditionalClauses(),
       window.api.piGetAdditionalClauseSets()
     ])
     if (Array.isArray(c)) setClauses(c)
     if (Array.isArray(s)) setSets(s)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     const result = (await window.api.piAddAdditionalClause(
       newTitle.trim() || null,
       newCode.trim(),
       newText.trim()
-    )) as any
+    )) as IpcResultLike | null
     if (result?.error) {
       showError(result.message || 'Failed to add clause')
       return
@@ -4578,7 +4617,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...clauses]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -4587,18 +4626,18 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
     await window.api.piReorderAdditionalClauses(newOrder.map((c) => c.id))
   }
 
-  const startEditSet = (s: PIAdditionalClauseSet) => {
+  const startEditSet = (s: PIAdditionalClauseSet): void => {
     setEditSetId(s.id)
     setEditSetName(s.name)
     setEditSetOrder(s.clauseIds || [])
     setEditSetDefault(s.defaultSelected || false)
   }
 
-  const toggleSetClause = (id: string) => {
+  const toggleSetClause = (id: string): void => {
     setEditSetOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
-  const moveSetClause = (index: number, direction: 'up' | 'down') => {
+  const moveSetClause = (index: number, direction: 'up' | 'down'): void => {
     setEditSetOrder((prev) => {
       const next = [...prev]
       const swapIndex = direction === 'up' ? index - 1 : index + 1
@@ -4608,7 +4647,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
     })
   }
 
-  const saveSet = async () => {
+  const saveSet = async (): Promise<void> => {
     if (!editSetId) return
     await window.api.piUpdateAdditionalClauseSet(
       editSetId,
@@ -4627,8 +4666,8 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
         <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Additional Clauses</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
           Extra items appended after the main conditions (e.g., JH/JL clauses, conflict exclusions).
-          Clauses marked "Default" are automatically included in new quotations. Formatted as bullet
-          points in the export.
+          Clauses marked &quot;Default&quot; are automatically included in new quotations. Formatted
+          as bullet points in the export.
         </p>
         <form
           onSubmit={handleAdd}
@@ -5244,21 +5283,24 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Trading Countries Tab ====================
 
-function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
+function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
   const [countries, setCountries] = useState<TradingExcludedCountry[]>([])
   const [newIso3, setNewIso3] = useState('')
   const [newListType, setNewListType] = useState<'excluded' | 'ddq'>('excluded')
   const [useCustomName, setUseCustomName] = useState(false)
   const [customName, setCustomName] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     setCountries(await window.api.piGetTradingExcludedCountries())
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (useCustomName) {
       if (!customName.trim()) return
@@ -5271,8 +5313,8 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
         setCustomName('')
         showSuccess('Country added')
         loadData()
-      } catch (err: any) {
-        showError(err.message || 'Failed to add')
+      } catch (err) {
+        showError((err instanceof Error && err.message) || 'Failed to add')
       }
     } else {
       if (!newIso3) return
@@ -5287,13 +5329,13 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
         setNewIso3('')
         showSuccess('Country added')
         loadData()
-      } catch (err: any) {
-        showError(err.message || 'Failed to add')
+      } catch (err) {
+        showError((err instanceof Error && err.message) || 'Failed to add')
       }
     }
   }
 
-  const handleToggleType = async (id: string, currentType: 'excluded' | 'ddq') => {
+  const handleToggleType = async (id: string, currentType: 'excluded' | 'ddq'): Promise<void> => {
     const newType = currentType === 'excluded' ? 'ddq' : 'excluded'
     await window.api.piUpdateTradingExcludedCountry(id, { listType: newType })
     loadData()
@@ -5315,7 +5357,10 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
     return c.excludeTypes.split(',').includes(code)
   }
 
-  const handleToggleExcludeType = async (c: TradingExcludedCountry, code: string) => {
+  const handleToggleExcludeType = async (
+    c: TradingExcludedCountry,
+    code: string
+  ): Promise<void> => {
     const current = getExcludeTypesArr(c)
     const isAll = !c.excludeTypes // null means all
     let next: string[]
@@ -5401,7 +5446,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
           )}
           <select
             value={newListType}
-            onChange={(e) => setNewListType(e.target.value as any)}
+            onChange={(e) => setNewListType(e.target.value as 'excluded' | 'ddq')}
             style={{
               padding: '10px',
               borderRadius: '8px',
@@ -5618,6 +5663,12 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps) {
   )
 }
 
+const TYPE_CODES = [
+  { code: 'P', label: 'P&I', color: '#6464ff' },
+  { code: 'H', label: 'H&M', color: '#ff64c8' },
+  { code: 'W', label: 'War', color: '#ff8c32' }
+]
+
 function DefaultExcludedCountriesPerType({
   countries,
   showSuccess,
@@ -5627,23 +5678,14 @@ function DefaultExcludedCountriesPerType({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight?: boolean
-}) {
-  const TYPE_CODES = [
-    { code: 'P', label: 'P&I', color: '#6464ff' },
-    { code: 'H', label: 'H&M', color: '#ff64c8' },
-    { code: 'W', label: 'War', color: '#ff8c32' }
-  ]
+}): React.JSX.Element {
   const [activeType, setActiveType] = useState('P')
   const [typeDefaults, setTypeDefaults] = useState<
     Record<string, { name: string; listType: string }[]>
   >({})
   const [collapsed, setCollapsed] = useState(true)
 
-  useEffect(() => {
-    loadDefaults()
-  }, [])
-
-  const loadDefaults = async () => {
+  const loadDefaults = useCallback(async (): Promise<void> => {
     const result: Record<string, { name: string; listType: string }[]> = {}
     for (const tc of TYPE_CODES) {
       try {
@@ -5651,18 +5693,26 @@ function DefaultExcludedCountriesPerType({
         if (raw) {
           result[tc.code] = JSON.parse(raw)
         }
-      } catch {}
+      } catch {
+        /* missing or malformed setting: skip this type */
+      }
     }
     setTypeDefaults(result)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadDefaults()
+    }
+    void run()
+  }, [loadDefaults])
 
   const currentDefaults = typeDefaults[activeType] || []
   const allCountries = countries
 
-  const isSelected = (name: string, listType: string) =>
+  const isSelected = (name: string, listType: string): boolean =>
     currentDefaults.some((d) => d.name === name && d.listType === listType)
 
-  const toggleCountry = (name: string, listType: string) => {
+  const toggleCountry = (name: string, listType: string): void => {
     let updated: { name: string; listType: string }[]
     if (isSelected(name, listType)) {
       updated = currentDefaults.filter((d) => !(d.name === name && d.listType === listType))
@@ -5672,7 +5722,7 @@ function DefaultExcludedCountriesPerType({
     setTypeDefaults((prev) => ({ ...prev, [activeType]: updated }))
   }
 
-  const saveDefaults = async () => {
+  const saveDefaults = async (): Promise<void> => {
     try {
       await window.api.setSetting(
         `default_excluded_countries_${activeType}`,
@@ -5681,17 +5731,17 @@ function DefaultExcludedCountriesPerType({
       showSuccess(
         `Default countries saved for ${TYPE_CODES.find((t) => t.code === activeType)?.label}`
       )
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save')
     }
   }
 
-  const selectAll = () => {
+  const selectAll = (): void => {
     const all = allCountries.map((c) => ({ name: c.name, listType: c.listType }))
     setTypeDefaults((prev) => ({ ...prev, [activeType]: all }))
   }
 
-  const deselectAll = () => {
+  const deselectAll = (): void => {
     setTypeDefaults((prev) => ({ ...prev, [activeType]: [] }))
   }
 
@@ -5881,7 +5931,15 @@ function DefaultExcludedCountriesPerType({
 
 // ==================== Trading Warranty Tab ====================
 
-const TRADING_CONDITION_SUB_FIELDS: { key: keyof PISectionTexts; label: string }[] = [
+type TradingConditionKey =
+  | 'tradingConditionB'
+  | 'tradingConditionC'
+  | 'tradingConditionD'
+  | 'tradingConditionE'
+  | 'tradingConditionF'
+  | 'tradingConditionG'
+
+const TRADING_CONDITION_SUB_FIELDS: { key: TradingConditionKey; label: string }[] = [
   { key: 'tradingConditionB', label: 'a) Sanctioned cargoes' },
   { key: 'tradingConditionC', label: 'b) Sanctioned individuals / entities' },
   { key: 'tradingConditionD', label: 'c) Compliance Screening Questionnaire' },
@@ -5890,15 +5948,11 @@ const TRADING_CONDITION_SUB_FIELDS: { key: keyof PISectionTexts; label: string }
   { key: 'tradingConditionG', label: 'f) Paramount clause' }
 ]
 
-function TradingWarrantyTab({ showSuccess }: TabProps) {
+function TradingWarrantyTab({ showSuccess }: TabProps): React.JSX.Element {
   const [texts, setTexts] = useState<PISectionTexts>({})
   const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionTexts()
     if (saved && Object.keys(saved).length > 0) {
       setTexts(saved)
@@ -5906,21 +5960,27 @@ function TradingWarrantyTab({ showSuccess }: TabProps) {
       setTexts(DEFAULT_SECTION_TEXTS)
     }
     setLoaded(true)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     await window.api.piSetSectionTexts(texts)
     showSuccess('Trading warranty texts saved')
   }
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     setTexts((prev) => {
       const reset = { ...prev }
       reset.tradingIsrael = DEFAULT_SECTION_TEXTS.tradingIsrael
       reset.ddqCountriesIntro = DEFAULT_SECTION_TEXTS.ddqCountriesIntro
       reset.tradingConditionA = DEFAULT_SECTION_TEXTS.tradingConditionA
       for (const f of TRADING_CONDITION_SUB_FIELDS) {
-        ;(reset as any)[f.key] = (DEFAULT_SECTION_TEXTS as any)[f.key]
+        reset[f.key] = DEFAULT_SECTION_TEXTS[f.key]
       }
       return reset
     })
@@ -6034,7 +6094,7 @@ function TradingWarrantyTab({ showSuccess }: TabProps) {
             {field.label}
           </label>
           <RichTextEditor
-            value={(texts as any)[field.key] || ''}
+            value={texts[field.key] || ''}
             onChange={(val) => setTexts((prev) => ({ ...prev, [field.key]: val }))}
             minHeight={60}
           />
@@ -6078,7 +6138,7 @@ function TradingWarrantyTab({ showSuccess }: TabProps) {
 
 // ==================== Trading Warranty Templates Tab ====================
 
-function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
+function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [templates, setTemplates] = useState<TradingWarrantyTemplate[]>([])
   const [newName, setNewName] = useState('')
   const [newText, setNewText] = useState('')
@@ -6089,16 +6149,18 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.piGetTradingWarrantyTemplates()
     setTemplates(Array.isArray(res) ? res : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newName.trim()) return
     try {
       await window.api.piAddTradingWarrantyTemplate(newName.trim(), newText)
@@ -6107,12 +6169,12 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
       setShowAdd(false)
       showSuccess('Template added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add')
     }
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editingId || !editName.trim()) return
     try {
       await window.api.piUpdateTradingWarrantyTemplate(editingId, {
@@ -6122,22 +6184,22 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
       setEditingId(null)
       showSuccess('Template updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.piDeleteTradingWarrantyTemplate(id)
       showSuccess('Template deleted')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
-  const move = async (idx: number, dir: -1 | 1) => {
+  const move = async (idx: number, dir: -1 | 1): Promise<void> => {
     const newIdx = idx + dir
     if (newIdx < 0 || newIdx >= templates.length) return
     const reordered = [...templates]
@@ -6146,7 +6208,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
     await window.api.piReorderTradingWarrantyTemplates(reordered.map((t) => t.id))
   }
 
-  const startEdit = (t: TradingWarrantyTemplate) => {
+  const startEdit = (t: TradingWarrantyTemplate): void => {
     setEditingId(t.id)
     setEditName(t.name)
     setEditText(t.text)
@@ -6371,7 +6433,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Trading Custom Texts Tab ====================
 
-function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
+function TradingCustomTextsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [items, setItems] = useState<TradingCustomText[]>([])
   const [newName, setNewName] = useState('')
   const [newText, setNewText] = useState('')
@@ -6382,16 +6444,18 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.piGetTradingCustomTexts()
     setItems(Array.isArray(res) ? res : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newName.trim()) return
     try {
       await window.api.piAddTradingCustomText(newName.trim(), newText)
@@ -6400,12 +6464,12 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
       setShowAdd(false)
       showSuccess('Custom text added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add')
     }
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editingId || !editName.trim()) return
     try {
       await window.api.piUpdateTradingCustomText(editingId, {
@@ -6415,22 +6479,22 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
       setEditingId(null)
       showSuccess('Custom text updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.piDeleteTradingCustomText(id)
       showSuccess('Custom text deleted')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
-  const move = async (idx: number, dir: -1 | 1) => {
+  const move = async (idx: number, dir: -1 | 1): Promise<void> => {
     const newIdx = idx + dir
     if (newIdx < 0 || newIdx >= items.length) return
     const reordered = [...items]
@@ -6439,7 +6503,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
     await window.api.piReorderTradingCustomTexts(reordered.map((t) => t.id))
   }
 
-  const startEdit = (t: TradingCustomText) => {
+  const startEdit = (t: TradingCustomText): void => {
     setEditingId(t.id)
     setEditName(t.name)
     setEditText(t.text)
@@ -6652,7 +6716,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Premium Text Templates Tab (NCB / UPCC) ====================
 
-function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
+function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [ncbTemplates, setNcbTemplates] = useState<PremiumTextTemplate[]>([])
   const [upccTemplates, setUpccTemplates] = useState<PremiumTextTemplate[]>([])
   const [showAddNcb, setShowAddNcb] = useState(false)
@@ -6665,18 +6729,20 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const res = await window.api.premiumGetTextTemplates()
     const all = Array.isArray(res) ? res : []
     setNcbTemplates(all.filter((t) => t.type === 'ncb'))
     setUpccTemplates(all.filter((t) => t.type === 'upcc'))
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (type: 'ncb' | 'upcc') => {
+  const handleAdd = async (type: 'ncb' | 'upcc'): Promise<void> => {
     if (!newName.trim()) return
     try {
       await window.api.premiumAddTextTemplate({ name: newName.trim(), text: newText, type })
@@ -6686,12 +6752,12 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
       else setShowAddUpcc(false)
       showSuccess('Template added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add')
     }
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editingId || !editName.trim()) return
     try {
       await window.api.premiumUpdateTextTemplate(editingId, {
@@ -6701,22 +6767,26 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
       setEditingId(null)
       showSuccess('Template updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.premiumDeleteTextTemplate(id)
       showSuccess('Template deleted')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
-  const move = async (templates: PremiumTextTemplate[], idx: number, dir: -1 | 1) => {
+  const move = async (
+    templates: PremiumTextTemplate[],
+    idx: number,
+    dir: -1 | 1
+  ): Promise<void> => {
     const newIdx = idx + dir
     if (newIdx < 0 || newIdx >= templates.length) return
     const reordered = [...templates]
@@ -6726,13 +6796,13 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
     await window.api.premiumReorderTextTemplates(reordered.map((t) => t.id))
   }
 
-  const startEdit = (t: PremiumTextTemplate) => {
+  const startEdit = (t: PremiumTextTemplate): void => {
     setEditingId(t.id)
     setEditName(t.name)
     setEditText(t.text)
   }
 
-  const openAdd = (type: 'ncb' | 'upcc') => {
+  const openAdd = (type: 'ncb' | 'upcc'): void => {
     setNewName('')
     setNewText('')
     setEditingId(null)
@@ -6750,7 +6820,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
     type: 'ncb' | 'upcc',
     showAdd: boolean,
     setShowAdd: (v: boolean) => void
-  ) => {
+  ): React.JSX.Element => {
     const autoPlaceholders =
       type === 'ncb'
         ? '{ncb_percent}, {ncb_amount}, {currency}'
@@ -7015,7 +7085,42 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Master Subjectivities Tab ====================
 
-function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
+const ENTITY_DOC_TYPES: DocumentType[] = [
+  {
+    id: 'entity:coi',
+    name: 'Certificate of Incorporation (Assured)',
+    description: '',
+    order: 900,
+    annualRenewal: false,
+    required: false
+  },
+  {
+    id: 'entity:aoa',
+    name: 'Articles of Association (Assured)',
+    description: '',
+    order: 901,
+    annualRenewal: false,
+    required: false
+  },
+  {
+    id: 'entity:kyc',
+    name: 'KYC (Assured)',
+    description: '',
+    order: 902,
+    annualRenewal: false,
+    required: false
+  },
+  {
+    id: 'entity:passport',
+    name: 'ID/Passport (Assured)',
+    description: '',
+    order: 903,
+    annualRenewal: false,
+    required: false
+  }
+]
+
+function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [items, setItems] = useState<PISubjectivity[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [newText, setNewText] = useState('')
@@ -7026,54 +7131,22 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
   const [editDocTypeIds, setEditDocTypeIds] = useState<string[]>([])
   const [editTypeScope, setEditTypeScope] = useState<string>('all')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const ENTITY_DOC_TYPES: DocumentType[] = [
-    {
-      id: 'entity:coi',
-      name: 'Certificate of Incorporation (Assured)',
-      description: '',
-      order: 900,
-      annualRenewal: false,
-      required: false
-    },
-    {
-      id: 'entity:aoa',
-      name: 'Articles of Association (Assured)',
-      description: '',
-      order: 901,
-      annualRenewal: false,
-      required: false
-    },
-    {
-      id: 'entity:kyc',
-      name: 'KYC (Assured)',
-      description: '',
-      order: 902,
-      annualRenewal: false,
-      required: false
-    },
-    {
-      id: 'entity:passport',
-      name: 'ID/Passport (Assured)',
-      description: '',
-      order: 903,
-      annualRenewal: false,
-      required: false
-    }
-  ]
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [subjs, dts] = await Promise.all([
       window.api.getPISubjectivities(),
       window.api.getDocumentTypes()
     ])
     setItems(Array.isArray(subjs) ? subjs : [])
     setDocTypes([...(Array.isArray(dts) ? dts : []), ...ENTITY_DOC_TYPES])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newText.trim()) return
     try {
       await window.api.addPISubjectivity({
@@ -7087,19 +7160,19 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
       setNewTypeScope('all')
       showSuccess('Subjectivity added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add')
     }
   }
 
-  const startEdit = (s: PISubjectivity) => {
+  const startEdit = (s: PISubjectivity): void => {
     setEditingId(s.id)
     setEditText(s.text)
     setEditDocTypeIds(s.docTypeIds || [])
     setEditTypeScope(s.typeScope || 'all')
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editingId || !editText.trim()) return
     try {
       await window.api.updatePISubjectivity(editingId, {
@@ -7110,12 +7183,12 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
       setEditingId(null)
       showSuccess('Updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1) => {
+  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
     const arr = [...items]
     const targetIdx = idx + dir
     if (targetIdx < 0 || targetIdx >= arr.length) return
@@ -7124,7 +7197,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     await window.api.reorderPISubjectivities(arr.map((s) => s.id))
   }
 
-  const toggleDocType = (ids: string[], setIds: (v: string[]) => void, dtId: string) => {
+  const toggleDocType = (ids: string[], setIds: (v: string[]) => void, dtId: string): void => {
     setIds(ids.includes(dtId) ? ids.filter((id) => id !== dtId) : [...ids, dtId])
   }
 
@@ -7136,7 +7209,18 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     color: 'var(--text-primary)',
     fontSize: '0.82rem'
   }
-  const chipStyle = (selected: boolean) => ({
+  const chipStyle = (
+    selected: boolean
+  ): {
+    padding: string
+    borderRadius: string
+    fontSize: string
+    cursor: string
+    border: string
+    background: string
+    color: string
+    fontWeight: number
+  } => ({
     padding: '3px 8px',
     borderRadius: '4px',
     fontSize: '0.72rem',
@@ -7201,7 +7285,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Scope:</span>
             <select
               value={newTypeScope}
-              onChange={(e) => setNewTypeScope(e.target.value as any)}
+              onChange={(e) => setNewTypeScope(e.target.value)}
               style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '0.78rem' }}
             >
               <option value="both">Both</option>
@@ -7454,7 +7538,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Sanctions Versions Tab ====================
 
-function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
+function SanctionsVersionsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [versions, setVersions] = useState<PISanctionsVersion[]>([])
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
@@ -7466,10 +7550,7 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
   const [editKey, setEditKey] = useState('')
   const [formResetKey, setFormResetKey] = useState(0)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const data = asArray<PISanctionsVersion>(await window.api.piGetSanctionsVersions())
     setVersions(data)
     const textMap: Record<string, string> = {}
@@ -7478,9 +7559,15 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
     })
     setEditedTexts(textMap)
     setDirtyIds(new Set())
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newName.trim() || !newKey.trim() || !newText.trim()) return
     try {
@@ -7495,18 +7582,18 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
       setFormResetKey((k) => k + 1)
       showSuccess('Version added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add')
     }
   }
 
-  const startEdit = (v: PISanctionsVersion) => {
+  const startEdit = (v: PISanctionsVersion): void => {
     setEditingId(v.id)
     setEditName(v.name)
     setEditKey(v.key)
   }
 
-  const handleUpdateNameKey = async () => {
+  const handleUpdateNameKey = async (): Promise<void> => {
     if (!editingId || !editName.trim() || !editKey.trim()) return
     try {
       const currentText =
@@ -7519,12 +7606,12 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
       setEditingId(null)
       showSuccess('Version updated')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update')
     }
   }
 
-  const handleSaveText = async (id: string) => {
+  const handleSaveText = async (id: string): Promise<void> => {
     const v = versions.find((ver) => ver.id === id)
     if (!v) return
     const text = editedTexts[id] ?? v.text
@@ -7536,17 +7623,17 @@ function SanctionsVersionsTab({ showSuccess, showError }: TabProps) {
         return s
       })
       showSuccess('Text saved')
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save')
     }
   }
 
-  const handleTextChange = (id: string, val: string) => {
+  const handleTextChange = (id: string, val: string): void => {
     setEditedTexts((prev) => ({ ...prev, [id]: val }))
     setDirtyIds((prev) => new Set(prev).add(id))
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1) => {
+  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
     const arr = [...versions]
     const targetIdx = idx + dir
     if (targetIdx < 0 || targetIdx >= arr.length) return
@@ -7872,18 +7959,14 @@ const STANDARD_TEXT_SECTIONS = [
   ...Array.from(new Set(SECTION_TEXT_FIELDS.map((f) => f.section)))
 ]
 
-function StandardTextsTab({ showSuccess }: TabProps) {
+function StandardTextsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [texts, setTexts] = useState<PISectionTexts>({})
   const [loaded, setLoaded] = useState(false)
   const [activeSection, setActiveSection] = useState(STANDARD_TEXT_SECTIONS[0])
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionTexts()
     if (saved && Object.keys(saved).length > 0) {
       setTexts(saved)
@@ -7891,14 +7974,20 @@ function StandardTextsTab({ showSuccess }: TabProps) {
       setTexts(DEFAULT_SECTION_TEXTS)
     }
     setLoaded(true)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     await window.api.piSetSectionTexts(texts)
     showSuccess('Standard texts saved')
   }
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     setTexts(DEFAULT_SECTION_TEXTS)
   }
 
@@ -8122,14 +8211,11 @@ function StandardTextsTab({ showSuccess }: TabProps) {
 
 // ==================== Instalment Defaults Tab ====================
 
-function InstalmentDefaultsTab({ showSuccess }: TabProps) {
+function InstalmentDefaultsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [defaults, setDefaults] = useState<InstalmentDefaults>({})
   const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetInstalmentDefaults()
     if (saved && Object.keys(saved).length > 0) {
       setDefaults(saved)
@@ -8137,14 +8223,20 @@ function InstalmentDefaultsTab({ showSuccess }: TabProps) {
       setDefaults({ '1': [0], '2': [0, 180], '3': [0, 90, 180], '4': [0, 90, 180, 270] })
     }
     setLoaded(true)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     await window.api.piSetInstalmentDefaults(defaults)
     showSuccess('Instalment defaults saved')
   }
 
-  const updateDay = (count: string, index: number, value: number) => {
+  const updateDay = (count: string, index: number, value: number): void => {
     setDefaults((prev) => {
       const arr = [...(prev[count] || [])]
       arr[index] = value
@@ -8230,23 +8322,25 @@ function InstalmentDefaultsTab({ showSuccess }: TabProps) {
 
 // ==================== Section Order Tab ====================
 
-function SectionOrderTab({ showSuccess }: TabProps) {
+function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
   const [order, setOrder] = useState<string[]>([])
   const [dirty, setDirty] = useState(false)
   const [selectedType, setSelectedType] = useState<string>('P')
 
-  useEffect(() => {
-    loadData()
-  }, [selectedType])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionOrderDefaultsByType(selectedType)
     const fallback = getDefaultSectionOrder(selectedType)
     setOrder(Array.isArray(saved) && saved.length > 0 ? saved : fallback)
     setDirty(false)
-  }
+  }, [selectedType])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleMove = (index: number, direction: 'up' | 'down') => {
+  const handleMove = (index: number, direction: 'up' | 'down'): void => {
     const newOrder = [...order]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -8255,13 +8349,13 @@ function SectionOrderTab({ showSuccess }: TabProps) {
     setDirty(true)
   }
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     await window.api.piSetSectionOrderDefaultsByType(selectedType, order)
     showSuccess('Section order saved')
     setDirty(false)
   }
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     setOrder(getDefaultSectionOrder(selectedType))
     setDirty(true)
   }
@@ -8398,7 +8492,7 @@ function SectionOrderTab({ showSuccess }: TabProps) {
 
 // ==================== Hull Agreed Value Texts Tab ====================
 
-function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
+function HullAgreedValueTextsTab({ showSuccess }: TabProps): React.JSX.Element {
   const [texts, setTexts] = useState<HullAgreedValueText[]>([])
   const [newText, setNewText] = useState('')
   const [newDefault, setNewDefault] = useState(false)
@@ -8407,15 +8501,18 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
   const [editText, setEditText] = useState('')
   const [editSection, setEditSection] = useState('hm')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const result = await window.api.hullGetAgreedValueTexts()
     if (Array.isArray(result)) setTexts(result)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     await window.api.hullAddAgreedValueText(newText.trim(), newDefault, newSection)
@@ -8426,25 +8523,25 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
     loadData()
   }
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string): Promise<void> => {
     await window.api.hullUpdateAgreedValueText(id, { text: editText.trim(), section: editSection })
     setEditingId(null)
     showSuccess('Text updated')
     loadData()
   }
 
-  const handleToggleDefault = async (id: string, current: boolean) => {
+  const handleToggleDefault = async (id: string, current: boolean): Promise<void> => {
     await window.api.hullUpdateAgreedValueText(id, { defaultSelected: !current })
     loadData()
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     await window.api.hullDeleteAgreedValueText(id)
     showSuccess('Text deleted')
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...texts]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -8662,7 +8759,7 @@ function HullAgreedValueTextsTab({ showSuccess }: TabProps) {
 
 // ==================== Hull Clauses Tab ====================
 
-function HullClausesTab({ showSuccess, showError }: TabProps) {
+function HullClausesTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [clauses, setClauses] = useState<HullClause[]>([])
   const [conditions, setConditions] = useState<HullClauseCondition[]>([])
   const [selectedClauseId, setSelectedClauseId] = useState<string | null>(null)
@@ -8694,24 +8791,31 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
   const [editCondHasAmount, setEditCondHasAmount] = useState(false)
   const [editCondPlaceholder, setEditCondPlaceholder] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const cls = await window.api.hullGetClauses()
     if (Array.isArray(cls)) setClauses(cls)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const loadConditions = async (clauseId: string) => {
+  const loadConditions = useCallback(async (clauseId: string): Promise<void> => {
     const conds = await window.api.hullGetClauseConditions(clauseId)
     if (Array.isArray(conds)) setConditions(conds)
-  }
+  }, [])
 
   useEffect(() => {
-    if (selectedClauseId) loadConditions(selectedClauseId)
-  }, [selectedClauseId])
+    if (!selectedClauseId) return
+    const run = async (): Promise<void> => {
+      await loadConditions(selectedClauseId)
+    }
+    void run()
+  }, [selectedClauseId, loadConditions])
 
-  const handleAddClause = async (e: React.FormEvent) => {
+  const handleAddClause = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newName.trim() || !newCode.trim()) return
     try {
@@ -8720,7 +8824,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
         newCode.trim(),
         newDesc.trim() || undefined,
         newClauseSection
-      )) as any
+      )) as IpcResultLike | null
       if (result?.error) {
         showError(result.message || 'Failed to add clause')
         return
@@ -8731,12 +8835,12 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
       setNewClauseSection('hm')
       showSuccess('Hull clause added')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add clause')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add clause')
     }
   }
 
-  const handleSaveClause = async () => {
+  const handleSaveClause = async (): Promise<void> => {
     if (!editingId) return
     try {
       await window.api.hullUpdateClause(editingId, {
@@ -8745,20 +8849,23 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
         description: editDesc.trim(),
         conditionSection: editClauseSection
       })
-    } catch {}
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update clause')
+      return
+    }
     setEditingId(null)
     showSuccess('Clause updated')
     loadData()
   }
 
-  const handleDuplicateClause = async (clause: HullClause) => {
+  const handleDuplicateClause = async (clause: HullClause): Promise<void> => {
     try {
       const result = (await window.api.hullAddClause(
         clause.name + ' (Copy)',
         clause.code + '-COPY',
         clause.description || undefined,
         clause.conditionSection || 'hm'
-      )) as any
+      )) as HullClause & IpcResultLike
       if (result?.error) {
         showError(result.message || 'Failed to duplicate')
         return
@@ -8782,12 +8889,12 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
         `Duplicated "${clause.name}" with ${Array.isArray(srcConds) ? srcConds.length : 0} conditions`
       )
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to duplicate clause')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to duplicate clause')
     }
   }
 
-  const handleDeleteClause = async (id: string) => {
+  const handleDeleteClause = async (id: string): Promise<void> => {
     await window.api.hullDeleteClause(id)
     if (selectedClauseId === id) {
       setSelectedClauseId(null)
@@ -8797,7 +8904,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
     loadData()
   }
 
-  const handleMoveClause = async (index: number, direction: 'up' | 'down') => {
+  const handleMoveClause = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...clauses]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -8807,7 +8914,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
   }
 
   // Condition CRUD
-  const handleAddCondition = async (e: React.FormEvent) => {
+  const handleAddCondition = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!selectedClauseId || !newCondNum.trim() || !newCondText.trim()) return
     await window.api.hullAddClauseCondition(
@@ -8828,7 +8935,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
     loadConditions(selectedClauseId)
   }
 
-  const handleSaveCondition = async () => {
+  const handleSaveCondition = async (): Promise<void> => {
     if (!editCondId || !selectedClauseId) return
     await window.api.hullUpdateClauseCondition(editCondId, {
       conditionNumber: editCondNum.trim(),
@@ -8841,20 +8948,20 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
     loadConditions(selectedClauseId)
   }
 
-  const handleToggleCondDefault = async (id: string, current: boolean) => {
+  const handleToggleCondDefault = async (id: string, current: boolean): Promise<void> => {
     if (!selectedClauseId) return
     await window.api.hullUpdateClauseCondition(id, { defaultSelected: !current })
     loadConditions(selectedClauseId)
   }
 
-  const handleDeleteCondition = async (id: string) => {
+  const handleDeleteCondition = async (id: string): Promise<void> => {
     if (!selectedClauseId) return
     await window.api.hullDeleteClauseCondition(id)
     showSuccess('Condition deleted')
     loadConditions(selectedClauseId)
   }
 
-  const handleMoveCondition = async (index: number, direction: 'up' | 'down') => {
+  const handleMoveCondition = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     if (!selectedClauseId) return
     const newOrder = [...conditions]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
@@ -9453,7 +9560,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
 
 // ==================== Hull Additional Conditions Tab ====================
 
-function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
+function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [conditions, setConditions] = useState<HullAdditionalCondition[]>([])
   const [hullClauses, setHullClauses] = useState<{ id: string; name: string; code: string }[]>([])
   const [newTitle, setNewTitle] = useState('')
@@ -9468,19 +9575,22 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
   const [editHasAmount, setEditHasAmount] = useState(false)
   const [editAmountPlaceholder, setEditAmountPlaceholder] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [result, clauses] = await Promise.all([
       window.api.hullGetAdditionalConditions(),
       window.api.hullGetClauses()
     ])
     if (Array.isArray(result)) setConditions(result)
     if (Array.isArray(clauses)) setHullClauses(clauses)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     const result = (await window.api.hullAddAdditionalCondition(
@@ -9490,7 +9600,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
       newClauseIds,
       newHasAmount,
       newAmountPlaceholder.trim() || undefined
-    )) as any
+    )) as IpcResultLike | null
     if (result?.error) {
       showError(result.message || 'Failed to add condition')
       return
@@ -9505,7 +9615,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     loadData()
   }
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string): Promise<void> => {
     await window.api.hullUpdateAdditionalCondition(id, {
       title: editTitle.trim() || null,
       text: editText.trim(),
@@ -9517,7 +9627,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     loadData()
   }
 
-  const toggleClauseLink = async (conditionId: string, clauseId: string) => {
+  const toggleClauseLink = async (conditionId: string, clauseId: string): Promise<void> => {
     const cond = conditions.find((c) => c.id === conditionId)
     if (!cond) return
     const current = cond.hullClauseIds || []
@@ -9528,12 +9638,12 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     loadData()
   }
 
-  const handleToggleDefault = async (id: string, current: boolean) => {
+  const handleToggleDefault = async (id: string, current: boolean): Promise<void> => {
     await window.api.hullUpdateAdditionalCondition(id, { defaultSelected: !current })
     loadData()
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     await window.api.hullDeleteAdditionalCondition(id)
     showSuccess('Condition deleted')
     loadData()
@@ -9542,17 +9652,17 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (index: number): void => {
     setDragIndex(index)
   }
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     if (dragIndex === null || dragIndex === index) return
     setDragOverIndex(index)
   }
 
-  const handleDrop = async (index: number) => {
+  const handleDrop = async (index: number): Promise<void> => {
     if (dragIndex === null || dragIndex === index) {
       setDragIndex(null)
       setDragOverIndex(null)
@@ -9567,7 +9677,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
     await window.api.hullReorderAdditionalConditions(newOrder.map((c) => c.id))
   }
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (): void => {
     setDragIndex(null)
     setDragOverIndex(null)
   }
@@ -10018,7 +10128,7 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
 
 // ==================== War Conditions Tab ====================
 
-function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
+function WarConditionsTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
   const [conditions, setConditions] = useState<WarCondition[]>([])
   const [newText, setNewText] = useState('')
   const [newDefault, setNewDefault] = useState(false)
@@ -10029,15 +10139,18 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
   const [importParsed, setImportParsed] = useState<string[]>([])
   const [importAsDefault, setImportAsDefault] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const result = await window.api.warGetConditions()
     if (Array.isArray(result)) setConditions(result)
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newText.trim()) return
     try {
@@ -10051,7 +10164,7 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
     }
   }
 
-  const parseImportText = (raw: string) => {
+  const parseImportText = (raw: string): void => {
     const lines = raw
       .split('\n')
       .map((l) => l.replace(/^[\s\-\u2022\u2013\u2014*•·\d.)\]]+\s*/, '').trim())
@@ -10059,7 +10172,7 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
     setImportParsed(lines)
   }
 
-  const handleBulkImport = async () => {
+  const handleBulkImport = async (): Promise<void> => {
     if (importParsed.length === 0) return
     try {
       for (const text of importParsed) {
@@ -10075,25 +10188,25 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
     }
   }
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string): Promise<void> => {
     await window.api.warUpdateCondition(id, { text: editText.trim() })
     setEditingId(null)
     showSuccess('Condition updated')
     loadData()
   }
 
-  const handleToggleDefault = async (id: string, current: boolean) => {
+  const handleToggleDefault = async (id: string, current: boolean): Promise<void> => {
     await window.api.warUpdateCondition(id, { defaultSelected: !current })
     loadData()
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     await window.api.warDeleteCondition(id)
     showSuccess('Condition deleted')
     loadData()
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...conditions]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -10473,7 +10586,7 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== War Settings Tab ====================
 
-function WarSettingsTab({ showSuccess, showError }: TabProps) {
+function WarSettingsTab({ showSuccess, showError }: TabProps): React.JSX.Element {
   const [settings, setSettings] = useState<WarSettings>({
     jwlaCode: 'JWLA032',
     jwlaDate: 'December 18, 2023',
@@ -10488,13 +10601,15 @@ function WarSettingsTab({ showSuccess, showError }: TabProps) {
     ;(async () => {
       try {
         const result = await window.api.warGetSettings()
-        if (result && !(result as any).error) setSettings(result)
-      } catch {}
+        if (result && !(result as IpcResultLike).error) setSettings(result)
+      } catch {
+        /* fall back to the default war settings */
+      }
       setLoaded(true)
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       await window.api.warSetSettings(settings)
       showSuccess('War settings saved')
@@ -10694,7 +10809,59 @@ const ALL_PERMISSIONS: { key: string; label: string }[] = PERMISSION_CATEGORIES.
   c.permissions.map((p) => ({ key: p.key, label: `${c.label}: ${p.label}` }))
 )
 
-function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
+const ColorPicker = ({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (c: string) => void
+}): React.JSX.Element => (
+  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+    {STEP_COLOR_PRESETS.map((c) => (
+      <button
+        key={c.value}
+        type="button"
+        onClick={() => onChange(c.value)}
+        title={c.label}
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          background: c.value,
+          border: value === c.value ? '3px solid var(--text-primary)' : '2px solid transparent',
+          cursor: 'pointer',
+          outline: value === c.value ? '2px solid var(--accent-primary)' : 'none',
+          outlineOffset: '1px'
+        }}
+      />
+    ))}
+  </div>
+)
+
+const ToggleCheckbox = ({
+  checked,
+  onChange,
+  label
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+}): React.JSX.Element => (
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '0.82rem',
+      cursor: 'pointer'
+    }}
+  >
+    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    {label}
+  </label>
+)
+
+function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps): React.JSX.Element {
   const [steps, setSteps] = useState<WorkflowStep[]>([])
   const [transitions, setTransitions] = useState<WorkflowTransition[]>([])
   const [editingStep, setEditingStep] = useState<string | null>(null)
@@ -10721,11 +10888,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     autoCreateRevision: boolean
   }>({ fromStepId: '', toStepId: '', permissionKey: null, autoCreateRevision: false })
 
-  useEffect(() => {
-    loadAll()
-  }, [])
-
-  const loadAll = async () => {
+  const loadAll = useCallback(async (): Promise<void> => {
     try {
       const [s, t] = await Promise.all([
         window.api.workflowGetSteps(),
@@ -10733,12 +10896,18 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
       ])
       setSteps(Array.isArray(s) ? s : [])
       setTransitions(Array.isArray(t) ? t : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to load workflow')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to load workflow')
     }
-  }
+  }, [showError])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadAll()
+    }
+    void run()
+  }, [loadAll])
 
-  const handleAddStep = async () => {
+  const handleAddStep = async (): Promise<void> => {
     if (!newStep.name.trim()) return
     try {
       await window.api.workflowAddStep({ ...newStep, canExport: true })
@@ -10752,24 +10921,24 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
         isInitial: false
       })
       loadAll()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add step')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add step')
     }
   }
 
-  const handleUpdateStep = async (id: string) => {
+  const handleUpdateStep = async (id: string): Promise<void> => {
     if (!editForm.name.trim()) return
     try {
       await window.api.workflowUpdateStep(id, { ...editForm, canExport: true })
       showSuccess('Step updated')
       setEditingStep(null)
       loadAll()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update step')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update step')
     }
   }
 
-  const handleDeleteStep = async (id: string) => {
+  const handleDeleteStep = async (id: string): Promise<void> => {
     const step = steps.find((s) => s.id === id)
     if (
       !(await confirmDialog(
@@ -10779,18 +10948,18 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
       return
     try {
       const result = await window.api.workflowDeleteStep(id)
-      if (result && !(result as any).success) {
-        showError((result as any).message || 'Cannot delete step')
+      if (result && !result.success) {
+        showError(result.message || 'Cannot delete step')
         return
       }
       showSuccess('Step deleted')
       loadAll()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete step')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete step')
     }
   }
 
-  const moveStep = async (index: number, dir: -1 | 1) => {
+  const moveStep = async (index: number, dir: -1 | 1): Promise<void> => {
     const arr = [...steps]
     const target = index + dir
     if (target < 0 || target >= arr.length) return
@@ -10799,7 +10968,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     await window.api.workflowReorderSteps(arr.map((s) => s.id))
   }
 
-  const handleAddTransition = async () => {
+  const handleAddTransition = async (): Promise<void> => {
     if (!newTransition.fromStepId || !newTransition.toStepId) return
     if (newTransition.fromStepId === newTransition.toStepId) {
       showError('From and To steps must be different')
@@ -10816,22 +10985,22 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
         autoCreateRevision: false
       })
       loadAll()
-    } catch (err: any) {
-      showError(err.message || 'Failed to add transition')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add transition')
     }
   }
 
-  const handleDeleteTransition = async (id: string) => {
+  const handleDeleteTransition = async (id: string): Promise<void> => {
     try {
       await window.api.workflowDeleteTransition(id)
       showSuccess('Transition deleted')
       loadAll()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete transition')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete transition')
     }
   }
 
-  const startEdit = (step: WorkflowStep) => {
+  const startEdit = (step: WorkflowStep): void => {
     setEditingStep(step.id)
     setEditForm({
       name: step.name,
@@ -10850,52 +11019,6 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
     fontWeight: 600
   }
   const tdStyle: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem' }
-
-  const ColorPicker = ({ value, onChange }: { value: string; onChange: (c: string) => void }) => (
-    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-      {STEP_COLOR_PRESETS.map((c) => (
-        <button
-          key={c.value}
-          type="button"
-          onClick={() => onChange(c.value)}
-          title={c.label}
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: '50%',
-            background: c.value,
-            border: value === c.value ? '3px solid var(--text-primary)' : '2px solid transparent',
-            cursor: 'pointer',
-            outline: value === c.value ? '2px solid var(--accent-primary)' : 'none',
-            outlineOffset: '1px'
-          }}
-        />
-      ))}
-    </div>
-  )
-
-  const ToggleCheckbox = ({
-    checked,
-    onChange,
-    label
-  }: {
-    checked: boolean
-    onChange: (v: boolean) => void
-    label: string
-  }) => (
-    <label
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        fontSize: '0.82rem',
-        cursor: 'pointer'
-      }}
-    >
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
-  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -11525,7 +11648,12 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
 
 // ==================== Survey Warranty Templates Tab ====================
 
-function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly }: TabProps) {
+function SurveyWarrantyTemplatesTab({
+  showSuccess,
+  showError,
+  isLight,
+  readOnly
+}: TabProps): React.JSX.Element {
   const [templates, setTemplates] = useState<SurveyWarrantyTemplate[]>([])
   const [sets, setSets] = useState<SurveyWarrantyTemplateSet[]>([])
   const [newText, setNewText] = useState('')
@@ -11538,11 +11666,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
   const [setName, setSetName] = useState('')
   const [setTemplateIds, setSetTemplateIds] = useState<string[]>([])
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       const [t, s] = await Promise.all([
         window.api.surveyWarrantyTemplateGetAll(),
@@ -11550,12 +11674,18 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
       ])
       if (Array.isArray(t)) setTemplates(t)
       if (Array.isArray(s)) setSets(s)
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
-  }
+  }, [showError])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const placeholderColor = (p: string) => {
+  const placeholderColor = (p: string): { bg: string; text: string } => {
     if (p === '{deadline}')
       return { bg: 'rgba(var(--accent-primary-rgb), 0.15)', text: 'var(--accent-primary)' }
     if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
@@ -11563,27 +11693,27 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     return { bg: 'rgba(180,180,180,0.15)', text: 'var(--text-secondary)' }
   }
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newText.trim()) return
     try {
       const result = (await window.api.surveyWarrantyTemplateAdd(
         newText.trim(),
         newTitle.trim() || undefined
-      )) as any
+      )) as IpcResultLike | null
       if (result?.error) {
-        showError(result.message)
+        showError(result.message ?? '')
         return
       }
       setNewText('')
       setNewTitle('')
       showSuccess('Template added')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editId || !editText.trim()) return
     try {
       await window.api.surveyWarrantyTemplateUpdate(
@@ -11594,22 +11724,22 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
       setEditId(null)
       showSuccess('Template updated')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.surveyWarrantyTemplateDelete(id)
       showSuccess('Template deleted')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const handleReorder = async (idx: number, dir: -1 | 1) => {
+  const handleReorder = async (idx: number, dir: -1 | 1): Promise<void> => {
     const arr = [...templates]
     const [item] = arr.splice(idx, 1)
     arr.splice(idx + dir, 0, item)
@@ -11617,15 +11747,15 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     await window.api.surveyWarrantyTemplateReorder(arr.map((t) => t.id))
   }
 
-  const handleAddSet = async () => {
+  const handleAddSet = async (): Promise<void> => {
     if (!setName.trim() || setTemplateIds.length === 0) return
     try {
       const result = (await window.api.surveyWarrantyTemplateSetAdd(
         setName.trim(),
         setTemplateIds
-      )) as any
+      )) as IpcResultLike | null
       if (result?.error) {
-        showError(result.message)
+        showError(result.message ?? '')
         return
       }
       setAddingSet(false)
@@ -11633,12 +11763,12 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
       setSetTemplateIds([])
       showSuccess('Set created')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const handleUpdateSet = async () => {
+  const handleUpdateSet = async (): Promise<void> => {
     if (!editSetId || !setName.trim()) return
     try {
       await window.api.surveyWarrantyTemplateSetUpdate(editSetId, setName.trim(), setTemplateIds)
@@ -11647,22 +11777,22 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
       setSetTemplateIds([])
       showSuccess('Set updated')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const handleDeleteSet = async (id: string) => {
+  const handleDeleteSet = async (id: string): Promise<void> => {
     try {
       await window.api.surveyWarrantyTemplateSetDelete(id)
       showSuccess('Set deleted')
       loadData()
-    } catch (e: any) {
-      showError(e.message)
+    } catch (e) {
+      showError(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const toggleSetTemplate = (tid: string) => {
+  const toggleSetTemplate = (tid: string): void => {
     setSetTemplateIds((prev) =>
       prev.includes(tid) ? prev.filter((x) => x !== tid) : [...prev, tid]
     )
@@ -12245,54 +12375,57 @@ function CargoClauseSetsManager({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
-  const [sets, setSets] = useState<any[]>([])
-  const [clauses, setClauses] = useState<any[]>([])
+}): React.JSX.Element {
+  const [sets, setSets] = useState<CargoClauseSet[]>([])
+  const [clauses, setClauses] = useState<CargoClause[]>([])
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null) // set id, or 'new'
   const [name, setName] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       const [sts, cls] = await Promise.all([
         window.api.cargoGetClauseSets(section),
         window.api.cargoGetClauses(section)
       ])
       setSets(Array.isArray(sts) ? sts : [])
-      setClauses((Array.isArray(cls) ? cls : []).filter((c: any) => c.active !== false))
+      setClauses((Array.isArray(cls) ? cls : []).filter((c) => c.active !== false))
     } catch {
       setSets([])
       setClauses([])
     }
-  }
-  useEffect(() => {
-    loadData()
   }, [section])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const startNew = () => {
+  const startNew = (): void => {
     setEditingId('new')
     setName('')
     setSelectedIds(new Set())
   }
-  const startEdit = (s: any) => {
+  const startEdit = (s: CargoClauseSet): void => {
     setEditingId(s.id)
     setName(s.name)
     setSelectedIds(new Set(s.clauseIds || []))
   }
-  const cancel = () => {
+  const cancel = (): void => {
     setEditingId(null)
     setName('')
     setSelectedIds(new Set())
   }
-  const toggle = (id: string) =>
+  const toggle = (id: string): void =>
     setSelectedIds((prev) => {
       const n = new Set(prev)
       n.has(id) ? n.delete(id) : n.add(id)
       return n
     })
 
-  const save = async () => {
+  const save = async (): Promise<void> => {
     if (!name.trim()) {
       showError('Set name is required')
       return
@@ -12305,18 +12438,18 @@ function CargoClauseSetsManager({
       showSuccess('Set saved')
       cancel()
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save set')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save set')
     }
   }
 
-  const remove = async (id: string) => {
+  const remove = async (id: string): Promise<void> => {
     try {
       await window.api.cargoDeleteClauseSet(id)
       showSuccess('Set deleted')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete set')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete set')
     }
   }
 
@@ -12543,11 +12676,11 @@ function ClausePicker({
   toggle,
   isLight
 }: {
-  clauses: any[]
+  clauses: CargoClause[]
   selectedIds: Set<string>
   toggle: (id: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   return (
     <div
       style={{
@@ -12599,8 +12732,8 @@ function CargoClausesTab({
   sectionLabel,
   showSuccess,
   showError
-}: TabProps & { section: string; sectionLabel: string }) {
-  const [clauses, setClauses] = useState<any[]>([])
+}: TabProps & { section: string; sectionLabel: string }): React.JSX.Element {
+  const [clauses, setClauses] = useState<CargoClause[]>([])
   const [newTitle, setNewTitle] = useState('')
   const [newCode, setNewCode] = useState('')
   const [newText, setNewText] = useState('')
@@ -12618,7 +12751,7 @@ function CargoClausesTab({
   const isLight = theme === 'light' || theme === 'aurora'
 
   // Institute Clauses state (only used when section === 'conditions')
-  const [instituteClauses, setInstituteClauses] = useState<any[]>([])
+  const [instituteClauses, setInstituteClauses] = useState<CargoInstituteClause[]>([])
   const [icNewName, setIcNewName] = useState('')
   const [icNewCode, setIcNewCode] = useState('')
   const [icNewDesc, setIcNewDesc] = useState('')
@@ -12627,7 +12760,7 @@ function CargoClausesTab({
   const [icEditCode, setIcEditCode] = useState('')
   const [icEditDesc, setIcEditDesc] = useState('')
 
-  const loadInstituteClauses = async () => {
+  const loadInstituteClauses = useCallback(async (): Promise<void> => {
     if (section !== 'conditions') return
     try {
       const result = await window.api.cargoGetInstituteClauses()
@@ -12635,13 +12768,16 @@ function CargoClausesTab({
     } catch {
       setInstituteClauses([])
     }
-  }
-
-  useEffect(() => {
-    loadInstituteClauses()
   }, [section])
 
-  const handleIcAdd = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadInstituteClauses()
+    }
+    void run()
+  }, [loadInstituteClauses])
+
+  const handleIcAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!icNewName.trim() || !icNewDesc.trim()) return
     try {
@@ -12650,7 +12786,7 @@ function CargoClausesTab({
         icNewCode.trim() || undefined,
         icNewDesc.trim() || undefined
       )
-      if (result && !(result as any).error) {
+      if (result && !(result as IpcResultLike).error) {
         setIcNewName('')
         setIcNewCode('')
         setIcNewDesc('')
@@ -12664,7 +12800,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleIcSaveEdit = async (id: string) => {
+  const handleIcSaveEdit = async (id: string): Promise<void> => {
     try {
       await window.api.cargoUpdateInstituteClause(id, {
         name: icEditName.trim(),
@@ -12679,7 +12815,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleIcToggleActive = async (id: string, currentActive: boolean) => {
+  const handleIcToggleActive = async (id: string, currentActive: boolean): Promise<void> => {
     try {
       await window.api.cargoUpdateInstituteClause(id, { active: !currentActive })
       loadInstituteClauses()
@@ -12688,7 +12824,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleIcDelete = async (id: string) => {
+  const handleIcDelete = async (id: string): Promise<void> => {
     try {
       await window.api.cargoDeleteInstituteClause(id)
       showSuccess('Institute clause deleted')
@@ -12698,7 +12834,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleIcMove = async (index: number, direction: 'up' | 'down') => {
+  const handleIcMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...instituteClauses]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -12707,7 +12843,7 @@ function CargoClausesTab({
     await window.api.cargoReorderInstituteClauses(newOrder.map((c) => c.id))
   }
 
-  const parseBulkLines = (raw: string) => {
+  const parseBulkLines = (raw: string): { code: string; title: string }[] => {
     return raw
       .split('\n')
       .map((line) => line.replace(/^[-–—•*]\s*/, '').trim())
@@ -12723,7 +12859,7 @@ function CargoClausesTab({
       })
   }
 
-  const handleBulkImport = async () => {
+  const handleBulkImport = async (): Promise<void> => {
     const items = parseBulkLines(bulkText)
     if (items.length === 0) return
     let added = 0
@@ -12735,8 +12871,10 @@ function CargoClausesTab({
           undefined,
           item.code || undefined
         )
-        if (result && !(result as any).error) added++
-      } catch {}
+        if (result && !(result as IpcResultLike).error) added++
+      } catch {
+        /* skip lines that fail; the toast reports how many were imported */
+      }
     }
     showSuccess(`Imported ${added} clause${added !== 1 ? 's' : ''}`)
     setBulkText('')
@@ -12744,19 +12882,22 @@ function CargoClausesTab({
     loadData()
   }
 
-  useEffect(() => {
-    loadData()
-  }, [section])
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       const result = await window.api.cargoGetClauses(section)
       setClauses(Array.isArray(result) ? result : [])
     } catch {
       setClauses([])
     }
-  }
+  }, [section])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newTitle.trim()) return
     try {
@@ -12768,7 +12909,7 @@ function CargoClausesTab({
         newHasAmount || undefined,
         newAmountPlaceholder.trim() || undefined
       )
-      if (result && !(result as any).error) {
+      if (result && !(result as IpcResultLike).error) {
         setNewTitle('')
         setNewCode('')
         setNewText('')
@@ -12784,7 +12925,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string): Promise<void> => {
     try {
       await window.api.cargoUpdateClause(id, {
         title: editTitle.trim(),
@@ -12801,7 +12942,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleToggleActive = async (id: string, currentActive: boolean) => {
+  const handleToggleActive = async (id: string, currentActive: boolean): Promise<void> => {
     try {
       await window.api.cargoUpdateClause(id, { active: !currentActive })
       loadData()
@@ -12810,7 +12951,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.cargoDeleteClause(id)
       showSuccess('Clause deleted')
@@ -12820,7 +12961,7 @@ function CargoClausesTab({
     }
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...clauses]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return

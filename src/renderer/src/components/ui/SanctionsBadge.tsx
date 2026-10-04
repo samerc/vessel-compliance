@@ -19,7 +19,7 @@ export default function SanctionsBadge({
   checkedAt,
   onReview,
   onRecheck
-}: SanctionsBadgeProps) {
+}: SanctionsBadgeProps): React.JSX.Element {
   if (checking) {
     return (
       <Badge tone="accent">

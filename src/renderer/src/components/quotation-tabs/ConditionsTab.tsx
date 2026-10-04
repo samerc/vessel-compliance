@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Trash2 } from 'lucide-react'
 import {
   Quotation,
@@ -15,6 +15,18 @@ import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 import { ok } from '../../utils/ipc'
 
+type QuotationAdditionalClauseRow = Awaited<
+  ReturnType<typeof window.api.getQuotationAdditionalClauses>
+>[number] & {
+  // returned by the adapter but missing from the preload type
+  alternativeId?: string | null
+}
+
+/** IPC results that may be a legacy { error: true, message } value. */
+interface IpcResultLike {
+  error?: unknown
+}
+
 export default function ConditionsTab({
   quotation,
   showSuccess,
@@ -27,7 +39,7 @@ export default function ConditionsTab({
   showError: (m: string) => void
   piAlternatives?: QuotationPIAlternative[]
   selectedPIAltId?: string | null
-}) {
+}): React.JSX.Element {
   const [subTab, setSubTab] = useState<'clauses' | 'additional'>('clauses')
   const [allClauses, setAllClauses] = useState<PIClause[]>([])
   const [clauseSets, setClauseSets] = useState<PIClauseSet[]>([])
@@ -38,18 +50,14 @@ export default function ConditionsTab({
   const [clauseVesselScopes, setClauseVesselScopes] = useState<Record<string, string[] | null>>({})
   const [clauseAltIds, setClauseAltIds] = useState<Record<string, string | null>>({})
   const [descOverrides, setDescOverrides] = useState<Record<string, string>>({})
-  const [additionalClauses, setAdditionalClauses] = useState<any[]>([])
+  const [additionalClauses, setAdditionalClauses] = useState<QuotationAdditionalClauseRow[]>([])
   const [allAdditional, setAllAdditional] = useState<PIAdditionalClause[]>([])
   const [additionalClauseSets, setAdditionalClauseSets] = useState<PIAdditionalClauseSet[]>([])
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
   const additionalDefaultsApplied = useRef(false)
   const clauseDefaultsApplied = useRef(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const [clauses, sets, selected, overrides, addClauses, allAdd, addSets, qv] = await Promise.all(
       [
         window.api.piGetClauses(),
@@ -65,27 +73,27 @@ export default function ConditionsTab({
     setAllClauses(Array.isArray(clauses) ? clauses : [])
     setClauseSets(Array.isArray(sets) ? sets : [])
     const safeSelected = Array.isArray(selected) ? selected : []
-    setSelectedIds(new Set(safeSelected.map((r: any) => r.piClauseId)))
+    setSelectedIds(new Set(safeSelected.map((r) => r.piClauseId)))
     setClauseRows(
-      safeSelected.map((r: any) => ({
+      safeSelected.map((r) => ({
         id: r.id,
         piClauseId: r.piClauseId,
         alternativeId: r.alternativeId || null
       }))
     )
     setClauseVesselScopes(
-      safeSelected.reduce((m: Record<string, string[] | null>, r: any) => {
+      safeSelected.reduce((m: Record<string, string[] | null>, r) => {
         if (r.vesselScope) m[r.piClauseId] = r.vesselScope
         return m
       }, {})
     )
     setClauseAltIds(
-      safeSelected.reduce((m: Record<string, string | null>, r: any) => {
+      safeSelected.reduce((m: Record<string, string | null>, r) => {
         m[r.piClauseId] = r.alternativeId || null
         return m
       }, {})
     )
-    setDescOverrides(overrides && !(overrides as any).error ? overrides : {})
+    setDescOverrides(overrides && !(overrides as IpcResultLike).error ? overrides : {})
     const safeAddCl = Array.isArray(addClauses) ? addClauses : []
     setAdditionalClauses(safeAddCl)
     const safeAllAdd = Array.isArray(allAdd) ? allAdd : []
@@ -102,15 +110,15 @@ export default function ConditionsTab({
         await window.api.setQuotationClauses(quotation.id, allClauseIds, {})
         const freshSelected = await window.api.getQuotationClauses(quotation.id)
         const safeFresh = Array.isArray(freshSelected) ? freshSelected : []
-        setSelectedIds(new Set(safeFresh.map((r: any) => r.piClauseId)))
+        setSelectedIds(new Set(safeFresh.map((r) => r.piClauseId)))
         setClauseRows(
-          safeFresh.map((r: any) => ({
+          safeFresh.map((r) => ({
             id: r.id,
             piClauseId: r.piClauseId,
             alternativeId: r.alternativeId || null
           }))
         )
-      } catch (err) {
+      } catch {
         // Silently fail — user can manually select
       }
     } else {
@@ -165,9 +173,15 @@ export default function ConditionsTab({
     } else {
       additionalDefaultsApplied.current = true
     }
-  }
+  }, [quotation.id])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const toggleClause = async (clauseId: string) => {
+  const toggleClause = async (clauseId: string): Promise<void> => {
     const hasPIAlts = piAlternatives.length >= 2
     const altId = hasPIAlts ? selectedPIAltId : null
 
@@ -184,7 +198,7 @@ export default function ConditionsTab({
           )
         } else {
           const result = await window.api.addQuotationClause(quotation.id, clauseId, altId)
-          if (result && !(result as any).error) {
+          if (result && !(result as IpcResultLike).error) {
             setClauseRows((prev) => [
               ...prev,
               { id: result.id, piClauseId: clauseId, alternativeId: altId }
@@ -194,22 +208,22 @@ export default function ConditionsTab({
         // Refresh selectedIds from all rows
         const fresh = await window.api.getQuotationClauses(quotation.id)
         const safeFresh = Array.isArray(fresh) ? fresh : []
-        setSelectedIds(new Set(safeFresh.map((r: any) => r.piClauseId)))
+        setSelectedIds(new Set(safeFresh.map((r) => r.piClauseId)))
         setClauseRows(
-          safeFresh.map((r: any) => ({
+          safeFresh.map((r) => ({
             id: r.id,
             piClauseId: r.piClauseId,
             alternativeId: r.alternativeId || null
           }))
         )
         setClauseAltIds(
-          safeFresh.reduce((m: Record<string, string | null>, r: any) => {
+          safeFresh.reduce((m: Record<string, string | null>, r) => {
             m[r.piClauseId] = r.alternativeId || null
             return m
           }, {})
         )
-      } catch (err: any) {
-        showError(err.message || 'Failed')
+      } catch (err) {
+        showError((err instanceof Error && err.message) || 'Failed')
       }
     } else {
       // Original bulk toggle (no alternatives or viewing "All")
@@ -236,7 +250,7 @@ export default function ConditionsTab({
               ])
             const currentWarrantyIds = (
               Array.isArray(currentWarrantyRows) ? currentWarrantyRows : []
-            ).map((r: any) => r.piWarrantyId)
+            ).map((r) => r.piWarrantyId)
             const cargoWarrantyIds = new Set(
               allWarranties.filter((w: PIWarranty) => w.isCargoRelated).map((w: PIWarranty) => w.id)
             )
@@ -254,12 +268,12 @@ export default function ConditionsTab({
                 .map((ex: PIExclusion) => ex.id)
             )
             const filteredExclusions = safeExRows.filter(
-              (r: any) => !r.piExclusionId || !cargoExclusionIds.has(r.piExclusionId)
+              (r) => !r.piExclusionId || !cargoExclusionIds.has(r.piExclusionId)
             )
             if (filteredExclusions.length < safeExRows.length) {
               await window.api.setQuotationExclusions(
                 quotation.id,
-                filteredExclusions.map((r: any) => ({
+                filteredExclusions.map((r) => ({
                   piExclusionId: r.piExclusionId,
                   customText: r.customText
                 }))
@@ -268,13 +282,13 @@ export default function ConditionsTab({
             }
           }
         }
-      } catch (err: any) {
-        showError(err.message || 'Failed to save clause selection')
+      } catch (err) {
+        showError((err instanceof Error && err.message) || 'Failed to save clause selection')
       }
     }
   }
 
-  const applySet = async (setId: string) => {
+  const applySet = async (setId: string): Promise<void> => {
     const cs = clauseSets.find((s) => s.id === setId)
     if (!cs?.clauseIds) return
     const hasPIAlts = piAlternatives.length >= 2
@@ -309,17 +323,17 @@ export default function ConditionsTab({
   }
 
   // Resolve override key: clauseId::altId for alt-specific, clauseId for shared
-  const overrideKey = (clauseId: string) => {
+  const overrideKey = (clauseId: string): string => {
     if (piAlternatives.length < 2 || !selectedPIAltId) return clauseId
     return `${clauseId}::${selectedPIAltId}`
   }
-  const getOverride = (clauseId: string) => {
+  const getOverride = (clauseId: string): string => {
     if (piAlternatives.length >= 2 && selectedPIAltId)
       return descOverrides[`${clauseId}::${selectedPIAltId}`]
     return descOverrides[clauseId]
   }
 
-  const updateDescOverride = async (clauseId: string, desc: string) => {
+  const updateDescOverride = async (clauseId: string, desc: string): Promise<void> => {
     const clause = allClauses.find((c) => c.id === clauseId)
     const override = desc === (clause?.description || '') ? null : desc
     const key = overrideKey(clauseId)
@@ -340,17 +354,15 @@ export default function ConditionsTab({
     )
   }
 
-  const updateClauseScope = async (piClauseId: string, scope: string[] | null) => {
+  const updateClauseScope = async (piClauseId: string, scope: string[] | null): Promise<void> => {
     setClauseVesselScopes((prev) => ({ ...prev, [piClauseId]: scope }))
     await window.api.updateQuotationClauseVesselScope(quotation.id, piClauseId, scope)
   }
 
-  const updateClauseAltId = async (clauseId: string, altId: string | null) => {
+  const updateClauseAltId = async (clauseId: string, altId: string | null): Promise<void> => {
     // Find the row id for this clause
     const selected = await window.api.getQuotationClauses(quotation.id)
-    const row = (Array.isArray(selected) ? selected : []).find(
-      (r: any) => r.piClauseId === clauseId
-    )
+    const row = (Array.isArray(selected) ? selected : []).find((r) => r.piClauseId === clauseId)
     if (row) {
       ok(await window.api.updateQuotationItemAlternativeId('quotation_clauses', row.id, altId))
       setClauseAltIds((prev) => ({ ...prev, [clauseId]: altId }))
@@ -366,14 +378,14 @@ export default function ConditionsTab({
     )
   }
 
-  const updateAdditionalClauseScope = async (id: string, scope: string[] | null) => {
+  const updateAdditionalClauseScope = async (id: string, scope: string[] | null): Promise<void> => {
     setAdditionalClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, vesselScope: scope } : c))
     )
     await window.api.updateQuotationItemVesselScope('quotation_additional_clauses', id, scope)
   }
 
-  const updateAdditionalClauseAltId = async (id: string, altId: string | null) => {
+  const updateAdditionalClauseAltId = async (id: string, altId: string | null): Promise<void> => {
     try {
       ok(
         await window.api.updateQuotationItemAlternativeId('quotation_additional_clauses', id, altId)
@@ -386,7 +398,7 @@ export default function ConditionsTab({
     }
   }
 
-  const addAdditionalClause = async (clauseId: string) => {
+  const addAdditionalClause = async (clauseId: string): Promise<void> => {
     const clause = allAdditional.find((c) => c.id === clauseId)
     if (!clause) return
     await window.api.addQuotationAdditionalClause({
@@ -398,10 +410,10 @@ export default function ConditionsTab({
     loadData()
   }
 
-  const applyAdditionalSet = async (setId: string) => {
+  const applyAdditionalSet = async (setId: string): Promise<void> => {
     const set = additionalClauseSets.find((s) => s.id === setId)
     if (!set?.clauseIds) return
-    const alreadyIds = new Set(additionalClauses.map((ac: any) => ac.piAdditionalClauseId))
+    const alreadyIds = new Set(additionalClauses.map((ac) => ac.piAdditionalClauseId))
     const toAdd = set.clauseIds.filter((id) => !alreadyIds.has(id))
     for (let i = 0; i < toAdd.length; i++) {
       await window.api.addQuotationAdditionalClause({
@@ -647,9 +659,7 @@ export default function ConditionsTab({
             )}
             {allAdditional.length > 0 &&
               (() => {
-                const alreadyIds = new Set(
-                  additionalClauses.map((ac: any) => ac.piAdditionalClauseId)
-                )
+                const alreadyIds = new Set(additionalClauses.map((ac) => ac.piAdditionalClauseId))
                 return (
                   <select
                     onChange={(e) => {
@@ -690,7 +700,7 @@ export default function ConditionsTab({
                 )
               })()}
           </div>
-          {additionalClauses.map((ac: any) => {
+          {additionalClauses.map((ac) => {
             const def = allAdditional.find((a) => a.id === ac.piAdditionalClauseId)
             const code = def?.code || ''
             const text = ac.customText || def?.text || ''

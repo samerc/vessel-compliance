@@ -18,7 +18,13 @@ interface TabsProps<K extends string> {
 }
 
 /** Underline tabs for switching views within a page */
-export function Tabs<K extends string>({ items, value, onChange, trailing, style }: TabsProps<K>) {
+export function Tabs<K extends string>({
+  items,
+  value,
+  onChange,
+  trailing,
+  style
+}: TabsProps<K>): React.JSX.Element {
   return (
     <div className="tabs" role="tablist" style={style}>
       {items
@@ -52,7 +58,11 @@ interface SegmentedProps<K extends string> {
 }
 
 /** Compact pill switcher (e.g. List / Settings in a page header) */
-export function SegmentedControl<K extends string>({ items, value, onChange }: SegmentedProps<K>) {
+export function SegmentedControl<K extends string>({
+  items,
+  value,
+  onChange
+}: SegmentedProps<K>): React.JSX.Element {
   return (
     <div className="segmented" role="tablist">
       {items

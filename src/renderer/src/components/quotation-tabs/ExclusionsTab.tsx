@@ -12,7 +12,12 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
-import { ok } from '../../utils/ipc'
+import { ok, isIpcError } from '../../utils/ipc'
+
+// A quotation_exclusions row (the IPC type omits alternativeId, which the adapter returns)
+type ExclusionRow = Awaited<ReturnType<typeof window.api.getQuotationExclusions>>[number] & {
+  alternativeId?: string | null
+}
 
 export default function ExclusionsTab({
   quotation,
@@ -24,15 +29,13 @@ export default function ExclusionsTab({
   showError: (m: string) => void
   piAlternatives?: QuotationPIAlternative[]
   selectedPIAltId?: string | null
-}) {
+}): React.JSX.Element {
   const [allExclusions, setAllExclusions] = useState<PIExclusion[]>([])
-  const [selectedRows, setSelectedRows] = useState<any[]>([])
+  const [selectedRows, setSelectedRows] = useState<ExclusionRow[]>([])
   // An exclusion is "selected" if it has ANY row (regardless of alternative). Its alternative scope
   // (All, or a subset like Alt 2 + Alt 3 — one row per alternative) is set via the multi-scope chips.
   const selectedIds = useMemo(() => {
-    return new Set(
-      selectedRows.filter((r: any) => r.piExclusionId).map((r: any) => r.piExclusionId)
-    )
+    return new Set(selectedRows.filter((r) => r.piExclusionId).map((r) => r.piExclusionId))
   }, [selectedRows])
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
   const [customExclusions, setCustomExclusions] = useState<QuotationCustomExclusion[]>([])
@@ -50,76 +53,87 @@ export default function ExclusionsTab({
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
+  // Latest showSuccess for the one-time load (the prop may change identity every render)
+  const showSuccessRef = useRef(showSuccess)
   useEffect(() => {
-    loadData()
-  }, [])
+    showSuccessRef.current = showSuccess
+  })
 
-  const loadData = async () => {
-    const [all, qe, qv, ce, clauses, qClauses, vesselList, vTypes] = await Promise.all([
-      window.api.piGetExclusions(),
-      window.api.getQuotationExclusions(quotation.id),
-      window.api.getQuotationVessels(quotation.id),
-      window.api.getQuotationCustomExclusions(quotation.id),
-      window.api.piGetClauses(),
-      window.api.getQuotationClauses(quotation.id),
-      window.api.getVessels(),
-      window.api.getVesselTypes()
-    ])
-    setVesselTypes(Array.isArray(vTypes) ? vTypes : [])
-    const safeAll = Array.isArray(all) ? all : []
-    setAllExclusions(safeAll)
-    const safeQe = Array.isArray(qe) ? qe : []
-    setSelectedRows(safeQe)
-    const currentIds = new Set(
-      safeQe.filter((e: any) => e.piExclusionId).map((e: any) => e.piExclusionId as string)
-    )
-    const safeQv = Array.isArray(qv) ? qv : []
-    setQVessels(safeQv)
-    setCustomExclusions(Array.isArray(ce) ? ce : [])
-    setAllClauses(Array.isArray(clauses) ? clauses : [])
-    const safeQClauses = Array.isArray(qClauses) ? qClauses : []
-    setSelectedClauseIds(
-      new Set(safeQClauses.map((c: any) => c.piClauseId || c.pi_clause_id || c.id))
-    )
-    const safeVesselList = Array.isArray(vesselList) ? vesselList : []
-
-    // Auto-apply vessel-type-based exclusions on first load
-    if (!autoApplied.current && safeQv.length > 0) {
-      autoApplied.current = true
-      const vesselTypeNames = new Set<string>()
-      for (const qvItem of safeQv) {
-        const reg = qvItem.vesselId
-          ? safeVesselList.find((v: Vessel) => v.id === qvItem.vesselId)
-          : null
-        const vtype = reg?.vesselType || qvItem.vesselType
-        if (vtype) vesselTypeNames.add(vtype.toLowerCase())
-      }
-      if (vesselTypeNames.size > 0) {
-        // Get vessel types to map names to IDs
-        const vesselTypes = await window.api.getVesselTypes()
-        const vtIds = new Set(
-          (Array.isArray(vesselTypes) ? vesselTypes : [])
-            .filter((vt: any) => vesselTypeNames.has(vt.name.toLowerCase()))
-            .map((vt: any) => vt.id)
-        )
-        const toAutoSelect = safeAll.filter(
-          (ex) =>
-            !currentIds.has(ex.id) &&
-            (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
-        )
-        if (toAutoSelect.length > 0) {
-          for (const ex of toAutoSelect) {
-            await window.api.addQuotationExclusion(quotation.id, ex.id, null)
-          }
-          const freshQe = await window.api.getQuotationExclusions(quotation.id)
-          setSelectedRows(Array.isArray(freshQe) ? freshQe : [])
-          showSuccess(
-            `Auto-selected ${toAutoSelect.length} vessel-type exclusion${toAutoSelect.length > 1 ? 's' : ''}`
+  // Load once per quotation; auto-applies vessel-type exclusions on the first load
+  useEffect(() => {
+    const loadData = async (): Promise<void> => {
+      const [all, qe, qv, ce, clauses, qClauses, vesselList, vTypes] = await Promise.all([
+        window.api.piGetExclusions(),
+        window.api.getQuotationExclusions(quotation.id),
+        window.api.getQuotationVessels(quotation.id),
+        window.api.getQuotationCustomExclusions(quotation.id),
+        window.api.piGetClauses(),
+        window.api.getQuotationClauses(quotation.id),
+        window.api.getVessels(),
+        window.api.getVesselTypes()
+      ])
+      setVesselTypes(Array.isArray(vTypes) ? vTypes : [])
+      const safeAll = Array.isArray(all) ? all : []
+      setAllExclusions(safeAll)
+      const safeQe = Array.isArray(qe) ? qe : []
+      setSelectedRows(safeQe)
+      const currentIds = new Set(
+        safeQe.filter((e) => e.piExclusionId).map((e) => e.piExclusionId as string)
+      )
+      const safeQv = Array.isArray(qv) ? qv : []
+      setQVessels(safeQv)
+      setCustomExclusions(Array.isArray(ce) ? ce : [])
+      setAllClauses(Array.isArray(clauses) ? clauses : [])
+      const safeQClauses = Array.isArray(qClauses) ? qClauses : []
+      setSelectedClauseIds(
+        new Set(
+          safeQClauses.map(
+            (c: (typeof safeQClauses)[number] & { pi_clause_id?: string }) =>
+              c.piClauseId || c.pi_clause_id || c.id
           )
+        )
+      )
+      const safeVesselList = Array.isArray(vesselList) ? vesselList : []
+
+      // Auto-apply vessel-type-based exclusions on first load
+      if (!autoApplied.current && safeQv.length > 0) {
+        autoApplied.current = true
+        const vesselTypeNames = new Set<string>()
+        for (const qvItem of safeQv) {
+          const reg = qvItem.vesselId
+            ? safeVesselList.find((v: Vessel) => v.id === qvItem.vesselId)
+            : null
+          const vtype = reg?.vesselType || qvItem.vesselType
+          if (vtype) vesselTypeNames.add(vtype.toLowerCase())
+        }
+        if (vesselTypeNames.size > 0) {
+          // Get vessel types to map names to IDs
+          const vesselTypes = await window.api.getVesselTypes()
+          const vtIds = new Set(
+            (Array.isArray(vesselTypes) ? vesselTypes : [])
+              .filter((vt) => vesselTypeNames.has(vt.name.toLowerCase()))
+              .map((vt) => vt.id)
+          )
+          const toAutoSelect = safeAll.filter(
+            (ex) =>
+              !currentIds.has(ex.id) &&
+              (ex.vesselTypeIds || []).some((vtId: string) => vtIds.has(vtId))
+          )
+          if (toAutoSelect.length > 0) {
+            for (const ex of toAutoSelect) {
+              await window.api.addQuotationExclusion(quotation.id, ex.id, null)
+            }
+            const freshQe = await window.api.getQuotationExclusions(quotation.id)
+            setSelectedRows(Array.isArray(freshQe) ? freshQe : [])
+            showSuccessRef.current(
+              `Auto-selected ${toAutoSelect.length} vessel-type exclusion${toAutoSelect.length > 1 ? 's' : ''}`
+            )
+          }
         }
       }
     }
-  }
+    void loadData()
+  }, [quotation.id])
 
   // Check if any cargo clause is selected (only relevant for cargo quotations)
   const isCargo = quotation.quotationTypeCode?.toLowerCase() === 'c'
@@ -132,10 +146,10 @@ export default function ExclusionsTab({
     return true
   })
 
-  const toggle = async (id: string) => {
+  const toggle = async (id: string): Promise<void> => {
     // Single-scope model: selecting adds ONE shared row (scope defaults to All — user scopes to a
     // specific alternative via the chip); deselecting removes every row for this exclusion.
-    const existing = selectedRows.filter((r: any) => r.piExclusionId === id)
+    const existing = selectedRows.filter((r) => r.piExclusionId === id)
     if (existing.length > 0) {
       for (const r of existing) await window.api.deleteQuotationExclusion(r.id)
     } else {
@@ -145,10 +159,10 @@ export default function ExclusionsTab({
     setSelectedRows(Array.isArray(qe) ? qe : [])
   }
 
-  const handleExcDragStart = (idx: number) => {
+  const handleExcDragStart = (idx: number): void => {
     dragExcRef.current = idx
   }
-  const handleExcDrop = async (targetIdx: number) => {
+  const handleExcDrop = async (targetIdx: number): Promise<void> => {
     const fromIdx = dragExcRef.current
     dragExcRef.current = null
     if (fromIdx === null || fromIdx === targetIdx) return
@@ -160,10 +174,10 @@ export default function ExclusionsTab({
     await window.api.reorderQuotationExclusions(newOrder.map((r) => r.id))
   }
 
-  const handleCustomDragStart = (idx: number) => {
+  const handleCustomDragStart = (idx: number): void => {
     dragCustomRef.current = idx
   }
-  const handleCustomDrop = async (targetIdx: number) => {
+  const handleCustomDrop = async (targetIdx: number): Promise<void> => {
     const fromIdx = dragCustomRef.current
     dragCustomRef.current = null
     if (fromIdx === null || fromIdx === targetIdx) return
@@ -174,7 +188,7 @@ export default function ExclusionsTab({
     await window.api.reorderQuotationCustomExclusions(newOrder.map((ce) => ce.id))
   }
 
-  const updateExclusionScope = async (id: string, scope: string[] | null) => {
+  const updateExclusionScope = async (id: string, scope: string[] | null): Promise<void> => {
     setSelectedRows((prev) => prev.map((e) => (e.id === id ? { ...e, vesselScope: scope } : e)))
     await window.api.updateQuotationItemVesselScope('quotation_exclusions', id, scope)
   }
@@ -182,19 +196,22 @@ export default function ExclusionsTab({
   // Current alternative scope of a master exclusion: null = All alternatives; else the subset of
   // alternative IDs it is scoped to (one quotation_exclusions row per alternative).
   const exclusionAltSet = (piExclusionId: string): string[] | null => {
-    const rows = selectedRows.filter((r: any) => r.piExclusionId === piExclusionId)
-    if (rows.some((r: any) => !r.alternativeId)) return null // any shared row → applies to All
-    return rows.map((r: any) => r.alternativeId)
+    const rows = selectedRows.filter((r) => r.piExclusionId === piExclusionId)
+    if (rows.some((r) => !r.alternativeId)) return null // any shared row → applies to All
+    return rows.map((r) => r.alternativeId as string)
   }
 
   // Sync the exclusion's rows to the chosen scope: null = single shared row (All); array = one row
   // per alternative in the subset. Reuses existing rows where possible (preserves vessel scope/order).
-  const setExclusionAltSet = async (piExclusionId: string, target: string[] | null) => {
-    const rows = selectedRows.filter((r: any) => r.piExclusionId === piExclusionId)
+  const setExclusionAltSet = async (
+    piExclusionId: string,
+    target: string[] | null
+  ): Promise<void> => {
+    const rows = selectedRows.filter((r) => r.piExclusionId === piExclusionId)
     const allIds = piAlternatives.map((a) => a.id)
     const wantAll = target === null || target.length === 0 || target.length === allIds.length
     if (wantAll) {
-      const keep = rows.find((r: any) => !r.alternativeId) || rows[0]
+      const keep = rows.find((r) => !r.alternativeId) || rows[0]
       for (const r of rows) if (r.id !== keep?.id) await window.api.deleteQuotationExclusion(r.id)
       if (keep && keep.alternativeId)
         ok(await window.api.updateQuotationItemAlternativeId('quotation_exclusions', keep.id, null))
@@ -206,9 +223,7 @@ export default function ExclusionsTab({
           await window.api.deleteQuotationExclusion(r.id)
       }
       const have = new Set(
-        rows
-          .filter((r: any) => r.alternativeId && want.has(r.alternativeId))
-          .map((r: any) => r.alternativeId)
+        rows.filter((r) => r.alternativeId && want.has(r.alternativeId)).map((r) => r.alternativeId)
       )
       for (const altId of target)
         if (!have.has(altId))
@@ -218,7 +233,7 @@ export default function ExclusionsTab({
     setSelectedRows(Array.isArray(qe) ? qe : [])
   }
 
-  const updateCustomExclusionAltId = async (id: string, altId: string | null) => {
+  const updateCustomExclusionAltId = async (id: string, altId: string | null): Promise<void> => {
     ok(await window.api.updateQuotationItemAlternativeId('quotation_custom_exclusions', id, altId))
     setCustomExclusions((prev) =>
       prev.map((ce) => (ce.id === id ? { ...ce, alternativeId: altId } : ce))
@@ -226,7 +241,7 @@ export default function ExclusionsTab({
   }
 
   // Custom exclusion handlers
-  const addCustom = async () => {
+  const addCustom = async (): Promise<void> => {
     if (!newCustomText.trim()) return
     // Single-scope model: new custom exclusions default to All (shared); scope via the chip below.
     const result = await window.api.addQuotationCustomExclusion({
@@ -234,14 +249,14 @@ export default function ExclusionsTab({
       text: newCustomText.trim(),
       order: customExclusions.length
     })
-    if (result && !(result as any).error) {
+    if (result && !isIpcError(result)) {
       setCustomExclusions((prev) => [...prev, result])
       setNewCustomText('')
       showSuccess('Custom exclusion added')
     }
   }
 
-  const saveCustomEdit = async (id: string) => {
+  const saveCustomEdit = async (id: string): Promise<void> => {
     await window.api.updateQuotationCustomExclusion(id, { text: editCustomText })
     setEditingCustomId(null)
     setCustomExclusions((prev) =>
@@ -250,23 +265,23 @@ export default function ExclusionsTab({
     showSuccess('Updated')
   }
 
-  const deleteCustom = async (id: string) => {
+  const deleteCustom = async (id: string): Promise<void> => {
     await window.api.deleteQuotationCustomExclusion(id)
     setCustomExclusions((prev) => prev.filter((ce) => ce.id !== id))
     showSuccess('Deleted')
   }
 
-  const updateCustomScope = async (id: string, scope: string[] | null) => {
+  const updateCustomScope = async (id: string, scope: string[] | null): Promise<void> => {
     setCustomExclusions((prev) =>
       prev.map((ce) => (ce.id === id ? { ...ce, vesselScope: scope } : ce))
     )
     await window.api.updateQuotationItemVesselScope('quotation_custom_exclusions', id, scope)
   }
 
-  const handleImport = async () => {
+  const handleImport = async (): Promise<void> => {
     const lines = importText
       .split('\n')
-      .map((l) => l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim())
+      .map((l) => l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim())
       .filter((l) => l.length > 0)
     if (lines.length === 0) return
     for (let i = 0; i < lines.length; i++) {
@@ -286,7 +301,7 @@ export default function ExclusionsTab({
   }
 
   const customTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const handleCustomTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleCustomTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     setNewCustomText(e.target.value)
     if (customTextareaRef.current) {
       customTextareaRef.current.style.height = 'auto'
@@ -362,7 +377,7 @@ export default function ExclusionsTab({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {visibleExclusions.map((e) => {
-          const row = selectedRows.find((r: any) => r.piExclusionId === e.id)
+          const row = selectedRows.find((r) => r.piExclusionId === e.id)
           return (
             <div
               key={e.id}
@@ -470,7 +485,7 @@ export default function ExclusionsTab({
               Reorder exclusions as they will appear in the export.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {orderedSelected.map((row: any, i: number) => {
+              {orderedSelected.map((row, i: number) => {
                 const excl = row.piExclusionId
                   ? allExclusions.find((e) => e.id === row.piExclusionId)
                   : null
@@ -777,7 +792,7 @@ export default function ExclusionsTab({
                   importText
                     .split('\n')
                     .map((l) =>
-                      l.replace(/^[\s•\-\*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim()
+                      l.replace(/^[\s•\-*\u2022\u2023\u25E6\u2043\u2219\d.)+]+/, '').trim()
                     )
                     .filter((l) => l.length > 0).length
                 }{' '}

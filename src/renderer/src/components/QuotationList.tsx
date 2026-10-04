@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Plus,
   Search,
@@ -27,7 +27,14 @@ import {
   RotateCcw,
   Trash
 } from 'lucide-react'
-import { Quotation, QuotationType } from '../../../shared/types'
+import {
+  Quotation,
+  QuotationType,
+  QuotationListRow,
+  QuotationSavedFilter,
+  QuotationSavedFilterValues,
+  DeletedQuotationRow
+} from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -35,7 +42,7 @@ import { formatDateOrDash } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
 import { Badge, EmptyState } from './ui'
 import type { BadgeTone } from './ui'
@@ -72,8 +79,30 @@ interface QuotationListProps {
   onCreateConsumed?: () => void
 }
 
+type ViewFilter = 'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'
+
+/** List row as rendered here; the clause summaries come from the paginated query but are not
+ *  in the shared QuotationListRow type. */
+type ListRow = QuotationListRow & { piClauseNames?: string | null; hullClauseCodes?: string | null }
+
+/** The list row stands in for the full quotation: the editor reloads it by id, and the delete /
+ *  duplicate handlers only read id, reference and revision fields (as before, when rows were any). */
+function asQuotation(row: ListRow): Quotation {
+  return row as unknown as Quotation
+}
+
+/** Saved filters written by older versions may carry registryOnly instead of viewFilter */
+type SavedFilterValues = QuotationSavedFilterValues & { registryOnly?: boolean }
+
+/** First day of M-1 .. last day of M+1 for the month navigator */
+function monthWindow(navYear: number, navMonth: number): { from: string; to: string } {
+  const from = new Date(navYear, navMonth - 1, 1) // first day of M-1
+  const toEnd = new Date(navYear, navMonth + 2, 0) // last day of M+1
+  return { from: from.toISOString().split('T')[0], to: toEnd.toISOString().split('T')[0] }
+}
+
 interface PaginatedData {
-  rows: any[]
+  rows: ListRow[]
   total: number
   stats: {
     total: number
@@ -82,12 +111,7 @@ interface PaginatedData {
   }
 }
 
-interface SavedFilter {
-  id: string
-  name: string
-  filters: any
-  order: number
-}
+type SavedFilter = QuotationSavedFilter
 
 export default function QuotationList({
   onOpenQuotation,
@@ -95,7 +119,7 @@ export default function QuotationList({
   onSearchChange,
   openCreate,
   onCreateConsumed
-}: QuotationListProps) {
+}: QuotationListProps): React.JSX.Element {
   const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
   const [data, setData] = useState<PaginatedData>({
     rows: [],
@@ -110,24 +134,18 @@ export default function QuotationList({
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [renewalFilter, setRenewalFilter] = useState<string>('all')
-  const [viewFilter, setViewFilter] = useState<
-    'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'
-  >('active')
-  const [deletedQuotations, setDeletedQuotations] = useState<any[]>([])
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('active')
+  const [deletedQuotations, setDeletedQuotations] = useState<DeletedQuotationRow[]>([])
   const [deletedLoading, setDeletedLoading] = useState(false)
   const [permDeleteId, setPermDeleteId] = useState<string | null>(null)
   const [createdByFilter, setCreatedByFilter] = useState<string>('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-
-  // Month navigation — always reset to current month on mount
+  // Month navigation — always starts at the current month on mount
   const [navYear, setNavYear] = useState(() => new Date().getFullYear())
   const [navMonth, setNavMonth] = useState(() => new Date().getMonth())
-  const [isSearchActive, setIsSearchActive] = useState(false)
-  useEffect(() => {
-    setNavYear(new Date().getFullYear())
-    setNavMonth(new Date().getMonth())
-  }, [])
+  const [dateFrom, setDateFrom] = useState(() => monthWindow(navYear, navMonth).from)
+  const [dateTo, setDateTo] = useState(() => monthWindow(navYear, navMonth).to)
+  // A search (incl. one restored from the parent) bypasses date/view filters
+  const [isSearchActive, setIsSearchActive] = useState(() => !!initialSearch)
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [page, setPage] = useState(0)
@@ -176,16 +194,26 @@ export default function QuotationList({
     deleteMode: 'single' | 'all'
   } | null>(null)
   const [showNewMenu, setShowNewMenu] = useState(false)
+  // Open the "new" menu when the parent requests it (adjust state during render on prop change)
+  const [prevOpenCreate, setPrevOpenCreate] = useState<boolean | undefined>(undefined)
+  if (openCreate !== prevOpenCreate) {
+    setPrevOpenCreate(openCreate)
+    if (openCreate) setShowNewMenu(true)
+  }
+  // Latest parent callbacks, so the effects below only re-run on their own deps
+  const onCreateConsumedRef = useRef(onCreateConsumed)
+  const onSearchChangeRef = useRef(onSearchChange)
   useEffect(() => {
-    if (!openCreate) return
-    setShowNewMenu(true)
-    onCreateConsumed?.()
+    onCreateConsumedRef.current = onCreateConsumed
+    onSearchChangeRef.current = onSearchChange
+  })
+  useEffect(() => {
+    if (openCreate) onCreateConsumedRef.current?.()
   }, [openCreate])
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
   const { hasPermission, user } = useAuth()
   const isLight = theme === 'light' || theme === 'aurora'
-  const loadIdRef = useRef(0)
 
   // Column preferences
   const QUOTATION_COLUMNS: ColumnDef[] = [
@@ -214,31 +242,31 @@ export default function QuotationList({
 
   // Keep the parent in sync so the search survives opening a quotation and coming back
   useEffect(() => {
-    onSearchChange?.(search)
+    onSearchChangeRef.current?.(search)
   }, [search])
 
-  // Month navigation → auto-set dateFrom/dateTo (M-1, M, M+1)
-  useEffect(() => {
-    if (isSearchActive) return
-    const from = new Date(navYear, navMonth - 1, 1) // first day of M-1
-    const toEnd = new Date(navYear, navMonth + 2, 0) // last day of M+1
-    setDateFrom(from.toISOString().split('T')[0])
-    setDateTo(toEnd.toISOString().split('T')[0])
-  }, [navYear, navMonth, isSearchActive])
+  // State adjusted during render when its inputs change (instead of effects that copy state)
+  // Search bypasses date/view filters: a new debounced search turns search mode on/off
+  const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch)
+  if (debouncedSearch !== prevDebouncedSearch) {
+    setPrevDebouncedSearch(debouncedSearch)
+    setIsSearchActive(!!debouncedSearch)
+  }
 
-  // Search bypasses date/view filters
-  useEffect(() => {
-    if (debouncedSearch) {
-      setIsSearchActive(true)
-    } else {
-      setIsSearchActive(false)
+  // Month navigation → auto-set dateFrom/dateTo (M-1, M, M+1)
+  const navKey = `${navYear}-${navMonth}-${isSearchActive}`
+  const [prevNavKey, setPrevNavKey] = useState(navKey)
+  if (navKey !== prevNavKey) {
+    setPrevNavKey(navKey)
+    if (!isSearchActive) {
+      const w = monthWindow(navYear, navMonth)
+      setDateFrom(w.from)
+      setDateTo(w.to)
     }
-  }, [debouncedSearch])
+  }
 
   // Reset page when filters change
-  useEffect(() => {
-    setPage(0)
-  }, [
+  const filterKey = JSON.stringify([
     debouncedSearch,
     statusFilter,
     typeFilter,
@@ -250,10 +278,15 @@ export default function QuotationList({
     activeGroupId,
     showFavoritesOnly
   ])
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    setPage(0)
+  }
 
   // Load auxiliary data on mount
   useEffect(() => {
-    const loadAux = async () => {
+    const loadAux = async (): Promise<void> => {
       const [qt, cr, favs, sf, grps] = await Promise.all([
         window.api.getQuotationTypes(),
         window.api.quotationGetCreators(),
@@ -271,46 +304,55 @@ export default function QuotationList({
   }, [])
 
   // Load paginated data when filters/sort/page change
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    const thisLoad = ++loadIdRef.current
-    try {
-      const typeCode =
-        typeFilter !== 'all'
-          ? quotationTypes.find((qt) => qt.id === typeFilter)?.code || undefined
-          : undefined
-      const result = await window.api.quotationGetPaginated({
-        page,
-        pageSize: PAGE_SIZE,
-        search: debouncedSearch || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        typeCode,
-        createdBy: createdByFilter !== 'all' ? createdByFilter : undefined,
-        dateFrom: isSearchActive ? undefined : dateFrom || undefined,
-        dateTo: isSearchActive ? undefined : dateTo || undefined,
-        renewalFilter: renewalFilter !== 'all' ? renewalFilter : undefined,
-        viewFilter: isSearchActive
-          ? undefined
-          : viewFilter !== 'all' && viewFilter !== 'deleted'
-            ? viewFilter
-            : undefined,
-        groupId: activeGroupId || undefined,
-        favoriteIds: showFavoritesOnly ? [...favorites] : undefined,
-        sortField,
-        sortDir
-      })
-      if (thisLoad !== loadIdRef.current) return
-      if (result && !(result as any).error) {
-        setData({
-          rows: Array.isArray(result.rows) ? result.rows : [],
-          total: result.total || 0,
-          stats: result.stats || { total: 0, byStatus: {}, byType: [] }
+  // (bump reloadKey to reload with the same filters)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
+  useEffect(() => {
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const typeCode =
+          typeFilter !== 'all'
+            ? quotationTypes.find((qt) => qt.id === typeFilter)?.code || undefined
+            : undefined
+        const result = await window.api.quotationGetPaginated({
+          page,
+          pageSize: PAGE_SIZE,
+          search: debouncedSearch || undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          typeCode,
+          createdBy: createdByFilter !== 'all' ? createdByFilter : undefined,
+          dateFrom: isSearchActive ? undefined : dateFrom || undefined,
+          dateTo: isSearchActive ? undefined : dateTo || undefined,
+          renewalFilter: renewalFilter !== 'all' ? renewalFilter : undefined,
+          viewFilter: isSearchActive
+            ? undefined
+            : viewFilter !== 'all' && viewFilter !== 'deleted'
+              ? viewFilter
+              : undefined,
+          groupId: activeGroupId || undefined,
+          favoriteIds: showFavoritesOnly ? [...favorites] : undefined,
+          sortField,
+          sortDir
         })
+        if (!alive) return
+        if (result && !isIpcError(result)) {
+          setData({
+            rows: Array.isArray(result.rows) ? result.rows : [],
+            total: result.total || 0,
+            stats: result.stats || { total: 0, byStatus: {}, byType: [] }
+          })
+        }
+      } catch {
+        /* silent */
+      } finally {
+        if (alive) setLoading(false)
       }
-    } catch {
-      /* silent */
-    } finally {
-      if (thisLoad === loadIdRef.current) setLoading(false)
+    }
+    void run()
+    return () => {
+      alive = false
     }
   }, [
     page,
@@ -328,14 +370,11 @@ export default function QuotationList({
     favorites,
     sortField,
     sortDir,
-    quotationTypes
+    quotationTypes,
+    reloadKey
   ])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const loadDeletedQuotations = async () => {
+  const loadDeletedQuotations = async (): Promise<void> => {
     setDeletedLoading(true)
     try {
       const result = await window.api.getDeletedQuotations()
@@ -347,24 +386,24 @@ export default function QuotationList({
     }
   }
 
-  const handleRestore = async (id: string) => {
+  const handleRestore = async (id: string): Promise<void> => {
     try {
       await window.api.restoreQuotation(id)
       showSuccess('Quotation restored')
       loadDeletedQuotations()
       loadData()
-    } catch (e: any) {
-      showError(e.message || 'Failed to restore')
+    } catch (e) {
+      showError((e instanceof Error ? e.message : '') || 'Failed to restore')
     }
   }
 
-  const handlePermanentDelete = async (id: string) => {
+  const handlePermanentDelete = async (id: string): Promise<void> => {
     try {
       await window.api.permanentlyDeleteQuotation(id)
       showSuccess('Quotation permanently deleted')
       loadDeletedQuotations()
-    } catch (e: any) {
-      showError(e.message || 'Failed to delete')
+    } catch (e) {
+      showError((e instanceof Error ? e.message : '') || 'Failed to delete')
     } finally {
       setPermDeleteId(null)
     }
@@ -373,7 +412,7 @@ export default function QuotationList({
   // Grouping
   const groupedRows = useMemo(() => {
     if (groupBy === 'none') return null
-    const groups: Record<string, any[]> = {}
+    const groups: Record<string, ListRow[]> = {}
     for (const row of data.rows) {
       const key =
         groupBy === 'type'
@@ -394,7 +433,7 @@ export default function QuotationList({
   }, [data.rows, favorites, showFavoritesOnly])
 
   // Handlers
-  const handleCreate = async (quotationTypeId: string) => {
+  const handleCreate = async (quotationTypeId: string): Promise<void> => {
     try {
       setShowNewMenu(false)
       const today = new Date().toISOString().split('T')[0]
@@ -407,12 +446,12 @@ export default function QuotationList({
       )
       showSuccess('Quotation created')
       onOpenQuotation(created)
-    } catch (err: any) {
-      showError(err.message || 'Failed to create quotation')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to create quotation')
     }
   }
 
-  const openDeleteModal = async (q: Quotation) => {
+  const openDeleteModal = async (q: Quotation): Promise<void> => {
     const groupId = q.revisionGroupId || q.id
     let count = 1
     try {
@@ -428,7 +467,7 @@ export default function QuotationList({
     })
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (!deleteModal?.quotation) return
     try {
       if (deleteModal.deleteMode === 'all' && deleteModal.revisionCount > 1) {
@@ -441,27 +480,27 @@ export default function QuotationList({
       }
       setDeleteModal(null)
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete quotation')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete quotation')
     }
   }
 
-  const handleDuplicate = async (q: Quotation, e: React.MouseEvent) => {
+  const handleDuplicate = async (q: Quotation, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
     try {
       const dup = await window.api.duplicateQuotation(q.id)
-      if ((dup as any)?.error) {
-        showError((dup as any).message || 'Failed to duplicate')
+      if (isIpcError(dup)) {
+        showError(dup.message || 'Failed to duplicate')
         return
       }
       showSuccess('Quotation duplicated')
       onOpenQuotation(dup)
-    } catch (err: any) {
-      showError(err.message || 'Failed to duplicate')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to duplicate')
     }
   }
 
-  const toggleSort = (field: SortField) => {
+  const toggleSort = (field: SortField): void => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -475,7 +514,7 @@ export default function QuotationList({
     setPage(0)
   }
 
-  const toggleFavorite = async (quotationId: string, e: React.MouseEvent) => {
+  const toggleFavorite = async (quotationId: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
     try {
       const isFav = await window.api.quotationToggleFavorite(quotationId)
@@ -490,7 +529,7 @@ export default function QuotationList({
     }
   }
 
-  const saveCurrentFilter = async () => {
+  const saveCurrentFilter = async (): Promise<void> => {
     if (!newFilterName.trim()) return
     try {
       const filters = {
@@ -503,7 +542,7 @@ export default function QuotationList({
         dateTo
       }
       const result = await window.api.quotationSaveFilter(newFilterName.trim(), filters)
-      if (result && !(result as any).error) {
+      if (result && !isIpcError(result)) {
         setSavedFilters((prev) => [...prev, { ...result, order: prev.length }])
         showSuccess('Filter saved')
       }
@@ -514,18 +553,18 @@ export default function QuotationList({
     setShowSaveFilterInput(false)
   }
 
-  const applyFilter = (filters: any) => {
+  const applyFilter = (filters: SavedFilterValues): void => {
     if (filters.statusFilter) setStatusFilter(filters.statusFilter)
     if (filters.typeFilter) setTypeFilter(filters.typeFilter)
     if (filters.renewalFilter) setRenewalFilter(filters.renewalFilter)
-    if (filters.viewFilter !== undefined) setViewFilter(filters.viewFilter)
+    if (filters.viewFilter !== undefined) setViewFilter(filters.viewFilter as ViewFilter)
     if (filters.registryOnly !== undefined) setViewFilter(filters.registryOnly ? 'registry' : 'all')
     if (filters.createdByFilter) setCreatedByFilter(filters.createdByFilter)
     if (filters.dateFrom !== undefined) setDateFrom(filters.dateFrom)
     if (filters.dateTo !== undefined) setDateTo(filters.dateTo)
   }
 
-  const deleteSavedFilter = async (id: string, e: React.MouseEvent) => {
+  const deleteSavedFilter = async (id: string, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
     try {
       await window.api.quotationDeleteFilter(id)
@@ -535,7 +574,7 @@ export default function QuotationList({
     }
   }
 
-  const clearAllFilters = () => {
+  const clearAllFilters = (): void => {
     setSearch('')
     setStatusFilter('all')
     setTypeFilter('all')
@@ -550,7 +589,7 @@ export default function QuotationList({
     setActiveGroupId(null)
   }
 
-  const navigateMonth = (direction: -1 | 1) => {
+  const navigateMonth = (direction: -1 | 1): void => {
     setNavMonth((prev) => {
       const n = prev + direction
       if (n < 0) {
@@ -565,7 +604,7 @@ export default function QuotationList({
     })
   }
 
-  const goToToday = () => {
+  const goToToday = (): void => {
     const now = new Date()
     setNavYear(now.getFullYear())
     setNavMonth(now.getMonth())
@@ -605,14 +644,14 @@ export default function QuotationList({
     showFavoritesOnly ||
     debouncedSearch
 
-  const getConditions = (q: any): string => {
+  const getConditions = (q: ListRow): string => {
     if (q.quotationTypeCode === 'H') return q.hullClauseCodes || ''
     return q.piClauseNames || ''
   }
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
 
-  const formatCurrency = (amount?: number, currency?: string) => {
+  const formatCurrency = (amount?: number | null, currency?: string | null): string => {
     if (!amount) return '-'
     return `${currency || 'USD'} ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
@@ -630,7 +669,7 @@ export default function QuotationList({
     letterSpacing: '0.04em'
   })
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const SortIcon = ({ field }: { field: SortField }): React.JSX.Element | null => {
     // Only the active sort shows an arrow (an arrow on every header widened the table past the screen)
     if (sortField !== field) return null
     return sortDir === 'asc' ? (
@@ -649,7 +688,7 @@ export default function QuotationList({
     fontSize: '0.8rem'
   }
 
-  const toggleSelectId = (id: string) => {
+  const toggleSelectId = (id: string): void => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -658,7 +697,7 @@ export default function QuotationList({
     })
   }
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (): void => {
     if (selectedIds.size === data.rows.length) {
       setSelectedIds(new Set())
     } else {
@@ -666,12 +705,12 @@ export default function QuotationList({
     }
   }
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = async (): Promise<void> => {
     if (selectedIds.size === 0) return
     try {
       const result = await window.api.quotationBulkDelete([...selectedIds])
-      if ((result as any)?.error) {
-        showError((result as any).message || 'Failed to bulk delete')
+      if (isIpcError(result)) {
+        showError(result.message || 'Failed to bulk delete')
         return
       }
       showSuccess(`${result} quotation(s) deleted`)
@@ -681,12 +720,12 @@ export default function QuotationList({
       // Reload groups to refresh counts
       const grps = await window.api.quotationGroupGetAll()
       setQGroups(Array.isArray(grps) ? grps : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to bulk delete')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to bulk delete')
     }
   }
 
-  const handleAddToGroup = async (groupId: string) => {
+  const handleAddToGroup = async (groupId: string): Promise<void> => {
     if (selectedIds.size === 0) return
     try {
       await window.api.quotationGroupBulkAdd(groupId, [...selectedIds])
@@ -695,12 +734,12 @@ export default function QuotationList({
       // Refresh groups
       const grps = await window.api.quotationGroupGetAll()
       setQGroups(Array.isArray(grps) ? grps : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to add to group')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add to group')
     }
   }
 
-  const handleCreateGroup = async () => {
+  const handleCreateGroup = async (): Promise<void> => {
     if (!newGroupName.trim()) return
     try {
       const result = await window.api.quotationGroupAdd(
@@ -708,19 +747,19 @@ export default function QuotationList({
         newGroupPersonal ? user?.id || null : null,
         newGroupColor
       )
-      if (result && !(result as any).error) {
+      if (result && !isIpcError(result)) {
         setQGroups((prev) => [...prev, result])
         setNewGroupName('')
         setNewGroupColor('#00aac8')
         setNewGroupPersonal(false)
         showSuccess('Group created')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to create group')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to create group')
     }
   }
 
-  const handleUpdateGroup = async (id: string) => {
+  const handleUpdateGroup = async (id: string): Promise<void> => {
     if (!editGroupName.trim()) return
     try {
       await window.api.quotationGroupUpdate(id, {
@@ -734,24 +773,24 @@ export default function QuotationList({
       )
       setEditingGroup(null)
       showSuccess('Group updated')
-    } catch (err: any) {
-      showError(err.message || 'Failed to update group')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update group')
     }
   }
 
-  const handleDeleteGroup = async (id: string) => {
+  const handleDeleteGroup = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this group? The quotations in it are kept.'))) return
     try {
       await window.api.quotationGroupDelete(id)
       setQGroups((prev) => prev.filter((g) => g.id !== id))
       if (activeGroupId === id) setActiveGroupId(null)
       showSuccess('Group deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete group')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete group')
     }
   }
 
-  const renderRow = (q: any, showFavStar = true) => {
+  const renderRow = (q: ListRow, showFavStar = true): React.JSX.Element => {
     const isFav = favorites.has(q.id)
     return (
       <tr
@@ -775,7 +814,7 @@ export default function QuotationList({
             showError(`This quotation is locked by ${q.lockedByName || 'another user'}`)
             return
           }
-          onOpenQuotation(q)
+          onOpenQuotation(asQuotation(q))
         }}
       >
         {selectMode && (
@@ -1039,7 +1078,7 @@ export default function QuotationList({
               )}
               {hasPermission('quotations:create') && (
                 <button
-                  onClick={(e) => handleDuplicate(q, e)}
+                  onClick={(e) => handleDuplicate(asQuotation(q), e)}
                   className="btn-ghost btn-icon"
                   title="Duplicate"
                   aria-label="Duplicate"
@@ -1051,7 +1090,7 @@ export default function QuotationList({
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    openDeleteModal(q)
+                    openDeleteModal(asQuotation(q))
                   }}
                   className="btn-ghost btn-icon"
                   style={{ color: 'var(--danger)' }}
@@ -1068,7 +1107,7 @@ export default function QuotationList({
     )
   }
 
-  const renderTableHeader = (showFavCol = true) => (
+  const renderTableHeader = (showFavCol = true): React.JSX.Element => (
     <thead>
       <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
         {selectMode && (
@@ -1635,8 +1674,7 @@ export default function QuotationList({
             {/* Type chips */}
             {quotationTypes.map((qt) => {
               const active = typeFilter === qt.id
-              const count =
-                (data.stats.byType as any[])?.find((t: any) => t.code === qt.code)?.count || 0
+              const count = data.stats.byType?.find((t) => t.code === qt.code)?.count || 0
               return (
                 <button
                   key={qt.id}
@@ -2314,7 +2352,7 @@ export default function QuotationList({
                           </span>
                         </td>
                       </tr>
-                      {rows.map((q: any) => renderRow(q))}
+                      {rows.map((q) => renderRow(q))}
                     </React.Fragment>
                   ))
                 ) : (

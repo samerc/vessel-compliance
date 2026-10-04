@@ -17,6 +17,32 @@ const SECTION_LABELS: Record<string, string> = {
   law: 'Law & Jurisdiction'
 }
 
+interface CargoClauseData {
+  all: CargoClause[]
+  sel: QuotationCargoClause[]
+  cust: QuotationCargoCustomClause[]
+  sts: CargoClauseSet[]
+}
+
+/** Loads the clause master list, the quotation's selections, its custom clauses and the sets */
+async function fetchCargoClauseData(
+  quotationId: string,
+  section: 'conditions' | 'special' | 'law'
+): Promise<CargoClauseData> {
+  const [all, sel, cust, sts] = await Promise.all([
+    window.api.cargoGetClauses(section),
+    window.api.cargoGetQuotationClauses(quotationId, section),
+    window.api.cargoGetQuotationCustomClauses(quotationId, section),
+    window.api.cargoGetClauseSets(section)
+  ])
+  return {
+    all: Array.isArray(all) ? all : [],
+    sel: Array.isArray(sel) ? sel : [],
+    cust: Array.isArray(cust) ? cust : [],
+    sts: Array.isArray(sts) ? sts : []
+  }
+}
+
 function InstituteClauseDropdown({
   clauses,
   selectedId,
@@ -25,7 +51,7 @@ function InstituteClauseDropdown({
   clauses: CargoInstituteClause[]
   selectedId: string
   onChange: (id: string) => void
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -35,7 +61,7 @@ function InstituteClauseDropdown({
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -182,15 +208,14 @@ export default function CargoClausesTab({
   quotation,
   section,
   updateField,
-  showSuccess: _showSuccess,
   showError
 }: {
   quotation: Quotation
   section: 'conditions' | 'special' | 'law'
-  updateField?: (field: keyof Quotation, value: any) => void
+  updateField?: (field: keyof Quotation, value: unknown) => void
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [allClauses, setAllClauses] = useState<CargoClause[]>([])
@@ -204,24 +229,24 @@ export default function CargoClausesTab({
   const [showSetPicker, setShowSetPicker] = useState(false)
   const setPickerRef = useRef<HTMLDivElement>(null)
 
-  const loadData = async () => {
+  const applyClauseData = (d: CargoClauseData): void => {
+    setAllClauses(d.all)
+    setSelectedClauses(d.sel)
+    setCustomClauses(d.cust)
+    setSets(d.sts)
+  }
+
+  const loadData = async (): Promise<void> => {
     try {
-      const [all, sel, cust, sts] = await Promise.all([
-        window.api.cargoGetClauses(section),
-        window.api.cargoGetQuotationClauses(quotation.id, section),
-        window.api.cargoGetQuotationCustomClauses(quotation.id, section),
-        window.api.cargoGetClauseSets(section)
-      ])
-      setAllClauses(Array.isArray(all) ? all : [])
-      setSelectedClauses(Array.isArray(sel) ? sel : [])
-      setCustomClauses(Array.isArray(cust) ? cust : [])
-      setSets(Array.isArray(sts) ? sts : [])
-    } catch {}
+      applyClauseData(await fetchCargoClauseData(quotation.id, section))
+    } catch {
+      /* a failed reload keeps the lists already on screen */
+    }
   }
 
   useEffect(() => {
     if (!showSetPicker) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (setPickerRef.current && !setPickerRef.current.contains(e.target as Node))
         setShowSetPicker(false)
     }
@@ -229,7 +254,7 @@ export default function CargoClausesTab({
     return () => document.removeEventListener('mousedown', handler)
   }, [showSetPicker])
 
-  const applySet = async (set: CargoClauseSet) => {
+  const applySet = async (set: CargoClauseSet): Promise<void> => {
     try {
       const existing = selectedClauses.map((c) => ({
         cargoClauseId: c.cargoClauseId,
@@ -244,29 +269,39 @@ export default function CargoClausesTab({
       if (additions.length === 0) return
       await window.api.cargoSetQuotationClauses(quotation.id, section, [...existing, ...additions])
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to apply set')
-    }
-  }
-
-  const loadInstituteClauses = async () => {
-    if (section !== 'conditions') return
-    try {
-      const result = await window.api.cargoGetInstituteClauses()
-      setInstituteClauses(Array.isArray(result) ? result.filter((c) => c.active !== false) : [])
-    } catch {
-      setInstituteClauses([])
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to apply set')
     }
   }
 
   useEffect(() => {
-    loadData()
-    loadInstituteClauses()
+    const loadClauses = async (): Promise<void> => {
+      try {
+        const d = await fetchCargoClauseData(quotation.id, section)
+        setAllClauses(d.all)
+        setSelectedClauses(d.sel)
+        setCustomClauses(d.cust)
+        setSets(d.sts)
+      } catch {
+        /* a failed load leaves the lists empty */
+      }
+    }
+    const loadInstituteClauses = async (): Promise<void> => {
+      if (section !== 'conditions') return
+      try {
+        const result = await window.api.cargoGetInstituteClauses()
+        setInstituteClauses(Array.isArray(result) ? result.filter((c) => c.active !== false) : [])
+      } catch {
+        setInstituteClauses([])
+      }
+    }
+    void loadClauses()
+    void loadInstituteClauses()
   }, [quotation.id, section])
 
   const selectedIds = new Set(selectedClauses.map((c) => c.cargoClauseId))
 
-  const toggleClause = async (clause: CargoClause) => {
+  const toggleClause = async (clause: CargoClause): Promise<void> => {
     try {
       let newItems: { cargoClauseId: string; textOverride?: string; amount?: number | null }[]
       if (selectedIds.has(clause.id)) {
@@ -289,12 +324,12 @@ export default function CargoClausesTab({
       }
       await window.api.cargoSetQuotationClauses(quotation.id, section, newItems)
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update')
     }
   }
 
-  const updateOverride = async (cargoClauseId: string, textOverride: string) => {
+  const updateOverride = async (cargoClauseId: string, textOverride: string): Promise<void> => {
     const newItems = selectedClauses.map((c) => ({
       cargoClauseId: c.cargoClauseId,
       textOverride:
@@ -307,7 +342,7 @@ export default function CargoClausesTab({
     )
   }
 
-  const updateAmount = async (cargoClauseId: string, amount: number | null) => {
+  const updateAmount = async (cargoClauseId: string, amount: number | null): Promise<void> => {
     const newItems = selectedClauses.map((c) => ({
       cargoClauseId: c.cargoClauseId,
       textOverride: c.textOverride || undefined,
@@ -319,7 +354,7 @@ export default function CargoClausesTab({
     )
   }
 
-  const addCustom = async () => {
+  const addCustom = async (): Promise<void> => {
     if (!newCustomText.trim()) return
     try {
       const result = await window.api.cargoAddQuotationCustomClause(
@@ -327,21 +362,21 @@ export default function CargoClausesTab({
         section,
         newCustomText.trim()
       )
-      if (result && !(result as any).error) {
+      if (result && !(result as { error?: unknown }).error) {
         setCustomClauses((prev) => [...prev, result])
         setNewCustomText('')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to add')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add')
     }
   }
 
-  const deleteCustom = async (id: string) => {
+  const deleteCustom = async (id: string): Promise<void> => {
     await window.api.cargoDeleteQuotationCustomClause(id)
     setCustomClauses((prev) => prev.filter((c) => c.id !== id))
   }
 
-  const updateCustomText = async (id: string, text: string) => {
+  const updateCustomText = async (id: string, text: string): Promise<void> => {
     await window.api.cargoUpdateQuotationCustomClause(id, { text })
     setCustomClauses((prev) => prev.map((c) => (c.id === id ? { ...c, text } : c)))
     setEditingCustom(null)
@@ -349,7 +384,7 @@ export default function CargoClausesTab({
 
   const availableClauses = allClauses.filter((c) => c.active !== false)
 
-  const handleInstituteClauseChange = (id: string) => {
+  const handleInstituteClauseChange = (id: string): void => {
     if (updateField) {
       updateField('cargoClauseId', id)
     }

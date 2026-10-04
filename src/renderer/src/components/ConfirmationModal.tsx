@@ -20,7 +20,7 @@ export default function ConfirmationModal({
   isDangerous = false,
   onConfirm,
   onCancel
-}: ConfirmationModalProps) {
+}: ConfirmationModalProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const modalRef = useRef<HTMLDivElement>(null)
@@ -42,7 +42,7 @@ export default function ConfirmationModal({
       first?.focus()
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onCancel()
         return

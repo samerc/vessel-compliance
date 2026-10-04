@@ -22,9 +22,9 @@ export default function Modal({
   footer,
   width = 520,
   closeOnOverlay = true
-}: ModalProps) {
+}: ModalProps): React.JSX.Element {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)

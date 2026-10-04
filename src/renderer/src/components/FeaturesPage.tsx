@@ -9,7 +9,7 @@ interface FeaturesPageProps {
 }
 
 /** Everything the app can do, from the feature registry, each with a link to it */
-export default function FeaturesPage({ onNavigate }: FeaturesPageProps) {
+export default function FeaturesPage({ onNavigate }: FeaturesPageProps): React.JSX.Element {
   const { hasPermission, isAdmin } = useAuth()
   const [query, setQuery] = useState('')
   const [area, setArea] = useState<FeatureArea | 'all'>('all')

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { formatNumberWithCommas, parseFormattedNumber } from '../utils/numberFormat'
 
 interface Props {
@@ -27,32 +27,24 @@ export default function NumberInput({
   max,
   decimals,
   className
-}: Props) {
+}: Props): React.JSX.Element {
   const [display, setDisplay] = useState('')
   const [focused, setFocused] = useState(false)
 
-  // Sync display from prop when not focused
-  useEffect(() => {
-    if (!focused) {
-      if (value == null || value === '') {
-        setDisplay('')
-      } else {
-        const num = typeof value === 'string' ? parseFloat(value) : value
-        if (!isNaN(num)) {
-          const formatted =
-            decimals !== undefined
-              ? num.toLocaleString('en-US', {
-                  minimumFractionDigits: decimals,
-                  maximumFractionDigits: decimals
-                })
-              : num.toLocaleString('en-US')
-          setDisplay(formatted)
-        } else {
-          setDisplay('')
-        }
-      }
-    }
-  }, [value, focused, decimals])
+  // While not focused the input shows the formatted prop value; while focused it shows what
+  // the user is typing.
+  const formatValue = (): string => {
+    if (value == null || value === '') return ''
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(num)) return ''
+    return decimals !== undefined
+      ? num.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        })
+      : num.toLocaleString('en-US')
+  }
+  const shown = focused ? display : formatValue()
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,7 +66,10 @@ export default function NumberInput({
     [onChange, min, max]
   )
 
-  const handleFocus = useCallback(() => setFocused(true), [])
+  const handleFocus = (): void => {
+    setDisplay(formatValue())
+    setFocused(true)
+  }
 
   const handleBlur = useCallback(() => {
     setFocused(false)
@@ -103,7 +98,7 @@ export default function NumberInput({
     <input
       type="text"
       inputMode="decimal"
-      value={display}
+      value={shown}
       onChange={handleChange}
       onFocus={handleFocus}
       onBlur={handleBlur}

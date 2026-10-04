@@ -6,7 +6,7 @@ interface SpinnerProps {
   label?: string
 }
 
-export default function Spinner({ size = 16, label }: SpinnerProps) {
+export default function Spinner({ size = 16, label }: SpinnerProps): React.JSX.Element {
   if (!label) return <Loader2 size={size} className="spinner" aria-label="Loading" />
   return (
     <span

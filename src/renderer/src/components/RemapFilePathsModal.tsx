@@ -70,7 +70,7 @@ export default function RemapFilePathsModal({
   entityName,
   includeEntityIds,
   onClose
-}: RemapFilePathsModalProps) {
+}: RemapFilePathsModalProps): React.JSX.Element {
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -88,7 +88,7 @@ export default function RemapFilePathsModal({
   const [checking, setChecking] = useState(false)
 
   useEffect(() => {
-    const load = async () => {
+    const load = async (): Promise<void> => {
       const allEntries: FileEntry[] = []
       // Load vessel files
       if (vesselId) {
@@ -119,7 +119,7 @@ export default function RemapFilePathsModal({
     load()
   }, [targetId, isEntity, vesselId, entityId, includeEntityIds])
 
-  async function handlePreview() {
+  async function handlePreview(): Promise<void> {
     if (!oldPrefix || !newPrefix) return
     setChecking(true)
     const mapped: MappedRow[] = []
@@ -147,7 +147,7 @@ export default function RemapFilePathsModal({
     setStep('preview')
   }
 
-  async function handleLocate(index: number) {
+  async function handleLocate(index: number): Promise<void> {
     const path = await window.api.dialogLocateFile()
     if (!path) return
     setRows((prev) =>
@@ -155,7 +155,7 @@ export default function RemapFilePathsModal({
     )
   }
 
-  async function handleApply() {
+  async function handleApply(): Promise<void> {
     const toUpdate = rows.filter((r) => r.status === 'matched')
     if (toUpdate.length === 0) {
       onClose()
@@ -185,8 +185,8 @@ export default function RemapFilePathsModal({
         `Updated ${toUpdate.length} file path${toUpdate.length !== 1 ? 's' : ''} for ${targetName}`
       )
       onClose()
-    } catch (e: any) {
-      showError(e.message || 'Failed to remap file paths')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to remap file paths')
     } finally {
       setSaving(false)
     }

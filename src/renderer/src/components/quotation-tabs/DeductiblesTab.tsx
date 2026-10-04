@@ -29,12 +29,12 @@ export default function DeductiblesTab({
   showSuccess: (m: string) => void
   showError?: (m: string) => void
   isLight?: boolean
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   getEffectiveText: (key: keyof PISectionTexts) => string
   piAlternatives?: QuotationPIAlternative[]
   selectedPIAltId?: string | null
-}) {
+}): React.JSX.Element {
   const altStyle = (altId: string | null | undefined): React.CSSProperties => {
     if (piAlternatives.length < 2 || !selectedPIAltId) return {}
     const matches = !altId || altId === selectedPIAltId
@@ -63,57 +63,59 @@ export default function DeductiblesTab({
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
   const defaultsApplied = useRef(false)
 
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
-    loadData()
-  }, [])
+    const loadData = async (): Promise<void> => {
+      const [qd, md, td, mtd, qv] = await Promise.all([
+        window.api.getQuotationDeductibles(quotation.id),
+        window.api.piGetDeductibles(),
+        window.api.getQuotationTextDeductibles(quotation.id),
+        window.api.piGetTextDeductibles(),
+        window.api.getQuotationVessels(quotation.id)
+      ])
+      const safeQd = Array.isArray(qd) ? qd : []
+      const safeMd = Array.isArray(md) ? md : []
+      const safeTd = Array.isArray(td) ? td : []
+      const safeMtd = Array.isArray(mtd) ? mtd : []
+      setDeductibles(safeQd)
+      setMasterDeductibles(safeMd)
+      setTextDeds(safeTd)
+      setMasterTextDeds(safeMtd)
+      setQVessels(Array.isArray(qv) ? qv : [])
 
-  const loadData = async () => {
-    const [qd, md, td, mtd, qv] = await Promise.all([
-      window.api.getQuotationDeductibles(quotation.id),
-      window.api.piGetDeductibles(),
-      window.api.getQuotationTextDeductibles(quotation.id),
-      window.api.piGetTextDeductibles(),
-      window.api.getQuotationVessels(quotation.id)
-    ])
-    const safeQd = Array.isArray(qd) ? qd : []
-    const safeMd = Array.isArray(md) ? md : []
-    const safeTd = Array.isArray(td) ? td : []
-    const safeMtd = Array.isArray(mtd) ? mtd : []
-    setDeductibles(safeQd)
-    setMasterDeductibles(safeMd)
-    setTextDeds(safeTd)
-    setMasterTextDeds(safeMtd)
-    setQVessels(Array.isArray(qv) ? qv : [])
-
-    // Auto-include default text deductibles on first load — only when the quotation's list
-    // really loaded empty (a failed load must not re-seed duplicates over existing rows)
-    if (
-      !defaultsApplied.current &&
-      Array.isArray(td) &&
-      safeTd.length === 0 &&
-      safeMtd.length > 0
-    ) {
-      defaultsApplied.current = true
-      const defaults = safeMtd.filter((t) => t.defaultIncluded)
-      for (let i = 0; i < defaults.length; i++) {
-        await window.api.addQuotationTextDeductible({
-          quotationId: quotation.id,
-          piTextDeductibleId: defaults[i].id,
-          title: defaults[i].title,
-          text: defaults[i].text,
-          order: i
-        })
+      // Auto-include default text deductibles on first load — only when the quotation's list
+      // really loaded empty (a failed load must not re-seed duplicates over existing rows)
+      if (
+        !defaultsApplied.current &&
+        Array.isArray(td) &&
+        safeTd.length === 0 &&
+        safeMtd.length > 0
+      ) {
+        defaultsApplied.current = true
+        const defaults = safeMtd.filter((t) => t.defaultIncluded)
+        for (let i = 0; i < defaults.length; i++) {
+          await window.api.addQuotationTextDeductible({
+            quotationId: quotation.id,
+            piTextDeductibleId: defaults[i].id,
+            title: defaults[i].title,
+            text: defaults[i].text,
+            order: i
+          })
+        }
+        if (defaults.length > 0) {
+          const freshTd = await window.api.getQuotationTextDeductibles(quotation.id)
+          setTextDeds(Array.isArray(freshTd) ? freshTd : [])
+        }
+      } else {
+        defaultsApplied.current = true
       }
-      if (defaults.length > 0) {
-        const freshTd = await window.api.getQuotationTextDeductibles(quotation.id)
-        setTextDeds(Array.isArray(freshTd) ? freshTd : [])
-      }
-    } else {
-      defaultsApplied.current = true
     }
-  }
+    loadData()
+  }, [quotation.id, reloadKey])
+  const reload = (): void => setReloadKey((k) => k + 1)
 
-  const handleAddFromMaster = async (masterId: string) => {
+  const handleAddFromMaster = async (masterId: string): Promise<void> => {
     const master = masterDeductibles.find((m) => m.id === masterId)
     if (!master) return
     await window.api.addQuotationDeductible({
@@ -127,10 +129,10 @@ export default function DeductiblesTab({
       order: deductibles.length
     })
     showSuccess('Deductible added')
-    loadData()
+    reload()
   }
 
-  const addCustomDeductible = async () => {
+  const addCustomDeductible = async (): Promise<void> => {
     if (!newCustomDesc.trim()) return
     await window.api.addQuotationDeductible({
       quotationId: quotation.id,
@@ -141,7 +143,7 @@ export default function DeductiblesTab({
     })
     setNewCustomDesc('')
     showSuccess('Custom deductible added')
-    loadData()
+    reload()
   }
 
   const handleUpdate = async (
@@ -157,7 +159,7 @@ export default function DeductiblesTab({
       previousAmount?: number | null
       previousSecondaryAmount?: number | null
     }
-  ) => {
+  ): Promise<void> => {
     await window.api.updateQuotationDeductible(id, updates)
   }
 
@@ -165,7 +167,7 @@ export default function DeductiblesTab({
     dedId: string,
     vesselId: string,
     amount: number | undefined
-  ) => {
+  ): void => {
     setDeductibles((prev) =>
       prev.map((d) => {
         if (d.id !== dedId) return d
@@ -189,7 +191,7 @@ export default function DeductiblesTab({
     )
   }
 
-  const saveDeductibleVesselAmounts = async (dedId: string) => {
+  const saveDeductibleVesselAmounts = async (dedId: string): Promise<void> => {
     const ded = deductibles.find((d) => d.id === dedId)
     if (!ded) return
     await handleUpdate(dedId, { amount: ded.amount, vesselAmounts: ded.vesselAmounts || null })
@@ -199,7 +201,7 @@ export default function DeductiblesTab({
     dedId: string,
     vesselId: string,
     amount: number | undefined
-  ) => {
+  ): void => {
     setDeductibles((prev) =>
       prev.map((d) => {
         if (d.id !== dedId) return d
@@ -223,7 +225,7 @@ export default function DeductiblesTab({
     )
   }
 
-  const saveDeductibleVesselSecondaryAmounts = async (dedId: string) => {
+  const saveDeductibleVesselSecondaryAmounts = async (dedId: string): Promise<void> => {
     const ded = deductibles.find((d) => d.id === dedId)
     if (!ded) return
     await handleUpdate(dedId, {
@@ -232,7 +234,7 @@ export default function DeductiblesTab({
     })
   }
 
-  const moveDeductible = async (index: number, direction: 'up' | 'down') => {
+  const moveDeductible = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= deductibles.length) return
     const newOrder = [...deductibles]
@@ -241,7 +243,7 @@ export default function DeductiblesTab({
     await window.api.reorderQuotationDeductibles(newOrder.map((d) => d.id))
   }
 
-  const handleAddTextDed = async () => {
+  const handleAddTextDed = async (): Promise<void> => {
     if (!newTextTitle.trim() && !newTextDed.trim()) return
     await window.api.addQuotationTextDeductible({
       quotationId: quotation.id,
@@ -252,10 +254,10 @@ export default function DeductiblesTab({
     setNewTextTitle('')
     setNewTextDed('')
     showSuccess('Text deductible added')
-    loadData()
+    reload()
   }
 
-  const addTextFromMaster = async (masterId: string) => {
+  const addTextFromMaster = async (masterId: string): Promise<void> => {
     const master = masterTextDeds.find((m) => m.id === masterId)
     if (!master) return
     await window.api.addQuotationTextDeductible({
@@ -266,10 +268,10 @@ export default function DeductiblesTab({
       order: textDeds.length
     })
     showSuccess('Text deductible added')
-    loadData()
+    reload()
   }
 
-  const moveTextDed = async (index: number, direction: 'up' | 'down') => {
+  const moveTextDed = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= textDeds.length) return
     const newOrder = [...textDeds]
@@ -278,22 +280,22 @@ export default function DeductiblesTab({
     await window.api.reorderQuotationTextDeductibles(newOrder.map((d) => d.id))
   }
 
-  const updateDeductibleScope = async (id: string, scope: string[] | null) => {
+  const updateDeductibleScope = async (id: string, scope: string[] | null): Promise<void> => {
     setDeductibles((prev) => prev.map((d) => (d.id === id ? { ...d, vesselScope: scope } : d)))
     await window.api.updateQuotationDeductible(id, { vesselScope: scope })
   }
 
-  const updateDeductibleAltId = async (id: string, altId: string | null) => {
+  const updateDeductibleAltId = async (id: string, altId: string | null): Promise<void> => {
     ok(await window.api.updateQuotationItemAlternativeId('quotation_deductibles', id, altId))
     setDeductibles((prev) => prev.map((d) => (d.id === id ? { ...d, alternativeId: altId } : d)))
   }
 
-  const updateTextDeductibleAltId = async (id: string, altId: string | null) => {
+  const updateTextDeductibleAltId = async (id: string, altId: string | null): Promise<void> => {
     ok(await window.api.updateQuotationItemAlternativeId('quotation_text_deductibles', id, altId))
     setTextDeds((prev) => prev.map((d) => (d.id === id ? { ...d, alternativeId: altId } : d)))
   }
 
-  const updateTextDeductibleScope = async (id: string, scope: string[] | null) => {
+  const updateTextDeductibleScope = async (id: string, scope: string[] | null): Promise<void> => {
     setTextDeds((prev) => prev.map((d) => (d.id === id ? { ...d, vesselScope: scope } : d)))
     await window.api.updateQuotationTextDeductible(id, { vesselScope: scope })
   }
@@ -464,7 +466,7 @@ export default function DeductiblesTab({
               aria-label="Delete"
               onClick={async () => {
                 await window.api.deleteQuotationDeductible(d.id)
-                loadData()
+                reload()
               }}
               style={{
                 background: 'transparent',
@@ -904,7 +906,7 @@ export default function DeductiblesTab({
                       text: editTextContent
                     })
                     setEditingTextId(null)
-                    loadData()
+                    reload()
                   }}
                   style={{
                     background: 'transparent',
@@ -973,7 +975,7 @@ export default function DeductiblesTab({
                   aria-label="Delete"
                   onClick={async () => {
                     await window.api.deleteQuotationTextDeductible(td.id)
-                    loadData()
+                    reload()
                   }}
                   style={{
                     background: 'transparent',

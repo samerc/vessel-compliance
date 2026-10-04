@@ -14,11 +14,13 @@ class ChangelogService {
 
     try {
       const result = await window.api.updateGetChangelogs()
-      if (result.error) {
+      if ('error' in result) {
         throw new Error(result.message || 'Failed to fetch changelogs')
       }
-      this.cache = result
-      return result
+      // GitHub may return null name/date/notes (shared Changelog type); callers treat them as strings
+      const entries = result as ChangelogEntry[]
+      this.cache = entries
+      return entries
     } catch (error) {
       console.error('ChangelogService error:', error)
       throw error

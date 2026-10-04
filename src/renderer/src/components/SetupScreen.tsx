@@ -18,17 +18,17 @@ export const SetupScreen: React.FC = () => {
     window.api.setupGetConfigPath().then(setCurrentConfigPath)
   }, [])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSelectDir = async () => {
+  const handleSelectDir = async (): Promise<void> => {
     const path = await window.api.setupSelectDirectory()
     if (path) setDirectory(path)
   }
 
-  const handleBrowseConfigFile = async () => {
+  const handleBrowseConfigFile = async (): Promise<void> => {
     const filePath = await window.api.setupSelectConfigFile()
     if (filePath) {
       setSelectedConfigFile(filePath)
@@ -36,7 +36,7 @@ export const SetupScreen: React.FC = () => {
     }
   }
 
-  const handleLoadConfigFile = async () => {
+  const handleLoadConfigFile = async (): Promise<void> => {
     if (!selectedConfigFile) return
 
     setLoading(true)
@@ -48,14 +48,14 @@ export const SetupScreen: React.FC = () => {
       } else {
         setError(result.message || 'Failed to load configuration')
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setError('')
 
@@ -71,8 +71,8 @@ export const SetupScreen: React.FC = () => {
       if (!result.success) {
         setError(result.message || 'Failed to save configuration')
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }

@@ -1,3 +1,4 @@
+import React from 'react'
 import { Quotation } from '../../../../shared/types'
 
 export default function VoyageTab({
@@ -6,9 +7,9 @@ export default function VoyageTab({
   setQ
 }: {
   quotation: Quotation
-  updateField: (field: string, value: any) => void
+  updateField: (field: string, value: unknown) => void
   setQ: (fn: (prev: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   return (
     <div>
       <h3 style={{ fontSize: '1rem', marginBottom: '16px' }}>Voyage / Period</h3>

@@ -18,8 +18,46 @@ import {
   ClassificationSociety,
   Entity,
   VesselDynamicPolicy,
-  VesselType
+  VesselType,
+  VesselDocument,
+  DocumentType,
+  VesselClassification
 } from '../../../shared/types'
+
+interface ComparePolicySummary {
+  typeName: string
+  policyNumber: string
+  status: string
+}
+
+interface CompareDocStats {
+  compliant: number
+  total: number
+  missing: number
+  expired: number
+  pct: number
+}
+
+interface CompareData {
+  vessel1: Vessel
+  vessel2: Vessel
+  policies1: ComparePolicySummary[]
+  policies2: ComparePolicySummary[]
+  docs1: CompareDocStats
+  docs2: CompareDocStats
+  class1: string
+  class2: string
+  fleet1: string
+  fleet2: string
+  customer1: string
+  customer2: string
+  flag1: string
+  flag2: string
+}
+
+// NOTE: Vessel has no `sanctionsStatus` (the field is ofacStatus), so the comparison always
+// shows PENDING. Kept as is (lint-only change).
+type VesselWithSanctionsStatus = Vessel & { sanctionsStatus?: string }
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { PageHeader } from './ui'
@@ -41,7 +79,7 @@ function MultiSelectDropdown({
   onChange: (ids: string[]) => void
   placeholder?: string
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
@@ -50,12 +88,12 @@ function MultiSelectDropdown({
   const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
   const showSearch = options.length > 6
 
-  const close = () => {
+  const close = (): void => {
     setOpen(false)
     setSearch('')
   }
 
-  const handleToggle = () => {
+  const handleToggle = (): void => {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
       const searchH = showSearch ? 44 : 0
@@ -81,7 +119,7 @@ function MultiSelectDropdown({
       )
     : options
 
-  const toggle = (id: string) =>
+  const toggle = (id: string): void =>
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
 
   const selectedLabels = options.filter((o) => selected.includes(o.id)).map((o) => o.label)
@@ -302,7 +340,87 @@ function MultiSelectDropdown({
 }
 
 // ── Module-level cache — persists filter state only when returning from vessel detail ──
-const _resetCache = () => {
+const SectionLabel = ({ children }: { children: string }): React.JSX.Element => (
+  <div
+    style={{
+      fontSize: '0.7rem',
+      fontWeight: 700,
+      letterSpacing: '0.6px',
+      textTransform: 'uppercase',
+      color: 'var(--text-secondary)',
+      marginBottom: '10px'
+    }}
+  >
+    {children}
+  </div>
+)
+const Divider = (): React.JSX.Element => (
+  <div style={{ height: '1px', background: 'var(--glass-border)', opacity: 0.6 }} />
+)
+
+const CompareRow = ({
+  label,
+  val1,
+  val2,
+  highlight
+}: {
+  label: string
+  val1: React.ReactNode
+  val2: React.ReactNode
+  highlight?: boolean
+}): React.JSX.Element => (
+  <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+    <td
+      style={{
+        padding: '10px 14px',
+        fontWeight: '600',
+        fontSize: '0.82rem',
+        color: 'var(--text-secondary)',
+        width: '160px'
+      }}
+    >
+      {label}
+    </td>
+    <td
+      style={{
+        padding: '10px 14px',
+        fontSize: '0.88rem',
+        fontWeight: highlight ? '700' : '400'
+      }}
+    >
+      {val1}
+    </td>
+    <td
+      style={{
+        padding: '10px 14px',
+        fontSize: '0.88rem',
+        fontWeight: highlight ? '700' : '400'
+      }}
+    >
+      {val2}
+    </td>
+  </tr>
+)
+
+const SectionHeader = ({ label }: { label: string }): React.JSX.Element => (
+  <tr>
+    <td
+      colSpan={3}
+      style={{
+        padding: '14px 14px 6px',
+        fontWeight: '800',
+        fontSize: '0.72rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        color: 'var(--accent-primary)'
+      }}
+    >
+      {label}
+    </td>
+  </tr>
+)
+
+const _resetCache = (): void => {
   _cache.hasSearched = false
   _cache.panelCollapsed = false
   _cache.nameSearch = ''
@@ -347,7 +465,7 @@ const _cache = {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) {
+export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps): React.JSX.Element {
   const { showError } = useToast()
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -400,7 +518,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
   // Vessel comparison state
   const [comparedVesselIds, setComparedVesselIds] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
-  const [compareData, setCompareData] = useState<any>(null)
+  const [compareData, setCompareData] = useState<CompareData | null>(null)
   const [compareLoading, setCompareLoading] = useState(false)
 
   // Save filter state to module cache on every change
@@ -457,30 +575,46 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     }
   }, [])
 
+  // Load the filter option lists once on mount
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const [v, pt, fs, cs, vt, ent] = await Promise.all([
-        window.api.getVessels(),
-        window.api.getPolicyTypes(),
-        window.api.getFlagStates(),
-        window.api.getClassificationSocieties(),
-        window.api.getVesselTypes(),
-        window.api.getEntities()
-      ])
-      setVessels(Array.isArray(v) ? v : [])
-      setPolicyTypes(Array.isArray(pt) ? pt : [])
-      setFlagStates(Array.isArray(fs) ? fs : [])
-      setClassSocieties(Array.isArray(cs) ? cs : [])
-      setVesselTypes(Array.isArray(vt) ? vt : [])
-      setEntities(Array.isArray(ent) ? ent : [])
-    } catch {
-      showError('Failed to load filter data')
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const [v, pt, fs, cs, vt, ent] = await Promise.all([
+          window.api.getVessels(),
+          window.api.getPolicyTypes(),
+          window.api.getFlagStates(),
+          window.api.getClassificationSocieties(),
+          window.api.getVesselTypes(),
+          window.api.getEntities()
+        ])
+        if (!alive) return
+        setVessels(Array.isArray(v) ? v : [])
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        setFlagStates(Array.isArray(fs) ? fs : [])
+        setClassSocieties(Array.isArray(cs) ? cs : [])
+        setVesselTypes(Array.isArray(vt) ? vt : [])
+        setEntities(Array.isArray(ent) ? ent : [])
+      } catch {
+        if (alive) showError('Failed to load filter data')
+      }
     }
-  }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [showError])
+
+  const flagMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const fs of flagStates) m.set(fs.id, fs.name)
+    return m
+  }, [flagStates])
+  const customerMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const e of entities) m.set(e.id, e.name)
+    return m
+  }, [entities])
 
   const activeFilterCount = [
     selectedPolicyTypes.length > 0,
@@ -497,7 +631,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
 
   const hasAnyCriteria = activeFilterCount > 0
 
-  const handleSearch = async () => {
+  const handleSearch = async (): Promise<void> => {
     if (!hasAnyCriteria) {
       showError('Please select at least one filter criterion')
       return
@@ -526,21 +660,21 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
             if (Array.isArray(cls) && cls.length > 0)
               cMap.set(
                 chunk[j].id,
-                cls.map((c: any) => c.classificationSocietyId)
+                cls.map((c) => c.classificationSocietyId)
               )
           })
         }
       }
       setVesselPolicies(pMap)
       setVesselClassifications(cMap)
-    } catch (err: any) {
-      showError(err.message || 'Failed to search')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to search')
     } finally {
       setLoading(false)
     }
   }
 
-  const clearAll = () => {
+  const clearAll = (): void => {
     setSelectedPolicyTypes([])
     setPolicyStatus('all')
     setSelectedFlagStates([])
@@ -560,7 +694,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     setVesselClassifications(new Map())
   }
 
-  const toggleCompareVessel = (id: string) => {
+  const toggleCompareVessel = (id: string): void => {
     setComparedVesselIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id)
       if (prev.length >= 2) return prev
@@ -568,7 +702,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     })
   }
 
-  const openCompare = async () => {
+  const openCompare = async (): Promise<void> => {
     if (comparedVesselIds.length !== 2) return
     setCompareLoading(true)
     setShowCompare(true)
@@ -590,21 +724,21 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
 
       const policyTypes_ = await window.api.getPolicyTypes()
       const ptMap = new Map(
-        (Array.isArray(policyTypes_) ? policyTypes_ : []).map((pt: any) => [pt.id, pt.name])
+        (Array.isArray(policyTypes_) ? policyTypes_ : []).map((pt) => [pt.id, pt.name])
       )
 
-      const buildPolicySummary = (policies: any[]) => {
+      const buildPolicySummary = (policies: VesselDynamicPolicy[]): ComparePolicySummary[] => {
         const active = (Array.isArray(policies) ? policies : []).filter(
-          (p: any) => p.status === 'active'
+          (p) => p.status === 'active'
         )
-        return active.map((p: any) => ({
+        return active.map((p) => ({
           typeName: ptMap.get(p.policyTypeId) || 'Unknown',
           policyNumber: p.policyNumber || '-',
           status: p.status
         }))
       }
 
-      const buildDocStats = (docs: any[], types: any[]) => {
+      const buildDocStats = (docs: VesselDocument[], types: DocumentType[]): CompareDocStats => {
         const safeTypes = Array.isArray(types) ? types : []
         const safeDocs = Array.isArray(docs) ? docs : []
         const total = safeTypes.length
@@ -613,7 +747,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
           expired = 0
         const today = new Date()
         for (const t of safeTypes) {
-          const doc = safeDocs.find((d: any) => d.documentTypeId === t.id)
+          const doc = safeDocs.find((d) => d.documentTypeId === t.id)
           if (!doc?.filePath) {
             missing++
             continue
@@ -634,15 +768,15 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
       }
 
       const classMap = new Map(classSocieties.map((cs) => [cs.id, cs.abbreviation || cs.name]))
-      const getClassNames = (clsList: any[]) =>
+      const getClassNames = (clsList: VesselClassification[]): string =>
         (Array.isArray(clsList) ? clsList : [])
-          .map((c: any) => classMap.get(c.classificationSocietyId) || 'Unknown')
+          .map((c) => classMap.get(c.classificationSocietyId) || 'Unknown')
           .join(', ') || '-'
 
       const fleetMap = new Map<string, string>()
       try {
         const fleets = await window.api.getFleets()
-        if (Array.isArray(fleets)) fleets.forEach((f: any) => fleetMap.set(f.id, f.name))
+        if (Array.isArray(fleets)) fleets.forEach((f) => fleetMap.set(f.id, f.name))
       } catch {
         /* ignore */
       }
@@ -663,8 +797,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
         flag1: vessel1.flagStateId ? flagMap.get(vessel1.flagStateId) || '-' : '-',
         flag2: vessel2.flagStateId ? flagMap.get(vessel2.flagStateId) || '-' : '-'
       })
-    } catch (err: any) {
-      showError(err.message || 'Failed to load comparison data')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to load comparison data')
     } finally {
       setCompareLoading(false)
     }
@@ -743,16 +877,6 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     )
   }, [filteredVessels, nameSearch])
 
-  const flagMap = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const fs of flagStates) m.set(fs.id, fs.name)
-    return m
-  }, [flagStates])
-  const customerMap = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const e of entities) m.set(e.id, e.name)
-    return m
-  }, [entities])
   const customerEntities = useMemo(() => {
     const ids = new Set(vessels.filter((v) => v.customerId).map((v) => v.customerId!))
     return entities.filter((e) => ids.has(e.id))
@@ -772,7 +896,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     [flagUnassigned, selectedFlagStates]
   )
 
-  const handleFlagChange = (ids: string[]) => {
+  const handleFlagChange = (ids: string[]): void => {
     setFlagUnassigned(ids.includes('__unassigned__'))
     setSelectedFlagStates(ids.filter((id) => id !== '__unassigned__'))
   }
@@ -787,7 +911,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     [classSocieties]
   )
 
-  const chip = (selected: boolean) => ({
+  const chip = (selected: boolean): React.CSSProperties => ({
     padding: '4px 12px',
     borderRadius: '14px',
     border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
@@ -820,24 +944,6 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     letterSpacing: '0.5px',
     color: 'var(--text-secondary)'
   }
-
-  const SectionLabel = ({ children }: { children: string }) => (
-    <div
-      style={{
-        fontSize: '0.7rem',
-        fontWeight: 700,
-        letterSpacing: '0.6px',
-        textTransform: 'uppercase',
-        color: 'var(--text-secondary)',
-        marginBottom: '10px'
-      }}
-    >
-      {children}
-    </div>
-  )
-  const Divider = () => (
-    <div style={{ height: '1px', background: 'var(--glass-border)', opacity: 0.6 }} />
-  )
 
   return (
     <div
@@ -1647,74 +1753,12 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                   flag2
                 } = compareData
 
-                const CompareRow = ({
-                  label,
-                  val1,
-                  val2,
-                  highlight
-                }: {
-                  label: string
-                  val1: React.ReactNode
-                  val2: React.ReactNode
-                  highlight?: boolean
-                }) => (
-                  <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                    <td
-                      style={{
-                        padding: '10px 14px',
-                        fontWeight: '600',
-                        fontSize: '0.82rem',
-                        color: 'var(--text-secondary)',
-                        width: '160px'
-                      }}
-                    >
-                      {label}
-                    </td>
-                    <td
-                      style={{
-                        padding: '10px 14px',
-                        fontSize: '0.88rem',
-                        fontWeight: highlight ? '700' : '400'
-                      }}
-                    >
-                      {val1}
-                    </td>
-                    <td
-                      style={{
-                        padding: '10px 14px',
-                        fontSize: '0.88rem',
-                        fontWeight: highlight ? '700' : '400'
-                      }}
-                    >
-                      {val2}
-                    </td>
-                  </tr>
-                )
-
-                const SectionHeader = ({ label }: { label: string }) => (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      style={{
-                        padding: '14px 14px 6px',
-                        fontWeight: '800',
-                        fontSize: '0.72rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {label}
-                    </td>
-                  </tr>
-                )
-
                 const allPolicyTypes = new Set([
-                  ...policies1.map((p: any) => p.typeName),
-                  ...policies2.map((p: any) => p.typeName)
+                  ...policies1.map((p) => p.typeName),
+                  ...policies2.map((p) => p.typeName)
                 ])
 
-                const pctColor = (pct: number) =>
+                const pctColor = (pct: number): '#10b981' | '#f59e0b' | 'var(--danger)' =>
                   pct === 100 ? '#10b981' : pct >= 80 ? '#f59e0b' : 'var(--danger)'
 
                 return (
@@ -1794,9 +1838,11 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                       <SectionHeader label="Policies" />
                       {allPolicyTypes.size > 0 ? (
                         Array.from(allPolicyTypes).map((typeName) => {
-                          const p1 = policies1.find((p: any) => p.typeName === typeName)
-                          const p2 = policies2.find((p: any) => p.typeName === typeName)
-                          const fmtPolicy = (p: any) =>
+                          const p1 = policies1.find((p) => p.typeName === typeName)
+                          const p2 = policies2.find((p) => p.typeName === typeName)
+                          const fmtPolicy = (
+                            p: ComparePolicySummary | undefined
+                          ): React.JSX.Element =>
                             p ? (
                               <span
                                 style={{
@@ -1887,7 +1933,9 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                               color: '#10b981'
                             }}
                           >
-                            {(vessel1 as any).sanctionsStatus?.toUpperCase() || 'PENDING'}
+                            {(
+                              vessel1 as VesselWithSanctionsStatus
+                            ).sanctionsStatus?.toUpperCase() || 'PENDING'}
                           </span>
                         }
                         val2={
@@ -1901,7 +1949,9 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                               color: '#10b981'
                             }}
                           >
-                            {(vessel2 as any).sanctionsStatus?.toUpperCase() || 'PENDING'}
+                            {(
+                              vessel2 as VesselWithSanctionsStatus
+                            ).sanctionsStatus?.toUpperCase() || 'PENDING'}
                           </span>
                         }
                       />

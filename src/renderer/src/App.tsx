@@ -82,7 +82,7 @@ const PolicySetupWizard = lazy(() => import('./components/PolicySetupWizard'))
 const NotificationsPage = lazy(() => import('./components/NotificationsPage'))
 const FeaturesPage = lazy(() => import('./components/FeaturesPage'))
 
-const LoadingFallback = () => (
+const LoadingFallback = (): React.JSX.Element => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
     Loading...
   </div>
@@ -102,7 +102,7 @@ function App(): React.JSX.Element {
   const [navigateToVesselSection, setNavigateToVesselSection] = useState<
     'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | undefined
   >(undefined)
-  const [navigateBackTab, setNavigateBackTab] = useState<string | undefined>(undefined)
+  const [navigateBackTab, setNavigateBackTab] = useState<AppTab | undefined>(undefined)
   const [complianceSubTab, setComplianceSubTab] = useState<
     'documents' | 'policies' | 'sanctions' | 'dataQuality'
   >('documents')
@@ -122,9 +122,17 @@ function App(): React.JSX.Element {
     null
   )
   const { showSuccess, showError } = useToast()
-  const [breadcrumbVesselName, setBreadcrumbVesselName] = useState<string | null>(null)
-  const [breadcrumbQuotationRef, setBreadcrumbQuotationRef] = useState<string | null>(null)
-  const [breadcrumbPolicyRef, setBreadcrumbPolicyRef] = useState<string | null>(null)
+  // Name fetched for the vessel the breadcrumb points at (keyed by id so a stale name never shows)
+  const [breadcrumbVessel, setBreadcrumbVessel] = useState<{ id: string; name: string } | null>(
+    null
+  )
+  const breadcrumbVesselName =
+    activeTab === 'vessels' && breadcrumbVessel && breadcrumbVessel.id === navigateToVesselId
+      ? breadcrumbVessel.name
+      : null
+  // Nothing sets these yet: the quotation / policy breadcrumbs end at the list label
+  const [breadcrumbQuotationRef] = useState<string | null>(null)
+  const [breadcrumbPolicyRef] = useState<string | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -164,7 +172,7 @@ function App(): React.JSX.Element {
     }
   }, [isAuthenticated])
 
-  const handleForceReset = async () => {
+  const handleForceReset = async (): Promise<void> => {
     if (resetPassword.length < 6) {
       setResetError('Password must be at least 6 characters')
       return
@@ -180,8 +188,8 @@ function App(): React.JSX.Element {
       setForcePasswordReset(false)
       setResetPassword('')
       setResetConfirm('')
-    } catch (err: any) {
-      setResetError(err.message || 'Failed to update password')
+    } catch (err) {
+      setResetError((err instanceof Error && err.message) || 'Failed to update password')
     } finally {
       setResetLoading(false)
     }
@@ -195,29 +203,23 @@ function App(): React.JSX.Element {
 
   // Resolve breadcrumb vessel name when navigating
   useEffect(() => {
-    if (navigateToVesselId && activeTab === 'vessels') {
-      window.api
-        .getVessels()
-        .then((vessels) => {
-          const v = vessels.find((v: any) => v.id === navigateToVesselId)
-          if (v) setBreadcrumbVesselName(v.name)
-        })
-        .catch(() => {})
-    } else if (activeTab !== 'vessels') {
-      setBreadcrumbVesselName(null)
+    if (!navigateToVesselId || activeTab !== 'vessels') return
+    let alive = true
+    window.api
+      .getVessels()
+      .then((vessels) => {
+        const v = vessels.find((v) => v.id === navigateToVesselId)
+        if (v && alive) setBreadcrumbVessel({ id: navigateToVesselId, name: v.name })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
     }
   }, [navigateToVesselId, activeTab])
 
-  // Clear breadcrumb context on top-level tab change
-  useEffect(() => {
-    if (!navigateToVesselId && activeTab === 'vessels') setBreadcrumbVesselName(null)
-    if (!initialQuotationId && activeTab === 'quotations') setBreadcrumbQuotationRef(null)
-    if (!selectedPolicyId && activeTab !== 'policy-detail') setBreadcrumbPolicyRef(null)
-  }, [activeTab, navigateToVesselId, initialQuotationId, selectedPolicyId])
-
   // Ctrl+K global search shortcut
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         setSearchOpen(true)
@@ -227,7 +229,7 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const handleSearchNavigate = useCallback((type: string, id: string, _extra?: any) => {
+  const handleSearchNavigate = useCallback((type: string, id: string) => {
     if (type === 'vessel') {
       setNavigateToVesselId(id)
       setNavigateToVesselSection(undefined)
@@ -331,8 +333,12 @@ function App(): React.JSX.Element {
     [runAction]
   )
 
-  // Restore sidebar state from DB when user session loads
-  useEffect(() => {
+  // When the session user changes: restore the sidebar state from the DB and read the
+  // one-time Ctrl+K tip flag (adjusting state during render, not in an effect)
+  const userId = user?.id
+  const [restoredForUserId, setRestoredForUserId] = useState<string | undefined>(undefined)
+  if (restoredForUserId !== userId) {
+    setRestoredForUserId(userId)
     if (user) {
       setSidebarCollapsed(!!user.sidebarCollapsed)
       try {
@@ -341,14 +347,19 @@ function App(): React.JSX.Element {
       } catch {
         setCollapsedGroups(new Set())
       }
+      try {
+        setDiscoverTipSeen(!!localStorage.getItem(`tip_discover_u${user.id}`))
+      } catch {
+        setDiscoverTipSeen(true)
+      }
     }
-  }, [user?.id])
+  }
 
-  const saveSidebarState = (collapsed: boolean, groups: Set<string>) => {
+  const saveSidebarState = (collapsed: boolean, groups: Set<string>): void => {
     window.api.updateUserSidebarState(collapsed, JSON.stringify([...groups])).catch(() => {})
   }
 
-  const toggleSidebar = () => {
+  const toggleSidebar = (): void => {
     setSidebarCollapsed((prev) => {
       const next = !prev
       saveSidebarState(next, collapsedGroups)
@@ -356,7 +367,7 @@ function App(): React.JSX.Element {
     })
   }
 
-  const toggleGroup = (id: string) => {
+  const toggleGroup = (id: string): void => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -405,25 +416,18 @@ function App(): React.JSX.Element {
 
   // Show What's New once per version per user (700ms delay so Dashboard is visible first)
   useEffect(() => {
-    if (!isAuthenticated || !appVersion || !user) return
-    const key = `whatsNew_seen_v${appVersion}_u${user.id}`
+    if (!isAuthenticated || !appVersion || !userId) return
+    const key = `whatsNew_seen_v${appVersion}_u${userId}`
     if (!localStorage.getItem(key)) {
       const timer = setTimeout(() => setShowWhatsNew(true), 700)
       return () => clearTimeout(timer)
     }
     return undefined
-  }, [isAuthenticated, appVersion, user?.id])
+  }, [isAuthenticated, appVersion, userId])
 
-  // One-time tip about Ctrl+K and the Features page (per user, per machine)
-  useEffect(() => {
-    if (!user) return
-    try {
-      setDiscoverTipSeen(!!localStorage.getItem(`tip_discover_u${user.id}`))
-    } catch {
-      setDiscoverTipSeen(true)
-    }
-  }, [user?.id])
-  const dismissDiscoverTip = () => {
+  // One-time tip about Ctrl+K and the Features page (per user, per machine); its flag is
+  // read when the session user changes (above)
+  const dismissDiscoverTip = (): void => {
     setDiscoverTipSeen(true)
     try {
       if (user) localStorage.setItem(`tip_discover_u${user.id}`, '1')
@@ -432,13 +436,14 @@ function App(): React.JSX.Element {
     }
   }
 
+  // Signed out: forget the count and the recent items (adjusting state during render)
+  if (!isAuthenticated && unreadNotifCount !== 0) setUnreadNotifCount(0)
+  if (!isAuthenticated && recentItems.length > 0) setRecentItems([])
+
   // Poll for unread notification count every 30 seconds
   useEffect(() => {
-    if (!isAuthenticated) {
-      setUnreadNotifCount(0)
-      return
-    }
-    const fetchCount = () => {
+    if (!isAuthenticated) return
+    const fetchCount = (): void => {
       window.api
         .notificationsGetUnreadCount()
         .then((c) => {
@@ -453,10 +458,7 @@ function App(): React.JSX.Element {
 
   // Load recent items
   const loadRecentItems = useCallback(() => {
-    if (!isAuthenticated) {
-      setRecentItems([])
-      return
-    }
+    if (!isAuthenticated) return
     window.api
       .recentItemsGet()
       .then((items) => {
@@ -471,13 +473,13 @@ function App(): React.JSX.Element {
 
   // Listen for recent-item-added custom event from child components
   useEffect(() => {
-    const handler = () => loadRecentItems()
+    const handler = (): void => loadRecentItems()
     window.addEventListener('recent-item-added', handler)
     return () => window.removeEventListener('recent-item-added', handler)
   }, [loadRecentItems])
 
   useEffect(() => {
-    const preventDefault = (e: DragEvent) => {
+    const preventDefault = (e: DragEvent): void => {
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     }
@@ -490,7 +492,7 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent): void => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false)
       }
@@ -511,7 +513,11 @@ function App(): React.JSX.Element {
   const menuBorder = isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.15)'
   const menuShadow = isLight ? '0 10px 25px rgba(0,0,0,0.15)' : '0 10px 25px rgba(0,0,0,0.5)'
 
-  const navItem = (tab: typeof activeTab, icon: React.ReactNode, label: string) => (
+  const navItem = (
+    tab: typeof activeTab,
+    icon: React.ReactNode,
+    label: string
+  ): React.JSX.Element => (
     <NavItem
       key={tab}
       icon={icon}
@@ -525,7 +531,7 @@ function App(): React.JSX.Element {
     />
   )
 
-  const sub = (tab: AppTab) =>
+  const sub = (tab: AppTab): { subTab?: string; subTabNonce?: number } =>
     pageRequest?.tab === tab ? { subTab: pageRequest.sub, subTabNonce: pageRequest.n } : {}
 
   // Derive breadcrumbs from current state
@@ -562,7 +568,7 @@ function App(): React.JSX.Element {
       breadcrumbs.push({
         label: TAB_LABELS[navigateBackTab] || navigateBackTab,
         onClick: () => {
-          setActiveTab(navigateBackTab as any)
+          setActiveTab(navigateBackTab)
           setNavigateBackTab(undefined)
           setNavigateToVesselId(null)
           setNavigateToVesselSection(undefined)
@@ -1437,8 +1443,8 @@ function App(): React.JSX.Element {
                 <div style={{ flex: 1, fontSize: '0.88rem' }}>
                   <strong>Find anything fast.</strong> Press <kbd className="kbd">Ctrl</kbd>{' '}
                   <kbd className="kbd">K</kbd> and type a vessel, a quotation number, a page or an
-                  action like "new quotation". The <strong>Features</strong> page lists everything
-                  the app can do.
+                  action like &quot;new quotation&quot;. The <strong>Features</strong> page lists
+                  everything the app can do.
                 </div>
                 <button
                   className="btn-secondary btn-sm"
@@ -1496,7 +1502,7 @@ function App(): React.JSX.Element {
                 onNavigateBack={
                   navigateBackTab
                     ? () => {
-                        setActiveTab(navigateBackTab as any)
+                        setActiveTab(navigateBackTab)
                         setNavigateBackTab(undefined)
                       }
                     : undefined
@@ -2089,7 +2095,7 @@ function NavGroup({
   groupCollapsed: boolean
   onToggle: (id: string) => void
   sidebarCollapsed: boolean
-}) {
+}): React.JSX.Element {
   if (sidebarCollapsed) {
     // Collapsed sidebar: thin separator only — items rendered directly in nav
     return (
@@ -2161,7 +2167,7 @@ function NavItem({
   active: boolean
   onClick: () => void
   sidebarCollapsed: boolean
-}) {
+}): React.JSX.Element {
   if (sidebarCollapsed) {
     return (
       <button

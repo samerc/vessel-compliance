@@ -9,7 +9,12 @@ interface PageHeaderProps {
 }
 
 /** Standard page title row: icon + h1 + optional subtitle, actions on the right */
-export default function PageHeader({ title, icon, subtitle, actions }: PageHeaderProps) {
+export default function PageHeader({
+  title,
+  icon,
+  subtitle,
+  actions
+}: PageHeaderProps): React.JSX.Element {
   return (
     <header className="page-header">
       <div style={{ minWidth: 0 }}>

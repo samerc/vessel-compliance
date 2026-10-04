@@ -14,7 +14,7 @@ export default function WarConditionsTab({
 }: {
   quotation: Quotation
   showError: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [allConditions, setAllConditions] = useState<WarCondition[]>([])
   const [qConditions, setQConditions] = useState<QuotationWarCondition[]>([])
   const [overrides, setOverrides] = useState<Record<string, string>>({})
@@ -23,53 +23,54 @@ export default function WarConditionsTab({
   const defaultsApplied = useRef(false)
 
   useEffect(() => {
-    loadData()
-  }, [quotation.id])
+    const loadData = async (): Promise<void> => {
+      const [conds, existing, settings, qvs] = await Promise.all([
+        window.api.warGetConditions(),
+        window.api.warGetQuotationWarConditions(quotation.id),
+        window.api.warGetSettings(),
+        window.api.getQuotationVessels(quotation.id)
+      ])
+      const safeConds = Array.isArray(conds) ? conds : []
+      const safeExisting = Array.isArray(existing) ? existing : []
+      setAllConditions(safeConds)
+      setQConditions(safeExisting)
+      if (settings && !('error' in settings)) setWarSettings(settings)
+      setVessels(Array.isArray(qvs) ? qvs : [])
 
-  const loadData = async () => {
-    const [conds, existing, settings, qvs] = await Promise.all([
-      window.api.warGetConditions(),
-      window.api.warGetQuotationWarConditions(quotation.id),
-      window.api.warGetSettings(),
-      window.api.getQuotationVessels(quotation.id)
-    ])
-    const safeConds = Array.isArray(conds) ? conds : []
-    const safeExisting = Array.isArray(existing) ? existing : []
-    setAllConditions(safeConds)
-    setQConditions(safeExisting)
-    if (settings && !(settings as any).error) setWarSettings(settings)
-    setVessels(Array.isArray(qvs) ? qvs : [])
+      // Build overrides from existing
+      const ov: Record<string, string> = {}
+      safeExisting.forEach((qc) => {
+        if (qc.textOverride) ov[qc.warConditionId] = qc.textOverride
+      })
+      setOverrides(ov)
 
-    // Build overrides from existing
-    const ov: Record<string, string> = {}
-    safeExisting.forEach((qc) => {
-      if (qc.textOverride) ov[qc.warConditionId] = qc.textOverride
-    })
-    setOverrides(ov)
-
-    // Auto-apply defaults on first load
-    if (
-      !defaultsApplied.current &&
-      Array.isArray(existing) &&
-      safeExisting.length === 0 &&
-      safeConds.length > 0
-    ) {
-      defaultsApplied.current = true
-      const defaults = safeConds.filter((c) => c.defaultSelected)
-      if (defaults.length > 0) {
-        try {
-          await window.api.warSetQuotationWarConditions(
-            quotation.id,
-            defaults.map((c) => ({ warConditionId: c.id }))
-          )
-          const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
-          setQConditions(Array.isArray(fresh) ? fresh : [])
-        } catch {}
+      // Auto-apply defaults on first load
+      if (
+        !defaultsApplied.current &&
+        Array.isArray(existing) &&
+        safeExisting.length === 0 &&
+        safeConds.length > 0
+      ) {
+        defaultsApplied.current = true
+        const defaults = safeConds.filter((c) => c.defaultSelected)
+        if (defaults.length > 0) {
+          try {
+            await window.api.warSetQuotationWarConditions(
+              quotation.id,
+              defaults.map((c) => ({ warConditionId: c.id }))
+            )
+            const fresh = await window.api.warGetQuotationWarConditions(quotation.id)
+            setQConditions(Array.isArray(fresh) ? fresh : [])
+          } catch {
+            /* defaults are best-effort; the user can still pick conditions */
+          }
+        }
+      } else {
+        defaultsApplied.current = true
       }
-    } else {
-      defaultsApplied.current = true
     }
-  }
+    void loadData()
+  }, [quotation.id])
 
   const selectedIds = new Set(qConditions.map((qc) => qc.warConditionId))
 
@@ -81,10 +82,11 @@ export default function WarConditionsTab({
       .replace(/\{tc_text\}/g, warSettings.tcText)
   }
 
-  const handleToggle = async (condId: string) => {
-    const newSelected = selectedIds.has(condId)
-      ? qConditions.filter((qc) => qc.warConditionId !== condId)
-      : [...qConditions, { warConditionId: condId } as any]
+  const handleToggle = async (condId: string): Promise<void> => {
+    const newSelected: Pick<QuotationWarCondition, 'warConditionId' | 'vesselScope'>[] =
+      selectedIds.has(condId)
+        ? qConditions.filter((qc) => qc.warConditionId !== condId)
+        : [...qConditions, { warConditionId: condId }]
     try {
       await window.api.warSetQuotationWarConditions(
         quotation.id,
@@ -101,11 +103,11 @@ export default function WarConditionsTab({
     }
   }
 
-  const handleOverrideChange = (condId: string, text: string) => {
+  const handleOverrideChange = (condId: string, text: string): void => {
     setOverrides((prev) => ({ ...prev, [condId]: text }))
   }
 
-  const handleOverrideBlur = async () => {
+  const handleOverrideBlur = async (): Promise<void> => {
     try {
       await window.api.warSetQuotationWarConditions(
         quotation.id,
@@ -115,10 +117,12 @@ export default function WarConditionsTab({
           vesselScope: qc.vesselScope || undefined
         }))
       )
-    } catch {}
+    } catch {
+      /* override save on blur is best-effort; retried on the next change */
+    }
   }
 
-  const handleScopeChange = async (condId: string, scope: string[] | null) => {
+  const handleScopeChange = async (condId: string, scope: string[] | null): Promise<void> => {
     const updated = qConditions.map((qc) =>
       qc.warConditionId === condId ? { ...qc, vesselScope: scope } : qc
     )
@@ -132,7 +136,9 @@ export default function WarConditionsTab({
         }))
       )
       setQConditions(updated)
-    } catch {}
+    } catch {
+      /* scope unchanged on failure */
+    }
   }
 
   return (

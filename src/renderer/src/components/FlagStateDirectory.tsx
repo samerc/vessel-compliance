@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Plus,
   Trash2,
@@ -24,7 +24,8 @@ interface FlagStateDirectoryProps {
   onNavigateToVessel?: (vesselId: string) => void
 }
 
-export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
+// onNavigateToVessel is accepted for API compatibility with Directory but not used yet
+const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
@@ -61,16 +62,18 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const [formAuthorityName, setFormAuthorityName] = useState('')
   const [formAuthorityAddress, setFormAuthorityAddress] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     const data = await window.api.getFlagStates()
     setFlagStates(Array.isArray(data) ? data : [])
-  }
+  }, [])
+  useEffect(() => {
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
+  }, [loadData])
 
-  const loadPorts = async (flagStateId: string) => {
+  const loadPorts = async (flagStateId: string): Promise<void> => {
     setLoadingPorts(true)
     try {
       const ports = await window.api.flagStateGetPorts(flagStateId)
@@ -106,7 +109,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   // Load port counts for all flags on mount
   useEffect(() => {
     if (flagStates.length === 0) return
-    const loadAllPortCounts = async () => {
+    const loadAllPortCounts = async (): Promise<void> => {
       const counts: Record<string, number> = {}
       await Promise.all(
         flagStates.map(async (fs) => {
@@ -124,7 +127,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   }, [flagStates])
 
   // Select flag → load ports
-  const handleSelect = async (fs: FlagState) => {
+  const handleSelect = async (fs: FlagState): Promise<void> => {
     if (selectedFlag?.id === fs.id) {
       setSelectedFlag(null)
       setPanelPorts([])
@@ -142,14 +145,14 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     value: string,
     setName: (v: string) => void,
     setIso3: (v: string) => void
-  ) => {
+  ): void => {
     setName(value)
     const match = countryNameToIso3.find((c) => c.name.toLowerCase() === value.toLowerCase())
     if (match) setIso3(match.iso3)
   }
 
   // Modal helpers
-  const resetForm = () => {
+  const resetForm = (): void => {
     setFormName('')
     setFormDisplayName('')
     setFormIso3('')
@@ -161,12 +164,12 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     setModalEditId(null)
   }
 
-  const openAddModal = () => {
+  const openAddModal = (): void => {
     resetForm()
     setShowModal(true)
   }
 
-  const openEditModal = (fs: FlagState) => {
+  const openEditModal = (fs: FlagState): void => {
     setModalEditId(fs.id)
     setFormName(fs.name)
     setFormDisplayName(fs.displayName || '')
@@ -179,12 +182,12 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     setShowModal(true)
   }
 
-  const closeModal = () => {
+  const closeModal = (): void => {
     setShowModal(false)
     resetForm()
   }
 
-  const handleModalSave = async () => {
+  const handleModalSave = async (): Promise<void> => {
     if (!formName.trim() || !formIso3.trim()) return
     if (formIso3.trim().length !== 3) {
       showError('ISO code must be exactly 3 characters')
@@ -214,12 +217,12 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       }
       closeModal()
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save flag state')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save flag state')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.deleteFlagState(id)
       if (selectedFlag?.id === id) {
@@ -229,20 +232,20 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       setDeleteConfirmId(null)
       showSuccess('Flag state deleted')
       loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete flag state')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete flag state')
     }
   }
 
   // Port handlers
-  const handleAddPort = async () => {
+  const handleAddPort = async (): Promise<void> => {
     if (!selectedFlag || !newPortName.trim()) return
     try {
       const port = (await window.api.flagStateAddPort(
         selectedFlag.id,
         newPortName.trim(),
         newPortDefault
-      )) as any
+      )) as FlagStatePort & { error?: unknown }
       if (port && !port.error) {
         const updated = newPortDefault
           ? panelPorts.map((p) => ({ ...p, isDefault: false }))
@@ -254,12 +257,12 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
         setNewPortDefault(false)
         showSuccess('Port added')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to add port')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add port')
     }
   }
 
-  const handleUpdatePort = async () => {
+  const handleUpdatePort = async (): Promise<void> => {
     if (!editingPortId || !editPortName.trim()) return
     try {
       await window.api.flagStateUpdatePort(editingPortId, editPortName.trim(), editPortDefault)
@@ -273,12 +276,12 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       )
       setEditingPortId(null)
       showSuccess('Port updated')
-    } catch (err: any) {
-      showError(err.message || 'Failed to update port')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update port')
     }
   }
 
-  const handleDeletePort = async (portId: string) => {
+  const handleDeletePort = async (portId: string): Promise<void> => {
     if (!selectedFlag) return
     try {
       await window.api.flagStateDeletePort(portId)
@@ -286,8 +289,8 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       setPanelPorts(updated)
       setPortCounts((prev) => ({ ...prev, [selectedFlag.id]: updated.length }))
       showSuccess('Port deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete port')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete port')
     }
   }
 
@@ -1508,3 +1511,5 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     </div>
   )
 }
+
+export default FlagStateDirectory

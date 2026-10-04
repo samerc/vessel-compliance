@@ -4,7 +4,7 @@ import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { TextAlign } from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
-import { Extension, Node as TipTapNode } from '@tiptap/react'
+import { Extension, Node as TipTapNode, type AnyExtension } from '@tiptap/react'
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import {
   Bold,
@@ -160,7 +160,7 @@ export default function RichTextEditor({
   showPlaceholders,
   showHeadings,
   placeholderItems
-}: RichTextEditorProps) {
+}: RichTextEditorProps): React.JSX.Element | null {
   const { theme } = useTheme()
   const iconColor = useMemo(
     () => (theme === 'light' || theme === 'aurora' ? '#606770' : 'rgba(255,255,255,0.6)'),
@@ -178,7 +178,7 @@ export default function RichTextEditor({
   const placeholderRef = useRef<HTMLDivElement>(null)
 
   const extensions = useMemo(() => {
-    const exts: any[] = [
+    const exts: AnyExtension[] = [
       StarterKit.configure({
         heading: showHeadings ? { levels: [1, 2, 3] } : false,
         codeBlock: false,
@@ -250,7 +250,7 @@ export default function RichTextEditor({
   // Close dropdowns on outside click
   useEffect(() => {
     if (!fontSizeOpen && !fontFamilyOpen && !lineSpacingOpen && !placeholderOpen) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (fontSizeOpen && fontSizeRef.current && !fontSizeRef.current.contains(e.target as Node))
         setFontSizeOpen(false)
       if (
@@ -276,7 +276,7 @@ export default function RichTextEditor({
     return () => document.removeEventListener('mousedown', handler)
   }, [fontSizeOpen, fontFamilyOpen, lineSpacingOpen, placeholderOpen])
 
-  const toggleLink = useCallback(async () => {
+  const toggleLink = useCallback(async (): Promise<void> => {
     if (!editor) return
     if (editor.isActive('link')) {
       editor.chain().focus().unsetLink().run()
@@ -290,24 +290,24 @@ export default function RichTextEditor({
 
   if (!editor) return null
 
-  const btn = (active: boolean) => `rte-btn${active ? ' rte-btn-active' : ''}`
+  const btn = (active: boolean): string => `rte-btn${active ? ' rte-btn-active' : ''}`
 
-  const currentFontSize = (editor.getAttributes('textStyle') as any).fontSize || ''
+  const currentFontSize = editor.getAttributes('textStyle').fontSize || ''
   const fontSizeLabel = currentFontSize ? currentFontSize.replace('pt', '') : '–'
 
-  const currentLineHeight = (editor.getAttributes('paragraph') as any).lineHeight || ''
+  const currentLineHeight = editor.getAttributes('paragraph').lineHeight || ''
 
-  const setFontSize = (size: string) => {
+  const setFontSize = (size: string): void => {
     editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
     setFontSizeOpen(false)
   }
 
-  const currentFontFamily = (editor.getAttributes('textStyle') as any).fontFamily || ''
+  const currentFontFamily = editor.getAttributes('textStyle').fontFamily || ''
   const fontFamilyLabel = currentFontFamily
     ? FONT_FAMILIES.find((f) => f.value === currentFontFamily)?.label || 'Custom'
     : 'Font'
 
-  const setFontFamily = (family: string) => {
+  const setFontFamily = (family: string): void => {
     if (family) {
       editor.chain().focus().setMark('textStyle', { fontFamily: family }).run()
     } else {
@@ -316,7 +316,7 @@ export default function RichTextEditor({
     setFontFamilyOpen(false)
   }
 
-  const setLineHeight = (lh: string) => {
+  const setLineHeight = (lh: string): void => {
     editor.chain().focus().updateAttributes('paragraph', { lineHeight: lh }).run()
     setLineSpacingOpen(false)
   }
@@ -412,18 +412,12 @@ export default function RichTextEditor({
         )}
         {showHeadings && (
           <>
-            {[1, 2, 3].map((lvl) => (
+            {([1, 2, 3] as const).map((lvl) => (
               <button
                 key={lvl}
                 type="button"
                 className={btn(editor.isActive('heading', { level: lvl }))}
-                onClick={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .toggleHeading({ level: lvl as any })
-                    .run()
-                }
+                onClick={() => editor.chain().focus().toggleHeading({ level: lvl }).run()}
                 title={`Heading ${lvl}`}
                 style={{
                   fontSize: '0.72rem',

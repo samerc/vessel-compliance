@@ -35,7 +35,8 @@ import {
   EntityUBO,
   SanctionsMatch,
   EntityDocumentType,
-  EntityDocument
+  EntityDocument,
+  PaginatedResult
 } from '../../../shared/types'
 import { CaseToggleBtn } from './CaseToggle'
 
@@ -58,6 +59,9 @@ import { exportCustomerCompliancePDF } from '../services/CustomerComplianceExpor
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { SanctionsBadge, EmptyState } from './ui'
+
+/** A vessel linked to an entity, directly (roles) or through an assured it is UBO of */
+type AssociatedVessel = Vessel & { roles: string[]; viaAssureds: string[] }
 
 function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
@@ -108,7 +112,7 @@ export default function EntityDirectory({
   onInitialEntityConsumed?: () => void
   openCreate?: boolean
   onCreateConsumed?: () => void
-}) {
+}): React.JSX.Element {
   const [entities, setEntities] = useState<Entity[]>([])
   const [allEntities, setAllEntities] = useState<Entity[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
@@ -171,11 +175,15 @@ export default function EntityDirectory({
   }>({ show: false, entity: null, message: '' })
 
   const [showCreateModal, setShowCreateModal] = useState(false)
+  // A create request (Quick Actions / palette) opens the create form once, then is consumed
+  const [prevOpenCreate, setPrevOpenCreate] = useState<boolean | undefined>(false)
+  if (openCreate !== prevOpenCreate) {
+    setPrevOpenCreate(openCreate)
+    if (openCreate && hasPermission('entities:create')) setShowCreateModal(true)
+  }
   useEffect(() => {
-    if (!openCreate) return
-    if (hasPermission('entities:create')) setShowCreateModal(true)
-    onCreateConsumed?.()
-  }, [openCreate])
+    if (openCreate) onCreateConsumed?.()
+  }, [openCreate, onCreateConsumed])
   const [createForm, setCreateForm] = useState({
     name: '',
     type: 'company' as 'company' | 'person',
@@ -205,7 +213,7 @@ export default function EntityDirectory({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [showEntityRemapModal, setShowEntityRemapModal] = useState(false)
 
-  const openMergeModal = async (entity: Entity) => {
+  const openMergeModal = async (entity: Entity): Promise<void> => {
     setMergeSource(entity)
     setMergeTarget(null)
     setMergeSearch('')
@@ -235,7 +243,7 @@ export default function EntityDirectory({
     return pairs.sort((x, y) => y.score - x.score)
   }, [allEntities, showDuplicatesModal, dupThreshold])
 
-  const handleMerge = async () => {
+  const handleMerge = async (): Promise<void> => {
     if (!mergeSource || !mergeTarget) return
     setIsMerging(true)
     try {
@@ -249,14 +257,14 @@ export default function EntityDirectory({
       setMergeTarget(null)
       setSelectedEntity(null)
       loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to merge entities')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to merge entities')
     } finally {
       setIsMerging(false)
     }
   }
 
-  const handleDeleteEntity = async (entity: Entity) => {
+  const handleDeleteEntity = async (entity: Entity): Promise<void> => {
     const assocVessels = getAssociatedVessels(entity.id)
     const message =
       assocVessels.length > 0
@@ -265,22 +273,22 @@ export default function EntityDirectory({
     setDeleteConfirmation({ show: true, entity, message })
   }
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (!deleteConfirmation.entity) return
     try {
       await window.api.deleteEntity(deleteConfirmation.entity.id)
       if (selectedEntity?.id === deleteConfirmation.entity.id) setSelectedEntity(null)
       showSuccess(`Entity "${deleteConfirmation.entity.name}" deleted`)
       loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to delete entity')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to delete entity')
     } finally {
       setDeleteConfirmation({ show: false, entity: null, message: '' })
     }
   }
 
   // Bulk operations
-  const toggleSelectEntity = (entityId: string) => {
+  const toggleSelectEntity = (entityId: string): void => {
     setSelectedEntityIds((prev) => {
       const next = new Set(prev)
       if (next.has(entityId)) next.delete(entityId)
@@ -289,7 +297,7 @@ export default function EntityDirectory({
     })
   }
 
-  const toggleSelectAllEntities = () => {
+  const toggleSelectAllEntities = (): void => {
     if (selectedEntityIds.size === entities.length) {
       setSelectedEntityIds(new Set())
     } else {
@@ -297,7 +305,7 @@ export default function EntityDirectory({
     }
   }
 
-  const handleBulkExportEntities = () => {
+  const handleBulkExportEntities = (): void => {
     const selected = allEntities.filter((e) => selectedEntityIds.has(e.id))
     if (selected.length === 0) return
     const headers = ['Name', 'Type', 'Identifier', 'Email', 'Phone', 'Sanctions Status']
@@ -323,7 +331,7 @@ export default function EntityDirectory({
     showSuccess(`Exported ${selected.length} entity(ies)`)
   }
 
-  const handleBulkDeleteEntities = async () => {
+  const handleBulkDeleteEntities = async (): Promise<void> => {
     try {
       const count = await window.api.bulkDeleteEntities([...selectedEntityIds])
       showSuccess(`Deleted ${count} entity(ies)`)
@@ -331,12 +339,12 @@ export default function EntityDirectory({
       setShowBulkDeleteConfirm(false)
       setSelectedEntity(null)
       loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to delete entities')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to delete entities')
     }
   }
 
-  const handleCreateEntity = async () => {
+  const handleCreateEntity = async (): Promise<void> => {
     if (!createForm.name.trim()) return
     setIsCreating(true)
     try {
@@ -376,97 +384,105 @@ export default function EntityDirectory({
       } catch {
         setCheckingId(null)
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to create entity')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to create entity')
     } finally {
       setIsCreating(false)
     }
   }
 
-  const fetchPage = () =>
-    window.api.getEntitiesPaginated({
-      page,
-      limit,
-      search: debouncedSearch,
-      type: typeFilter,
-      ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
-      customersOnly: viewMode === 'customers' ? true : undefined
-    })
-  const applyPage = (result: any) => {
-    setEntities(Array.isArray(result?.data) ? result.data : [])
-    setTotal(result?.total ?? 0)
-    setTotalPages(result?.totalPages ?? 1)
-  }
+  // Bumped after an edit: the next load is a full reload (vessels, assureds, UBOs, docs...)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
   // Search / filter / paging only changes the page: don't re-fetch every vessel, assured,
   // UBO, entity and document on each keystroke (the full reload is for mount and edits)
   const pageReqRef = useRef(0)
-  const loadPage = async () => {
-    const req = ++pageReqRef.current
-    setIsLoading(true)
-    try {
-      const result = await fetchPage()
-      if (req === pageReqRef.current) applyPage(result)
-    } finally {
-      if (req === pageReqRef.current) setIsLoading(false)
-    }
-  }
-
-  const loadData = async () => {
-    const req = ++pageReqRef.current
-    setIsLoading(true)
-    try {
-      const [result, v, va, eu, allEnts, edTypes, allDocs, pols] = await Promise.all([
-        fetchPage(),
-        window.api.getVessels(),
-        window.api.getVesselAssureds(),
-        window.api.getEntityUBOs(),
-        window.api.getEntities(),
-        window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments(),
-        window.api.getAllVesselDynamicPolicies()
-      ])
-      if (req === pageReqRef.current) applyPage(result)
-      setVessels(Array.isArray(v) ? v : [])
-      setVesselAssureds(Array.isArray(va) ? va : [])
-      setEntityUBOs(Array.isArray(eu) ? eu : [])
-      setAllEntities(Array.isArray(allEnts) ? allEnts : [])
-      setEntityDocTypes(
-        Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : []
-      )
-      setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
-      const custMap = new Map<string, string | null>()
-      for (const p of Array.isArray(pols) ? pols : []) {
-        if (p.status === 'active' && p.customerEntityId)
-          custMap.set(p.customerEntityId, p.customerType || null)
-      }
-      setPolicyCustomers(custMap)
-    } finally {
-      if (req === pageReqRef.current) setIsLoading(false)
-    }
-  }
-
   const initialLoadDone = useRef(false)
+  const loadedReloadKey = useRef(reloadKey)
   useEffect(() => {
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true
-      loadData()
-    } else {
-      loadPage()
+    const full = !initialLoadDone.current || loadedReloadKey.current !== reloadKey
+    initialLoadDone.current = true
+    loadedReloadKey.current = reloadKey
+    const fetchPage = (): Promise<PaginatedResult<Entity>> =>
+      window.api.getEntitiesPaginated({
+        page,
+        limit,
+        search: debouncedSearch,
+        type: typeFilter,
+        ofacStatus: ofacStatusFilter as EntityQueryParams['ofacStatus'],
+        customersOnly: viewMode === 'customers' ? true : undefined
+      })
+    const applyPage = (result: PaginatedResult<Entity> | null | undefined): void => {
+      setEntities(Array.isArray(result?.data) ? result.data : [])
+      setTotal(result?.total ?? 0)
+      setTotalPages(result?.totalPages ?? 1)
     }
-  }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode])
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
 
-  // Debounced duplicate detection when typing in create modal
+    const loadPage = async (): Promise<void> => {
+      const req = ++pageReqRef.current
+      setIsLoading(true)
+      try {
+        const result = await fetchPage()
+        if (req === pageReqRef.current) applyPage(result)
+      } finally {
+        if (req === pageReqRef.current) setIsLoading(false)
+      }
+    }
+
+    const loadAll = async (): Promise<void> => {
+      const req = ++pageReqRef.current
+      setIsLoading(true)
+      try {
+        const [result, v, va, eu, allEnts, edTypes, allDocs, pols] = await Promise.all([
+          fetchPage(),
+          window.api.getVessels(),
+          window.api.getVesselAssureds(),
+          window.api.getEntityUBOs(),
+          window.api.getEntities(),
+          window.api.getEntityDocumentTypes(),
+          window.api.getEntityDocuments(),
+          window.api.getAllVesselDynamicPolicies()
+        ])
+        if (req === pageReqRef.current) applyPage(result)
+        setVessels(Array.isArray(v) ? v : [])
+        setVesselAssureds(Array.isArray(va) ? va : [])
+        setEntityUBOs(Array.isArray(eu) ? eu : [])
+        setAllEntities(Array.isArray(allEnts) ? allEnts : [])
+        setEntityDocTypes(
+          Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : []
+        )
+        setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
+        const custMap = new Map<string, string | null>()
+        for (const p of Array.isArray(pols) ? pols : []) {
+          if (p.status === 'active' && p.customerEntityId)
+            custMap.set(p.customerEntityId, p.customerType || null)
+        }
+        setPolicyCustomers(custMap)
+      } finally {
+        if (req === pageReqRef.current) setIsLoading(false)
+      }
+    }
+
+    void (full ? loadAll() : loadPage())
+  }, [page, limit, debouncedSearch, typeFilter, ofacStatusFilter, viewMode, reloadKey])
+
+  // A new search / filter / page size starts again at page 1 (adjusting state during render)
+  const filterKey = JSON.stringify([debouncedSearch, typeFilter, ofacStatusFilter, limit, viewMode])
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey)
+    setPage(1)
+  }
+
+  // Debounced duplicate detection when typing in create modal; a closed modal or a short
+  // name clears the list (adjusting state during render)
+  const similarCheckOff = !showCreateModal || createForm.name.trim().length < 3
+  if (similarCheckOff && similarEntities.length > 0) setSimilarEntities([])
   useEffect(() => {
     if (similarCheckTimer.current) clearTimeout(similarCheckTimer.current)
     const name = createForm.name.trim()
-    if (!showCreateModal || name.length < 3) {
-      setSimilarEntities([])
-      return
-    }
+    if (!showCreateModal || name.length < 3) return
     similarCheckTimer.current = setTimeout(() => {
       const matches: { name: string; score: number }[] = []
       for (const ent of allEntities) {
@@ -500,30 +516,32 @@ export default function EntityDirectory({
   useEffect(() => {
     const anyOpen = sanctionsModal.show || showMergeModal || showCreateModal
     if (!anyOpen) return
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') handleGlobalEscape()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [sanctionsModal.show, showMergeModal, showCreateModal, handleGlobalEscape])
 
-  // Auto-select entity from global search or recent items
+  // Auto-select entity from global search or recent items (once the entities are loaded),
+  // then tell the parent the request is consumed
+  const hasEntities = allEntities.length > 0
+  const [selectedInitialId, setSelectedInitialId] = useState<string | null>(null)
+  if ((initialEntityId ?? null) !== selectedInitialId && (!initialEntityId || hasEntities)) {
+    setSelectedInitialId(initialEntityId ?? null)
+    const entity = initialEntityId ? allEntities.find((e) => e.id === initialEntityId) : undefined
+    if (entity) setSelectedEntity(entity)
+  }
   useEffect(() => {
-    if (initialEntityId && allEntities.length > 0) {
-      const entity = allEntities.find((e) => e.id === initialEntityId)
-      if (entity) setSelectedEntity(entity)
-      onInitialEntityConsumed?.()
-    }
-  }, [initialEntityId, allEntities])
+    if (initialEntityId && hasEntities) onInitialEntityConsumed?.()
+  }, [initialEntityId, hasEntities, onInitialEntityConsumed])
 
-  const [hasInitialized, setHasInitialized] = useState(false)
-  useEffect(() => {
-    if (hasInitialized) {
-      setSelectedEntity(null)
-    } else {
-      setHasInitialized(true)
-    }
-  }, [page])
+  // Changing page closes the detail panel (adjusting state during render)
+  const [prevPage, setPrevPage] = useState(page)
+  if (page !== prevPage) {
+    setPrevPage(page)
+    setSelectedEntity(null)
+  }
 
   // ── Pre-built index Maps (rebuilt only when source data changes) ─────────────
 
@@ -565,7 +583,7 @@ export default function EntityDirectory({
 
   // ── Data helpers ────────────────────────────────────────────────────────────
 
-  const getAssociatedVessels = (entityId: string) => {
+  const getAssociatedVessels = (entityId: string): AssociatedVessel[] => {
     const directLinks = assuredsByEntity.get(entityId) || []
     const parentIds = uboParentIds.get(entityId) || []
     const indirectLinks = parentIds.flatMap((pid) => assuredsByEntity.get(pid) || [])
@@ -589,7 +607,7 @@ export default function EntityDirectory({
       })
   }
 
-  const getVesselCount = (entityId: string) => vesselCountByEntity.get(entityId) ?? 0
+  const getVesselCount = (entityId: string): number => vesselCountByEntity.get(entityId) ?? 0
 
   const getParentCompanies = (entityId: string): Entity[] => {
     return (uboParentIds.get(entityId) || [])
@@ -597,7 +615,7 @@ export default function EntityDirectory({
       .filter((e): e is Entity => !!e)
   }
 
-  const getDocScore = (entity: Entity) => {
+  const getDocScore = (entity: Entity): { have: number; total: number } => {
     const applicableTypes = entityDocTypes.filter(
       (t) => t.isRequired && (t.entityScope === 'both' || t.entityScope === entity.type)
     )
@@ -619,7 +637,7 @@ export default function EntityDirectory({
   )
 
   // ── OFAC handlers ───────────────────────────────────────────────────────────
-  const handleOfacRecheck = async (entity: Entity) => {
+  const handleOfacRecheck = async (entity: Entity): Promise<void> => {
     setCheckingId(entity.id)
     try {
       const result = await OfacService.checkSanctions(entity.name)
@@ -642,14 +660,16 @@ export default function EntityDirectory({
           entityId: entity.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Sanctions check failed. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) || 'Sanctions check failed. Please try again.'
+      )
     } finally {
       setCheckingId(null)
     }
   }
 
-  const handleVesselOfacRecheck = async (vessel: Vessel) => {
+  const handleVesselOfacRecheck = async (vessel: Vessel): Promise<void> => {
     setCheckingId(vessel.id)
     try {
       const result = await OfacService.checkSanctions(vessel.name)
@@ -672,14 +692,16 @@ export default function EntityDirectory({
           vesselId: vessel.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Sanctions check failed. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) || 'Sanctions check failed. Please try again.'
+      )
     } finally {
       setCheckingId(null)
     }
   }
 
-  const handleMarkClean = async () => {
+  const handleMarkClean = async (): Promise<void> => {
     if (sanctionsModal.entityId) {
       await window.api.updateEntity(sanctionsModal.entityId, {
         ofacStatus: 'CLEARED',
@@ -695,7 +717,7 @@ export default function EntityDirectory({
     loadData()
   }
 
-  const handleConfirmMatch = async () => {
+  const handleConfirmMatch = async (): Promise<void> => {
     if (sanctionsModal.entityId) {
       await window.api.updateEntity(sanctionsModal.entityId, {
         ofacStatus: 'MATCH',
@@ -711,7 +733,7 @@ export default function EntityDirectory({
     loadData()
   }
 
-  const handleViewPotentialMatch = async (entity?: Entity, vessel?: Vessel) => {
+  const handleViewPotentialMatch = async (entity?: Entity, vessel?: Vessel): Promise<void> => {
     const id = entity?.id || vessel?.id
     const name = entity?.name || vessel?.name || ''
     if (id) setCheckingId(id)
@@ -726,8 +748,11 @@ export default function EntityDirectory({
           vesselId: vessel?.id
         })
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to load sanctions data. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) ||
+          'Failed to load sanctions data. Please try again.'
+      )
     } finally {
       setCheckingId(null)
     }
@@ -735,21 +760,16 @@ export default function EntityDirectory({
 
   // ── Sub-components ──────────────────────────────────────────────────────────
 
-  const OfacBadge = ({
-    entity,
-    vessel,
-    onRecheck
-  }: {
-    entity?: Entity
-    vessel?: Vessel
+  const renderOfacBadge = (
+    target: { entity: Entity; vessel?: undefined } | { entity?: undefined; vessel: Vessel },
     onRecheck: () => void
-  }) => {
-    const target = entity || vessel
+  ): React.JSX.Element => {
+    const { entity, vessel } = target
     return (
       <SanctionsBadge
-        status={target?.ofacStatus}
-        checking={checkingId === target?.id}
-        checkedAt={target?.ofacCheckedAt}
+        status={(entity || vessel)?.ofacStatus}
+        checking={checkingId === (entity || vessel)?.id}
+        checkedAt={(entity || vessel)?.ofacCheckedAt}
         onReview={() => handleViewPotentialMatch(entity, vessel)}
         onRecheck={onRecheck}
       />
@@ -761,19 +781,30 @@ export default function EntityDirectory({
   const parentCompanies =
     selectedEntity?.type === 'person' ? getParentCompanies(selectedEntity.id) : []
 
-  // Track recent item view when an entity is selected (addresses/commissions/docs are
-  // now handled by the shared EntityEditPanel).
-  useEffect(() => {
+  // A newly selected entity opens with the core-field editor closed (adjusting state during render)
+  const selectedEntityId = selectedEntity?.id
+  const [prevSelectedEntityId, setPrevSelectedEntityId] = useState(selectedEntityId)
+  if (selectedEntityId !== prevSelectedEntityId) {
+    setPrevSelectedEntityId(selectedEntityId)
     setEditingEntityCore(false)
-    if (selectedEntity) {
-      window.api
-        .recentItemsAdd('entity', selectedEntity.id, selectedEntity.name, selectedEntity.type)
-        .then(() => {
-          window.dispatchEvent(new Event('recent-item-added'))
-        })
-        .catch(() => {})
-    }
-  }, [selectedEntity?.id])
+  }
+
+  // Track recent item view when an entity is selected (addresses/commissions/docs are
+  // now handled by the shared EntityEditPanel). Only a change of entity counts, not an edit.
+  const selectedEntityRef = useRef(selectedEntity)
+  useEffect(() => {
+    selectedEntityRef.current = selectedEntity
+  })
+  useEffect(() => {
+    const entity = selectedEntityRef.current
+    if (!selectedEntityId || !entity) return
+    window.api
+      .recentItemsAdd('entity', entity.id, entity.name, entity.type)
+      .then(() => {
+        window.dispatchEvent(new Event('recent-item-added'))
+      })
+      .catch(() => {})
+  }, [selectedEntityId])
 
   // ── VesselDetail drill-down ──────────────────────────────────────────────────
   if (viewingVessel) {
@@ -974,7 +1005,7 @@ export default function EntityDirectory({
         {/* Type filter */}
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as any)}
+          onChange={(e) => setTypeFilter(e.target.value as 'all' | 'company' | 'person')}
           style={{ padding: '7px 10px', fontSize: '0.82rem', minWidth: '120px' }}
           aria-label="Filter by type"
         >
@@ -1284,7 +1315,7 @@ export default function EntityDirectory({
                     </td>
                   </tr>
                 ) : (
-                  entities.map((entity) => {
+                  entities.map((entity: Entity) => {
                     const isSelected = selectedEntity?.id === entity.id
                     const isBulkChecked = selectedEntityIds.has(entity.id)
                     const score = getDocScore(entity)
@@ -1433,10 +1464,7 @@ export default function EntityDirectory({
                         {/* Sanctions */}
                         {entVisSet.has('sanctions') && (
                           <td style={{ padding: '11px 16px' }}>
-                            <OfacBadge
-                              entity={entity}
-                              onRecheck={() => handleOfacRecheck(entity)}
-                            />
+                            {renderOfacBadge({ entity }, () => handleOfacRecheck(entity))}
                           </td>
                         )}
                         {/* Documents */}
@@ -1840,7 +1868,7 @@ export default function EntityDirectory({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {associatedVessels.map((vessel, i) => (
+                  {associatedVessels.map((vessel: AssociatedVessel, i: number) => (
                     <div
                       key={vessel.id}
                       style={{
@@ -1938,10 +1966,7 @@ export default function EntityDirectory({
                           ))}
                         </div>
                       </div>
-                      <OfacBadge
-                        vessel={vessel}
-                        onRecheck={() => handleVesselOfacRecheck(vessel)}
-                      />
+                      {renderOfacBadge({ vessel }, () => handleVesselOfacRecheck(vessel))}
                     </div>
                   ))}
                 </div>
@@ -2068,7 +2093,9 @@ export default function EntityDirectory({
                 </label>
                 <select
                   value={createForm.type}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value as any }))}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, type: e.target.value as 'company' | 'person' }))
+                  }
                   style={{ width: '100%', padding: '10px 12px' }}
                 >
                   <option value="company">Company</option>

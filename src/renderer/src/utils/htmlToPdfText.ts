@@ -33,7 +33,7 @@ export function renderHtmlToPdf(
   const parser = new DOMParser()
   const parsed = parser.parseFromString(html, 'text/html')
 
-  function checkPageBreak() {
+  function checkPageBreak(): void {
     if (y + lineHeight > pageBreakY) {
       doc.addPage()
       y = 20
@@ -65,7 +65,7 @@ export function renderHtmlToPdf(
     return segments
   }
 
-  function renderSegments(segments: PdfTextSegment[], indent = 0) {
+  function renderSegments(segments: PdfTextSegment[], indent = 0): void {
     // Flatten segments into lines, then render each line with mixed formatting
     // For simplicity, render segment by segment tracking X position
     let currentX = x + indent
@@ -106,7 +106,7 @@ export function renderHtmlToPdf(
     checkPageBreak()
   }
 
-  function processNode(node: Node) {
+  function processNode(node: Node): void {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
         const text = (child.textContent || '').trim()

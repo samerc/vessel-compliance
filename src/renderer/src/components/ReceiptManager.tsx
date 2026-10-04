@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Receipt, Vessel, VesselAssured } from '../../../shared/types'
+import { Receipt, Vessel, VesselAssured, ReceiptInput } from '../../../shared/types'
+import { isIpcError } from '../utils/ipc'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
@@ -27,7 +28,7 @@ interface PolicyLite {
   id: string
   policyNumber: string
   vesselId: string
-  typeName?: string
+  typeName?: string | null
   status?: string
   source: 'issued' | 'dynamic'
 }
@@ -41,7 +42,7 @@ interface ReceiptManagerProps {
 interface FormPolicy {
   policyDocId: string | null
   policyNumber: string
-  typeName?: string
+  typeName?: string | null
   instalments: number[]
 }
 
@@ -64,7 +65,7 @@ export default function ReceiptManager({
   vesselId,
   vesselName,
   embedded = false
-}: ReceiptManagerProps) {
+}: ReceiptManagerProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -81,23 +82,30 @@ export default function ReceiptManager({
 
   const modalBg = isLight ? '#ffffff' : '#1a1d28'
 
-  const loadReceipts = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = vesselId
-        ? await window.api.receiptListByVessel(vesselId)
-        : await window.api.receiptList()
-      setReceipts(Array.isArray(data) ? data : [])
-    } catch (e: any) {
-      showError(e?.message || 'Failed to load receipts')
-    } finally {
-      setLoading(false)
-    }
-  }, [vesselId, showError])
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadReceipts = useCallback((): void => setReloadKey((k) => k + 1), [])
 
+  // Loads on mount, when the vessel changes, and whenever loadReceipts() is called
   useEffect(() => {
-    loadReceipts()
-  }, [loadReceipts])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const data = vesselId
+          ? await window.api.receiptListByVessel(vesselId)
+          : await window.api.receiptList()
+        if (alive) setReceipts(Array.isArray(data) ? data : [])
+      } catch (e) {
+        if (alive) showError((e instanceof Error && e.message) || 'Failed to load receipts')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [vesselId, showError, reloadKey])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -111,39 +119,39 @@ export default function ReceiptManager({
     )
   }, [receipts, search])
 
-  const handleDelete = async (r: Receipt) => {
+  const handleDelete = async (r: Receipt): Promise<void> => {
     const ok = await confirmDialog(`Delete receipt ${r.receiptNumber}? This cannot be undone.`)
     if (!ok) return
     try {
-      const res: any = await window.api.receiptDelete(r.id)
-      if (res?.error) throw new Error(res.message)
+      const res = await window.api.receiptDelete(r.id)
+      if (isIpcError(res)) throw new Error(res.message)
       showSuccess('Receipt deleted')
       loadReceipts()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to delete receipt')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to delete receipt')
     }
   }
 
-  const handleExport = async (r: Receipt) => {
+  const handleExport = async (r: Receipt): Promise<void> => {
     try {
       const full = await window.api.receiptGet(r.id)
       await exportReceiptDocx(full || r)
-    } catch (e: any) {
-      showError(e?.message || 'Failed to export receipt')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to export receipt')
     }
   }
 
-  const openCreate = () => {
+  const openCreate = (): void => {
     setEditing(null)
     setShowModal(true)
   }
-  const openEdit = async (r: Receipt) => {
+  const openEdit = async (r: Receipt): Promise<void> => {
     try {
       const full = await window.api.receiptGet(r.id)
       setEditing(full || r)
       setShowModal(true)
-    } catch (e: any) {
-      showError(e?.message || 'Failed to load receipt')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to load receipt')
     }
   }
 
@@ -377,7 +385,7 @@ function ReceiptModal({
   lockedVesselName?: string
   onClose: () => void
   onSaved: () => void
-}) {
+}): React.JSX.Element {
   const { showError, showSuccess } = useToast()
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [assureds, setAssureds] = useState<VesselAssured[]>([])
@@ -478,12 +486,12 @@ function ReceiptModal({
 
   // Load assureds + policies when the vessel changes
   useEffect(() => {
-    if (!vId) {
-      setAssureds([])
-      setPolicies([])
-      return
-    }
     ;(async () => {
+      if (!vId) {
+        setAssureds([])
+        setPolicies([])
+        return
+      }
       try {
         const as = await window.api.getVesselAssureds(vId)
         setAssureds(Array.isArray(as) ? as : [])
@@ -494,7 +502,7 @@ function ReceiptModal({
       const seen = new Set<string>()
       try {
         const all = await window.api.getPoliciesList()
-        for (const p of (Array.isArray(all) ? all : []).filter((p: any) => p.vesselId === vId)) {
+        for (const p of (Array.isArray(all) ? all : []).filter((p) => p.vesselId === vId)) {
           if (!p.policyNumber) continue
           merged.push({
             id: p.id,
@@ -544,7 +552,7 @@ function ReceiptModal({
     })()
   }, [vId])
 
-  const selectVessel = (v: Vessel) => {
+  const selectVessel = (v: Vessel): void => {
     setVId(v.id)
     setVName(v.name)
     setVesselDropOpen(false)
@@ -554,14 +562,14 @@ function ReceiptModal({
 
   const defaultInst = 1
 
-  const setPolicyInstalments = (policyNumber: string, value: string) => {
+  const setPolicyInstalments = (policyNumber: string, value: string): void => {
     const nums = parseInstalments(value)
     setSelectedPolicies((prev) =>
       prev.map((sp) => (sp.policyNumber === policyNumber ? { ...sp, instalments: nums } : sp))
     )
   }
 
-  const togglePolicy = async (p: PolicyLite) => {
+  const togglePolicy = async (p: PolicyLite): Promise<void> => {
     const exists = selectedPolicies.some(
       (sp) => sp.policyDocId === p.id || sp.policyNumber === p.policyNumber
     )
@@ -588,7 +596,7 @@ function ReceiptModal({
         const inst = await window.api.policyGetInstalments(p.id)
         const num = defaultInst
         const row =
-          (Array.isArray(inst) ? inst : []).find((i: any) => Number(i.instalmentNumber) === num) ||
+          (Array.isArray(inst) ? inst : []).find((i) => Number(i.instalmentNumber) === num) ||
           (Array.isArray(inst) ? inst[num - 1] : null)
         if (row && row.premiumAmount != null) setAmount(String(Number(row.premiumAmount)))
       } catch {
@@ -648,7 +656,7 @@ function ReceiptModal({
       .slice(0, 100)
   }, [vessels, vesselSearch])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!vName.trim()) {
       showError('Please select or enter a vessel')
       return
@@ -662,7 +670,7 @@ function ReceiptModal({
       return
     }
     setSaving(true)
-    const payload = {
+    const payload: ReceiptInput = {
       vesselId: vId,
       vesselName: vName,
       payerName: payerName.trim(),
@@ -684,15 +692,15 @@ function ReceiptModal({
     }
     try {
       if (editing) {
-        await window.api.receiptUpdate(editing.id, payload as any)
+        await window.api.receiptUpdate(editing.id, payload)
         showSuccess('Receipt updated')
       } else {
-        await window.api.receiptCreate(payload as any)
+        await window.api.receiptCreate(payload)
         showSuccess('Receipt created')
       }
       onSaved()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to save receipt')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to save receipt')
     } finally {
       setSaving(false)
     }
@@ -1120,7 +1128,13 @@ function ReceiptModal({
 }
 
 // ── Settings modal ───────────────────────────────────────────────────────
-function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => void }) {
+function SettingsModal({
+  modalBg,
+  onClose
+}: {
+  modalBg: string
+  onClose: () => void
+}): React.JSX.Element {
   const { showError, showSuccess } = useToast()
   const [nextSerial, setNextSerial] = useState('')
   const [city, setCity] = useState('BEIRUT')
@@ -1138,7 +1152,7 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
     })()
   }, [])
 
-  const save = async () => {
+  const save = async (): Promise<void> => {
     setSaving(true)
     try {
       await window.api.receiptSetSettings({
@@ -1147,8 +1161,8 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
       })
       showSuccess('Receipt settings saved')
       onClose()
-    } catch (e: any) {
-      showError(e?.message || 'Failed to save settings')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to save settings')
     } finally {
       setSaving(false)
     }

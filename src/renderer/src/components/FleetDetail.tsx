@@ -30,7 +30,7 @@ interface FleetDetailProps {
   onBack: () => void
 }
 
-export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
+export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.JSX.Element {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [allVessels, setAllVessels] = useState<Vessel[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -71,28 +71,36 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddSearch, setQuickAddSearch] = useState('')
 
+  // Bumped to re-run the load effect (after add/remove, returning from vessel detail)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
+
   useEffect(() => {
-    loadData()
-  }, [fleet])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const allV = await window.api.getVessels()
+        const fVessels = allV.filter((v) => v.fleetId === fleet.id)
+        const dTypes = await window.api.getDocumentTypes()
+        const docs = await window.api.getVesselDocuments()
+        if (!alive) return
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const allV = await window.api.getVessels()
-      const fVessels = allV.filter((v) => v.fleetId === fleet.id)
-      const dTypes = await window.api.getDocumentTypes()
-      const docs = await window.api.getVesselDocuments()
-
-      setAllVessels(Array.isArray(allV) ? allV : [])
-      setVessels(Array.isArray(fVessels) ? fVessels : [])
-      setDocTypes(Array.isArray(dTypes) ? dTypes : [])
-      setAllDocs(Array.isArray(docs) ? docs : [])
-    } finally {
-      setLoading(false)
+        setAllVessels(Array.isArray(allV) ? allV : [])
+        setVessels(Array.isArray(fVessels) ? fVessels : [])
+        setDocTypes(Array.isArray(dTypes) ? dTypes : [])
+        setAllDocs(Array.isArray(docs) ? docs : [])
+      } finally {
+        if (alive) setLoading(false)
+      }
     }
-  }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [fleet, reloadKey])
 
-  const handleAddVessel = async (vessel: Vessel) => {
+  const handleAddVessel = async (vessel: Vessel): Promise<void> => {
     await window.api.updateVessel(vessel.id, { fleetId: fleet.id })
     setQuickAddSearch('')
     setShowQuickAdd(false)
@@ -100,9 +108,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     loadData()
   }
 
-  const handleRemoveVessel = async (vessel: Vessel) => {
+  const handleRemoveVessel = async (vessel: Vessel): Promise<void> => {
     if (await confirmDialog(`Remove ${vessel.name} from this fleet?`)) {
-      await window.api.updateVessel(vessel.id, { fleetId: null as any })
+      // Vessel.fleetId is typed `string | undefined`, but the adapter needs an explicit null to clear it
+      await window.api.updateVessel(vessel.id, { fleetId: null } as unknown as Partial<Vessel>)
       showSuccess(`${vessel.name} removed from fleet`)
       loadData()
     }
@@ -149,7 +158,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     )
   }
 
-  const handleOpenExportModal = (mode: 'zip' | 'pdf' | 'excel') => {
+  const handleOpenExportModal = (mode: 'zip' | 'pdf' | 'excel'): void => {
     const vList = mode === 'zip' ? activeVessels : vessels
     if (vList.length === 0) return
     setZipSelectedIds(new Set(vList.map((v) => v.id)))
@@ -158,7 +167,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     setShowZipModal(true)
   }
 
-  const handleExportIndividualPDFs = async () => {
+  const handleExportIndividualPDFs = async (): Promise<void> => {
     const selectedVessels = activeVessels.filter((v) => zipSelectedIds.has(v.id))
     if (selectedVessels.length === 0) return
     setShowZipModal(false)
@@ -195,7 +204,11 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
     }
   }
 
-  const renderVesselTable = (vesselList: Vessel[], title: string, showRemove: boolean) => {
+  const renderVesselTable = (
+    vesselList: Vessel[],
+    title: string,
+    showRemove: boolean
+  ): React.JSX.Element | null => {
     if (vesselList.length === 0) return null
     return (
       <div style={{ marginBottom: '24px' }}>

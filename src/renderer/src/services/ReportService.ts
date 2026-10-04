@@ -9,38 +9,47 @@ import {
   VesselDynamicPolicy,
   ConditionSurvey,
   SurveyDefect,
-  Surveyor
+  Surveyor,
+  Entity,
+  EntityDocumentType,
+  EntityDocument
 } from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
 import { getReportSettings, getReportText, reportTextParagraphs } from './ReportSettingsService'
 
 // Guard against IPC error objects (safeHandle returns { error:true } on failure)
-const safeArray = (v: unknown): any[] => (Array.isArray(v) ? v : [])
+const safeArray = <T>(v: T[]): T[] => (Array.isArray(v) ? v : [])
+
+type ExcelRow = Record<string, unknown>
+type DocWithAutoTable = jsPDF & { lastAutoTable?: { finalY?: number } }
 
 // Dynamic entity document helpers
-async function loadEntityDocData() {
+async function loadEntityDocData(): Promise<{
+  edTypes: EntityDocumentType[]
+  edDocs: EntityDocument[]
+}> {
   const [edTypes, edDocs] = await Promise.all([
     window.api.getEntityDocumentTypes(),
     window.api.getEntityDocuments()
   ])
   return {
-    edTypes: safeArray(edTypes).filter((t: any) => t.isActive && t.isRequired),
+    edTypes: safeArray(edTypes).filter((t) => t.isActive && t.isRequired),
     edDocs: safeArray(edDocs)
   }
 }
 
 function entityDocStatus(
-  entity: any,
-  edTypes: any[],
-  edDocs: any[]
+  entity: Entity,
+  edTypes: EntityDocumentType[],
+  edDocs: EntityDocument[]
 ): { name: string; onFile: boolean }[] {
   return edTypes
-    .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
-    .map((t: any) => ({
+    .filter((t) => t.entityScope === 'both' || t.entityScope === entity.type)
+    .map((t) => ({
       name: t.name,
       onFile: edDocs.some(
-        (d: any) => d.entityId === entity.id && d.documentTypeId === t.id && d.filePath
+        (d) => d.entityId === entity.id && d.documentTypeId === t.id && d.filePath
       )
     }))
 }
@@ -110,7 +119,7 @@ const dateOnly = (dateStr: string | null | undefined): string => {
 
 export const ReportService = {
   exportVesselToExcel: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
-    const complianceData: any[] = []
+    const complianceData: ExcelRow[] = []
     let compliantCount = 0
     let requiredCount = 0
 
@@ -175,7 +184,7 @@ export const ReportService = {
     )
     const { edTypes, edDocs } = await loadEntityDocData()
 
-    const entityDocsData: any[] = []
+    const entityDocsData: ExcelRow[] = []
     if (vesselAssureds.length > 0) {
       entityDocsData.push({
         'Document Name': '',
@@ -358,7 +367,7 @@ export const ReportService = {
     options?: { returnBytes?: boolean }
   ): Promise<Uint8Array | void> => {
     const doc = new jsPDF()
-    const tableData: any[] = []
+    const tableData: string[][] = []
     let compliantCount = 0
     let requiredCount = 0
 
@@ -637,7 +646,7 @@ export const ReportService = {
     docTypes: DocumentType[],
     allDocs: VesselDocument[]
   ) => {
-    const data: any[] = []
+    const data: ExcelRow[] = []
     let totalCompliant = 0
     let totalRequired = 0
     const activeVessels = vessels.filter((v) => v.isActive)
@@ -694,7 +703,7 @@ export const ReportService = {
     const { edTypes: excelEdTypes, edDocs: excelEdDocs } = await loadEntityDocData()
 
     // Collect all unique assureds across the fleet with their vessel associations
-    const assuredMap = new Map<string, { entity: any; vessels: string[]; role: string }>()
+    const assuredMap = new Map<string, { entity: Entity; vessels: string[]; role: string }>()
 
     for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
@@ -720,7 +729,7 @@ export const ReportService = {
     )
 
     // Add assured entities section
-    const assuredData: any[] = []
+    const assuredData: ExcelRow[] = []
     if (sortedExcelAssureds.length > 0) {
       assuredData.push({
         Vessel: '',
@@ -945,7 +954,7 @@ export const ReportService = {
     allDocs: VesselDocument[]
   ) => {
     const doc = new jsPDF()
-    const tableData: any[] = []
+    const tableData: string[][] = []
     let totalCompliant = 0
     let totalRequired = 0
     const activeVessels = vessels.filter((v) => v.isActive)
@@ -993,7 +1002,7 @@ export const ReportService = {
     const { edTypes: fleetEdTypes, edDocs: fleetEdDocs } = await loadEntityDocData()
 
     // Collect all unique assureds across the fleet with their vessel associations
-    const assuredMap = new Map<string, { entity: any; vessels: string[]; roles: string[] }>()
+    const assuredMap = new Map<string, { entity: Entity; vessels: string[]; roles: string[] }>()
 
     for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
@@ -1250,7 +1259,7 @@ export const ReportService = {
     const surveyor: Surveyor | undefined = surveyors.find(
       (s: Surveyor) => s.id === survey.surveyorId
     )
-    const flagState = flagStatesRaw.find((f: any) => f.id === vessel.flagStateId)
+    const flagState = flagStatesRaw.find((f) => f.id === vessel.flagStateId)
 
     // Configurable intro / end text (Admin → Report Settings → Report Texts)
     const reportSettings = await getReportSettings()
@@ -1350,7 +1359,7 @@ export const ReportService = {
     const lc: [number, number, number] = [55, 55, 55]
     const vc: [number, number, number] = [0, 0, 0]
 
-    const drawField = (label: string, value: string) => {
+    const drawField = (label: string, value: string): void => {
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(...lc)
@@ -1486,7 +1495,7 @@ export const ReportService = {
         ? sortedDefects.filter((d) => (d.notes || d.closureNotes) && includeNoteIds.has(d.id))
         : []
 
-    let ny = (doc as any).lastAutoTable?.finalY ?? y + 10
+    let ny = (doc as DocWithAutoTable).lastAutoTable?.finalY ?? y + 10
     if (notesToShow.length > 0) {
       ny += 10
 

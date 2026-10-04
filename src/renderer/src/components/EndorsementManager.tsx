@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus,
   Edit3,
@@ -24,7 +24,8 @@ import ConfirmationModal from './ConfirmationModal'
 import type {
   PolicyEndorsement,
   EndorsementInstalment,
-  EndorsementTemplate
+  EndorsementTemplate,
+  PolicyDocInstalment
 } from '../../../shared/types'
 import { ENDORSEMENT_PRESET_SECTIONS } from '../../../shared/types'
 import {
@@ -102,12 +103,45 @@ function calcProRata(
   return result.proRataPremium
 }
 
+interface EndorsementPageData {
+  endorsements: PolicyEndorsement[]
+  templates: EndorsementTemplate[]
+  policyData: { inceptionDate: string; expiryDate: string; commissionPercent: number } | null
+  policyInstalments: Array<{ instalmentNumber: number; dueDate: string }>
+}
+
+async function fetchEndorsementPageData(policyDocId: string): Promise<EndorsementPageData> {
+  const [list, tmpls, policy, polInst] = await Promise.all([
+    window.api.endorsementList(policyDocId),
+    window.api.endorsementGetTemplates(),
+    window.api.policyGetById(policyDocId),
+    window.api.policyGetInstalments(policyDocId)
+  ])
+  return {
+    endorsements: Array.isArray(list) ? list : [],
+    templates: Array.isArray(tmpls) ? tmpls : [],
+    policyData: policy
+      ? {
+          inceptionDate: policy.inceptionDate || '',
+          expiryDate: policy.expiryDate || '',
+          commissionPercent: Number(policy.commissionPercent) || 0
+        }
+      : null,
+    policyInstalments: Array.isArray(polInst)
+      ? polInst.map((pi: PolicyDocInstalment) => ({
+          instalmentNumber: pi.instalmentNumber,
+          dueDate: pi.dueDate || ''
+        }))
+      : []
+  }
+}
+
 export default function EndorsementManager({
   policyDocId,
   premiumCurrency,
   initialAddMode,
   initialContent
-}: EndorsementManagerProps) {
+}: EndorsementManagerProps): React.JSX.Element {
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
   const { theme } = useTheme()
@@ -137,50 +171,42 @@ export default function EndorsementManager({
     { show: false, id: '', number: 0 }
   )
 
-  const loadData = useCallback(async () => {
+  const applyData = useCallback((d: EndorsementPageData): void => {
+    setEndorsements(d.endorsements)
+    setTemplates(d.templates)
+    if (d.policyData) setPolicyData(d.policyData)
+    setPolicyInstalments(d.policyInstalments)
+  }, [])
+
+  const loadData = useCallback(async (): Promise<void> => {
     setLoading(true)
     try {
-      const [list, tmpls, policy, polInst] = await Promise.all([
-        window.api.endorsementList(policyDocId),
-        window.api.endorsementGetTemplates(),
-        window.api.policyGetById(policyDocId),
-        window.api.policyGetInstalments(policyDocId)
-      ])
-      setEndorsements(Array.isArray(list) ? list : [])
-      setTemplates(Array.isArray(tmpls) ? tmpls : [])
-      if (policy) {
-        setPolicyData({
-          inceptionDate: policy.inceptionDate || '',
-          expiryDate: policy.expiryDate || '',
-          commissionPercent: Number(policy.commissionPercent) || 0
-        })
-      }
-      setPolicyInstalments(
-        Array.isArray(polInst)
-          ? polInst.map((pi: any) => ({
-              instalmentNumber: pi.instalmentNumber,
-              dueDate: pi.dueDate || ''
-            }))
-          : []
-      )
-    } catch (err: any) {
+      applyData(await fetchEndorsementPageData(policyDocId))
+    } catch {
       showError('Failed to load endorsements')
     }
     setLoading(false)
-  }, [policyDocId])
+  }, [policyDocId, showError, applyData])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  // Handle initialAddMode
-  useEffect(() => {
-    if (initialAddMode && !loading && canManage) {
-      handleAdd()
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const d = await fetchEndorsementPageData(policyDocId)
+        if (alive) applyData(d)
+      } catch {
+        if (alive) showError('Failed to load endorsements')
+      }
+      if (alive) setLoading(false)
     }
-  }, [initialAddMode, loading])
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [policyDocId, showError, applyData])
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     try {
       await window.api.endorsementNextNumber(policyDocId)
       const newEdit = {
@@ -204,7 +230,18 @@ export default function EndorsementManager({
     }
   }
 
-  const handleEdit = async (endorsement: PolicyEndorsement) => {
+  // Handle initialAddMode (latest handleAdd via ref so the effect only re-runs on these deps)
+  const handleAddRef = useRef(handleAdd)
+  useEffect(() => {
+    handleAddRef.current = handleAdd
+  })
+  useEffect(() => {
+    if (initialAddMode && !loading && canManage) {
+      void handleAddRef.current()
+    }
+  }, [initialAddMode, loading, canManage])
+
+  const handleEdit = async (endorsement: PolicyEndorsement): Promise<void> => {
     if (endorsement.status === 'exported') {
       showError('Cannot edit an exported endorsement')
       return
@@ -279,7 +316,7 @@ export default function EndorsementManager({
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!editState.effectiveDate) {
       showError('Effective date is required')
       return
@@ -353,13 +390,13 @@ export default function EndorsementManager({
       setIsEditing(false)
       setEditState(EMPTY_EDIT)
       await loadData()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save endorsement')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save endorsement')
     }
     setSaving(false)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     try {
       await window.api.endorsementDelete(id)
       showSuccess('Endorsement deleted')
@@ -369,7 +406,7 @@ export default function EndorsementManager({
     }
   }
 
-  const handleExport = async (endorsement: PolicyEndorsement) => {
+  const handleExport = async (endorsement: PolicyEndorsement): Promise<void> => {
     setExporting(endorsement.id)
     try {
       const { exportEndorsementDocx } = await import('../services/PolicyExportService')
@@ -381,37 +418,37 @@ export default function EndorsementManager({
       })
       showSuccess('Endorsement exported')
       await loadData()
-    } catch (err: any) {
-      showError(err?.message || 'Export failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Export failed')
     }
     setExporting(null)
   }
 
-  const handleExportDA = async (endorsement: PolicyEndorsement) => {
+  const handleExportDA = async (endorsement: PolicyEndorsement): Promise<void> => {
     setExporting(endorsement.id + '_da')
     try {
       const { exportEndorsementDADocx } = await import('../services/PolicyExportService')
       await exportEndorsementDADocx(policyDocId, endorsement.id)
       showSuccess('Debit Advice exported')
-    } catch (err: any) {
-      showError(err?.message || 'DA export failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'DA export failed')
     }
     setExporting(null)
   }
 
-  const handleExportCA = async (endorsement: PolicyEndorsement) => {
+  const handleExportCA = async (endorsement: PolicyEndorsement): Promise<void> => {
     setExporting(endorsement.id + '_ca')
     try {
       const { exportEndorsementCADocx } = await import('../services/PolicyExportService')
       await exportEndorsementCADocx(policyDocId, endorsement.id)
       showSuccess('Credit Advice exported')
-    } catch (err: any) {
-      showError(err?.message || 'CA export failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'CA export failed')
     }
     setExporting(null)
   }
 
-  const handleSign = async (endorsement: PolicyEndorsement) => {
+  const handleSign = async (endorsement: PolicyEndorsement): Promise<void> => {
     try {
       await window.api.endorsementSign(endorsement.id)
       showSuccess('Endorsement signed')
@@ -421,7 +458,7 @@ export default function EndorsementManager({
     }
   }
 
-  const toggleSection = (key: string) => {
+  const toggleSection = (key: string): void => {
     setEditState((prev) => ({
       ...prev,
       sections: prev.sections.map((s) =>
@@ -436,7 +473,7 @@ export default function EndorsementManager({
     })
   }
 
-  const toggleFullWidth = (key: string) => {
+  const toggleFullWidth = (key: string): void => {
     setEditState((prev) => ({
       ...prev,
       sections: prev.sections.map((s) =>
@@ -445,7 +482,7 @@ export default function EndorsementManager({
     }))
   }
 
-  const addCustomSection = () => {
+  const addCustomSection = (): void => {
     const id = crypto.randomUUID?.() || Date.now().toString()
     const key = `custom__${id}`
     setEditState((prev) => ({
@@ -465,7 +502,7 @@ export default function EndorsementManager({
     setExpandedSections((prev) => new Set([...prev, key]))
   }
 
-  const removeSection = (key: string) => {
+  const removeSection = (key: string): void => {
     if (!key.startsWith('custom__')) return
     setEditState((prev) => ({
       ...prev,
@@ -473,7 +510,7 @@ export default function EndorsementManager({
     }))
   }
 
-  const moveSection = (idx: number, dir: -1 | 1) => {
+  const moveSection = (idx: number, dir: -1 | 1): void => {
     const target = idx + dir
     if (target < 0 || target >= editState.sections.length) return
     setEditState((prev) => {
@@ -483,25 +520,25 @@ export default function EndorsementManager({
     })
   }
 
-  const updateSectionContent = (key: string, content: string) => {
+  const updateSectionContent = (key: string, content: string): void => {
     setEditState((prev) => ({
       ...prev,
       sections: prev.sections.map((s) => (s.sectionKey === key ? { ...s, content } : s))
     }))
   }
 
-  const updateSectionTitle = (key: string, title: string) => {
+  const updateSectionTitle = (key: string, title: string): void => {
     setEditState((prev) => ({
       ...prev,
       sections: prev.sections.map((s) => (s.sectionKey === key ? { ...s, sectionTitle: title } : s))
     }))
   }
 
-  const applyTemplate = (sectionKey: string, template: EndorsementTemplate) => {
+  const applyTemplate = (sectionKey: string, template: EndorsementTemplate): void => {
     updateSectionContent(sectionKey, template.content)
   }
 
-  const addInstalment = () => {
+  const addInstalment = (): void => {
     setEditState((prev) => ({
       ...prev,
       instalments: [
@@ -516,7 +553,7 @@ export default function EndorsementManager({
     }))
   }
 
-  const prefillInstalments = () => {
+  const prefillInstalments = (): void => {
     if (policyInstalments.length === 0) {
       showError('No policy instalments found')
       return
@@ -575,7 +612,7 @@ export default function EndorsementManager({
     setShowInstalments(true)
   }
 
-  const removeInstalment = (idx: number) => {
+  const removeInstalment = (idx: number): void => {
     setEditState((prev) => ({
       ...prev,
       instalments: prev.instalments
@@ -585,7 +622,7 @@ export default function EndorsementManager({
   }
 
   // --- Styles ---
-  const chipStyle = (active: boolean) => ({
+  const chipStyle = (active: boolean): React.CSSProperties => ({
     padding: '4px 12px',
     borderRadius: '14px',
     fontSize: '0.75rem',
@@ -618,7 +655,7 @@ export default function EndorsementManager({
     display: 'block'
   }
 
-  const statusBadge = (status: string, signed: boolean) => {
+  const statusBadge = (status: string, signed: boolean): React.JSX.Element => {
     const s = signed ? 'signed' : status
     const colors: Record<string, { bg: string; color: string }> = {
       draft: { bg: 'rgba(150,150,150,0.15)', color: 'var(--text-secondary)' },

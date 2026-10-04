@@ -23,7 +23,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 
 interface WarrantyManagerProps {
   vesselId: string
@@ -62,7 +62,7 @@ export default function WarrantyManager({
   vesselId,
   dynamicPolicies,
   isLight
-}: WarrantyManagerProps) {
+}: WarrantyManagerProps): React.JSX.Element {
   const { user, hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
   const { showSuccess, showError } = useToast()
@@ -119,40 +119,47 @@ export default function WarrantyManager({
   // Complete form
   const [completeNotes, setCompleteNotes] = useState('')
 
-  useEffect(() => {
-    loadWarranties()
-  }, [vesselId])
-
   const [linkedSurveyCounts, setLinkedSurveyCounts] = useState<
     Record<string, { open: number; closed: number }>
   >({})
 
-  const loadWarranties = async () => {
-    try {
-      const data = await window.api.surveyWarrantyGetByVessel(vesselId)
-      const safe = Array.isArray(data) ? data : []
-      setWarranties(safe)
-      // Load defect counts for linked surveys
-      const counts: Record<string, { open: number; closed: number }> = {}
-      for (const w of safe) {
-        if (w.conditionSurveyId) {
-          try {
-            const defects = await window.api.getSurveyDefects(w.conditionSurveyId)
-            const open = defects.filter((d: any) => d.status === 'OPEN').length
-            const closed = defects.filter((d: any) => d.status !== 'OPEN').length
-            counts[w.id] = { open, closed }
-          } catch {
-            /* ignore */
+  // Loads on mount / vessel change, and again whenever loadWarranties() is called
+  const [warrantiesKey, setWarrantiesKey] = useState(0)
+  const loadWarranties = (): void => setWarrantiesKey((k) => k + 1)
+  useEffect(() => {
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const data = await window.api.surveyWarrantyGetByVessel(vesselId)
+        if (!alive) return
+        const safe = Array.isArray(data) ? data : []
+        setWarranties(safe)
+        // Load defect counts for linked surveys
+        const counts: Record<string, { open: number; closed: number }> = {}
+        for (const w of safe) {
+          if (w.conditionSurveyId) {
+            try {
+              const defects = await window.api.getSurveyDefects(w.conditionSurveyId)
+              const open = defects.filter((d) => d.status === 'OPEN').length
+              const closed = defects.filter((d) => d.status !== 'OPEN').length
+              counts[w.id] = { open, closed }
+            } catch {
+              /* ignore */
+            }
           }
         }
+        if (alive) setLinkedSurveyCounts(counts)
+      } catch (err) {
+        if (alive) showError((err instanceof Error && err.message) || 'Failed to load warranties')
       }
-      setLinkedSurveyCounts(counts)
-    } catch (err: any) {
-      showError(err.message || 'Failed to load warranties')
     }
-  }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [vesselId, showError, warrantiesKey])
 
-  const loadReminders = async (warrantyId: string) => {
+  const loadReminders = async (warrantyId: string): Promise<void> => {
     try {
       const data = await window.api.surveyWarrantyGetReminders(warrantyId)
       setReminders((prev) => ({ ...prev, [warrantyId]: Array.isArray(data) ? data : [] }))
@@ -161,7 +168,7 @@ export default function WarrantyManager({
     }
   }
 
-  const toggleExpand = async (id: string) => {
+  const toggleExpand = async (id: string): Promise<void> => {
     if (expandedId === id) {
       setExpandedId(null)
     } else {
@@ -186,20 +193,20 @@ export default function WarrantyManager({
   // extends naturally when serials reach 5 digits (P262010000 -> SUR10000).
   const deriveSurReference = (policyId: string): string => {
     const policy = dynamicPolicies.find((p) => p.id === policyId)
-    const num = (policy as any)?.policyNumber as string | undefined
+    const num = policy?.policyNumber
     if (!num) return ''
     const serial = num.trim().replace(/^[A-Za-z]\d{4}/, '')
     return serial ? `SUR${serial}` : ''
   }
 
-  const handlePolicyChange = (policyId: string) => {
+  const handlePolicyChange = (policyId: string): void => {
     setFormPolicyId(policyId)
     if (policyId) setFormInceptionDate(getPolicyInceptionDate(policyId))
     setFormReference(deriveSurReference(policyId))
   }
 
   // ── Add / Edit ──────────────────────────────────────────────────
-  const openAddModal = () => {
+  const openAddModal = (): void => {
     setEditingWarranty(null)
     setFormDescription('')
     setFormDeadlineType('days')
@@ -216,7 +223,7 @@ export default function WarrantyManager({
     setShowAddModal(true)
   }
 
-  const openEditModal = (w: SurveyWarranty) => {
+  const openEditModal = (w: SurveyWarranty): void => {
     setEditingWarranty(w)
     setFormDescription(w.description)
     setFormDeadlineType(w.deadlineType)
@@ -233,21 +240,21 @@ export default function WarrantyManager({
   // One save at a time (double click must not add the warranty twice)
   const savingWarrantyRef = useRef(false)
   const [savingWarranty, setSavingWarranty] = useState(false)
-  const handleSaveWarranty = async () => {
+  const handleSaveWarranty = async (): Promise<void> => {
     if (savingWarrantyRef.current) return
     savingWarrantyRef.current = true
     setSavingWarranty(true)
     try {
       await saveWarrantyNow()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save warranty')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save warranty')
     } finally {
       savingWarrantyRef.current = false
       setSavingWarranty(false)
     }
   }
 
-  const saveWarrantyNow = async () => {
+  const saveWarrantyNow = async (): Promise<void> => {
     if (!formDescription.trim()) {
       showError('Description is required')
       return
@@ -293,24 +300,24 @@ export default function WarrantyManager({
       setShowAddModal(false)
       setEditingWarranty(null)
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save warranty')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save warranty')
     }
   }
 
   // ── Mark survey done ─────────────────────────────────────────────
-  const handleMarkSurveyDone = async (w: SurveyWarranty) => {
+  const handleMarkSurveyDone = async (w: SurveyWarranty): Promise<void> => {
     try {
       await window.api.surveyWarrantyUpdate(w.id, { status: 'survey_done' })
       showSuccess('Warranty marked as survey carried out')
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to update status')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update status')
     }
   }
 
   // ── Convert to Survey (quick modal) ─────────────────────────────
-  const openConvertModal = async (w: SurveyWarranty) => {
+  const openConvertModal = async (w: SurveyWarranty): Promise<void> => {
     setConvertWarranty(w)
     setConvertDate(new Date().toISOString().split('T')[0])
     setConvertReference(w.reference || '')
@@ -332,7 +339,7 @@ export default function WarrantyManager({
     }
   }
 
-  const handleConfirmConvert = async () => {
+  const handleConfirmConvert = async (): Promise<void> => {
     if (!convertWarranty) return
     if (!convertSurveyorId) {
       showError('Please choose a surveyor')
@@ -362,15 +369,15 @@ export default function WarrantyManager({
       showSuccess('Survey created and linked to warranty')
       setConvertWarranty(null)
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to convert to survey')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to convert to survey')
     } finally {
       setConvertSaving(false)
     }
   }
 
   // ── Link to existing Survey ─────────────────────────────────────
-  const openLinkModal = async (w: SurveyWarranty) => {
+  const openLinkModal = async (w: SurveyWarranty): Promise<void> => {
     setLinkWarranty(w)
     setLinkSearch('')
     setLinkLoading(true)
@@ -384,14 +391,14 @@ export default function WarrantyManager({
       for (const s of (Array.isArray(surveyors) ? surveyors : []) as Surveyor[])
         map[s.id] = s.companyName
       setSurveyorMap(map)
-    } catch (err: any) {
-      showError(err.message || 'Failed to load surveys')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to load surveys')
     } finally {
       setLinkLoading(false)
     }
   }
 
-  const handleLinkSurvey = async (surveyId: string) => {
+  const handleLinkSurvey = async (surveyId: string): Promise<void> => {
     if (!linkWarranty) return
     try {
       ok(
@@ -403,13 +410,13 @@ export default function WarrantyManager({
       showSuccess('Survey linked to warranty')
       setLinkWarranty(null)
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to link survey')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to link survey')
     }
   }
 
   // ── Complete ─────────────────────────────────────────────────────
-  const handleComplete = async () => {
+  const handleComplete = async (): Promise<void> => {
     if (!completeWarrantyId) return
     try {
       const warranty = warranties.find((w) => w.id === completeWarrantyId)
@@ -433,13 +440,13 @@ export default function WarrantyManager({
       setCompleteWarrantyId(null)
       setCompleteNotes('')
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to complete warranty')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to complete warranty')
     }
   }
 
   // ── Waive ────────────────────────────────────────────────────────
-  const handleWaive = async () => {
+  const handleWaive = async (): Promise<void> => {
     if (!waiveWarrantyId || !waiveReason.trim()) {
       showError('Waiver reason is required')
       return
@@ -450,13 +457,13 @@ export default function WarrantyManager({
       setWaiveWarrantyId(null)
       setWaiveReason('')
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to waive warranty')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to waive warranty')
     }
   }
 
   // ── Log Reminder ─────────────────────────────────────────────────
-  const openReminderModal = (warrantyId: string) => {
+  const openReminderModal = (warrantyId: string): void => {
     setReminderWarrantyId(warrantyId)
     setReminderSentAt(new Date().toISOString().split('T')[0])
     setReminderChannel('email')
@@ -465,7 +472,7 @@ export default function WarrantyManager({
     setReminderNextDate('')
   }
 
-  const handleLogReminder = async () => {
+  const handleLogReminder = async (): Promise<void> => {
     if (!reminderWarrantyId || !reminderSentAt) {
       showError('Sent date is required')
       return
@@ -481,28 +488,28 @@ export default function WarrantyManager({
         nextReminderDate: reminderNextDate || null,
         loggedBy: user?.id || null
       })
-      if (result && typeof result === 'object' && (result as any).error) {
-        showError((result as any).message || 'Failed to log reminder')
+      if (isIpcError(result)) {
+        showError(result.message || 'Failed to log reminder')
         return
       }
       showSuccess('Reminder logged')
       setReminderWarrantyId(null)
       await loadReminders(wid)
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to log reminder')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to log reminder')
     }
   }
 
   // ── Delete ───────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this warranty? This cannot be undone.'))) return
     try {
       await window.api.surveyWarrantyDelete(id)
       showSuccess('Warranty deleted')
       loadWarranties()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to delete')
     }
   }
 
@@ -567,7 +574,7 @@ export default function WarrantyManager({
     overflowY: 'auto'
   }
 
-  const renderWarrantyCard = (w: SurveyWarranty) => {
+  const renderWarrantyCard = (w: SurveyWarranty): React.JSX.Element => {
     const sc = STATUS_COLORS[w.status]
     const isExpanded = expandedId === w.id
     const isActive = w.status === 'pending' || w.status === 'survey_done'
@@ -1096,7 +1103,7 @@ export default function WarrantyManager({
     )
   }
 
-  const renderGroup = (label: string, items: SurveyWarranty[]) => (
+  const renderGroup = (label: string, items: SurveyWarranty[]): React.JSX.Element => (
     <div key={label} style={{ marginBottom: '20px' }}>
       <div
         style={{
@@ -1501,7 +1508,9 @@ export default function WarrantyManager({
                 <label style={labelStyle}>Channel</label>
                 <select
                   value={reminderChannel}
-                  onChange={(e) => setReminderChannel(e.target.value as any)}
+                  onChange={(e) =>
+                    setReminderChannel(e.target.value as 'email' | 'phone' | 'other')
+                  }
                   style={inputStyle}
                 >
                   <option value="email">Email</option>

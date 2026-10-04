@@ -88,7 +88,7 @@ function fmt(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function PremiumCalculator() {
+export default function PremiumCalculator(): React.JSX.Element {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [annualPremium, setAnnualPremium] = useState<string>('')
@@ -97,7 +97,7 @@ export default function PremiumCalculator() {
   const [commissionPct, setCommissionPct] = useState<string>('0')
   const [copiedField, setCopiedField] = useState<'premium' | 'commission' | null>(null)
 
-  const copyToClipboard = (value: number, field: 'premium' | 'commission') => {
+  const copyToClipboard = (value: number, field: 'premium' | 'commission'): void => {
     navigator.clipboard.writeText(numberToText(value)).then(() => {
       setCopiedField(field)
       setTimeout(() => setCopiedField(null), 2000)
@@ -138,7 +138,7 @@ export default function PremiumCalculator() {
     }
   }, [startDate, endDate, annualPremium, standardPeriod, numInstalments, commissionPct])
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     setStartDate('')
     setEndDate('')
     setAnnualPremium('')
@@ -147,7 +147,7 @@ export default function PremiumCalculator() {
     setCommissionPct('0')
   }
 
-  const stepStyle = (color: string) => ({
+  const stepStyle = (color: string): React.CSSProperties => ({
     padding: '12px 16px' as const,
     background: `rgba(${color}, 0.06)`,
     borderRadius: '8px',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   FileText,
   Trash2,
@@ -72,7 +72,11 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   const [editCategory, setEditCategory] = useState('general')
   const [editBody, setEditBody] = useState('')
   const [dirty, setDirty] = useState(false)
-  const skipDirtyRef = useRef(false)
+  // True for a short moment after the editor fields are synced from a template, so the
+  // rich text editor's own content normalisation does not count as an edit
+  const [suppressDirty, setSuppressDirty] = useState(false)
+  // Template id the editor fields were last synced for
+  const [syncedId, setSyncedId] = useState<string | null>(null)
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false)
@@ -85,7 +89,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   const [showGenerate, setShowGenerate] = useState(false)
   const [generateMode, setGenerateMode] = useState<'docx' | 'copy'>('docx')
 
-  const loadTemplates = useCallback(async () => {
+  // Used by handlers that need to await the reload (create); the effect below does the initial load
+  const loadTemplates = useCallback(async (): Promise<void> => {
     try {
       setLoading(true)
       const cat = activeCategory === 'all' ? undefined : activeCategory
@@ -98,43 +103,74 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [activeCategory])
+  }, [activeCategory, showError])
 
   useEffect(() => {
-    loadTemplates()
-  }, [loadTemplates])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const cat = activeCategory === 'all' ? undefined : activeCategory
+        const result = await window.api.docTemplateGetAll(cat)
+        if (alive && Array.isArray(result)) {
+          setTemplates(result)
+        }
+      } catch {
+        if (alive) showError('Failed to load document templates')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [activeCategory, showError])
 
   const selected = templates.find((t) => t.id === selectedId) || null
 
-  // Sync editor fields when selection changes
-  useEffect(() => {
+  // Sync editor fields when the selected template changes (adjust state during render)
+  const currentSelectedId = selected?.id ?? null
+  if (currentSelectedId !== syncedId) {
+    setSyncedId(currentSelectedId)
     if (selected) {
-      skipDirtyRef.current = true
       setEditName(selected.name)
       setEditDescription(selected.description || '')
       setEditCategory(selected.category)
       setEditBody(selected.body || '')
       setDirty(false)
-      setTimeout(() => {
-        skipDirtyRef.current = false
-      }, 50)
+      setSuppressDirty(true)
     }
-  }, [selectedId, selected?.id])
+  }
 
-  // Track dirty state
+  // End the post-sync window after 50ms
   useEffect(() => {
-    if (skipDirtyRef.current) return
-    if (selected) {
-      const changed =
-        editName !== selected.name ||
-        editDescription !== (selected.description || '') ||
-        editCategory !== selected.category ||
-        editBody !== (selected.body || '')
-      setDirty(changed)
-    }
-  }, [editName, editDescription, editCategory, editBody])
+    if (!suppressDirty) return
+    const t = setTimeout(() => setSuppressDirty(false), 50)
+    return () => clearTimeout(t)
+  }, [suppressDirty, syncedId])
 
-  const handleSave = async () => {
+  // Track dirty state on every edit (compared against the stored template)
+  const trackDirty = (next: {
+    name?: string
+    description?: string
+    category?: string
+    body?: string
+  }): void => {
+    if (suppressDirty || !selected) return
+    const name = next.name ?? editName
+    const description = next.description ?? editDescription
+    const category = next.category ?? editCategory
+    const body = next.body ?? editBody
+    setDirty(
+      name !== selected.name ||
+        description !== (selected.description || '') ||
+        category !== selected.category ||
+        body !== (selected.body || '')
+    )
+  }
+
+  const handleSave = async (): Promise<void> => {
     if (!selected || !dirty) return
     try {
       await window.api.docTemplateUpdate(selected.id, {
@@ -151,7 +187,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (!selected) return
     if (!(await confirmDialog(`Delete template "${selected.name}"?`))) return
     try {
@@ -164,7 +200,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
-  const handleCreate = async () => {
+  const handleCreate = async (): Promise<void> => {
     if (!createName.trim()) return
     try {
       setCreating(true)
@@ -188,7 +224,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }
 
-  const handleReorder = async (id: string, direction: 'up' | 'down') => {
+  const handleReorder = async (id: string, direction: 'up' | 'down'): Promise<void> => {
     const idx = templates.findIndex((t) => t.id === id)
     if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
@@ -459,7 +495,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   <input
                     type="text"
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => {
+                      setEditName(e.target.value)
+                      trackDirty({ name: e.target.value })
+                    }}
                     disabled={!canManage}
                     style={{
                       width: '100%',
@@ -488,7 +527,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   </label>
                   <select
                     value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
+                    onChange={(e) => {
+                      setEditCategory(e.target.value)
+                      trackDirty({ category: e.target.value })
+                    }}
                     disabled={!canManage}
                     style={{
                       width: '100%',
@@ -524,7 +566,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 </label>
                 <textarea
                   value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
+                  onChange={(e) => {
+                    setEditDescription(e.target.value)
+                    trackDirty({ description: e.target.value })
+                  }}
                   disabled={!canManage}
                   rows={2}
                   style={{
@@ -556,7 +601,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 </label>
                 <RichTextEditor
                   value={editBody}
-                  onChange={setEditBody}
+                  onChange={(html) => {
+                    setEditBody(html)
+                    trackDirty({ body: html })
+                  }}
                   placeholder="Write your template content here... Use Insert Field to add placeholders."
                   minHeight={250}
                   showFontSize
@@ -877,7 +925,7 @@ function GenerateModal({
   onClose: () => void
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [vessels, setVessels] = useState<{ id: string; name: string }[]>([])
   const [entities, setEntities] = useState<{ id: string; name: string }[]>([])
   const [selectedVesselId, setSelectedVesselId] = useState('')
@@ -890,30 +938,27 @@ function GenerateModal({
     window.api
       .getVessels()
       .then((v) => {
-        if (Array.isArray(v)) setVessels(v.map((x: any) => ({ id: x.id, name: x.name })))
+        if (Array.isArray(v)) setVessels(v.map((x) => ({ id: x.id, name: x.name })))
       })
       .catch(() => {})
     window.api
       .getEntities()
       .then((e) => {
-        if (Array.isArray(e)) setEntities(e.map((x: any) => ({ id: x.id, name: x.name })))
+        if (Array.isArray(e)) setEntities(e.map((x) => ({ id: x.id, name: x.name })))
       })
       .catch(() => {})
   }, [])
 
   // Load policies when vessel changes
   useEffect(() => {
-    if (!selectedVesselId) {
-      setPolicies([])
-      setSelectedPolicyId('')
-      return
-    }
+    // Clearing the vessel resets the policy list in the select's onChange
+    if (!selectedVesselId) return
     window.api
       .getVesselDynamicPolicies(selectedVesselId)
       .then((p) => {
         if (Array.isArray(p)) {
           setPolicies(
-            p.map((x: any) => ({
+            p.map((x) => ({
               id: x.id,
               label: `${x.policyTypeName || 'Policy'} - ${x.policyNumber || 'No number'}`
             }))
@@ -923,7 +968,7 @@ function GenerateModal({
       .catch(() => {})
   }, [selectedVesselId])
 
-  const handleAction = async () => {
+  const handleAction = async (): Promise<void> => {
     try {
       setProcessing(true)
       const ctx = await buildTemplateContext({
@@ -1047,7 +1092,13 @@ function GenerateModal({
           </label>
           <select
             value={selectedVesselId}
-            onChange={(e) => setSelectedVesselId(e.target.value)}
+            onChange={(e) => {
+              setSelectedVesselId(e.target.value)
+              if (!e.target.value) {
+                setPolicies([])
+                setSelectedPolicyId('')
+              }
+            }}
             style={selectStyle}
           >
             <option value="">-- None --</option>

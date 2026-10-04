@@ -17,32 +17,10 @@ import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { Badge, EmptyState, Spinner } from './ui'
 import type { BadgeTone } from './ui'
+import type { PolicyListRow } from '../../../shared/types'
 
-interface PolicyListItem {
-  id: string
-  vesselId: string
-  vesselName: string
-  imoNumber: string
-  policyTypeId: string
-  policyTypeName: string
-  policyNumber?: string
-  conditionId?: string
-  conditionName?: string
-  status: string
-  currency: string
-  brokerEntityId?: string
-  brokerName?: string
-  customerName?: string
-  customerType?: string
-  fleetName?: string
-  notes?: string
-  inceptionDate?: string
-  expiryDate?: string
-  premiumAmount?: number
-  createdAt?: string
-  updatedAt?: string
-  exportedAt?: string
-}
+// policy:list row; currency/fleetName are not returned by the IPC today (read as undefined)
+type PolicyListItem = PolicyListRow & { currency?: string; fleetName?: string }
 
 interface PolicyListProps {
   onSelectPolicy: (policyId: string) => void
@@ -81,7 +59,7 @@ const TYPE_COLORS: [string, string][] = [
   ['loss', 'var(--info)']
 ]
 
-function getTypeColor(typeName: string): string {
+function getTypeColor(typeName: string | null): string {
   const lower = (typeName || '').toLowerCase()
   return TYPE_COLORS.find(([key]) => lower.includes(key))?.[1] || 'var(--accent-primary)'
 }
@@ -99,7 +77,25 @@ const POLICY_COLUMNS: ColumnDef[] = [
   { id: 'actions', label: 'Actions', defaultVisible: true }
 ]
 
-export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
+function SortIcon({
+  field,
+  sortField,
+  sortDir
+}: {
+  field: SortField
+  sortField: SortField
+  sortDir: SortDir
+}): React.JSX.Element {
+  if (sortField !== field)
+    return <ChevronDown size={12} style={{ opacity: 0.3, marginLeft: '2px' }} />
+  return sortDir === 'asc' ? (
+    <ChevronUp size={12} style={{ marginLeft: '2px' }} />
+  ) : (
+    <ChevronDown size={12} style={{ marginLeft: '2px' }} />
+  )
+}
+
+export default function PolicyList({ onSelectPolicy }: PolicyListProps): React.JSX.Element {
   const [policies, setPolicies] = useState<PolicyListItem[]>([])
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string }[]>([])
   const [search, setSearch] = useState('')
@@ -110,7 +106,10 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; policy: any }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean
+    policy: PolicyListItem | null
+  }>({
     show: false,
     policy: null
   })
@@ -119,24 +118,29 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
   const { visibleColumns, setVisibleColumns } = useColumnPrefs('policies', POLICY_COLUMNS)
   const visibleSet = new Set(visibleColumns)
 
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [p, pt] = await Promise.all([window.api.getPoliciesList(), window.api.getPolicyTypes()])
-      setPolicies(Array.isArray(p) ? p : [])
-      setPolicyTypes(Array.isArray(pt) ? pt : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to load policies')
-    } finally {
-      setLoading(false)
+    const loadData = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const [p, pt] = await Promise.all([
+          window.api.getPoliciesList(),
+          window.api.getPolicyTypes()
+        ])
+        setPolicies(Array.isArray(p) ? p : [])
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+      } catch (err) {
+        showError((err instanceof Error ? err.message : '') || 'Failed to load policies')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    loadData()
+  }, [reloadKey, showError])
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
-  const toggleSort = (field: SortField) => {
+  const toggleSort = (field: SortField): void => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -200,16 +204,16 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
   const sorted = useMemo(() => {
     const arr = [...filtered]
     arr.sort((a, b) => {
-      let av: any, bv: any
+      let av: string | number, bv: string | number
       if (sortField === 'premiumAmount') {
         av = a.premiumAmount || 0
         bv = b.premiumAmount || 0
       } else if (sortField === 'inceptionDate' || sortField === 'expiryDate') {
-        av = (a as any)[sortField] || ''
-        bv = (b as any)[sortField] || ''
+        av = a[sortField] || ''
+        bv = b[sortField] || ''
       } else {
-        av = ((a as any)[sortField] || '').toLowerCase()
-        bv = ((b as any)[sortField] || '').toLowerCase()
+        av = (a[sortField] || '').toLowerCase()
+        bv = (b[sortField] || '').toLowerCase()
       }
       if (av < bv) return sortDir === 'asc' ? -1 : 1
       if (av > bv) return sortDir === 'asc' ? 1 : -1
@@ -222,17 +226,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(0)
-  }, [search, statusFilter, typeFilter, registryOnly])
-
-  const formatCurrency = (amount?: number, currency?: string) => {
+  const formatCurrency = (amount?: number, currency?: string): string => {
     if (!amount) return '-'
     return `${currency || 'USD'} ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
 
-  const formatPeriod = (inception?: string, expiry?: string) => {
+  const formatPeriod = (inception?: string | null, expiry?: string | null): string => {
     if (!inception && !expiry) return '-'
     const i = inception ? formatDateShort(inception) : '?'
     const e = expiry ? formatDateShort(expiry) : '?'
@@ -251,16 +250,6 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   })
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field)
-      return <ChevronDown size={12} style={{ opacity: 0.3, marginLeft: '2px' }} />
-    return sortDir === 'asc' ? (
-      <ChevronUp size={12} style={{ marginLeft: '2px' }} />
-    ) : (
-      <ChevronDown size={12} style={{ marginLeft: '2px' }} />
-    )
-  }
 
   const selectStyle: React.CSSProperties = {
     padding: '8px 12px',
@@ -340,14 +329,20 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(0)
+            }}
             placeholder="Search policy number, vessel, customer, broker..."
             style={{ width: '100%', paddingLeft: '36px', fontSize: '0.85rem' }}
           />
         </div>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => {
+            setTypeFilter(e.target.value)
+            setPage(0)
+          }}
           style={selectStyle}
         >
           <option value="all">All Types</option>
@@ -359,7 +354,10 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
         </select>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+            setPage(0)
+          }}
           style={selectStyle}
         >
           <option value="all">All Statuses</option>
@@ -369,10 +367,22 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
           <option value="cancelled">Cancelled</option>
         </select>
         <div className="segmented">
-          <button className={!registryOnly ? 'active' : ''} onClick={() => setRegistryOnly(false)}>
+          <button
+            className={!registryOnly ? 'active' : ''}
+            onClick={() => {
+              if (registryOnly) setPage(0)
+              setRegistryOnly(false)
+            }}
+          >
             All
           </button>
-          <button className={registryOnly ? 'active' : ''} onClick={() => setRegistryOnly(true)}>
+          <button
+            className={registryOnly ? 'active' : ''}
+            onClick={() => {
+              if (!registryOnly) setPage(0)
+              setRegistryOnly(true)
+            }}
+          >
             Registry Only
           </button>
         </div>
@@ -394,22 +404,23 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
             <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
               {visibleSet.has('policyNo') && (
                 <th style={thStyle('policyNumber')} onClick={() => toggleSort('policyNumber')}>
-                  Policy No. <SortIcon field="policyNumber" />
+                  Policy No.{' '}
+                  <SortIcon field="policyNumber" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('type') && (
                 <th style={thStyle('policyTypeName')} onClick={() => toggleSort('policyTypeName')}>
-                  Type <SortIcon field="policyTypeName" />
+                  Type <SortIcon field="policyTypeName" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('vessel') && (
                 <th style={thStyle('vesselName')} onClick={() => toggleSort('vesselName')}>
-                  Vessel <SortIcon field="vesselName" />
+                  Vessel <SortIcon field="vesselName" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('customer') && (
                 <th style={thStyle('customerName')} onClick={() => toggleSort('customerName')}>
-                  Customer <SortIcon field="customerName" />
+                  Customer <SortIcon field="customerName" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('period') && (
@@ -417,12 +428,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                   style={{ ...thStyle('inceptionDate'), whiteSpace: 'nowrap' }}
                   onClick={() => toggleSort('inceptionDate')}
                 >
-                  Period <SortIcon field="inceptionDate" />
+                  Period <SortIcon field="inceptionDate" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('status') && (
                 <th style={thStyle('status')} onClick={() => toggleSort('status')}>
-                  Status <SortIcon field="status" />
+                  Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('premium') && (
@@ -430,17 +441,17 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                   style={thStyle('premiumAmount', 'right')}
                   onClick={() => toggleSort('premiumAmount')}
                 >
-                  Premium <SortIcon field="premiumAmount" />
+                  Premium <SortIcon field="premiumAmount" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('converted') && (
                 <th style={thStyle('createdAt')} onClick={() => toggleSort('createdAt')}>
-                  Converted <SortIcon field="createdAt" />
+                  Converted <SortIcon field="createdAt" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               {visibleSet.has('exported') && (
                 <th style={thStyle('exportedAt')} onClick={() => toggleSort('exportedAt')}>
-                  Exported <SortIcon field="exportedAt" />
+                  Exported <SortIcon field="exportedAt" sortField={sortField} sortDir={sortDir} />
                 </th>
               )}
               <th
@@ -501,6 +512,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                               setTypeFilter('all')
                               setStatusFilter('all')
                               setRegistryOnly(false)
+                              setPage(0)
                             }}
                           >
                             Clear filters
@@ -532,7 +544,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                         }}
                       >
                         {p.policyNumber ? (
-                          `${p.policyNumber}${(p as any).revisionNumber > 0 ? `-R${(p as any).revisionNumber}` : ''}`
+                          `${p.policyNumber}${p.revisionNumber > 0 ? `-R${p.revisionNumber}` : ''}`
                         ) : (
                           <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                             --
@@ -736,11 +748,11 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
           onConfirm={async () => {
             setDeleteConfirm({ show: false, policy: null })
             try {
-              await window.api.policyDelete(deleteConfirm.policy.id)
+              await window.api.policyDelete(deleteConfirm.policy!.id)
               showSuccess('Policy deleted')
               loadData()
-            } catch (err: any) {
-              showError(err.message || 'Failed to delete')
+            } catch (err) {
+              showError((err instanceof Error ? err.message : '') || 'Failed to delete')
             }
           }}
           onCancel={() => setDeleteConfirm({ show: false, policy: null })}

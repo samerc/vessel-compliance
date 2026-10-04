@@ -29,19 +29,22 @@ import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
 import { PageHeader } from './ui'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
+import type {
+  PolicyRenewalRow,
+  PolicyRenewalNote,
+  RenewalStatusType,
+  Quotation,
+  Vessel
+} from '../../../shared/types'
 
 interface PolicyRenewalsProps {
   onNavigateToVessel?: (vesselId: string) => void
   onCreateRenewalQuotation?: (quotationId: string) => void
 }
 
-interface RenewalStatusType {
-  id: string
-  name: string
-  color: string
-  order: number
-}
+/** A renewal row; the 3-month view tags each with the month it belongs to */
+type RenewalRow = PolicyRenewalRow & { _monthLabel?: string }
 
 const MONTH_NAMES = [
   'January',
@@ -105,7 +108,7 @@ function KPI({
   label: string
   value: string | number
   sub?: string
-}) {
+}): React.JSX.Element {
   return (
     <div
       className="glass-card"
@@ -166,7 +169,8 @@ function KPI({
 // Default column widths: Vessel, Customer, PolicyType, PolicyNo, EndDate, Premium, Days, Status, QuotSent, Actions
 const DEFAULT_COL_WIDTHS = [200, 170, 120, 130, 110, 95, 90, 130, 140, 110]
 
-function formatPremium(value: number | null, currency: string | null): string {
+// premium arrives as the raw DECIMAL string from policies:getRenewalsByMonth
+function formatPremium(value: string | number | null, currency: string | null): string {
   if (value == null) return '-'
   const cur = currency || 'USD'
   return `${cur} ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -175,7 +179,7 @@ function formatPremium(value: number | null, currency: string | null): string {
 export default function PolicyRenewals({
   onNavigateToVessel,
   onCreateRenewalQuotation
-}: PolicyRenewalsProps) {
+}: PolicyRenewalsProps): React.JSX.Element {
   const { theme } = useTheme()
   const { user, hasPermission } = useAuth()
   const { showSuccess, showError } = useToast()
@@ -185,7 +189,7 @@ export default function PolicyRenewals({
   const now = new Date()
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1) // 1-based
-  const [renewals, setRenewals] = useState<any[]>([])
+  const [renewals, setRenewals] = useState<RenewalRow[]>([])
   const [loading, setLoading] = useState(false)
   const [sortField, setSortFieldRaw] = useState<SortField>(
     () => (localStorage.getItem('renewals_sortField') as SortField) || 'endDate'
@@ -193,11 +197,11 @@ export default function PolicyRenewals({
   const [sortDir, setSortDirRaw] = useState<SortDir>(
     () => (localStorage.getItem('renewals_sortDir') as SortDir) || 'asc'
   )
-  const setSortField = (f: SortField) => {
+  const setSortField = (f: SortField): void => {
     setSortFieldRaw(f)
     localStorage.setItem('renewals_sortField', f)
   }
-  const setSortDir = (d: SortDir | ((prev: SortDir) => SortDir)) => {
+  const setSortDir = (d: SortDir | ((prev: SortDir) => SortDir)): void => {
     setSortDirRaw((prev) => {
       const val = typeof d === 'function' ? d(prev) : d
       localStorage.setItem('renewals_sortDir', val)
@@ -226,7 +230,7 @@ export default function PolicyRenewals({
     policyType: string
     policyNumber: string
   } | null>(null)
-  const [renewalNotes, setRenewalNotes] = useState<any[]>([])
+  const [renewalNotes, setRenewalNotes] = useState<PolicyRenewalNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
   const [newNoteText, setNewNoteText] = useState('')
   const [notesSaving, setNotesSaving] = useState(false)
@@ -260,7 +264,7 @@ export default function PolicyRenewals({
   // Close renew dropdown on outside click (use timeout to avoid closing on the same click that opened)
   useEffect(() => {
     if (!renewMenuId) return
-    const handler = () => setRenewMenuId(null)
+    const handler = (): void => setRenewMenuId(null)
     const timer = setTimeout(() => document.addEventListener('mousedown', handler), 10)
     return () => {
       clearTimeout(timer)
@@ -290,8 +294,11 @@ export default function PolicyRenewals({
   )
   const rnVisSet = new Set(rnVisibleCols)
 
-  // Load saved column widths from localStorage on mount
-  useEffect(() => {
+  // Load the user's saved column widths from localStorage when the user is known / changes
+  // (adjusting state during render, not in an effect)
+  const [widthsUserId, setWidthsUserId] = useState<string | undefined>(undefined)
+  if (widthsUserId !== user?.id) {
+    setWidthsUserId(user?.id)
     if (user?.id) {
       const saved = localStorage.getItem(`renewal_col_widths_${user.id}`)
       if (saved) {
@@ -307,7 +314,7 @@ export default function PolicyRenewals({
         }
       }
     }
-  }, [user?.id])
+  }
 
   // Keep ref in sync with state (used to read latest value in event handlers)
   useEffect(() => {
@@ -318,66 +325,84 @@ export default function PolicyRenewals({
   useEffect(() => {
     window.api
       .getPolicyTypes()
-      .then((types: any[]) => {
+      .then((types) => {
         if (Array.isArray(types)) {
-          setPolicyTypes(types.map((t: any) => ({ id: t.id, name: t.name })))
+          setPolicyTypes(types.map((t) => ({ id: t.id, name: t.name })))
         }
       })
       .catch(() => {})
   }, [])
 
+  // Bumped to reload the renewals / the status types (after a status or note change)
+  const [renewalsKey, setRenewalsKey] = useState(0)
+  const [statusTypesKey, setStatusTypesKey] = useState(0)
+  const loadRenewals = (): void => setRenewalsKey((k) => k + 1)
+  const loadStatusTypes = (): void => setStatusTypesKey((k) => k + 1)
+
   useEffect(() => {
-    loadRenewals()
-    loadStatusTypes()
-  }, [selectedYear, selectedMonth, multiMonthView])
-
-  const loadRenewals = async () => {
-    setLoading(true)
-    try {
-      if (multiMonthView) {
-        // Build list of 3 consecutive months starting from selectedYear/selectedMonth
-        const months: { year: number; month: number }[] = []
-        let y = selectedYear,
-          m = selectedMonth
-        for (let i = 0; i < 3; i++) {
-          months.push({ year: y, month: m })
-          m++
-          if (m > 12) {
-            m = 1
-            y++
+    let alive = true
+    const fetchRenewals = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        if (multiMonthView) {
+          // Build list of 3 consecutive months starting from selectedYear/selectedMonth
+          const months: { year: number; month: number }[] = []
+          let y = selectedYear,
+            m = selectedMonth
+          for (let i = 0; i < 3; i++) {
+            months.push({ year: y, month: m })
+            m++
+            if (m > 12) {
+              m = 1
+              y++
+            }
           }
+          const results = await Promise.all(
+            months.map(({ year, month }) => window.api.getPolicyRenewalsByMonth(year, month))
+          )
+          // Tag each record with its month label so grouping works
+          const combined = results.flatMap((data, i) =>
+            (Array.isArray(data) ? data : []).map((r) => ({
+              ...r,
+              _monthLabel: `${MONTH_NAMES[months[i].month - 1]} ${months[i].year}`
+            }))
+          )
+          if (!alive) return
+          setRenewals(combined)
+        } else {
+          const data = await window.api.getPolicyRenewalsByMonth(selectedYear, selectedMonth)
+          if (!alive) return
+          setRenewals(Array.isArray(data) ? data : [])
         }
-        const results = await Promise.all(
-          months.map(({ year, month }) => window.api.getPolicyRenewalsByMonth(year, month))
-        )
-        // Tag each record with its month label so grouping works
-        const combined = results.flatMap((data, i) =>
-          (Array.isArray(data) ? data : []).map((r: any) => ({
-            ...r,
-            _monthLabel: `${MONTH_NAMES[months[i].month - 1]} ${months[i].year}`
-          }))
-        )
-        setRenewals(combined)
-      } else {
-        const data = await window.api.getPolicyRenewalsByMonth(selectedYear, selectedMonth)
-        setRenewals(Array.isArray(data) ? data : [])
+      } catch {
+        if (!alive) return
+        setRenewals([])
       }
-    } catch {
-      setRenewals([])
+      if (alive) setLoading(false)
     }
-    setLoading(false)
-  }
-
-  const loadStatusTypes = async () => {
-    try {
-      const data = await window.api.getRenewalStatusTypes()
-      setStatusTypes(Array.isArray(data) ? data : [])
-    } catch {
-      setStatusTypes([])
+    void fetchRenewals()
+    return () => {
+      alive = false
     }
-  }
+  }, [selectedYear, selectedMonth, multiMonthView, renewalsKey])
 
-  const handleAddStatus = async (e: React.FormEvent) => {
+  useEffect(() => {
+    let alive = true
+    const fetchStatusTypes = async (): Promise<void> => {
+      try {
+        const data = await window.api.getRenewalStatusTypes()
+        if (alive) setStatusTypes(Array.isArray(data) ? data : [])
+      } catch {
+        if (alive) setStatusTypes([])
+      }
+    }
+    void fetchStatusTypes()
+    return () => {
+      alive = false
+    }
+  }, [selectedYear, selectedMonth, multiMonthView, statusTypesKey])
+
+  const handleAddStatus = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newStatusName.trim()) return
     await window.api.addRenewalStatusType(newStatusName.trim(), newStatusColor)
@@ -386,7 +411,7 @@ export default function PolicyRenewals({
     loadStatusTypes()
   }
 
-  const handleDeleteStatus = async (id: string) => {
+  const handleDeleteStatus = async (id: string): Promise<void> => {
     if (
       !(await confirmDialog(
         'Delete this status? Policies using it will have their status cleared.'
@@ -398,7 +423,7 @@ export default function PolicyRenewals({
     loadRenewals()
   }
 
-  const handleSaveEditStatus = async (id: string) => {
+  const handleSaveEditStatus = async (id: string): Promise<void> => {
     if (!editStatusName.trim()) return
     await window.api.updateRenewalStatusType(id, editStatusName.trim(), editStatusColor)
     setEditingStatusId(null)
@@ -406,7 +431,7 @@ export default function PolicyRenewals({
     loadRenewals()
   }
 
-  const handleOpenNotes = async (r: any) => {
+  const handleOpenNotes = async (r: RenewalRow): Promise<void> => {
     setNotesModal({
       id: r.id,
       vesselName: r.vesselName,
@@ -424,7 +449,7 @@ export default function PolicyRenewals({
     }
   }
 
-  const handleAddNote = async () => {
+  const handleAddNote = async (): Promise<void> => {
     if (!notesModal || !newNoteText.trim()) return
     setNotesSaving(true)
     try {
@@ -444,7 +469,7 @@ export default function PolicyRenewals({
     }
   }
 
-  const handleDeleteNote = async (noteId: string) => {
+  const handleDeleteNote = async (noteId: string): Promise<void> => {
     if (!notesModal) return
     await window.api.deletePolicyRenewalNote(noteId)
     setRenewalNotes((prev) => prev.filter((n) => n.id !== noteId))
@@ -455,7 +480,7 @@ export default function PolicyRenewals({
     )
   }
 
-  const handleSetQuotationDate = async (policyId: string, date: string) => {
+  const handleSetQuotationDate = async (policyId: string, date: string): Promise<void> => {
     const val = date || null
     await window.api.setQuotationSentDate(policyId, val)
     setRenewals((prev) =>
@@ -463,7 +488,7 @@ export default function PolicyRenewals({
     )
   }
 
-  const handleSetStatus = async (policyId: string, statusId: string | null) => {
+  const handleSetStatus = async (policyId: string, statusId: string | null): Promise<void> => {
     await window.api.setRenewalStatusForPolicy(policyId, statusId)
     setRenewals((prev) =>
       prev.map((r) => {
@@ -479,7 +504,7 @@ export default function PolicyRenewals({
     )
   }
 
-  const handleRenew = async (row: any, includeFleet: boolean) => {
+  const handleRenew = async (row: RenewalRow, includeFleet: boolean): Promise<void> => {
     setRenewMenuId(null)
     setRenewMenuPos(null)
     setRenewLoading(row.id)
@@ -493,22 +518,19 @@ export default function PolicyRenewals({
       else if (policyTypeName.includes('fdd')) qtCode = 'F'
       else if (policyTypeName.includes('loss of hire') || policyTypeName.includes('loh'))
         qtCode = 'L'
-      const quotationType =
-        quotationTypes.find((qt: any) => qt.code === qtCode) || quotationTypes[0]
+      const quotationType = quotationTypes.find((qt) => qt.code === qtCode) || quotationTypes[0]
       if (!quotationType) throw new Error('No quotation types configured')
 
       // Fleet renewal: merge policy data from all fleet vessels into one quotation
       if (includeFleet) {
         const allVessels = await window.api.getVessels()
-        const primaryVessel = allVessels.find((v: any) => v.id === row.vesselId)
+        const primaryVessel = allVessels.find((v) => v.id === row.vesselId)
         const primaryFleetId = primaryVessel?.fleetId
         if (primaryFleetId) {
-          const fleetVessels = allVessels.filter(
-            (v: any) => v.isActive && v.fleetId === primaryFleetId
-          )
-          const fleetVesselIds = fleetVessels.map((v: any) => v.id)
+          const fleetVessels = allVessels.filter((v) => v.isActive && v.fleetId === primaryFleetId)
+          const fleetVesselIds = fleetVessels.map((v) => v.id)
           const result = await window.api.policyRenewFleet(fleetVesselIds, qtCode)
-          if (result && !(result as any).error && result.quotationId) {
+          if (result && !isIpcError(result) && result.quotationId) {
             showSuccess(`Fleet renewal quotation created with ${fleetVessels.length} vessels`)
             onCreateRenewalQuotation?.(result.quotationId)
             return
@@ -521,7 +543,7 @@ export default function PolicyRenewals({
         const policyDocId = await window.api.policyFindActiveForVessel(row.vesselId, qtCode)
         if (policyDocId) {
           const result = await window.api.policyRenew(policyDocId)
-          if (result && !(result as any).error && result.quotationId) {
+          if (result && !isIpcError(result) && result.quotationId) {
             showSuccess(`Renewal quotation created from existing policy`)
             onCreateRenewalQuotation?.(result.quotationId)
             return
@@ -544,20 +566,20 @@ export default function PolicyRenewals({
           periodText,
           quotationDate: new Date().toISOString().split('T')[0],
           createdBy: user?.username
-        } as any)
+        } as Partial<Quotation>)
       )
-      if (!q || (q as any).error) throw new Error('Failed to create quotation')
+      if (!q || isIpcError(q)) throw new Error('Failed to create quotation')
 
       // Get vessels and flag states for populating vessel data
       const allVessels = await window.api.getVessels()
       const flagStates = await window.api.getFlagStates()
-      const primaryVessel = allVessels.find((v: any) => v.id === row.vesselId)
+      const primaryVessel = allVessels.find((v) => v.id === row.vesselId)
       const primaryFleetId = primaryVessel?.fleetId
 
       // Determine which vessels to add
-      let vesselsToAdd: any[] = []
+      let vesselsToAdd: Vessel[] = []
       if (includeFleet && primaryFleetId) {
-        vesselsToAdd = allVessels.filter((v: any) => v.isActive && v.fleetId === primaryFleetId)
+        vesselsToAdd = allVessels.filter((v) => v.isActive && v.fleetId === primaryFleetId)
       } else {
         vesselsToAdd = primaryVessel ? [primaryVessel] : []
       }
@@ -566,7 +588,7 @@ export default function PolicyRenewals({
       for (let i = 0; i < vesselsToAdd.length; i++) {
         const v = vesselsToAdd[i]
         const flagName = v.flagStateId
-          ? flagStates.find((f: any) => f.id === v.flagStateId)?.name || ''
+          ? flagStates.find((f) => f.id === v.flagStateId)?.name || ''
           : ''
         await window.api.addQuotationVessel({
           quotationId: q.id,
@@ -588,7 +610,7 @@ export default function PolicyRenewals({
       const allEntities = await window.api.getEntities()
       const assuredRoles = await window.api.getAssuredRoles()
       const roleOrder = new Map(
-        (Array.isArray(assuredRoles) ? assuredRoles : []).map((r: any, idx: number) => [
+        (Array.isArray(assuredRoles) ? assuredRoles : []).map((r, idx: number) => [
           r.name?.toLowerCase(),
           r.order ?? idx
         ])
@@ -601,19 +623,18 @@ export default function PolicyRenewals({
         try {
           const vassureds = await window.api.getVesselAssureds(v.id)
           const toAdd = (Array.isArray(vassureds) ? vassureds : [])
-            .filter((va: any) => !existingEntityIds.has(va.entityId))
+            .filter((va) => !existingEntityIds.has(va.entityId))
             .sort(
-              (a: any, b: any) =>
+              (a, b) =>
                 (roleOrder.get(a.role?.toLowerCase()) ?? 999) -
                 (roleOrder.get(b.role?.toLowerCase()) ?? 999)
             )
           for (const va of toAdd) {
-            const entity = allEntities.find((e: any) => e.id === va.entityId)
+            const entity = allEntities.find((e) => e.id === va.entityId)
             if (!entity) continue
             // c/o role → set as broker
             if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
-              if (!q.coName)
-                ok(await window.api.updateQuotation(q.id, { coName: entity.name } as any))
+              if (!q.coName) ok(await window.api.updateQuotation(q.id, { coName: entity.name }))
               continue
             }
             await window.api.addQuotationAssured({
@@ -626,24 +647,26 @@ export default function PolicyRenewals({
             })
             existingEntityIds.add(va.entityId)
           }
-        } catch {}
+        } catch {
+          /* best-effort: a vessel whose assureds fail to load is skipped */
+        }
       }
 
       showSuccess(`Renewal quotation ${q.referenceNumber || 'draft'} created`)
       onCreateRenewalQuotation?.(q.id)
-    } catch (err: any) {
-      showError(err.message || 'Failed to create renewal quotation')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to create renewal quotation')
     } finally {
       setRenewLoading(null)
     }
   }
 
-  const handleResizeStart = (colIdx: number, e: React.MouseEvent) => {
+  const handleResizeStart = (colIdx: number, e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
     resizeRef.current = { colIdx, startX: e.clientX, startWidth: colWidths[colIdx] }
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
+    const onMouseMove = (moveEvent: MouseEvent): void => {
       if (!resizeRef.current) return
       const { colIdx: ci, startX, startWidth } = resizeRef.current
       const delta = moveEvent.clientX - startX
@@ -654,7 +677,7 @@ export default function PolicyRenewals({
       })
     }
 
-    const onMouseUp = () => {
+    const onMouseUp = (): void => {
       resizeRef.current = null
       dragListenersRef.current = null
       document.removeEventListener('mousemove', onMouseMove)
@@ -669,7 +692,7 @@ export default function PolicyRenewals({
     dragListenersRef.current = { move: onMouseMove, up: onMouseUp }
   }
 
-  const goToPreviousMonth = () => {
+  const goToPreviousMonth = (): void => {
     if (selectedMonth === 1) {
       setSelectedMonth(12)
       setSelectedYear((y) => y - 1)
@@ -678,7 +701,7 @@ export default function PolicyRenewals({
     }
   }
 
-  const goToNextMonth = () => {
+  const goToNextMonth = (): void => {
     if (selectedMonth === 12) {
       setSelectedMonth(1)
       setSelectedYear((y) => y + 1)
@@ -687,12 +710,12 @@ export default function PolicyRenewals({
     }
   }
 
-  const goToCurrentMonth = () => {
+  const goToCurrentMonth = (): void => {
     setSelectedYear(now.getFullYear())
     setSelectedMonth(now.getMonth() + 1)
   }
 
-  const handleSort = (field: SortField) => {
+  const handleSort = (field: SortField): void => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else {
       setSortField(field)
@@ -738,11 +761,11 @@ export default function PolicyRenewals({
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [renewals, sortField, sortDir, search, policyTypeFilter])
+  }, [renewals, sortField, sortDir, search, policyTypeFilter, policyTypes])
 
   const groupedRenewals = useMemo(() => {
     if (!groupByFleet) return null
-    const groups = new Map<string, any[]>()
+    const groups = new Map<string, RenewalRow[]>()
     for (const r of sortedRenewals) {
       const key = r.fleetName || '— Unassigned —'
       if (!groups.has(key)) groups.set(key, [])
@@ -776,7 +799,7 @@ export default function PolicyRenewals({
     const total = data.length
     // Premiums are summed PER CURRENCY — adding USD and EUR together is meaningless
     const byCurrency = new Map<string, { sum: number; count: number }>()
-    for (const r of data as any[]) {
+    for (const r of data) {
       const p = Number(r.premium) || 0
       if (p <= 0) continue
       const cur = r.currency || 'USD'
@@ -786,17 +809,17 @@ export default function PolicyRenewals({
       byCurrency.set(cur, e)
     }
     const curs = [...byCurrency.entries()].sort((a, b) => b[1].sum - a[1].sum)
-    const fmtCur = (cur: string, n: number) => `${cur} ${Math.round(n).toLocaleString()}`
+    const fmtCur = (cur: string, n: number): string => `${cur} ${Math.round(n).toLocaleString()}`
     const totalPremiumLabel =
       curs.length > 0 ? curs.map(([c, e]) => fmtCur(c, e.sum)).join(' · ') : '--'
     const avgPremiumLabel =
       curs.length > 0 ? curs.map(([c, e]) => fmtCur(c, e.sum / e.count)).join(' · ') : '--'
-    const withStatus = data.filter((r: any) => r.renewalStatusName)
+    const withStatus = data.filter((r) => r.renewalStatusName)
     const renewalRate = total > 0 ? Math.round((withStatus.length / total) * 100) : 0
     return { total, totalPremiumLabel, avgPremiumLabel, renewalRate }
-  }, [renewals, policyTypeFilter])
+  }, [renewals, policyTypeFilter, policyTypes])
 
-  const exportToExcel = async () => {
+  const exportToExcel = async (): Promise<void> => {
     // Load notes for all renewals
     const notesByKey = new Map<string, string>()
     try {
@@ -806,7 +829,7 @@ export default function PolicyRenewals({
         if (Array.isArray(notes) && notes.length > 0) {
           const formatted = notes
             .map(
-              (n: any) =>
+              (n) =>
                 `[${n.createdByUsername || 'unknown'} ${formatDateTime(n.createdAt)}] ${n.note}`
             )
             .join('\n')
@@ -844,7 +867,7 @@ export default function PolicyRenewals({
     XLSX.writeFile(wb, `Renewals_${MONTH_NAMES[selectedMonth - 1]}_${selectedYear}.xlsx`)
   }
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField): React.JSX.Element => {
     if (sortField !== field) return <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>↕</span>
     return sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDownIcon size={14} />
   }
@@ -867,7 +890,7 @@ export default function PolicyRenewals({
     overflow: 'hidden'
   }
 
-  const ResizeHandle = ({ colIdx }: { colIdx: number }) => (
+  const renderResizeHandle = (colIdx: number): React.JSX.Element => (
     <div
       onMouseDown={(e) => handleResizeStart(colIdx, e)}
       style={{
@@ -882,7 +905,7 @@ export default function PolicyRenewals({
     />
   )
 
-  const renderRenewalRow = (r: any, idx: number) => (
+  const renderRenewalRow = (r: RenewalRow, idx: number): React.JSX.Element => (
     <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--table-border)' }}>
       {rnVisSet.has('vessel') && (
         <td style={{ padding: '8px 12px', overflow: 'hidden' }}>
@@ -1142,7 +1165,7 @@ export default function PolicyRenewals({
                 border: 'none',
                 borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
                 cursor: 'pointer',
-                color: r.noteCount > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                color: (r.noteCount ?? 0) > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
@@ -1150,7 +1173,9 @@ export default function PolicyRenewals({
                 transition: 'background 0.12s'
               }}
               title={
-                r.noteCount > 0 ? `${r.noteCount} note${r.noteCount > 1 ? 's' : ''}` : 'Add notes'
+                (r.noteCount ?? 0) > 0
+                  ? `${r.noteCount} note${(r.noteCount ?? 0) > 1 ? 's' : ''}`
+                  : 'Add notes'
               }
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = isLight
@@ -1162,7 +1187,7 @@ export default function PolicyRenewals({
               }}
             >
               <MessageSquare size={14} />
-              {r.noteCount > 0 && (
+              {(r.noteCount ?? 0) > 0 && (
                 <span
                   style={{
                     position: 'absolute',
@@ -1798,7 +1823,7 @@ export default function PolicyRenewals({
           ))}
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
             {sortedRenewals.length} of {renewals.length} renewals |{' '}
-            {new Set(sortedRenewals.map((r: any) => r.vesselId)).size} vessels
+            {new Set(sortedRenewals.map((r) => r.vesselId)).size} vessels
           </span>
         </div>
       )}
@@ -1860,9 +1885,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('vesselName')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Vessel <SortIcon field="vesselName" />
+                      Vessel {renderSortIcon('vesselName')}
                     </span>
-                    <ResizeHandle colIdx={0} />
+                    {renderResizeHandle(0)}
                   </th>
                 )}
                 {rnVisSet.has('customer') && (
@@ -1872,9 +1897,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('customerName')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Customer <SortIcon field="customerName" />
+                      Customer {renderSortIcon('customerName')}
                     </span>
-                    <ResizeHandle colIdx={1} />
+                    {renderResizeHandle(1)}
                   </th>
                 )}
                 {rnVisSet.has('policyType') && (
@@ -1884,9 +1909,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('policyTypeName')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Policy Type <SortIcon field="policyTypeName" />
+                      Policy Type {renderSortIcon('policyTypeName')}
                     </span>
-                    <ResizeHandle colIdx={2} />
+                    {renderResizeHandle(2)}
                   </th>
                 )}
                 {rnVisSet.has('policyNo') && (
@@ -1896,9 +1921,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('policyNumber')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Policy No. <SortIcon field="policyNumber" />
+                      Policy No. {renderSortIcon('policyNumber')}
                     </span>
-                    <ResizeHandle colIdx={3} />
+                    {renderResizeHandle(3)}
                   </th>
                 )}
                 {rnVisSet.has('endDate') && (
@@ -1908,9 +1933,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('endDate')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      End Date <SortIcon field="endDate" />
+                      End Date {renderSortIcon('endDate')}
                     </span>
-                    <ResizeHandle colIdx={4} />
+                    {renderResizeHandle(4)}
                   </th>
                 )}
                 {rnVisSet.has('premium') && (
@@ -1920,9 +1945,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('premium')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Premium <SortIcon field="premium" />
+                      Premium {renderSortIcon('premium')}
                     </span>
-                    <ResizeHandle colIdx={5} />
+                    {renderResizeHandle(5)}
                   </th>
                 )}
                 {rnVisSet.has('days') && (
@@ -1944,9 +1969,9 @@ export default function PolicyRenewals({
                         justifyContent: 'flex-end'
                       }}
                     >
-                      Days <SortIcon field="daysUntil" />
+                      Days {renderSortIcon('daysUntil')}
                     </span>
-                    <ResizeHandle colIdx={6} />
+                    {renderResizeHandle(6)}
                   </th>
                 )}
                 {rnVisSet.has('status') && (
@@ -1956,9 +1981,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('renewalStatusName')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Status <SortIcon field="renewalStatusName" />
+                      Status {renderSortIcon('renewalStatusName')}
                     </span>
-                    <ResizeHandle colIdx={7} />
+                    {renderResizeHandle(7)}
                   </th>
                 )}
                 {rnVisSet.has('quotSent') && (
@@ -1968,9 +1993,9 @@ export default function PolicyRenewals({
                     onClick={() => handleSort('quotationSentDate')}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Quot. Sent <SortIcon field="quotationSentDate" />
+                      Quot. Sent {renderSortIcon('quotationSentDate')}
                     </span>
-                    <ResizeHandle colIdx={8} />
+                    {renderResizeHandle(8)}
                   </th>
                 )}
                 <th
@@ -1993,7 +2018,7 @@ export default function PolicyRenewals({
                       onChange={setRnVisibleCols}
                     />
                   </div>
-                  <ResizeHandle colIdx={9} />
+                  {renderResizeHandle(9)}
                 </th>
               </tr>
             </thead>
@@ -2021,7 +2046,7 @@ export default function PolicyRenewals({
                 // Group by month label, then optionally by fleet within each month
                 (() => {
                   const monthOrder: string[] = []
-                  const byMonth = new Map<string, any[]>()
+                  const byMonth = new Map<string, RenewalRow[]>()
                   for (const r of sortedRenewals) {
                     const lbl = r._monthLabel || ''
                     if (!byMonth.has(lbl)) {
@@ -2034,7 +2059,7 @@ export default function PolicyRenewals({
                     const monthRows = byMonth.get(lbl)!
                     const fleetGroups = groupByFleet
                       ? (() => {
-                          const map = new Map<string, any[]>()
+                          const map = new Map<string, RenewalRow[]>()
                           for (const r of monthRows) {
                             const k = r.fleetName || '— Unassigned —'
                             if (!map.has(k)) map.set(k, [])
@@ -2109,10 +2134,10 @@ export default function PolicyRenewals({
                                     </span>
                                   </td>
                                 </tr>
-                                {rows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                                {rows.map((r, idx: number) => renderRenewalRow(r, idx))}
                               </React.Fragment>
                             ))
-                          : monthRows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                          : monthRows.map((r, idx: number) => renderRenewalRow(r, idx))}
                       </React.Fragment>
                     )
                   })
@@ -2151,11 +2176,11 @@ export default function PolicyRenewals({
                         </span>
                       </td>
                     </tr>
-                    {rows.map((r: any, idx: number) => renderRenewalRow(r, idx))}
+                    {rows.map((r, idx: number) => renderRenewalRow(r, idx))}
                   </React.Fragment>
                 ))
               ) : (
-                sortedRenewals.map((r: any, idx: number) => renderRenewalRow(r, idx))
+                sortedRenewals.map((r, idx: number) => renderRenewalRow(r, idx))
               )}
             </tbody>
           </table>
@@ -2184,7 +2209,7 @@ export default function PolicyRenewals({
                 >
                   $
                   {Math.round(
-                    sortedRenewals.reduce((s: number, r: any) => s + (Number(r.premium) || 0), 0)
+                    sortedRenewals.reduce((s: number, r) => s + (Number(r.premium) || 0), 0)
                   ).toLocaleString()}
                 </strong>
               </span>

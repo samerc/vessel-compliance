@@ -55,9 +55,7 @@ export async function buildTemplateContext(opts: {
   if (opts.vesselId) {
     try {
       const vessels = await window.api.getVessels()
-      const vessel = Array.isArray(vessels)
-        ? vessels.find((v: any) => v.id === opts.vesselId)
-        : null
+      const vessel = Array.isArray(vessels) ? vessels.find((v) => v.id === opts.vesselId) : null
       if (vessel) {
         ctx['{{vesselName}}'] = vessel.name || ''
         ctx['{{imoNumber}}'] = vessel.imoNumber || ''
@@ -72,7 +70,7 @@ export async function buildTemplateContext(opts: {
           try {
             const flags = await window.api.getFlagStates()
             const flag = Array.isArray(flags)
-              ? flags.find((f: any) => f.id === vessel.flagStateId)
+              ? flags.find((f) => f.id === vessel.flagStateId)
               : null
             if (flag) ctx['{{flagState}}'] = flag.name || ''
           } catch {
@@ -85,7 +83,7 @@ export async function buildTemplateContext(opts: {
           try {
             const entities = await window.api.getEntities()
             const entity = Array.isArray(entities)
-              ? entities.find((e: any) => e.id === vessel.customerId)
+              ? entities.find((e) => e.id === vessel.customerId)
               : null
             if (entity) {
               if (vessel.customerType === 'broker') {
@@ -109,9 +107,7 @@ export async function buildTemplateContext(opts: {
   if (opts.entityId) {
     try {
       const entities = await window.api.getEntities()
-      const entity = Array.isArray(entities)
-        ? entities.find((e: any) => e.id === opts.entityId)
-        : null
+      const entity = Array.isArray(entities) ? entities.find((e) => e.id === opts.entityId) : null
       if (entity) {
         ctx['{{customerName}}'] = entity.name || ''
         ctx['{{customerEmail}}'] = entity.email || ''
@@ -125,9 +121,7 @@ export async function buildTemplateContext(opts: {
   if (opts.policyId && opts.vesselId) {
     try {
       const policies = await window.api.getVesselDynamicPolicies(opts.vesselId)
-      const policy = Array.isArray(policies)
-        ? policies.find((p: any) => p.id === opts.policyId)
-        : null
+      const policy = Array.isArray(policies) ? policies.find((p) => p.id === opts.policyId) : null
       if (policy) {
         ctx['{{policyNumber}}'] = policy.policyNumber || ''
         ctx['{{policyType}}'] = policy.policyTypeName || ''
@@ -172,7 +166,7 @@ export async function generateTemplateDocx(bodyHtml: string, fileName: string): 
     const sectionTexts = await window.api.piGetSectionTexts()
     const headerHtml = sectionTexts?.docHeader
     if (headerHtml) {
-      const hSpacing = (sectionTexts as any).docHeaderSpacing || undefined
+      const hSpacing = sectionTexts.docHeaderSpacing || undefined
       headerParas.push(
         ...parseHtmlToParagraphs(headerHtml, {
           size: 18,
@@ -255,7 +249,7 @@ export async function generateTemplateDocx(bodyHtml: string, fileName: string): 
         headers: undefined,
         footers:
           footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
-        children: children as any[]
+        children
       }
     ]
   })

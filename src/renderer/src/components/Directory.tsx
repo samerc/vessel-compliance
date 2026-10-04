@@ -23,7 +23,7 @@ export default function Directory({
   onCreateConsumed,
   subTab,
   subTabNonce
-}: DirectoryProps) {
+}: DirectoryProps): React.JSX.Element {
   const [activeView, setActiveView] = useState<
     'entities' | 'surveyors' | 'flag-states' | 'address-book'
   >('entities')

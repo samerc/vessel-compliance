@@ -30,6 +30,7 @@ import {
   History,
   LayoutDashboard
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import {
   Vessel,
   VesselDocument,
@@ -38,7 +39,10 @@ import {
   SurveyWarranty,
   WorkflowStep,
   EntityDocumentType,
-  EntityDocument
+  EntityDocument,
+  OpenDefectRow,
+  ComplianceCheckResult,
+  Fleet
 } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -52,7 +56,7 @@ interface WidgetDef {
   id: string
   name: string
   description: string
-  icon: any
+  icon: LucideIcon
   category: 'overview' | 'compliance' | 'operations' | 'activity'
   defaultEnabled: boolean
   defaultOrder: number
@@ -298,8 +302,8 @@ interface WidgetData {
   docs: VesselDocument[]
   docTypes: DocumentType[]
   entities: Entity[]
-  openDefects: any[]
-  pendingSanctions: any[]
+  openDefects: OpenDefectRow[]
+  pendingSanctions: ComplianceCheckResult[]
   activeWarranties: SurveyWarranty[]
   endorsementsDue: number
   activity: DashboardActivity
@@ -346,7 +350,7 @@ export default function Dashboard({
   onViewSurveyFollowUp?: () => void
   onNavigateToVessel?: (vesselId: string, section: 'documents' | 'policies') => void
   onNavigate?: (tab: string) => void
-}) {
+}): React.JSX.Element {
   const { theme } = useTheme()
   const { user } = useAuth()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -359,8 +363,8 @@ export default function Dashboard({
   const [entities, setEntities] = useState<Entity[]>([])
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
-  const [openDefects, setOpenDefects] = useState<any[]>([])
-  const [pendingSanctions, setPendingSanctions] = useState<any[]>([])
+  const [openDefects, setOpenDefects] = useState<OpenDefectRow[]>([])
+  const [pendingSanctions, setPendingSanctions] = useState<ComplianceCheckResult[]>([])
   const [activeWarranties, setActiveWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<number>(0)
   const [activity, setActivity] = useState<DashboardActivity>({
@@ -416,63 +420,70 @@ export default function Dashboard({
     }, 500)
   }, [])
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const [vData, dData, tData, eData, edtData, edData] = await Promise.all([
-        window.api.getVessels(),
-        window.api.getVesselDocuments(),
-        window.api.getDocumentTypes(),
-        window.api.getEntities(),
-        window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments()
-      ])
-      setVessels(Array.isArray(vData) ? vData : [])
-      setDocs(Array.isArray(dData) ? dData : [])
-      setDocTypes(Array.isArray(tData) ? tData : [])
-      setEntities(Array.isArray(eData) ? eData : [])
-      setEntityDocTypes(
-        Array.isArray(edtData)
-          ? (edtData as EntityDocumentType[]).filter((t) => t.isActive && t.isRequired)
-          : []
-      )
-      setEntityDocs(Array.isArray(edData) ? edData : [])
-    } catch {
-      showError('Failed to load core dashboard data')
-    }
-
-    const secondaryResults = await Promise.allSettled([
-      window.api.getOpenDefectsByVessel().then((d) => setOpenDefects(Array.isArray(d) ? d : [])),
-      window.api
-        .complianceGetPendingResults()
-        .then((d) => setPendingSanctions(Array.isArray(d) ? d : [])),
-      window.api.surveyWarrantyGetAll().then((d) => setActiveWarranties(Array.isArray(d) ? d : [])),
-      window.api
-        .surveyWarrantyGetEndorsementsDue()
-        .then((d) => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
-      window.api
-        .dashboardGetActivity()
-        .then((d) =>
-          setActivity(
-            d && Array.isArray((d as any).recentVessels)
-              ? (d as any)
-              : { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
-          )
-        ),
-      window.api.dashboardGetDataQualityAlerts().then((d) => {
-        if (d && typeof d === 'object' && !('error' in d)) setDataQuality(d)
-      })
-    ])
-    const failCount = secondaryResults.filter((r) => r.status === 'rejected').length
-    if (failCount > 0)
-      showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
-    setLastRefreshed(new Date())
-    setIsLoading(false)
-  }, [showError])
+  // Bumped by the Refresh button; the effect below owns the load.
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    const loadData = async (): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const [vData, dData, tData, eData, edtData, edData] = await Promise.all([
+          window.api.getVessels(),
+          window.api.getVesselDocuments(),
+          window.api.getDocumentTypes(),
+          window.api.getEntities(),
+          window.api.getEntityDocumentTypes(),
+          window.api.getEntityDocuments()
+        ])
+        setVessels(Array.isArray(vData) ? vData : [])
+        setDocs(Array.isArray(dData) ? dData : [])
+        setDocTypes(Array.isArray(tData) ? tData : [])
+        setEntities(Array.isArray(eData) ? eData : [])
+        setEntityDocTypes(
+          Array.isArray(edtData)
+            ? (edtData as EntityDocumentType[]).filter((t) => t.isActive && t.isRequired)
+            : []
+        )
+        setEntityDocs(Array.isArray(edData) ? edData : [])
+      } catch {
+        showError('Failed to load core dashboard data')
+      }
+
+      const secondaryResults = await Promise.allSettled([
+        window.api.getOpenDefectsByVessel().then((d) => setOpenDefects(Array.isArray(d) ? d : [])),
+        window.api
+          .complianceGetPendingResults()
+          .then((d) => setPendingSanctions(Array.isArray(d) ? d : [])),
+        window.api
+          .surveyWarrantyGetAll()
+          .then((d) => setActiveWarranties(Array.isArray(d) ? d : [])),
+        window.api
+          .surveyWarrantyGetEndorsementsDue()
+          .then((d) => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
+        window.api.dashboardGetActivity().then((d) =>
+          setActivity(
+            d && Array.isArray(d.recentVessels)
+              ? d
+              : {
+                  recentVessels: [],
+                  recentEntities: [],
+                  recentAuditEntries: [],
+                  weekRenewals: []
+                }
+          )
+        ),
+        window.api.dashboardGetDataQualityAlerts().then((d) => {
+          if (d && typeof d === 'object' && !('error' in d)) setDataQuality(d)
+        })
+      ])
+      const failCount = secondaryResults.filter((r) => r.status === 'rejected').length
+      if (failCount > 0)
+        showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
+      setLastRefreshed(new Date())
+      setIsLoading(false)
+    }
+    void loadData()
+  }, [reloadKey, showError])
 
   // ── Computed values ──
   const activeVessels = useMemo(() => vessels.filter((v) => v.isActive), [vessels])
@@ -725,12 +736,12 @@ export default function Dashboard({
     [layout]
   )
 
-  const toggleWidget = (id: string) => {
+  const toggleWidget = (id: string): void => {
     const newWidgets = layout.widgets.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w))
     saveLayout({ widgets: newWidgets })
   }
 
-  const moveWidget = (id: string, direction: 'up' | 'down') => {
+  const moveWidget = (id: string, direction: 'up' | 'down'): void => {
     const sorted = [...layout.widgets].sort((a, b) => a.order - b.order)
     const idx = sorted.findIndex((w) => w.id === id)
     if (idx < 0) return
@@ -742,11 +753,11 @@ export default function Dashboard({
     saveLayout({ widgets: sorted })
   }
 
-  const resetToDefault = () => {
+  const resetToDefault = (): void => {
     saveLayout(getDefaultLayout())
   }
 
-  const dismissOnboarding = () => {
+  const dismissOnboarding = (): void => {
     setShowOnboarding(false)
     localStorage.setItem('dashboard_onboarded_' + user?.id, 'true')
     window.api.dashboardSetOnboarded().catch(() => {})
@@ -768,7 +779,7 @@ export default function Dashboard({
     year: 'numeric'
   })
 
-  const sizeToSpan = (size: string) => {
+  const sizeToSpan = (size: string): string => {
     if (size === 'full') return 'span 6'
     if (size === 'half') return 'span 3'
     return 'span 2'
@@ -881,7 +892,11 @@ export default function Dashboard({
               <Settings size={14} />
               {editMode ? 'Done' : 'Customize'}
             </button>
-            <button onClick={loadData} disabled={isLoading} className="btn-secondary btn-sm">
+            <button
+              onClick={() => setReloadKey((k) => k + 1)}
+              disabled={isLoading}
+              className="btn-secondary btn-sm"
+            >
               <RefreshCw size={14} className={isLoading ? 'spinner' : undefined} />
               Refresh
             </button>
@@ -1164,7 +1179,7 @@ function WidgetRenderer({
   id: string
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element | null {
   switch (id) {
     case 'kpi':
       return <KPIWidget data={data} />
@@ -1199,7 +1214,7 @@ function WidgetRenderer({
 
 // ── KPI Widget ───────────────────────────────────────────────────────────
 
-function KPIWidget({ data }: { data: WidgetData }) {
+function KPIWidget({ data }: { data: WidgetData }): React.JSX.Element {
   const {
     activeVessels,
     vessels,
@@ -1279,7 +1294,7 @@ function ExpirationsWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { upcomingItems, isLight, onViewAlerts, onNavigateToVessel } = data
 
   return (
@@ -1531,7 +1546,7 @@ function OperationalWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const {
     missingCount,
     expiredCount,
@@ -1648,7 +1663,7 @@ function RecentVesselsWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { activity, isLight } = data
 
   return (
@@ -1765,7 +1780,7 @@ function RecentEntitiesWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { activity, isLight } = data
 
   return (
@@ -1890,7 +1905,7 @@ function RecentChangesWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { activity, isLight } = data
 
   return (
@@ -2025,7 +2040,7 @@ function DataQualityWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { dataQuality, isLight } = data
 
   return (
@@ -2098,7 +2113,7 @@ function WeekRenewalsWidget({
 }: {
   data: WidgetData
   cardStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   const { activity, isLight } = data
 
   return (
@@ -2234,7 +2249,7 @@ function RenewalCalendarWidget({
 }: {
   cardStyle: React.CSSProperties
   data: WidgetData
-}) {
+}): React.JSX.Element {
   const { onNavigate } = data
   const [monthCounts, setMonthCounts] = useState<
     { label: string; count: number; year: number; month: number }[]
@@ -2357,7 +2372,7 @@ function QuotationPipelineWidget({
 }: {
   cardStyle: React.CSSProperties
   data: WidgetData
-}) {
+}): React.JSX.Element {
   const { isLight, onNavigate } = data
   const [stepCounts, setStepCounts] = useState<{ name: string; color: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
@@ -2372,7 +2387,7 @@ function QuotationPipelineWidget({
           .map((step) => ({
             name: step.name,
             color: step.color || '#888',
-            count: quots.filter((q: any) => q.workflowStepId === step.id).length
+            count: quots.filter((q) => q.workflowStepId === step.id).length
           }))
         setStepCounts(counts)
         setLoading(false)
@@ -2488,7 +2503,7 @@ function QuickActionsWidget({
 }: {
   cardStyle: React.CSSProperties
   data: WidgetData
-}) {
+}): React.JSX.Element {
   const { onNavigate } = data
 
   const actions = [
@@ -2581,9 +2596,9 @@ function FleetOverviewWidget({
 }: {
   cardStyle: React.CSSProperties
   data: WidgetData
-}) {
+}): React.JSX.Element | null {
   const { activeVessels, allAlerts, docTypes, isLight } = data
-  const [fleets, setFleets] = useState<any[]>([])
+  const [fleets, setFleets] = useState<Fleet[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -2601,7 +2616,7 @@ function FleetOverviewWidget({
     const vesselCounts = new Map<string, number>()
     const fleetOfVessel = new Map<string, string>()
     for (const v of activeVessels) {
-      const fid = (v as any).fleetId as string | undefined
+      const fid = v.fleetId
       if (!fid) continue
       vesselCounts.set(fid, (vesselCounts.get(fid) || 0) + 1)
       fleetOfVessel.set(v.id, fid)
@@ -2624,7 +2639,7 @@ function FleetOverviewWidget({
       .filter(Boolean) as { name: string; vesselCount: number; compliance: number }[]
   }, [fleets, activeVessels, allAlerts, docTypes])
 
-  const unassigned = activeVessels.filter((v) => !(v as any).fleetId).length
+  const unassigned = activeVessels.filter((v) => !v.fleetId).length
 
   return (
     <div style={cardStyle}>
@@ -2744,25 +2759,29 @@ function DeadlineCalendarWidget({
 }: {
   cardStyle: React.CSSProperties
   data: WidgetData
-}) {
+}): React.JSX.Element {
   const { isLight } = data
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  // Month key whose events are loaded; loading = it differs from the shown month
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() // 0-indexed
+  const monthKey = `${year}-${month}`
+  const loading = loadedKey !== monthKey
 
   useEffect(() => {
-    setLoading(true)
-    setSelectedDay(null)
+    let alive = true
+    const key = `${year}-${month}`
     window.api
       .dashboardGetCalendarEvents(year, month + 1)
       .then((result) => {
+        if (!alive) return
         if (!result || typeof result !== 'object') {
           setEvents([])
-          setLoading(false)
+          setLoadedKey(key)
           return
         }
         const evts: CalendarEvent[] = []
@@ -2811,17 +2830,26 @@ function DeadlineCalendarWidget({
           }
         }
         setEvents(evts)
-        setLoading(false)
+        setLoadedKey(key)
       })
       .catch(() => {
+        if (!alive) return
         setEvents([])
-        setLoading(false)
+        setLoadedKey(key)
       })
+    return () => {
+      alive = false
+    }
   }, [year, month])
 
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
-  const goToday = () => setCurrentDate(new Date())
+  // Changing the shown month clears the selected day
+  const showMonth = (d: Date): void => {
+    if (d.getFullYear() !== year || d.getMonth() !== month) setSelectedDay(null)
+    setCurrentDate(d)
+  }
+  const prevMonth = (): void => showMonth(new Date(year, month - 1, 1))
+  const nextMonth = (): void => showMonth(new Date(year, month + 1, 1))
+  const goToday = (): void => showMonth(new Date())
 
   const monthLabel = currentDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const firstDayOfMonth = new Date(year, month, 1).getDay()
@@ -2832,12 +2860,12 @@ function DeadlineCalendarWidget({
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month
   const todayDay = today.getDate()
 
-  const getEventsForDay = (day: number) => {
+  const getEventsForDay = (day: number): CalendarEvent[] => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     return events.filter((e) => e.date.startsWith(dateStr))
   }
 
-  const dayHasType = (dayEvents: CalendarEvent[], type: string) =>
+  const dayHasType = (dayEvents: CalendarEvent[], type: string): boolean =>
     dayEvents.some((e) => e.type === type)
 
   const DOT_COLORS = {
@@ -3175,7 +3203,7 @@ function DataQualityRow({
   label: string
   count: number
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const hasIssue = count > 0
   const color = hasIssue ? '#e6a800' : '#00c864'
   return (
@@ -3236,7 +3264,7 @@ function KPICard({
   value: string | number
   sub?: string
   valueColor?: string
-}) {
+}): React.JSX.Element {
   return (
     <div
       className="glass-card"
@@ -3306,7 +3334,7 @@ function StatusRow({
   label: string
   value: number
   color: string
-}) {
+}): React.JSX.Element {
   return (
     <div
       style={{
@@ -3344,7 +3372,7 @@ function StatusRow({
   )
 }
 
-function EmptyActivity({ label }: { label: string }) {
+function EmptyActivity({ label }: { label: string }): React.JSX.Element {
   return (
     <div
       style={{

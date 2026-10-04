@@ -1,6 +1,13 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { Vessel, DocumentType, VesselDocument } from '../../../shared/types'
+import {
+  Vessel,
+  DocumentType,
+  VesselDocument,
+  Entity,
+  EntityDocumentType,
+  EntityDocument
+} from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 
@@ -38,14 +45,14 @@ const W = 210
 const MARGIN = 10
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const dateOnly = (s: string | null | undefined) => (s ? s.split('T')[0] : '')
+const dateOnly = (s: string | null | undefined): string => (s ? s.split('T')[0] : '')
 
-const fmt = (s: string | null | undefined) => (s ? formatDateShort(s) || '—' : '—')
+const fmt = (s: string | null | undefined): string => (s ? formatDateShort(s) || '—' : '—')
 
-const isExpired = (d: string | null | undefined) =>
+const isExpired = (d: string | null | undefined): boolean =>
   !!d && new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
 
-const isExpiringSoon = (d: string | null | undefined) => {
+const isExpiringSoon = (d: string | null | undefined): boolean => {
   if (!d) return false
   const today = new Date(new Date().setHours(0, 0, 0, 0))
   const threshold = new Date(today)
@@ -57,7 +64,7 @@ const isExpiringSoon = (d: string | null | undefined) => {
 const annualShortCycle = (
   expiry: string | null | undefined,
   received: string | null | undefined
-) => {
+): boolean => {
   if (!expiry || !received) return false
   return (new Date(expiry).getTime() - new Date(received).getTime()) / 86400000 < 60
 }
@@ -78,18 +85,24 @@ function getStatus(
 }
 
 // Returns [onFile, onFile, ...] booleans for each required document of an entity
-function entityDocPresence(entity: any, edTypes: any[], edDocs: any[]): boolean[] {
+function entityDocPresence(
+  entity: Entity,
+  edTypes: EntityDocumentType[],
+  edDocs: EntityDocument[]
+): boolean[] {
   const applicable = edTypes.filter(
-    (t: any) => t.entityScope === 'both' || t.entityScope === entity.type
+    (t) => t.entityScope === 'both' || t.entityScope === entity.type
   )
-  const docsForEntity = edDocs.filter((d: any) => d.entityId === entity.id)
-  return applicable.map((t: any) =>
-    docsForEntity.some((d: any) => d.documentTypeId === t.id && d.filePath)
-  )
+  const docsForEntity = edDocs.filter((d) => d.entityId === entity.id)
+  return applicable.map((t) => docsForEntity.some((d) => d.documentTypeId === t.id && d.filePath))
 }
 
+/** jsPDF exposes getNumberOfPages on `internal` at runtime, but its typings omit it */
+type JsPdfInternalWithPages = jsPDF['internal'] & { getNumberOfPages: () => number }
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
+
 // ── Page chrome ───────────────────────────────────────────────────────────────
-function drawPageHeader(doc: jsPDF) {
+function drawPageHeader(doc: jsPDF): void {
   doc.setFillColor(...C.navy)
   doc.rect(0, 0, W, 14, 'F')
   doc.setFillColor(...C.accent)
@@ -110,7 +123,7 @@ function drawPageHeader(doc: jsPDF) {
   doc.text('CONFIDENTIAL', W - MARGIN, 9, { align: 'right' })
 }
 
-function drawPageFooter(doc: jsPDF, pageNum: number, total: number) {
+function drawPageFooter(doc: jsPDF, pageNum: number, total: number): void {
   const H = doc.internal.pageSize.getHeight()
   doc.setDrawColor(...C.bgMid)
   doc.setLineWidth(0.3)
@@ -123,7 +136,7 @@ function drawPageFooter(doc: jsPDF, pageNum: number, total: number) {
   doc.text(`Page ${pageNum} / ${total}`, W - MARGIN, H - 7, { align: 'right' })
 }
 
-function drawSectionLabel(doc: jsPDF, y: number, text: string) {
+function drawSectionLabel(doc: jsPDF, y: number, text: string): void {
   doc.setFillColor(...C.navy)
   doc.rect(MARGIN, y, W - MARGIN * 2, 8, 'F')
   doc.setTextColor(...C.white)
@@ -134,7 +147,11 @@ function drawSectionLabel(doc: jsPDF, y: number, text: string) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export const ReportServiceV2 = {
-  exportVesselToPDF: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[]) => {
+  exportVesselToPDF: async (
+    vessel: Vessel,
+    docTypes: DocumentType[],
+    docs: VesselDocument[]
+  ): Promise<void> => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageH = doc.internal.pageSize.getHeight()
 
@@ -159,14 +176,14 @@ export const ReportServiceV2 = {
       window.api.getEntityDocuments()
     ])
     const activeEdTypes = (Array.isArray(entityDocTypesRaw) ? entityDocTypesRaw : []).filter(
-      (t: any) => t.isActive && t.isRequired
+      (t) => t.isActive && t.isRequired
     )
     const allEntityDocs = Array.isArray(entityDocsRaw) ? entityDocsRaw : []
 
     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
-    const roleOrderMap = new Map((assuredRoles as any[]).map((r, i) => [r.name, i]))
-    ;(vesselAssureds as any[]).sort(
-      (a: any, b: any) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999)
+    const roleOrderMap = new Map(assuredRoles.map((r, i) => [r.name, i]))
+    vesselAssureds.sort(
+      (a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999)
     )
 
     // ── Build vessel document rows ─────────────────────────────────────────────
@@ -214,7 +231,7 @@ export const ReportServiceV2 = {
       })
     }
 
-    for (const ct of customDocTypes as any[]) {
+    for (const ct of customDocTypes) {
       const vDoc = docs.find((d) => d.documentTypeId === ct.id)
       const status = getStatus(!!vDoc?.filePath, vDoc?.expiryDate)
       if (status === 'Compliant') compliant++
@@ -232,17 +249,17 @@ export const ReportServiceV2 = {
     }
 
     // ── Count assured + UBO entity documents in stats ──────────────────────────
-    for (const va of vesselAssureds as any[]) {
-      const entity = (allEntities as any[]).find((e) => e.id === va.entityId)
+    for (const va of vesselAssureds) {
+      const entity = allEntities.find((e) => e.id === va.entityId)
       if (!entity) continue
       for (const onFile of entityDocPresence(entity, activeEdTypes, allEntityDocs)) {
         if (onFile) compliant++
         else missing++
       }
-      const ubos = (allEntityUBOs as any[])
+      const ubos = allEntityUBOs
         .filter((u) => u.assuredEntityId === entity.id)
-        .map((u) => (allEntities as any[]).find((e) => e.id === u.uboEntityId))
-        .filter(Boolean)
+        .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
+        .filter((e): e is Entity => Boolean(e))
       for (const ubo of ubos) {
         for (const onFile of entityDocPresence(ubo, activeEdTypes, allEntityDocs)) {
           if (onFile) compliant++
@@ -363,7 +380,7 @@ export const ReportServiceV2 = {
       },
       columnStyles: {
         0: { cellWidth: 62 },
-        1: { cellWidth: 43, textColor: C.textSec as any, fontSize: 7.5 },
+        1: { cellWidth: 43, textColor: C.textSec, fontSize: 7.5 },
         2: { cellWidth: 26, halign: 'center', fontSize: 8 },
         3: { cellWidth: 30, halign: 'center', fontSize: 8 },
         4: { cellWidth: 29, halign: 'center', fontSize: 8, fontStyle: 'bold' }
@@ -371,17 +388,17 @@ export const ReportServiceV2 = {
       styles: {
         fontSize: 8.5,
         cellPadding: { top: 5, bottom: 5, left: 4, right: 3 },
-        lineColor: C.bgMid as any,
+        lineColor: C.bgMid,
         lineWidth: 0.25,
         overflow: 'linebreak'
       },
-      alternateRowStyles: { fillColor: C.bgLight as any },
+      alternateRowStyles: { fillColor: C.bgLight },
       didParseCell: (data) => {
         if (data.section !== 'body' || data.column.index !== 4) return
         const col = statusColors[data.cell.raw as DocStatus]
         if (col) {
-          data.cell.styles.textColor = col.text as any
-          data.cell.styles.fillColor = col.bg as any
+          data.cell.styles.textColor = col.text
+          data.cell.styles.fillColor = col.bg
         }
       },
       didDrawPage: (data) => {
@@ -390,7 +407,7 @@ export const ReportServiceV2 = {
     })
 
     // ── Assured entities & UBOs section ───────────────────────────────────────
-    if ((vesselAssureds as any[]).length > 0) {
+    if (vesselAssureds.length > 0) {
       // Build entity table rows
       type EntityRowMeta = 'entityHeader' | 'uboBar' | 'uboEntityHeader' | 'doc'
       const entityRows: [string, string, string][] = []
@@ -398,8 +415,8 @@ export const ReportServiceV2 = {
 
       // Deduplicate entities with multiple roles — merge roles into one header
       const seenEntityIds = new Set<string>()
-      for (const va of vesselAssureds as any[]) {
-        const entity = (allEntities as any[]).find((e) => e.id === va.entityId)
+      for (const va of vesselAssureds) {
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) continue
         if (seenEntityIds.has(entity.id)) {
           // Already shown — just append role to the last header for this entity
@@ -418,19 +435,19 @@ export const ReportServiceV2 = {
         entityRowMeta.push('entityHeader')
 
         for (const edt of activeEdTypes.filter(
-          (t: any) => t.entityScope === 'both' || t.entityScope === entity.type
+          (t) => t.entityScope === 'both' || t.entityScope === entity.type
         )) {
           const hasDoc = allEntityDocs.some(
-            (d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath
+            (d) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath
           )
           entityRows.push([edt.name, '', hasDoc ? 'ON FILE' : 'MISSING'])
           entityRowMeta.push('doc')
         }
 
-        const ubos = (allEntityUBOs as any[])
+        const ubos = allEntityUBOs
           .filter((u) => u.assuredEntityId === entity.id)
-          .map((u) => (allEntities as any[]).find((e) => e.id === u.uboEntityId))
-          .filter(Boolean)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
+          .filter((e): e is Entity => Boolean(e))
 
         if (ubos.length > 0) {
           entityRows.push(['ULTIMATE BENEFICIAL OWNERS', '', ''])
@@ -442,10 +459,10 @@ export const ReportServiceV2 = {
             entityRowMeta.push('uboEntityHeader')
 
             for (const edt of activeEdTypes.filter(
-              (t: any) => t.entityScope === 'both' || t.entityScope === ubo.type
+              (t) => t.entityScope === 'both' || t.entityScope === ubo.type
             )) {
               const hasDoc = allEntityDocs.some(
-                (d: any) => d.entityId === ubo.id && d.documentTypeId === edt.id && d.filePath
+                (d) => d.entityId === ubo.id && d.documentTypeId === edt.id && d.filePath
               )
               entityRows.push([edt.name, '', hasDoc ? 'ON FILE' : 'MISSING'])
               entityRowMeta.push('doc')
@@ -454,7 +471,7 @@ export const ReportServiceV2 = {
         }
       }
 
-      let ey = (doc as any).lastAutoTable.finalY + 10
+      let ey = (doc as DocWithAutoTable).lastAutoTable.finalY + 10
       if (ey > pageH - 45) {
         doc.addPage()
         drawPageHeader(doc)
@@ -485,7 +502,7 @@ export const ReportServiceV2 = {
         styles: {
           fontSize: 8.5,
           cellPadding: { top: 5, bottom: 5, left: 4, right: 3 },
-          lineColor: C.bgMid as any,
+          lineColor: C.bgMid,
           lineWidth: 0.25,
           overflow: 'linebreak'
         },
@@ -495,62 +512,62 @@ export const ReportServiceV2 = {
 
           // Entity header row — navy, teal right-side meta, left-padded for stripe
           if (meta === 'entityHeader') {
-            data.cell.styles.fillColor = C.navy as any
+            data.cell.styles.fillColor = C.navy
             data.cell.styles.fontStyle = data.column.index === 0 ? 'bold' : 'normal'
             data.cell.styles.fontSize = data.column.index === 0 ? 9.5 : 8
             if (data.column.index === 0) {
-              data.cell.styles.textColor = C.white as any
+              data.cell.styles.textColor = C.white
               data.cell.styles.cellPadding = { top: 5, bottom: 5, left: 7, right: 3 }
             } else if (data.column.index === 1) {
-              data.cell.styles.textColor = C.accent as any
+              data.cell.styles.textColor = C.accent
             } else {
-              data.cell.styles.textColor = C.navy as any // hide status col
+              data.cell.styles.textColor = C.navy // hide status col
             }
           }
 
           // UBO label bar — navyMid background, text only in col 0
           if (meta === 'uboBar') {
-            data.cell.styles.fillColor = C.navyMid as any
+            data.cell.styles.fillColor = C.navyMid
             data.cell.styles.fontStyle = 'bold'
             data.cell.styles.fontSize = 7.5
             if (data.column.index === 0) {
-              data.cell.styles.textColor = C.white as any
+              data.cell.styles.textColor = C.white
               data.cell.styles.cellPadding = { top: 4, bottom: 4, left: 12, right: 3 }
             } else {
-              data.cell.styles.textColor = C.navyMid as any // hide other cols
+              data.cell.styles.textColor = C.navyMid // hide other cols
             }
           }
 
           // UBO entity header — bgMid background, indented, smaller than entity header
           if (meta === 'uboEntityHeader') {
-            data.cell.styles.fillColor = C.bgMid as any
+            data.cell.styles.fillColor = C.bgMid
             data.cell.styles.fontStyle = data.column.index === 0 ? 'bold' : 'normal'
             data.cell.styles.fontSize = data.column.index === 0 ? 8.5 : 7.5
             if (data.column.index === 0) {
-              data.cell.styles.textColor = C.textPri as any
+              data.cell.styles.textColor = C.textPri
               data.cell.styles.cellPadding = { top: 4.5, bottom: 4.5, left: 12, right: 3 }
             } else if (data.column.index === 1) {
-              data.cell.styles.textColor = C.textSec as any
+              data.cell.styles.textColor = C.textSec
             } else {
-              data.cell.styles.textColor = C.bgMid as any // hide status col
+              data.cell.styles.textColor = C.bgMid // hide status col
             }
           }
 
           // Doc rows — alternating fills, indented, color-coded status
           if (meta === 'doc') {
-            data.cell.styles.fillColor = (data.row.index % 2 === 0 ? C.white : C.bgLight) as any
+            data.cell.styles.fillColor = data.row.index % 2 === 0 ? C.white : C.bgLight
             if (data.column.index === 0) {
-              data.cell.styles.textColor = C.textPri as any
+              data.cell.styles.textColor = C.textPri
               data.cell.styles.cellPadding = { top: 5, bottom: 5, left: 12, right: 3 }
             }
             if (data.column.index === 2) {
               const s = data.cell.raw as string
               if (s === 'ON FILE') {
-                data.cell.styles.textColor = C.green as any
-                data.cell.styles.fillColor = C.greenBg as any
+                data.cell.styles.textColor = C.green
+                data.cell.styles.fillColor = C.greenBg
               } else if (s === 'MISSING') {
-                data.cell.styles.textColor = C.red as any
-                data.cell.styles.fillColor = C.redBg as any
+                data.cell.styles.textColor = C.red
+                data.cell.styles.fillColor = C.redBg
               }
             }
           }
@@ -576,7 +593,7 @@ export const ReportServiceV2 = {
     }
 
     // ── Fix page footers with correct total ────────────────────────────────────
-    const totalPages = (doc.internal as any).getNumberOfPages()
+    const totalPages = (doc.internal as JsPdfInternalWithPages).getNumberOfPages()
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i)
       drawPageFooter(doc, i, totalPages)

@@ -29,7 +29,7 @@ export function MoneyInput({
   disabled?: boolean
   title?: string
   'aria-label'?: string
-}) {
+}): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
   const zeroStr = showZero && value === 0 ? '0' : ''
@@ -49,7 +49,7 @@ export function MoneyInput({
         setRaw(value != null && value !== 0 ? String(value) : zeroStr)
       }}
       onChange={(e) => {
-        const v = e.target.value.replace(/[^0-9.,\-]/g, '')
+        const v = e.target.value.replace(/[^0-9.,-]/g, '')
         setRaw(v)
         onChange(parseMoney(v))
       }}
@@ -71,7 +71,7 @@ export function StrMoneyInput({
 }: Omit<React.ComponentProps<typeof MoneyInput>, 'value' | 'onChange' | 'onBlur' | 'showZero'> & {
   value: string | number | undefined | null
   onChange: (val: string) => void
-}) {
+}): React.JSX.Element {
   const n = value === '' || value == null ? undefined : parseMoney(String(value))
   return (
     <MoneyInput
@@ -91,7 +91,7 @@ export function AlternativeScopeChips({
   alternatives: QuotationPIAlternative[]
   currentAltId: string | null
   onChangeAltId: (altId: string | null) => void
-}) {
+}): React.JSX.Element | null {
   if (alternatives.length < 2) return null
   return (
     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
@@ -149,12 +149,12 @@ export function AlternativeMultiScopeChips({
   alternatives: QuotationPIAlternative[]
   selectedAltIds: string[] | null
   onChange: (altIds: string[] | null) => void
-}) {
+}): React.JSX.Element | null {
   if (alternatives.length < 2) return null
   const allIds = alternatives.map((a) => a.id)
   const isAll = selectedAltIds === null
   const set = new Set(selectedAltIds || [])
-  const toggleAlt = (altId: string) => {
+  const toggleAlt = (altId: string): void => {
     if (isAll) {
       onChange([altId])
       return
@@ -174,7 +174,7 @@ export function AlternativeMultiScopeChips({
     label: string,
     onClick: () => void,
     key?: string
-  ) => (
+  ): React.JSX.Element => (
     <button
       key={key}
       onClick={onClick}
@@ -218,7 +218,7 @@ export function PickerDropdown({
   options: { value: string; label: string }[]
   onSelect: (value: string) => void
   fontSize?: string
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -226,7 +226,7 @@ export function PickerDropdown({
   const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)

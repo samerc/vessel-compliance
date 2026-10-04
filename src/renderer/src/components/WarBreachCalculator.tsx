@@ -20,6 +20,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateLong } from '../utils/dateUtils'
 import { asArray } from '../utils/ipc'
 import { StrMoneyInput } from './quotation-tabs/shared'
+import type { WarBreachRecord } from '../../../shared/types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,11 +126,18 @@ function calcVessel(row: VesselRow, settings: TaxSettings, baseDays: number): Ve
   return { totalDays, grossPrem, taxesGov, net, commission, nrTax, netDue }
 }
 
+/** A vessel row as stored in a saved record's vesselsJson */
+type SavedVesselRow = VesselRow & {
+  calc: VesselCalc | null
+  /** Never written by the save (rows carry `vessel`); kept because the history list reads it */
+  vesselName?: string
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) =>
+const fmt = (n: number): string =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const fmtNum = (n: number) => parseFloat(n.toFixed(2)) // numeric value for Excel
+const fmtNum = (n: number): number => parseFloat(n.toFixed(2)) // numeric value for Excel
 
 function fmtDate(d: string): string {
   if (!d) return ''
@@ -139,26 +147,31 @@ function fmtDate(d: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function WarBreachCalculator() {
+export default function WarBreachCalculator(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
 
   const [showHistory, setShowHistory] = useState(false)
-  const [historyRecords, setHistoryRecords] = useState<any[]>([])
+  const [historyRecords, setHistoryRecords] = useState<WarBreachRecord[]>([])
   const [saving, setSaving] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const [viewingRecord, setViewingRecord] = useState<any | null>(null)
+  const [viewingRecord, setViewingRecord] = useState<WarBreachRecord | null>(null)
   const [copiedModal, setCopiedModal] = useState(false)
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (): Promise<void> => {
     const records = await window.api.warBreachGetAll()
-    setHistoryRecords(asArray(records))
+    setHistoryRecords(asArray<WarBreachRecord>(records))
   }, [])
 
   useEffect(() => {
-    if (showHistory) loadHistory()
-  }, [showHistory, loadHistory])
+    if (!showHistory) return
+    const run = async (): Promise<void> => {
+      const records = await window.api.warBreachGetAll()
+      setHistoryRecords(asArray<WarBreachRecord>(records))
+    }
+    void run()
+  }, [showHistory])
 
   const [coverNoteNo, setCoverNoteNo] = useState('')
   const [currency, setCurrency] = useState('US DOLLARS')
@@ -197,7 +210,7 @@ export default function WarBreachCalculator() {
 
   // ── Vessel row handlers ───────────────────────────────────────────────────
 
-  const addVessel = () =>
+  const addVessel = (): void =>
     setVessels((prev) => [
       ...prev,
       {
@@ -212,20 +225,20 @@ export default function WarBreachCalculator() {
       }
     ])
 
-  const removeVessel = (id: string) => {
+  const removeVessel = (id: string): void => {
     if (vessels.length === 1) return
     setVessels((prev) => prev.filter((v) => v.id !== id))
   }
 
-  const updateVessel = (id: string, field: keyof VesselRow, value: string) =>
+  const updateVessel = (id: string, field: keyof VesselRow, value: string): void =>
     setVessels((prev) => prev.map((v) => (v.id === id ? { ...v, [field]: value } : v)))
 
-  const updateSetting = (field: keyof TaxSettings, value: number) =>
+  const updateSetting = (field: keyof TaxSettings, value: number): void =>
     setSettings((prev) => ({ ...prev, [field]: value }))
 
-  const resetSettings = () => setSettings(DEFAULT_SETTINGS)
+  const resetSettings = (): void => setSettings(DEFAULT_SETTINGS)
 
-  const clearAll = () => {
+  const clearAll = (): void => {
     setCoverNoteNo('')
     setCurrency('US DOLLARS')
     setBreachDetails('')
@@ -245,7 +258,7 @@ export default function WarBreachCalculator() {
     ])
   }
 
-  const handleSaveRecord = async () => {
+  const handleSaveRecord = async (): Promise<void> => {
     if (!hasAnyResult) return
     setSaving(true)
     try {
@@ -272,7 +285,7 @@ export default function WarBreachCalculator() {
     }
   }
 
-  const handleDeleteRecord = async (id: string) => {
+  const handleDeleteRecord = async (id: string): Promise<void> => {
     try {
       await window.api.warBreachDelete(id)
       loadHistory()
@@ -287,7 +300,7 @@ export default function WarBreachCalculator() {
   // ── Filename builder ──────────────────────────────────────────────────────
 
   function buildFilename(ext: string): string {
-    const toTitleCase = (s: string) =>
+    const toTitleCase = (s: string): string =>
       s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
 
     const vesselNames = vessels
@@ -310,7 +323,7 @@ export default function WarBreachCalculator() {
 
   // ── Excel export ──────────────────────────────────────────────────────────
 
-  function exportToExcel() {
+  function exportToExcel(): void {
     const wb = XLSX.utils.book_new()
 
     // Info rows
@@ -460,11 +473,11 @@ export default function WarBreachCalculator() {
 
   function buildEmailHTML(): string {
     // Light bg + dark text — Outlook's paste engine strips text color reliably; this is always readable
-    const th = (t: string, align = 'right') =>
+    const th = (t: string, align = 'right'): string =>
       `<td align="${align}" style="border:1px solid #8aaac8;padding:6px 10px;background:#cce0f5;color:#0a2040;text-align:${align};white-space:nowrap;font-size:11px;font-family:Arial,sans-serif;font-weight:bold;">${t}</td>`
-    const td = (t: string, extra = '') =>
+    const td = (t: string, extra = ''): string =>
       `<td style="border:1px solid #ddd;padding:5px 10px;text-align:right;font-size:11px;font-family:Arial,sans-serif;${extra}">${t}</td>`
-    const tdL = (t: string) =>
+    const tdL = (t: string): string =>
       `<td style="border:1px solid #ddd;padding:5px 10px;text-align:left;font-size:11px;font-family:Arial,sans-serif;">${t}</td>`
 
     const commLabel = `Your Comm. ${settings.commissionPct}%`
@@ -555,7 +568,7 @@ export default function WarBreachCalculator() {
     return lines.join('\n')
   }
 
-  const handleCopy = async () => {
+  const handleCopy = async (): Promise<void> => {
     try {
       const htmlBlob = new Blob([buildEmailHTML()], { type: 'text/html' })
       const textBlob = new Blob([buildEmailTSV()], { type: 'text/plain' })
@@ -1202,14 +1215,14 @@ export default function WarBreachCalculator() {
           ) : (
             <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
               {historyRecords.map((rec, idx) => {
-                const vessels = (() => {
+                const vessels: SavedVesselRow[] = (() => {
                   try {
                     return JSON.parse(rec.vesselsJson)
                   } catch {
                     return []
                   }
                 })()
-                const vesselCount = vessels.filter((v: any) => v.calc !== null).length
+                const vesselCount = vessels.filter((v) => v.calc !== null).length
                 const date = formatDateShort(rec.createdAt)
                 const isConfirming = deleteConfirmId === rec.id
                 return (
@@ -1253,8 +1266,8 @@ export default function WarBreachCalculator() {
                         }}
                       >
                         {vessels
-                          .filter((v: any) => v.vesselName)
-                          .map((v: any) => v.vesselName)
+                          .filter((v) => v.vesselName)
+                          .map((v) => v.vesselName)
                           .join(', ') ||
                           rec.coverNoteNo || (
                             <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
@@ -1379,7 +1392,7 @@ export default function WarBreachCalculator() {
       {/* ── Record View Modal ── */}
       {viewingRecord &&
         (() => {
-          const recVessels: (VesselRow & { calc: VesselCalc | null })[] = (() => {
+          const recVessels: SavedVesselRow[] = (() => {
             try {
               return JSON.parse(viewingRecord.vesselsJson)
             } catch {
@@ -1400,8 +1413,8 @@ export default function WarBreachCalculator() {
           const bdet = viewingRecord.breachDetails || ''
           const bd = viewingRecord.baseDays
 
-          const modalFilename = (ext: string) => {
-            const toTitleCase = (s: string) =>
+          const modalFilename = (ext: string): string => {
+            const toTitleCase = (s: string): string =>
               s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
             const vesselNames = recVessels
               .filter((v) => v.calc !== null)
@@ -1420,7 +1433,7 @@ export default function WarBreachCalculator() {
             return `${[vesselNames || 'Vessels', bdet || 'Breach', monthYear].join(' - ')}.${ext}`
           }
 
-          const modalExportToExcel = () => {
+          const modalExportToExcel = (): void => {
             const wb = XLSX.utils.book_new()
             const infoRows = [
               ['COVER NOTE', cvn, 'CURRENCY', curr, 'BASE DAYS', bd, 'BREACH DETAILS', bdet],
@@ -1536,12 +1549,12 @@ export default function WarBreachCalculator() {
             XLSX.writeFile(wb, modalFilename('xlsx'))
           }
 
-          const buildModalEmailHTML = () => {
-            const th = (t: string, align = 'right') =>
+          const buildModalEmailHTML = (): string => {
+            const th = (t: string, align = 'right'): string =>
               `<td align="${align}" style="border:1px solid #8aaac8;padding:6px 10px;background:#cce0f5;color:#0a2040;text-align:${align};white-space:nowrap;font-size:11px;font-family:Arial,sans-serif;font-weight:bold;">${t}</td>`
-            const td = (t: string, extra = '') =>
+            const td = (t: string, extra = ''): string =>
               `<td style="border:1px solid #ddd;padding:5px 10px;text-align:right;font-size:11px;font-family:Arial,sans-serif;${extra}">${t}</td>`
-            const tdL = (t: string) =>
+            const tdL = (t: string): string =>
               `<td style="border:1px solid #ddd;padding:5px 10px;text-align:left;font-size:11px;font-family:Arial,sans-serif;">${t}</td>`
             const dataRows = recVessels
               .map((v, i) => {
@@ -1557,7 +1570,7 @@ export default function WarBreachCalculator() {
             return `<table style="border-collapse:collapse;width:100%;"><tbody><tr>${th('POL. N°', 'left')}${th('VESSEL', 'left')}${th('FROM', 'left')}${th('TO', 'left')}${th('SUM INS.')}${th('RATE %')}${th('NCB')}${th('GROSS PREM.')}${th('TAXES GOV.')}${th('NET')}${th(`Your Comm. ${recSettings.commissionPct}%`)}${th('Tax Non-Resident')}${th('NET DUE')}</tr>${dataRows}${totalsRow}</tbody></table>`
           }
 
-          const buildModalEmailTSV = () => {
+          const buildModalEmailTSV = (): string => {
             const cols = [
               'POL. N°',
               'VESSEL',
@@ -1605,7 +1618,7 @@ export default function WarBreachCalculator() {
             return lines.join('\n')
           }
 
-          const handleModalCopy = async () => {
+          const handleModalCopy = async (): Promise<void> => {
             try {
               const htmlBlob = new Blob([buildModalEmailHTML()], { type: 'text/html' })
               const textBlob = new Blob([buildModalEmailTSV()], { type: 'text/plain' })

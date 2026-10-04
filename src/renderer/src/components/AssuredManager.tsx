@@ -28,13 +28,13 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ConfirmationModal from './ConfirmationModal'
 import EntityEditPanel from './EntityEditPanel'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 
 interface AssuredManagerProps {
   vessel: Vessel
 }
 
-export default function AssuredManager({ vessel }: AssuredManagerProps) {
+export default function AssuredManager({ vessel }: AssuredManagerProps): React.JSX.Element {
   const [entities, setEntities] = useState<Entity[]>([])
   const [roles, setRoles] = useState<AssuredRole[]>([])
   const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
@@ -90,40 +90,48 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     uboParentId?: string // For UBO deletion we need parent assured ID
   }>({ show: false, id: null, title: '', message: '', type: 'assured' })
 
-  useEffect(() => {
-    loadData()
-  }, [vessel.id])
+  // Bumped after every change to reload the vessel's assureds and their entities
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
-  const loadData = async () => {
-    try {
-      const [e, r, va, eu, addrs, edTypes, allDocs] = await Promise.all([
-        window.api.getEntities(),
-        window.api.getAssuredRoles(),
-        window.api.getVesselAssureds(vessel.id),
-        window.api.getEntityUBOs(),
-        window.api.getAllEntityAddresses(),
-        window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments()
-      ])
-      setEntities(Array.isArray(e) ? e : [])
-      setRoles(Array.isArray(r) ? r : [])
-      setVesselAssureds(Array.isArray(va) ? va : [])
-      setEntityUBOs(Array.isArray(eu) ? eu : [])
-      setAllAddresses(Array.isArray(addrs) ? addrs : [])
-      setEntityDocTypes(
-        Array.isArray(edTypes) ? (edTypes as EntityDocumentType[]).filter((t) => t.isActive) : []
-      )
-      setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
-    } catch (error) {
-      console.error('Failed to load assured data:', error)
+  useEffect(() => {
+    let alive = true
+    const load = async (): Promise<void> => {
+      try {
+        const [e, r, va, eu, addrs, edTypes, allDocs] = await Promise.all([
+          window.api.getEntities(),
+          window.api.getAssuredRoles(),
+          window.api.getVesselAssureds(vessel.id),
+          window.api.getEntityUBOs(),
+          window.api.getAllEntityAddresses(),
+          window.api.getEntityDocumentTypes(),
+          window.api.getEntityDocuments()
+        ])
+        if (!alive) return
+        setEntities(Array.isArray(e) ? e : [])
+        setRoles(Array.isArray(r) ? r : [])
+        setVesselAssureds(Array.isArray(va) ? va : [])
+        setEntityUBOs(Array.isArray(eu) ? eu : [])
+        setAllAddresses(Array.isArray(addrs) ? addrs : [])
+        setEntityDocTypes(
+          Array.isArray(edTypes) ? (edTypes as EntityDocumentType[]).filter((t) => t.isActive) : []
+        )
+        setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
+      } catch (error) {
+        console.error('Failed to load assured data:', error)
+      }
     }
-  }
+    void load()
+    return () => {
+      alive = false
+    }
+  }, [vessel.id, reloadKey])
 
   const matchingEntities = entities.filter(
     (ent) => newName && ent.name.toLowerCase().includes(newName.toLowerCase())
   )
 
-  const handleAddAssured = async (e: React.FormEvent) => {
+  const handleAddAssured = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newName.trim() || !newRole.trim()) return
 
@@ -170,14 +178,16 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
       setShowAddForm(false)
       showSuccess('Assured added successfully')
       loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to add assured. Please try again.')
+    } catch (error) {
+      showError(
+        (error instanceof Error && error.message) || 'Failed to add assured. Please try again.'
+      )
     } finally {
       setIsAddingAssured(false)
     }
   }
 
-  const handleUpdateRole = async (id: string) => {
+  const handleUpdateRole = async (id: string): Promise<void> => {
     if (!editRoleValue.trim()) return
     setIsUpdatingRole(true)
     try {
@@ -193,25 +203,28 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
       showSuccess('Role updated successfully')
       setEditingVesselAssuredId(null)
       loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to update role.')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to update role.')
     } finally {
       setIsUpdatingRole(false)
     }
   }
 
-  const handleChangeAddress = async (vesselAssuredId: string, addressId: string | null) => {
+  const handleChangeAddress = async (
+    vesselAssuredId: string,
+    addressId: string | null
+  ): Promise<void> => {
     try {
       await window.api.updateVesselAssuredAddress(vesselAssuredId, addressId)
       setVesselAssureds((prev) =>
         prev.map((va) => (va.id === vesselAssuredId ? { ...va, addressId } : va))
       )
-    } catch (e: any) {
-      showError(e.message || 'Failed to update address')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to update address')
     }
   }
 
-  const handleAddNewAddress = async (vesselAssuredId: string, entityId: string) => {
+  const handleAddNewAddress = async (vesselAssuredId: string, entityId: string): Promise<void> => {
     if (!addrForm.label.trim() || !addrForm.addressLine1.trim()) return
     try {
       const newAddr = await window.api.addEntityAddress({
@@ -223,8 +236,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         country: addrForm.country.trim() || undefined,
         postalCode: addrForm.postalCode.trim() || undefined
       })
-      if (newAddr && (newAddr as any).error) {
-        showError((newAddr as any).message || 'Failed to add address')
+      if (isIpcError(newAddr)) {
+        showError(newAddr.message || 'Failed to add address')
         return
       }
       if (newAddr && newAddr.id) {
@@ -241,12 +254,12 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         country: '',
         postalCode: ''
       })
-    } catch (e: any) {
-      showError(e.message || 'Failed to add address')
+    } catch (e) {
+      showError((e instanceof Error && e.message) || 'Failed to add address')
     }
   }
 
-  const handleDeleteAssured = async (id: string) => {
+  const handleDeleteAssured = async (id: string): Promise<void> => {
     setDeleteConfirmation({
       show: true,
       id,
@@ -257,7 +270,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
     })
   }
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (!deleteConfirmation.id) return
 
     if (deleteConfirmation.type === 'assured') {
@@ -267,8 +280,11 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
         setIsAddingAssured(false)
         if (selectedAssuredId === deleteConfirmation.id) setSelectedAssuredId(null)
         loadData()
-      } catch (error: any) {
-        showError(error.message || 'Failed to remove assured. You may need admin privileges.')
+      } catch (error) {
+        showError(
+          (error instanceof Error && error.message) ||
+            'Failed to remove assured. You may need admin privileges.'
+        )
       }
     }
     setDeleteConfirmation((prev) => ({ ...prev, show: false }))
@@ -283,7 +299,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
   const selectedVA = sortedAssureds.find((va) => va.id === selectedAssuredId)
   const selectedEntity = selectedVA ? entities.find((e) => e.id === selectedVA.entityId) : null
 
-  const getDocScore = (entityId: string, entityType: string) => {
+  const getDocScore = (entityId: string, entityType: string): { have: number; total: number } => {
     const applicable = entityDocTypes.filter(
       (t) => t.isRequired && (t.entityScope === 'both' || t.entityScope === entityType)
     )
@@ -482,7 +498,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                       </label>
                       <select
                         value={newType}
-                        onChange={(e) => setNewType(e.target.value as any)}
+                        onChange={(e) => setNewType(e.target.value as 'company' | 'person')}
                         style={{ width: '100%', color: 'var(--text-primary)' }}
                       >
                         <option value="company">Company</option>

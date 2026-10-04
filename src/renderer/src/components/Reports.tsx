@@ -1,6 +1,13 @@
 import { useState, lazy, Suspense } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
-import { FileBarChart2, Database, Users, ClipboardCheck, CalendarClock } from 'lucide-react'
+import {
+  FileBarChart2,
+  Database,
+  Users,
+  ClipboardCheck,
+  CalendarClock,
+  type LucideIcon
+} from 'lucide-react'
 import { PageHeader, Tabs } from './ui'
 import LossRecordReport from './LossRecordReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
@@ -18,7 +25,7 @@ type ReportTab =
   | 'condition-survey'
   | 'renewal-pipeline'
 
-const TABS: { id: ReportTab; label: string; icon: any }[] = [
+const TABS: { id: ReportTab; label: string; icon: LucideIcon }[] = [
   { id: 'report-builder', label: 'Report Builder', icon: Database },
   { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
   { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 },
@@ -27,7 +34,7 @@ const TABS: { id: ReportTab; label: string; icon: any }[] = [
   { id: 'renewal-pipeline', label: 'Renewal Pipeline', icon: CalendarClock }
 ]
 
-export default function Reports({ subTab, subTabNonce }: SubTabProps = {}) {
+export default function Reports({ subTab, subTabNonce }: SubTabProps = {}): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<ReportTab>('report-builder')
   useRequestedSubTab(
     subTab,

@@ -17,7 +17,11 @@ import {
   Footer,
   PageNumber,
   ImageRun,
-  Header
+  Header,
+  type ITableCellBorders,
+  type INumberingOptions,
+  type ISectionPropertiesOptions,
+  type ISectionOptions
 } from 'docx'
 import {
   Quotation,
@@ -50,7 +54,14 @@ import {
   WarSettings,
   QuotationAssuredGroup,
   QuotationAgreedValueOption,
-  QuotationDiscount
+  QuotationDiscount,
+  PolicyDocument,
+  PolicyDocInstalment,
+  PolicyDocAddress,
+  PolicyBlueCard,
+  PolicyEndorsement,
+  EndorsementSection,
+  EndorsementInstalment
 } from '../../../shared/types'
 import { computePayablePremium } from '../../../shared/premium'
 import JSZip from 'jszip'
@@ -62,7 +73,7 @@ import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { numberToWords } from '../utils/numberToWords'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 // formatDate not needed — blue cards use bcFormatDate, policies use polFormatDateUS
 
 // ==================== Blue Card Types ====================
@@ -168,7 +179,7 @@ async function loadBcSettings(): Promise<BcSettingsMap> {
     keys.map(async (key) => {
       try {
         const val = await window.api.getSetting(key)
-        if (val) (result as any)[key] = val
+        if (val) result[key] = val
       } catch {
         /* use default */
       }
@@ -179,7 +190,7 @@ async function loadBcSettings(): Promise<BcSettingsMap> {
 
 // ---- Blue Card DOCX primitives ----
 
-function bcNoBorders() {
+function bcNoBorders(): ITableCellBorders {
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   return { top: none, bottom: none, left: none, right: none }
 }
@@ -334,7 +345,7 @@ function buildBbcWrcPage(
         new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
         bcText(`REF: ${ref}`, { bold: true })
       ],
-      tabStops: [{ type: 'right' as any, position: 9600 }]
+      tabStops: [{ type: 'right' as const, position: 9600 }]
     })
   )
 
@@ -435,7 +446,7 @@ function buildBbcWrcPage(
   const pDateW = 3000
   const pTimeTzW = 10000 - pHeadW - pLabelW - pDateW
 
-  const bcPeriodCell = (text: string, w: number, bold: boolean) =>
+  const bcPeriodCell = (text: string, w: number, bold: boolean): TableCell =>
     new TableCell({
       width: { size: w, type: WidthType.DXA },
       borders: bcNoBorders(),
@@ -448,7 +459,7 @@ function buildBbcWrcPage(
     label: string,
     date: string,
     time: string | null | undefined
-  ) =>
+  ): TableRow =>
     new TableRow({
       children: [
         bcPeriodCell(head, pHeadW, false),
@@ -616,7 +627,7 @@ function buildMlcPage(
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
-  const normProvider = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const normProvider = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
   const includeCompanyName =
     !!data.companyName &&
     (providerAddrLines.length === 0 ||
@@ -645,7 +656,7 @@ function buildMlcPage(
   const contactRows: TableRow[] = []
   const cLabelW = 800
   const cValueW = 9200
-  const cRow = (label: string, value: string) =>
+  const cRow = (label: string, value: string): TableRow =>
     new TableRow({
       children: [
         new TableCell({
@@ -851,7 +862,7 @@ async function buildBlueCardBlobFresh(
   let settings: BcSettingsMap
   let headerHtml = ''
   let headerSpacing: number | undefined
-  let footerSettings: any = null
+  let footerSettings: PolicyExportSettings | null = null
   if (policyId) {
     const exp = await loadFrozenExportData(policyId)
     const f = exp.frozen
@@ -865,7 +876,7 @@ async function buildBlueCardBlobFresh(
     try {
       const st = await window.api.piGetSectionTexts()
       headerHtml = st?.docHeader || ''
-      headerSpacing = (st as any)?.docHeaderSpacing || undefined
+      headerSpacing = st?.docHeaderSpacing || undefined
     } catch {
       /* no header */
     }
@@ -933,7 +944,7 @@ async function buildBlueCardBlobFresh(
           headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
         footers:
           footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
-        children: children as any[]
+        children
       }
     ]
   })
@@ -986,69 +997,11 @@ const POL_TABLE_MARGINS = { marginUnitType: WidthType.DXA, top: 0, bottom: 0, le
 
 // ---- Policy data interfaces ----
 
-interface PolicyDocRecord {
-  id: string
-  quotationId: string
-  vesselId: string
-  policyNumber: string
-  revisionNumber: number
-  inceptionDate: string
-  inceptionTime: string
-  expiryDate: string
-  expiryTime: string
-  timezone: string
-  commissionPercent?: number
-  bankId?: string
-  showAddresses: boolean
-  openingClause?: string
-  selectedSubjectivityIds?: string[] | null
-  importantNotice?: string
-  premiumAmount?: number
-  selectedAlternativeId?: string | null
-  closingCity?: string
-  cancelReplaceText?: string
-  previousPolicyNumber?: string
-  previousPolicyDate?: string
-  quotationTypeCode?: string
-  quotationTypeName?: string
-  createdAt?: string
-  exportSnapshot?: string | null
-  sectionOrder?: string[] | null
-  selectedLolOptionId?: string | null
-  selectedAgreedValueOptionId?: string | null
-  ourShare?: number | null
-  subjectivityDays?: number
-}
-
-interface PolicyInstalment {
-  id: string
-  policyId: string
-  instalmentNumber: number
-  dueDate: string
-  amount?: number
-  premiumAmount?: number
-  commissionAmount?: number
-  currency?: string
-  isNonRefundable?: boolean
-}
-
-interface PolicyAddress {
-  id: string
-  policyId: string
-  entityId: string
-  entityName: string
-  role: string
-  address?: string
-  addressText?: string
-  country?: string
-  order?: number
-}
-
-interface PolicyBlueCardEntry {
-  id: string
-  policyId: string
-  text: string
-}
+// Policy records come from the shared IPC types. A frozen snapshot may hold rows captured by
+// older versions, so the legacy optional fields they could carry stay readable.
+type PolicyDocRecord = PolicyDocument
+type PolicyInstalment = PolicyDocInstalment & { amount?: number }
+type PolicyAddress = PolicyDocAddress & { address?: string; country?: string }
 
 interface BankRecord {
   id: string
@@ -1062,7 +1015,7 @@ interface PolicyExportData {
   quotation: Quotation
   instalments: PolicyInstalment[]
   addresses: PolicyAddress[]
-  blueCards: PolicyBlueCardEntry[]
+  blueCards: PolicyBlueCard[]
   vessel: QuotationVessel | null
   vesselInfo: PolVesselInfo
   bank: BankRecord | null
@@ -1144,10 +1097,13 @@ interface PolicyExportData {
   // pick up later setting changes. A new revision produces a new row with no snapshot,
   // which re-freezes on its first export.
   frozen?: FrozenExportSettings
+  // Set on captured snapshots only
+  signatureSnapshot?: SignatureSnapshot | null
+  snapshotAt?: string
 }
 
 interface FrozenExportSettings {
-  exportSettings: any // parsed policyExportSettings (footer, header titles, intros…)
+  exportSettings: PolicyExportSettings // parsed policyExportSettings (footer, header titles, intros…)
   bcSettings: Record<string, string> // blue-card title/certify/cancel + MLC contact block
   docHeader: string // company letterhead HTML
   docHeaderSpacing?: number
@@ -1157,9 +1113,37 @@ interface FrozenExportSettings {
   brokerEntity?: { id: string; name: string; email?: string; phone?: string } | null
   brokerAddress?: { addressLine1?: string; city?: string; country?: string } | null
   logoPath?: string | null
-  declarationSettings?: any // per-year War declaration config (UMR/Amlin/risk code)
+  declarationSettings?: DeclarationSettings | null // per-year War declaration config (UMR/Amlin/risk code)
   endorsementClosingText?: string | null
   policyClosingText?: string | null // per-type policy closing section text (policy_text_{code}_closingText)
+}
+
+/** Parsed `policyExportSettings` JSON; only the keys read directly are listed */
+interface PolicyExportSettings {
+  footerText?: string
+  premiumPaymentTime?: unknown
+  [key: string]: unknown
+}
+
+/** Parsed `declaration_settings` JSON, keyed by year */
+type DeclarationSettings = Record<
+  string,
+  { umr?: string; amlinRef?: string; riskCode?: string } | undefined
+>
+
+/** Signature image frozen into the export snapshot */
+interface SignatureSnapshot {
+  imageData: number[]
+  signerName: string
+}
+
+/** Signature bytes as they may arrive: a plain array or a serialized Buffer / index map */
+type SigImageData = number[] | { data?: number[]; [key: string]: unknown }
+
+/** Rows that can be scoped to a P&I alternative and/or vessels */
+interface AltScopedRow {
+  alternativeId?: string | null
+  vesselScope?: unknown
 }
 
 interface PolVesselInfo {
@@ -1180,9 +1164,9 @@ interface PolVesselInfo {
  * can be frozen into the snapshot. Reused for fresh loads and to backfill legacy snapshots. */
 async function loadFrozenSettings(
   quotation: Quotation,
-  sectionTextsRaw?: any
+  sectionTextsRaw?: PISectionTexts | null
 ): Promise<FrozenExportSettings> {
-  let exportSettings: any = {}
+  let exportSettings: PolicyExportSettings = {}
   try {
     const raw = await window.api.getSetting('policyExportSettings')
     if (raw) exportSettings = JSON.parse(raw)
@@ -1203,7 +1187,7 @@ async function loadFrozenSettings(
   const qrBase =
     quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
   const logoPath = await window.api.piGetQuotationLogoPath()
-  let declarationSettings: any = null
+  let declarationSettings: DeclarationSettings | null = null
   try {
     const rawDec = await window.api.getSetting('declaration_settings')
     if (rawDec) declarationSettings = JSON.parse(rawDec)
@@ -1216,7 +1200,7 @@ async function loadFrozenSettings(
     (await window.api
       .getSetting(`policy_text_${quotation.quotationTypeCode}_closingText`)
       .catch(() => null)) || null
-  let st: any = sectionTextsRaw
+  let st: PISectionTexts | null | undefined = sectionTextsRaw
   if (!st) {
     try {
       st = await window.api.piGetSectionTexts()
@@ -1229,9 +1213,7 @@ async function loadFrozenSettings(
   if (quotation.customerEntityId && quotation.customerType === 'broker') {
     try {
       const ents = await window.api.getEntities()
-      const be = (Array.isArray(ents) ? ents : []).find(
-        (e: any) => e.id === quotation.customerEntityId
-      )
+      const be = (Array.isArray(ents) ? ents : []).find((e) => e.id === quotation.customerEntityId)
       if (be) brokerEntity = { id: be.id, name: be.name, email: be.email, phone: be.phone }
       const addrs = await window.api.getEntityAddresses(quotation.customerEntityId)
       if (Array.isArray(addrs) && addrs.length > 0)
@@ -1247,8 +1229,8 @@ async function loadFrozenSettings(
   return {
     exportSettings,
     bcSettings,
-    docHeader: (st as any)?.docHeader || '',
-    docHeaderSpacing: (st as any)?.docHeaderSpacing,
+    docHeader: st?.docHeader || '',
+    docHeaderSpacing: st?.docHeaderSpacing,
     fontSize: fontRaw ? parseInt(fontRaw, 10) : null,
     qrBase,
     sectionOrderDefault,
@@ -1262,7 +1244,8 @@ async function loadFrozenSettings(
 }
 
 async function loadPolicyExportData(policyId: string): Promise<PolicyExportData> {
-  const policy: PolicyDocRecord = await window.api.policyGetById(policyId)
+  // A missing policy still fails on the property access below (unchanged behaviour)
+  const policy: PolicyDocRecord = (await window.api.policyGetById(policyId))!
 
   // If policy has a frozen export snapshot, use it instead of live data
   if (policy.exportSnapshot) {
@@ -1386,13 +1369,13 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   // Sort assureds by the configured role order (Registered Owners → Managers → …) so the
   // Insured section renders them in role order within each vessel.
   const assuredRoleOrder = new Map(
-    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [
+    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r, idx: number) => [
       r.name?.toLowerCase(),
       r.order ?? idx
     ])
   )
   const assuredsSorted = [...(Array.isArray(assureds) ? assureds : [])].sort(
-    (a: any, b: any) =>
+    (a, b) =>
       (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) -
       (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
   )
@@ -1403,14 +1386,18 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   // Filter by selected alternative and vessel scope
   const altId = policy.selectedAlternativeId || null
-  const filterByAlt = (items: any[]) => {
+  const filterByAlt = <T>(items: T[]): T[] => {
     let result = items
     if (altId) {
-      result = result.filter((item: any) => !item.alternativeId || item.alternativeId === altId)
+      result = result.filter((row) => {
+        const item = row as AltScopedRow
+        return !item.alternativeId || item.alternativeId === altId
+      })
     }
     // Also filter by vessel scope if multi-vessel quotation
     if (vessel && safeQVessels.length > 1) {
-      result = result.filter((item: any) => {
+      result = result.filter((row) => {
+        const item = row as AltScopedRow
         if (!item.vesselScope || !Array.isArray(item.vesselScope) || item.vesselScope.length === 0)
           return true
         return item.vesselScope.includes(vessel!.id)
@@ -1420,7 +1407,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   }
 
   const safeClauseRows = filterByAlt(Array.isArray(clauseRows) ? clauseRows : [])
-  const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
+  const selectedClauseIds = safeClauseRows.map((r) => r.piClauseId)
   const clauseOverrides: Record<string, string> =
     clauseOverridesArr &&
     typeof clauseOverridesArr === 'object' &&
@@ -1429,7 +1416,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       : {}
 
   const safeWarrantyRows = filterByAlt(Array.isArray(warrantyRows) ? warrantyRows : [])
-  const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
+  const selectedWarrantyIds = safeWarrantyRows.map((r) => r.piWarrantyId)
 
   const piAlternativesRaw =
     quotation.quotationTypeCode === 'P'
@@ -1440,7 +1427,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     quotation.quotationTypeCode === 'P' ? await window.api.lolGetOptions(policy.quotationId) : []
 
   // Resolve IACS classification from junction table
-  let vesselClassificationNames: Record<string, string> = {}
+  const vesselClassificationNames: Record<string, string> = {}
   try {
     const [classSocieties] = await Promise.all([window.api.getClassificationSocieties()])
     const safeQV = Array.isArray(quotationVessels) ? quotationVessels : []
@@ -1450,33 +1437,34 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         const classIds = await window.api.getVesselClassifications(qv.vesselId)
         if (Array.isArray(classIds) && classIds.length > 0) {
           // Sort IACS first
-          const iacsIds = new Set(classSocieties.filter((s: any) => s.isIacs).map((s: any) => s.id))
-          const sorted = [...classIds].sort((a: any, b: any) => {
+          const iacsIds = new Set(classSocieties.filter((s) => s.isIacs).map((s) => s.id))
+          const sorted = [...classIds].sort((a, b) => {
             const aId = typeof a === 'string' ? a : a.classificationSocietyId
             const bId = typeof b === 'string' ? b : b.classificationSocietyId
             return (iacsIds.has(bId) ? 1 : 0) - (iacsIds.has(aId) ? 1 : 0)
           })
           const names = sorted
-            .map((c: any) => {
+            .map((c) => {
               const cid = typeof c === 'string' ? c : c.classificationSocietyId
-              const cs = classSocieties.find((s: any) => s.id === cid)
+              const cs = classSocieties.find((s) => s.id === cid)
               if (!cs) return null
               return cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
             })
             .filter(Boolean)
           if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
         }
-      } catch {}
+      } catch {
+        /* fall back to the vessel's classification below */
+      }
       // Fallback: if junction table empty, resolve classificationSociety ID from vessel
       if (!vesselClassificationNames[qv.id] && qv.vesselId) {
         const realV = (Array.isArray(quotationVessels) ? quotationVessels : []).find(
           (v) => v.id === qv.id
         )
-        const classId =
-          realV?.classification || (safeQV.find((v) => v.id === qv.id) as any)?.classification
+        const classId = realV?.classification || safeQV.find((v) => v.id === qv.id)?.classification
         if (classId) {
           const cs = classSocieties.find(
-            (s: any) => s.id === classId || s.name === classId || s.abbreviation === classId
+            (s) => s.id === classId || s.name === classId || s.abbreviation === classId
           )
           if (cs)
             vesselClassificationNames[qv.id] = cs.abbreviation
@@ -1485,7 +1473,9 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         }
       }
     }
-  } catch {}
+  } catch {
+    /* classification names are optional */
+  }
 
   const mergedTexts: PISectionTexts = {
     ...DEFAULT_SECTION_TEXTS,
@@ -1540,7 +1530,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   )
   const finalSubjectivities =
     selSubjIds != null
-      ? scopedSubjectivities.filter((s: any) => selSubjIds.includes(s.id))
+      ? scopedSubjectivities.filter((s) => selSubjIds.includes(s.id))
       : scopedSubjectivities
   const subjectivitiesNil = selSubjIds != null && finalSubjectivities.length === 0
 
@@ -1573,12 +1563,12 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       const vLabel = vessel.vesselLabel
       // Find the group matching this vessel's label
       const safeGroups = Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : []
-      const vesselGroup = safeGroups.find((g: any) => g.name === vLabel)
+      const vesselGroup = safeGroups.find((g) => g.name === vLabel)
       if (vesselGroup) {
-        return all.filter((a: any) => a.groupId === vesselGroup.id)
+        return all.filter((a) => a.groupId === vesselGroup.id)
       }
       // Legacy: filter by vesselLabel
-      return all.filter((a: any) => !a.vesselLabel || a.vesselLabel === vLabel)
+      return all.filter((a) => !a.vesselLabel || a.vesselLabel === vLabel)
     })(),
     subLimits: Array.isArray(subLimits) ? subLimits : [],
     selectedClauseIds,
@@ -1617,17 +1607,20 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     ),
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
-    warSettings: warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null,
+    warSettings:
+      warSettingsRaw && !('error' in warSettingsRaw && warSettingsRaw.error)
+        ? warSettingsRaw
+        : null,
     surveyWarranties: filterByAlt(
       (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
-        .filter((sw: any) => {
+        .filter((sw) => {
           // Filter by vessel scope: null/empty = all vessels, array = specific vessels
           if (!sw.vesselScope || !Array.isArray(sw.vesselScope) || sw.vesselScope.length === 0)
             return true
           return vessel ? sw.vesselScope.includes(vessel.id) : true
         })
-        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-        .map((sw: any) => ({
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((sw) => ({
           ...sw,
           text: (sw.text || '')
             .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
@@ -1643,7 +1636,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       const all = Array.isArray(assuredGroupsRaw) ? assuredGroupsRaw : []
       if (!vessel || safeQVessels.length <= 1) return all
       // Only include the group matching this vessel's label
-      return all.filter((g: any) => g.name === vessel.vesselLabel)
+      return all.filter((g) => g.name === vessel.vesselLabel)
     })(),
     customSections: Array.isArray(customSectionsRaw) ? customSectionsRaw : [],
     lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
@@ -1666,19 +1659,22 @@ async function capturePolicyExportSnapshotFromData(
   data: PolicyExportData
 ): Promise<void> {
   // Strip the exportSnapshot field from the nested policy to avoid storing a snapshot-of-a-snapshot
-  const snapshotPolicy = { ...data.policy }
+  const snapshotPolicy: Omit<PolicyDocRecord, 'exportSnapshot'> & {
+    exportSnapshot?: string | null
+  } = {
+    ...data.policy
+  }
   delete snapshotPolicy.exportSnapshot
 
   // Capture the signature image so it's frozen with the policy
-  let signatureSnapshot: { imageData: number[]; signerName: string } | null =
-    (data as any).signatureSnapshot || null
+  let signatureSnapshot: SignatureSnapshot | null = data.signatureSnapshot || null
   try {
     const sigData = await window.api.policyGetSignature(policyId)
     if (sigData && sigData.imageData) {
       signatureSnapshot = {
         imageData: Array.isArray(sigData.imageData)
           ? sigData.imageData
-          : Array.from(sigData.imageData as any),
+          : Array.from(sigData.imageData as ArrayLike<number>),
         signerName: sigData.signerName || ''
       }
     }
@@ -1871,18 +1867,18 @@ function applyFrozenFontSize(data: PolicyExportData): void {
   }
 }
 
-function polNp(text: string) {
+function polNp(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 80, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   })
 }
 
-function polBp(text: string) {
+function polBp(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 80, line: 240, lineRule: 'auto' as const },
     children: [
       new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
     ]
@@ -1895,7 +1891,7 @@ function polBp(text: string) {
 // which is only shown in the PERIOD section.
 function polPremiumPaymentTime(data: PolicyExportData): string {
   try {
-    const es: any = data.frozen?.exportSettings
+    const es = data.frozen?.exportSettings
     if (es && typeof es.premiumPaymentTime === 'string' && es.premiumPaymentTime.trim()) {
       return es.premiumPaymentTime.trim()
     }
@@ -1916,10 +1912,10 @@ function polApplyPremiumTime(tpl: string, ppTime: string): string {
 
 // Bold amount followed by a non-bold parenthetical (the amount-in-words), e.g.
 // **USD 6,000,000** (US Dollars Six Million Only)
-function polAmountWordsP(amountText: string, wordsText: string) {
+function polAmountWordsP(amountText: string, wordsText: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 80, line: 240, lineRule: 'auto' as const },
     children: [
       new TextRun({
         text: amountText,
@@ -1935,9 +1931,9 @@ function polAmountWordsP(amountText: string, wordsText: string) {
 
 // Tight variants (no trailing `after`) — for a heading/line immediately followed by a
 // polEmptyP() spacer, so the gap is exactly one blank line (matching the insured section).
-function polBupTight(text: string) {
+function polBupTight(text: string): Paragraph {
   return new Paragraph({
-    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 0, line: 240, lineRule: 'auto' as const },
     children: [
       new TextRun({
         text,
@@ -1951,19 +1947,19 @@ function polBupTight(text: string) {
   })
 }
 
-function polNpTight(text: string) {
+function polNpTight(text: string): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
-    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 0, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   })
 }
 
-function polBulletP(text: string) {
+function polBulletP(text: string): Paragraph {
   return new Paragraph({
     numbering: { reference: 'dash-bullet', level: 0 },
     alignment: AlignmentType.JUSTIFIED,
-    spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 40, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
   })
 }
@@ -1976,9 +1972,9 @@ function polHtmlToLines(html: string): string {
 
 // Blank-line paragraphs are tagged so a section can be cleaned up by polCollapseEmpty
 const polEmptyParas = new WeakSet<object>()
-function polEmptyP() {
+function polEmptyP(): Paragraph {
   const p = new Paragraph({
-    spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 40, line: 240, lineRule: 'auto' as const },
     children: []
   })
   polEmptyParas.add(p as unknown as object)
@@ -2002,9 +1998,9 @@ function polCollapseEmpty(items: (Paragraph | Table)[]): (Paragraph | Table)[] {
 
 // A precise, tiny vertical gap (exact line height in points) — used where a full blank line
 // is too much, e.g. a 3pt gap between a paragraph and a following block.
-function polSpacerPts(pts: number) {
+function polSpacerPts(pts: number): Paragraph {
   return new Paragraph({
-    spacing: { before: 0, after: 0, line: Math.round(pts * 20), lineRule: 'exact' as any },
+    spacing: { before: 0, after: 0, line: Math.round(pts * 20), lineRule: 'exact' as const },
     children: []
   })
 }
@@ -2046,7 +2042,7 @@ function polMpTight(text: string): Paragraph[] {
     out.push(
       new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: i === lastNonEmpty ? 0 : 80, line: 240, lineRule: 'auto' as any },
+        spacing: { after: i === lastNonEmpty ? 0 : 80, line: 240, lineRule: 'auto' as const },
         children: [new TextRun({ text: p, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
       })
     )
@@ -2092,7 +2088,11 @@ function polBuildAmountBreakdown(
     left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
     right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   }
-  const brRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) =>
+  const brRow = (
+    label: string,
+    amount: number,
+    opts?: { bold?: boolean; total?: boolean }
+  ): TableRow =>
     new TableRow({
       children: [
         new TableCell({
@@ -2100,7 +2100,7 @@ function polBuildAmountBreakdown(
           borders: opts?.total ? totalTop : polNoBorders(),
           children: [
             new Paragraph({
-              spacing: { after: 20, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 20, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: label,
@@ -2119,7 +2119,7 @@ function polBuildAmountBreakdown(
           children: [
             new Paragraph({
               alignment: AlignmentType.LEFT,
-              spacing: { after: 20, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 20, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: polFormatCurrency(amount, currency),
@@ -2146,7 +2146,7 @@ function polBuildAmountBreakdown(
       ]
     }),
     new Paragraph({
-      spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `(${numberToWords(total, currency)})`,
@@ -2203,28 +2203,28 @@ function polMpBullet(text: string): Paragraph[] {
   return [polBulletP(decoded)]
 }
 
-function polCenteredP(text: string, bold = false) {
+function polCenteredP(text: string, bold = false): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 80, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })]
   })
 }
 
-function polCenteredPTight(text: string, bold = false) {
+function polCenteredPTight(text: string, bold = false): Paragraph {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+    spacing: { after: 0, line: 240, lineRule: 'auto' as const },
     children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })]
   })
 }
 
-function polNoBorders() {
+function polNoBorders(): ITableCellBorders {
   const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   return { top: none, bottom: none, left: none, right: none }
 }
 
-function polMakeDocxNumbering() {
+function polMakeDocxNumbering(): INumberingOptions {
   return {
     config: [
       {
@@ -2268,7 +2268,7 @@ function polMakeDocxNumbering() {
   }
 }
 
-function polMakePageProperties() {
+function polMakePageProperties(): ISectionPropertiesOptions {
   return {
     page: {
       size: {
@@ -2292,7 +2292,7 @@ function polMakePageProperties() {
 let _polCaptureMode = false
 let _polCapturedBlob: Blob | null = null
 
-function polDownloadBlob(blob: Blob, filename: string) {
+function polDownloadBlob(blob: Blob, filename: string): void {
   if (_polCaptureMode) {
     _polCapturedBlob = blob
     return
@@ -2338,7 +2338,9 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
 
   if (data.addresses.length > 0) {
     // Sort addresses: by explicit order field first, then by quotation assured order
-    const assuredOrder = data.assureds.map((a: any) => a.entityId || a.entity_id)
+    const assuredOrder: (string | null | undefined)[] = data.assureds.map(
+      (a) => a.entityId || (a as QuotationAssured & { entity_id?: string }).entity_id
+    )
     const sortedAddrs = [...data.addresses].sort((a, b) => {
       // If addresses have distinct explicit order, use that
       if (a.order != null && b.order != null && a.order !== b.order) return a.order - b.order
@@ -2354,7 +2356,12 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       // Left: entity name – country
       const leftChildren: Paragraph[] = []
       const nameRuns: TextRun[] = [
-        new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({
+          text: addr.entityName as string,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
       ]
       if (addr.country)
         nameRuns.push(
@@ -2367,7 +2374,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
         )
       leftChildren.push(
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: nameRuns
         })
       )
@@ -2377,7 +2384,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
       if (addr.role)
         rightChildren.push(
           new Paragraph({
-            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({
                 text: `"as ${addr.role}"`,
@@ -2415,7 +2422,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
         for (let li = 0; li < addrLines.length; li++) {
           addrParas.push(
             new Paragraph({
-              spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 0, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: addrLines[li].trim(),
@@ -2450,7 +2457,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
               borders: polNoBorders(),
               children: [
                 new Paragraph({
-                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                   children: [
                     new TextRun({
                       text: a.name,
@@ -2466,7 +2473,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
               borders: polNoBorders(),
               children: [
                 new Paragraph({
-                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                   children: [
                     new TextRun({
                       text: a.role ? `"as ${a.role}"` : '',
@@ -2507,7 +2514,7 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     data.quotation.coName ||
     data.assureds.find((a) => a.role?.toLowerCase().includes('broker'))?.name
   const isDirectClient = data.quotation.customerType === 'direct'
-  if (brokerName && !isDirectClient && !(data.policy as any).hideBroker) {
+  if (brokerName && !isDirectClient && !data.policy.hideBroker) {
     content.push(polSpacerPts(3))
     content.push(polNpTight(`c/o ${brokerName}`))
   }
@@ -2603,7 +2610,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   const dateW = Math.round(POL_BODY_INNER_W * 0.3)
   const timeTzW = POL_BODY_INNER_W - labelW - dateW
 
-  const makeCell = (text: string, bold = false) =>
+  const makeCell = (text: string, bold = false): TableCell =>
     new TableCell({
       width: { size: 0, type: WidthType.AUTO },
       borders: polNoBorders(),
@@ -2616,7 +2623,7 @@ function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
       ]
     })
 
-  const fmtTimeTz = (time: string | null | undefined, tz: string | null | undefined) => {
+  const fmtTimeTz = (time: string | null | undefined, tz: string | null | undefined): string => {
     const parts = [polFormatTime(time), tz || ''].filter(Boolean)
     return parts.join(' ')
   }
@@ -2652,13 +2659,13 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
   const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
-  const pCell = (text: string, w: number) =>
+  const pCell = (text: string, w: number): TableCell =>
     new TableCell({
       width: { size: w, type: WidthType.DXA },
       borders: polNoBorders(),
       children: [
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
         })
       ]
@@ -2698,13 +2705,13 @@ function polBuildEndorsementPeriod(
   const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
-  const pCell = (text: string, w: number) =>
+  const pCell = (text: string, w: number): TableCell =>
     new TableCell({
       width: { size: w, type: WidthType.DXA },
       borders: polNoBorders(),
       children: [
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
         })
       ]
@@ -2852,7 +2859,9 @@ function polBuildHullConditionsContent(
   if (!altId && dAlts.length === 1) altId = dAlts[0].id
   if (!altId && dAlts.length > 1) {
     // If there's a selected alternative stored on the quotation, use that
-    const qAltId = (data.quotation as any).selectedAlternativeId
+    // Quotation has no such field today, so this reads undefined (kept as is)
+    const qAltId = (data.quotation as Quotation & { selectedAlternativeId?: string | null })
+      .selectedAlternativeId
     if (qAltId && dAlts.some((a) => a.id === qAltId)) altId = qAltId
   }
   const currency = data.quotation.premiumCurrency || 'USD'
@@ -2874,7 +2883,7 @@ function polBuildHullConditionsContent(
     return sibling?.amount
   }
 
-  const makeCondTable = (conds: typeof hc) =>
+  const makeCondTable = (conds: typeof hc): Table =>
     new Table({
       width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
       margins: POL_TABLE_MARGINS,
@@ -2949,7 +2958,7 @@ function polBuildHullConditionsContent(
   const ivClauseId = data.quotation.ivClauseId || null
 
   // Dedup helper: merge alt-specific + null, prefer alt-specific
-  const dedupConds = (conds: typeof hc) => {
+  const dedupConds = (conds: typeof hc): QuotationHullCondition[] => {
     const seen = new Map<string, (typeof hc)[0]>()
     // Alt-specific first
     for (const c of conds.filter((x) => x.alternativeId)) {
@@ -3082,10 +3091,13 @@ function polBuildHullConditionsContent(
 
   // Merge additional + custom conditions by the shared order_index so they interleave
   // as bullets (matching the quotation export), instead of a separate trailing block.
-  const mergedAddl: { order: number; kind: 'addl' | 'custom'; qa?: any; cc?: any }[] = [
-    ...visibleHa.map((qa) => ({ order: (qa as any).order ?? 0, kind: 'addl' as const, qa })),
+  type MergedAddl =
+    | { order: number; kind: 'addl'; qa: (typeof visibleHa)[number] }
+    | { order: number; kind: 'custom'; cc: PolicyExportData['hullCustomConditions'][number] }
+  const mergedAddl: MergedAddl[] = [
+    ...visibleHa.map((qa) => ({ order: qa.order ?? 0, kind: 'addl' as const, qa })),
     ...data.hullCustomConditions.map((cc) => ({
-      order: (cc as any).order ?? 0,
+      order: cc.order ?? 0,
       kind: 'custom' as const,
       cc
     }))
@@ -3164,9 +3176,9 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       }
     } else if (data.piAlternatives.length > 0 && data.policy.selectedAlternativeId) {
       const selAlt = data.piAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)
-      if (selAlt && (selAlt as any).lolAmount != null) {
-        resolvedLolAmount = (selAlt as any).lolAmount
-        if ((selAlt as any).lolCurrency) resolvedLolCurrency = (selAlt as any).lolCurrency
+      if (selAlt && selAlt.lolAmount != null) {
+        resolvedLolAmount = selAlt.lolAmount
+        if (selAlt.lolCurrency) resolvedLolCurrency = selAlt.lolCurrency
       }
     } else if (
       data.vessel &&
@@ -3205,7 +3217,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     const subLimitParas = data.subLimits.map(
       (sl) =>
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({
               text: sl.text
@@ -3224,7 +3236,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         .map((l) => l.trim())
         .filter(Boolean)
         .map((l) => polNp(l))
-    const pushBlock = (paras: Paragraph[]) => {
+    const pushBlock = (paras: Paragraph[]): void => {
       if (paras.length === 0) return
       if (content.length > 0) content.push(polEmptyP())
       content.push(...paras)
@@ -3250,7 +3262,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         ])
     }
   } else if (typeCode === 'H') {
-    const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
+    const vesselCur = data.vessel?.agreedValueCurrency || null
     const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
     const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
     const hmItems = data.hullAgreedValueItems.filter((it) => (it.section || 'hm') === 'hm')
@@ -3304,7 +3316,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       const vIsS2Only = Boolean(data.quotation.warSection2Only)
 
       const vesselAV = data.vessel?.agreedValue ?? data.quotation.agreedValue ?? 0
-      const sec2Amt = (data.vessel as any)?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
+      const sec2Amt = data.vessel?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
       if (vIsS2Only) {
         // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
         content.push(
@@ -3398,7 +3410,7 @@ function resolvePolicySectionOrder(data: PolicyExportData, settingsDefault?: str
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const hardcoded = getDefaultSectionOrder(typeCode)
   const def = settingsDefault && settingsDefault.length > 0 ? settingsDefault : hardcoded
-  const saved = (data.policy as any).sectionOrder
+  const saved = data.policy.sectionOrder
   const order = Array.isArray(saved) && saved.length > 0 ? [...saved] : [...def]
   for (const k of hardcoded) if (!order.includes(k)) order.push(k)
   for (const cs of data.customSections) {
@@ -3449,7 +3461,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
         content.push(
           new Paragraph({
             numbering: { reference: 'trading-numbered', level: 0 },
-            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({
                 text: ddqIntro.replace(/\{ddq_countries\}/g, ddqList),
@@ -3464,7 +3476,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
         content.push(
           new Paragraph({
             numbering: { reference: 'trading-numbered', level: 0 },
-            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({ text: ddqIntro, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
             ]
@@ -3473,7 +3485,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
         // Country list indented to align under the numbered item's text (240 = numbering indent)
         content.push(
           new Paragraph({
-            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as const },
             indent: { left: 240 },
             children: [
               new TextRun({ text: ddqList, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
@@ -3489,7 +3501,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
         content.push(
           new Paragraph({
             numbering: { reference: 'trading-numbered', level: 0 },
-            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({
                 text: stripHtml(intro),
@@ -3515,7 +3527,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
           content.push(
             new Paragraph({
               numbering: { reference: 'trading-numbered', level: 1 },
-              spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 0, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: stripHtml(txt),
@@ -3534,7 +3546,7 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
       content.push(
         new Paragraph({
           numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({
               text: stripHtml(polSt(data, 'tradingIsrael')),
@@ -3609,7 +3621,7 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
         d.vesselSecondaryAmounts[policyVesselId] != null
           ? d.vesselSecondaryAmounts[policyVesselId]
           : d.secondaryAmount
-      const replDed = (text: string, cur: string, amt: number | undefined | null) => {
+      const replDed = (text: string, cur: string, amt: number | undefined | null): string => {
         const a = amt != null ? polFormatCurrency(amt, cur) : '___'
         return text
           .replace(/\{currency\}\s*\{amount\}/g, a)
@@ -3748,17 +3760,14 @@ async function polBuildPremiumPaymentSection(
   const currency = data.quotation.premiumCurrency || 'USD'
   const wq = data.quotation
   // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
-  const polNr = (data.policy as any).nonRefundableType
+  const polNr = data.policy.nonRefundableType
   const nrType = polNr != null ? (polNr === 'none' ? null : polNr) : wq.nonRefundableType
   const nrPct =
-    (data.policy as any).nonRefundablePercent != null
-      ? (data.policy as any).nonRefundablePercent
+    data.policy.nonRefundablePercent != null
+      ? data.policy.nonRefundablePercent
       : wq.nonRefundablePercent
   // Priority: instalment sum (most accurate) → policy premium → quotation premium
-  const instalmentSum = instalments.reduce(
-    (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
-    0
-  )
+  const instalmentSum = instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0)
   const totalPremium =
     instalmentSum > 0
       ? instalmentSum
@@ -3867,17 +3876,17 @@ async function polBuildPremiumPaymentSection(
 
   // 2b. Outstanding premium notice — policy override (set in the conversion wizard) wins over the quotation
   const outstandingEnabled =
-    (data.policy as any).outstandingPremiumEnabled != null
-      ? (data.policy as any).outstandingPremiumEnabled
+    data.policy.outstandingPremiumEnabled != null
+      ? data.policy.outstandingPremiumEnabled
       : wq.outstandingPremiumEnabled
   const outstandingText =
-    (data.policy as any).outstandingPremiumText != null
-      ? (data.policy as any).outstandingPremiumText
+    data.policy.outstandingPremiumText != null
+      ? data.policy.outstandingPremiumText
       : wq.outstandingPremiumText
   if (outstandingEnabled && outstandingText) {
     content.push(
       new Paragraph({
-        spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+        spacing: { after: 0, line: 240, lineRule: 'auto' as const },
         children: [
           new TextRun({
             text: outstandingText,
@@ -3950,8 +3959,8 @@ export async function exportPolicyDocx(
   let tcHtml: string | null = null
   if (includeTC) {
     try {
-      const tcTpl = (await window.api.tcGetTemplate(typeCode)) as any
-      if (tcTpl && !tcTpl.error && tcTpl.kind === 'html' && tcTpl.contentHtml)
+      const tcTpl = await window.api.tcGetTemplate(typeCode)
+      if (tcTpl && !isIpcError(tcTpl) && tcTpl.kind === 'html' && tcTpl.contentHtml)
         tcHtml = tcTpl.contentHtml
     } catch {
       /* no T&C */
@@ -4009,7 +4018,12 @@ export async function exportPolicyDocx(
 
   // Build main two-column table
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -4050,7 +4064,7 @@ export async function exportPolicyDocx(
 
   // Collect each section with its order-key; emitted in the configured section order below.
   const secList: { key: string; row: TableRow }[] = []
-  const addRow = (key: string, row: TableRow) => secList.push({ key, row })
+  const addRow = (key: string, row: TableRow): number => secList.push({ key, row })
 
   // INSURED
   const insuredContent = polBuildInsuredSection(data)
@@ -4083,7 +4097,7 @@ export async function exportPolicyDocx(
       }
       // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
       const avContent: (Paragraph | Table)[] = []
-      const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
+      const vesselCur = data.vessel?.agreedValueCurrency || null
       const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
       const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
       if (ivCurrency === hmCurrency) {
@@ -4210,8 +4224,7 @@ export async function exportPolicyDocx(
     }
   }
   for (const ce of data.customExclusions) {
-    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== exclAltId)
-      continue
+    if (hasAltExclusions && ce.alternativeId && ce.alternativeId !== exclAltId) continue
     exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
   if (exclusionsContent.length > 0) addRow('exclusions', makeRow('Exclusions', exclusionsContent))
@@ -4360,7 +4373,7 @@ export async function exportPolicyDocx(
     inOrder.add(key)
     lastKnownIdx = insertAt
   }
-  const secIndex = (k: string) => secOrder.indexOf(k)
+  const secIndex = (k: string): number => secOrder.indexOf(k)
   const rows = secList
     .map((s, i) => ({ s, i }))
     .sort((a, b) => secIndex(a.s.key) - secIndex(b.s.key) || a.i - b.i)
@@ -4470,7 +4483,7 @@ export async function exportPolicyDocx(
 
   // QR Verification — P&I only, and only when enabled for this policy (wizard toggle, default off)
   try {
-    const qrEnabled = (data.policy as any).qrEnabled === true
+    const qrEnabled = data.policy.qrEnabled === true
     const qrBase =
       data.quotation.quotationTypeCode === 'P' && qrEnabled ? data.frozen?.qrBase || null : null
     if (qrBase && data.vesselInfo.imo) {
@@ -4557,18 +4570,20 @@ export async function exportPolicyDocx(
   // Signature block — use snapshot if available, otherwise load live
   let signatureImageRun: ImageRun | null = null
   let signatureFooterRun: ImageRun | null = null
-  let sigBuf: Uint8Array | null = null
+  let sigBuf: Uint8Array | null
   try {
-    const snapshotSig = (data as any).signatureSnapshot
-    let imageData: any = null
+    const snapshotSig = data.signatureSnapshot
+    let imageData: SigImageData | null = null
     if (snapshotSig && snapshotSig.imageData) {
-      imageData = snapshotSig.imageData
+      imageData = snapshotSig.imageData as SigImageData
     } else {
       const sigData = await window.api.policyGetSignature(policyId)
-      if (sigData) imageData = sigData.imageData
+      if (sigData) imageData = sigData.imageData as SigImageData
     }
     if (imageData) {
-      const arr = Array.isArray(imageData) ? imageData : imageData.data || Object.values(imageData)
+      const arr = Array.isArray(imageData)
+        ? imageData
+        : imageData.data || (Object.values(imageData) as number[])
       sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
@@ -4602,7 +4617,7 @@ export async function exportPolicyDocx(
   insurerCellChildren.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
-      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 80, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'THE INSURER',
@@ -4629,7 +4644,7 @@ export async function exportPolicyDocx(
               children: [
                 new Paragraph({
                   alignment: AlignmentType.LEFT,
-                  spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 80, line: 240, lineRule: 'auto' as const },
                   children: [
                     new TextRun({
                       text: 'THE INSURED',
@@ -4662,7 +4677,7 @@ export async function exportPolicyDocx(
 
   // Build header — company details (Times New Roman) + policy number & vessel (Arial)
   const headerHtml = polSt(data, 'docHeader')
-  const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
+  const headerSpacing = data.sectionTexts.docHeaderSpacing || undefined
   const headerParas = headerHtml
     ? parseHtmlToParagraphs(headerHtml, {
         size: 18,
@@ -4674,7 +4689,7 @@ export async function exportPolicyDocx(
     : []
   // Load policy export settings
   let footerText = ''
-  let configTotalPages = totalPages
+  const configTotalPages = totalPages
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
@@ -4849,12 +4864,12 @@ export async function exportPolicyDocx(
   }
   const policyFooter = new Footer({ children: footerChildren })
 
-  const docSections: any[] = [
+  const docSections: ISectionOptions[] = [
     {
       properties: polMakePageProperties(),
       headers: { default: defaultHeader },
       footers: { default: policyFooter },
-      children: children as any[]
+      children
     }
   ]
 
@@ -4936,7 +4951,7 @@ export async function exportPolicyDocx(
       properties: polMakePageProperties(),
       headers: { default: new Header({ children: [polEmptyP()] }) },
       footers: { default: new Footer({ children: tcFooterChildren }) },
-      children: tcChildren as any[]
+      children: tcChildren
     })
   }
 
@@ -5014,8 +5029,8 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
-  const tcTemplate = (await window.api.tcGetTemplate(typeCode)) as any
-  if (!tcTemplate || tcTemplate.error) {
+  const tcTemplate = await window.api.tcGetTemplate(typeCode)
+  if (!tcTemplate || isIpcError(tcTemplate)) {
     throw new Error(
       'No T&C template set for this policy type. Add one in Policy Settings → T&C Templates.'
     )
@@ -5024,11 +5039,12 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   // Rich-text (html) T&C: build ONE combined DOCX (policy + T&C section) and convert once.
   if (tcTemplate.kind === 'html' && tcTemplate.contentHtml) {
     const { buffer, fileName } = await generatePolicyDocxBuffer(policyId, undefined, true)
-    const res = (await window.api.convertDocxBufferToPdf({
+    const res = await window.api.convertDocxBufferToPdf({
       docxData: Array.from(new Uint8Array(buffer)),
       fileName
-    })) as any
-    if (!res || res.error) throw new Error(res?.message || 'PDF conversion failed')
+    })
+    if (!res || isIpcError(res))
+      throw new Error((isIpcError(res) && res.message) || 'PDF conversion failed')
     const htmlPdf = {
       blob: new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
       fileName: res.fileName
@@ -5070,8 +5086,8 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     policyTypeTitle
   })
 
-  if (!pass1Result || (pass1Result as any).error) {
-    throw new Error((pass1Result as any)?.message || 'PDF conversion failed')
+  if (!pass1Result || isIpcError(pass1Result)) {
+    throw new Error((isIpcError(pass1Result) && pass1Result.message) || 'PDF conversion failed')
   }
 
   // Pass 2: re-generate with hardcoded combined total
@@ -5085,8 +5101,8 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     policyTypeTitle
   })
 
-  if (!result || (result as any).error) {
-    throw new Error((result as any)?.message || 'PDF conversion failed')
+  if (!result || isIpcError(result)) {
+    throw new Error((isIpcError(result) && result.message) || 'PDF conversion failed')
   }
 
   // Download the merged PDF
@@ -5113,7 +5129,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
  * policy's frozen export settings (passed in) so it never changes on re-export. */
 async function polBuildAdviceFooter(
   sigBuf: Uint8Array | null,
-  frozenSettings?: any
+  frozenSettings?: PolicyExportSettings | null
 ): Promise<Footer> {
   let footerText = ''
   try {
@@ -5241,7 +5257,7 @@ function polBuildAdviceClosing(
   closingRuns.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
-      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: reportSettings,
@@ -5279,21 +5295,23 @@ function polBuildAdviceClosing(
 /** Load digital signature for closing + footer */
 async function polLoadSignature(
   policyId: string,
-  snapshotSig?: any
+  snapshotSig?: SignatureSnapshot | null
 ): Promise<{ sigBuf: Uint8Array | null; signatureImageRun: ImageRun | null }> {
   let sigBuf: Uint8Array | null = null
   let signatureImageRun: ImageRun | null = null
   try {
     // Use snapshot signature if available (frozen at signing time)
-    let imageData: any = null
+    let imageData: SigImageData | null = null
     if (snapshotSig && snapshotSig.imageData) {
-      imageData = snapshotSig.imageData
+      imageData = snapshotSig.imageData as SigImageData
     } else {
       const sigData = await window.api.policyGetSignature(policyId)
-      if (sigData) imageData = sigData.imageData
+      if (sigData) imageData = sigData.imageData as SigImageData
     }
     if (imageData) {
-      const arr = Array.isArray(imageData) ? imageData : imageData.data || Object.values(imageData)
+      const arr = Array.isArray(imageData)
+        ? imageData
+        : imageData.data || (Object.values(imageData) as number[])
       sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
@@ -5343,12 +5361,12 @@ async function buildDebitAdviceBlobFresh(
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
   // Load signature (for closing section — not in footer for DA)
-  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, data.signatureSnapshot)
 
   // Build header (company details only, no certificate title) + footer
   const daHeaderParas: Paragraph[] = []
   const daHeaderHtml = polSt(data, 'docHeader')
-  const daHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  const daHeaderSpacing = data.sectionTexts.docHeaderSpacing || 220
   if (daHeaderHtml) {
     daHeaderParas.push(
       ...parseHtmlToParagraphs(daHeaderHtml, {
@@ -5368,7 +5386,7 @@ async function buildDebitAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'DEBIT ADVICE',
@@ -5384,7 +5402,7 @@ async function buildDebitAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'In connection with',
@@ -5398,7 +5416,7 @@ async function buildDebitAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `${headerTitle} ${data.policy.policyNumber}`,
@@ -5412,7 +5430,7 @@ async function buildDebitAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
@@ -5435,7 +5453,12 @@ async function buildDebitAdviceBlobFresh(
 
   // Build main two-column table (same pattern as policy)
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -5482,10 +5505,7 @@ async function buildDebitAdviceBlobFresh(
 
   // PREMIUM — amount bold + words on same line: "USD 45,000 (US Dollars Forty-Five Thousand Only)"
   const totalPremium =
-    data.instalments.reduce(
-      (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
-      0
-    ) ||
+    data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) ||
     data.policy.premiumAmount ||
     data.quotation.premiumAmount ||
     0
@@ -5521,7 +5541,7 @@ async function buildDebitAdviceBlobFresh(
   } else {
     premiumContent.push(
       new Paragraph({
-        spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+        spacing: { after: 40, line: 240, lineRule: 'auto' as const },
         children: [
           new TextRun({
             text: polFormatCurrency(totalPremium, currency),
@@ -5556,7 +5576,9 @@ async function buildDebitAdviceBlobFresh(
       if (p.debitAdviceIntroText) daIntroTemplate = p.debitAdviceIntroText
       if (p.debitAdviceIntroSingleText) daIntroSingleTemplate = p.debitAdviceIntroSingleText
     }
-  } catch {}
+  } catch {
+    /* keep the default intro texts */
+  }
 
   const ppTime = polPremiumPaymentTime(data)
   if (numInst === 1 && data.instalments.length === 1) {
@@ -5602,12 +5624,12 @@ async function buildDebitAdviceBlobFresh(
   ppcpContent.push(polSpacerPts(3))
 
   // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
-  const daPolNr = (data.policy as any).nonRefundableType
+  const daPolNr = data.policy.nonRefundableType
   const daNrType =
     daPolNr != null ? (daPolNr === 'none' ? null : daPolNr) : data.quotation.nonRefundableType
   const daNrPct =
-    (data.policy as any).nonRefundablePercent != null
-      ? (data.policy as any).nonRefundablePercent
+    data.policy.nonRefundablePercent != null
+      ? data.policy.nonRefundablePercent
       : data.quotation.nonRefundablePercent
   // Instalment table — 2 columns: "Xth Instalment due {date}" | "USD X (non-refundable)"
   if (data.instalments.length > 0) {
@@ -5618,7 +5640,7 @@ async function buildDebitAdviceBlobFresh(
       const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       const isNR = inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)
       const amtText =
-        polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency) +
+        polFormatCurrency(inst.premiumAmount || inst.amount || 0, currency) +
         (isNR ? ' (non-refundable)' : '')
       return new TableRow({
         children: [
@@ -5627,7 +5649,7 @@ async function buildDebitAdviceBlobFresh(
             borders: polNoBorders(),
             children: [
               new Paragraph({
-                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                 children: [
                   new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
                 ]
@@ -5639,7 +5661,7 @@ async function buildDebitAdviceBlobFresh(
             borders: polNoBorders(),
             children: [
               new Paragraph({
-                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                 children: [
                   new TextRun({
                     text: amtText,
@@ -5683,7 +5705,7 @@ async function buildDebitAdviceBlobFresh(
       if (line.trim())
         bankContent.push(
           new Paragraph({
-            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({
                 text: line.trim(),
@@ -5730,7 +5752,7 @@ async function buildDebitAdviceBlobFresh(
           })
         },
         footers: { default: adviceFooter },
-        children: children as any[]
+        children
       }
     ]
   })
@@ -5778,12 +5800,12 @@ async function buildCreditAdviceBlobFresh(
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature (for closing section — not in footer for CA)
-  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, data.signatureSnapshot)
 
   // Build header (company details only) + footer
   const caHeaderParas: Paragraph[] = []
   const caHeaderHtml = polSt(data, 'docHeader')
-  const caHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  const caHeaderSpacing = data.sectionTexts.docHeaderSpacing || 220
   if (caHeaderHtml) {
     caHeaderParas.push(
       ...parseHtmlToParagraphs(caHeaderHtml, {
@@ -5821,9 +5843,9 @@ async function buildCreditAdviceBlobFresh(
   // The hide-broker toggle intentionally does NOT apply here: the CA is the broker's document.
   const brokerEntityId = data.quotation.customerEntityId
   const isBroker = data.quotation.customerType === 'broker'
-  const caZeroP = (text: string) =>
+  const caZeroP = (text: string): Paragraph =>
     new Paragraph({
-      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 0, line: 240, lineRule: 'auto' as const },
       children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
     })
   if (brokerEntityId && isBroker) {
@@ -5857,7 +5879,7 @@ async function buildCreditAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'CREDIT ADVICE',
@@ -5873,7 +5895,7 @@ async function buildCreditAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'In connection with',
@@ -5887,7 +5909,7 @@ async function buildCreditAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `${headerTitle} ${data.policy.policyNumber}`,
@@ -5901,7 +5923,7 @@ async function buildCreditAdviceBlobFresh(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
@@ -5916,7 +5938,12 @@ async function buildCreditAdviceBlobFresh(
 
   // Build main two-column table (same pattern as policy)
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -5963,7 +5990,7 @@ async function buildCreditAdviceBlobFresh(
         ...data,
         quotation: { ...data.quotation, coName: '' },
         addresses: data.addresses.filter((a) => a.entityId !== brokerEntityId),
-        assureds: data.assureds.filter((a) => (a as any).entityId !== brokerEntityId)
+        assureds: data.assureds.filter((a) => a.entityId !== brokerEntityId)
       }
     : data
   const insuredContent = polBuildInsuredSection(caFilteredData)
@@ -5971,10 +5998,7 @@ async function buildCreditAdviceBlobFresh(
 
   // CREDIT AMOUNT — amount + words on same line
   const totalPremium =
-    data.instalments.reduce(
-      (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
-      0
-    ) ||
+    data.instalments.reduce((sum, i) => sum + (i.premiumAmount || i.amount || 0), 0) ||
     data.policy.premiumAmount ||
     data.quotation.premiumAmount ||
     0
@@ -5982,7 +6006,7 @@ async function buildCreditAdviceBlobFresh(
   const commissionAmount = (totalPremium * commissionPercent) / 100
   const creditContent: (Paragraph | Table)[] = [
     new Paragraph({
-      spacing: { after: 120, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 120, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency),
@@ -6006,7 +6030,7 @@ async function buildCreditAdviceBlobFresh(
   const detailsContent: (Paragraph | Table)[] = []
   detailsContent.push(
     new Paragraph({
-      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `Being ${polFmtPct(commissionPercent)}% Commission on Premium ${polFormatCurrency(totalPremium, currency)}`,
@@ -6026,7 +6050,7 @@ async function buildCreditAdviceBlobFresh(
         .replace('{instalments}', '1')
       detailsContent.push(
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({ text: singleText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
           ]
@@ -6036,7 +6060,7 @@ async function buildCreditAdviceBlobFresh(
       const multiText = caCommissionMultiText.replace('{instalments}', String(numInst))
       detailsContent.push(
         new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { after: 0, line: 240, lineRule: 'auto' as const },
           children: [
             new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
           ]
@@ -6053,9 +6077,7 @@ async function buildCreditAdviceBlobFresh(
           inst.commissionAmount != null
             ? inst.commissionAmount
             : Math.round(
-                ((((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent) /
-                  100) *
-                  100
+                (((inst.premiumAmount || inst.amount || 0) * commissionPercent) / 100) * 100
               ) / 100
         return new TableRow({
           children: [
@@ -6064,7 +6086,7 @@ async function buildCreditAdviceBlobFresh(
               borders: polNoBorders(),
               children: [
                 new Paragraph({
-                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                   children: [
                     new TextRun({
                       text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`,
@@ -6081,7 +6103,7 @@ async function buildCreditAdviceBlobFresh(
               borders: polNoBorders(),
               children: [
                 new Paragraph({
-                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                   children: [
                     new TextRun({
                       text: polFormatCurrency(commAmt, currency),
@@ -6107,7 +6129,7 @@ async function buildCreditAdviceBlobFresh(
       )
       detailsContent.push(
         new Paragraph({
-          spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+          spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
           children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })]
         })
       )
@@ -6150,7 +6172,7 @@ async function buildCreditAdviceBlobFresh(
           })
         },
         footers: { default: adviceFooter },
-        children: children as any[]
+        children
       }
     ]
   })
@@ -6231,7 +6253,7 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   const data = await loadPolicyExportData(policyId)
   const q = data.quotation
   const currency =
-    (data.vessel as any)?.agreedValueCurrency || q.agreedValueCurrency || q.premiumCurrency || 'USD'
+    data.vessel?.agreedValueCurrency || q.agreedValueCurrency || q.premiumCurrency || 'USD'
   const curSymbol = currency === 'USD' ? 'US$' : currency
 
   // Year from inception
@@ -6251,7 +6273,9 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
       amlinRef = yearSettings.amlinRef || ''
       if (yearSettings.riskCode) riskCode = yearSettings.riskCode
     }
-  } catch {}
+  } catch {
+    /* keep the default declaration values */
+  }
 
   // Assured text
   const assuredLines: string[] = []
@@ -6295,7 +6319,10 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   const warrantyLines: string[] = []
   for (const wid of data.selectedWarrantyIds) {
     const w = data.allWarranties.find((aw) => aw.id === wid)
-    if (w) warrantyLines.push(resolveWarPh(w.text || (w as any).name))
+    if (w)
+      warrantyLines.push(
+        resolveWarPh((w.text || (w as PIWarranty & { name?: string }).name) as string)
+      )
   }
   for (const cw of data.customWarranties) warrantyLines.push(resolveWarPh(cw.text))
 
@@ -6350,7 +6377,7 @@ export async function exportDeclarationDocx(
   const FONT = 'Arial'
   const SIZE = 20 // 10pt
 
-  const emptyP = () => new Paragraph({ spacing: { after: 0 }, children: [] })
+  const emptyP = (): Paragraph => new Paragraph({ spacing: { after: 0 }, children: [] })
 
   const LABEL_W = 1800
   const VALUE_W = 8200
@@ -6358,7 +6385,7 @@ export async function exportDeclarationDocx(
   // Extra top/bottom cell padding to space the sections apart a little more
   const SECTION_MARGINS = { top: 90, bottom: 90, left: 0, right: 0 }
 
-  const labelCell = (text: string) =>
+  const labelCell = (text: string): TableCell =>
     new TableCell({
       width: { size: LABEL_W, type: WidthType.DXA },
       borders: polNoBorders(),
@@ -6372,7 +6399,7 @@ export async function exportDeclarationDocx(
       ]
     })
 
-  const valueCell = (lines: string[]) =>
+  const valueCell = (lines: string[]): TableCell =>
     new TableCell({
       width: { size: VALUE_W, type: WidthType.DXA },
       borders: polNoBorders(),
@@ -6383,14 +6410,14 @@ export async function exportDeclarationDocx(
           ? lines.map(
               (l) =>
                 new Paragraph({
-                  spacing: { after: 60, line: 240, lineRule: 'auto' as any },
+                  spacing: { after: 60, line: 240, lineRule: 'auto' as const },
                   children: [new TextRun({ text: l, size: SIZE, font: FONT })]
                 })
             )
           : [emptyP()]
     })
 
-  const makeRow = (label: string, lines: string[]) =>
+  const makeRow = (label: string, lines: string[]): TableRow =>
     new TableRow({
       children: [labelCell(label), valueCell(lines)]
     })
@@ -6516,7 +6543,7 @@ export async function exportDeclarationDocx(
     sections: [
       {
         properties: { page: { margin: { top: 900, bottom: 900, left: 900, right: 900 } } },
-        children: children as any[]
+        children
       }
     ]
   })
@@ -6532,7 +6559,15 @@ export async function exportDeclarationDocx(
 // ENDORSEMENT EXPORT
 // ============================================================================
 
-async function loadEndorsementExportData(policyId: string, endorsementId: string) {
+async function loadEndorsementExportData(
+  policyId: string,
+  endorsementId: string
+): Promise<{
+  data: PolicyExportData
+  endorsement: PolicyEndorsement
+  sections: EndorsementSection[]
+  instalments: EndorsementInstalment[]
+}> {
   const data = await loadFrozenExportData(policyId)
   const endorsement = await window.api.endorsementGet(endorsementId)
   if (!endorsement) throw new Error('Endorsement not found')
@@ -6577,15 +6612,12 @@ export async function exportEndorsementDocx(
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(
-    policyId,
-    (data as any).signatureSnapshot
-  )
+  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, data.signatureSnapshot)
 
   // Build header + footer
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
-  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  const hdrSpacing = data.sectionTexts.docHeaderSpacing || 220
   if (hdrHtml) {
     hdrParas.push(
       ...parseHtmlToParagraphs(hdrHtml, {
@@ -6605,7 +6637,7 @@ export async function exportEndorsementDocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `Endorsement No. ${endorsement.endorsementNumber}`,
@@ -6620,7 +6652,7 @@ export async function exportEndorsementDocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'in connection with',
@@ -6634,7 +6666,7 @@ export async function exportEndorsementDocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({ text: headerTitle, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
       ]
@@ -6644,7 +6676,7 @@ export async function exportEndorsementDocx(
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+        spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
         children: [
           new TextRun({
             text: '— and the relative Debit Advice —',
@@ -6660,7 +6692,7 @@ export async function exportEndorsementDocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: data.policy.policyNumber,
@@ -6675,7 +6707,12 @@ export async function exportEndorsementDocx(
 
   // ── Two-column table layout (same as policy) ──
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -6690,7 +6727,7 @@ export async function exportEndorsementDocx(
             new Paragraph({
               keepLines: true,
               alignment: AlignmentType.JUSTIFIED,
-              spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 80, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: title,
@@ -6728,11 +6765,11 @@ export async function exportEndorsementDocx(
   rows.push(makeRow('EFFECTIVE DATE', [polNp(effDate)]))
 
   // Endorsement sections — two-column or full-width, interleaved
-  const enabledSections = sections.filter((s: any) => s.isEnabled)
-  enabledSections.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+  const enabledSections = sections.filter((s) => s.isEnabled)
+  enabledSections.sort((a, b) => a.orderIndex - b.orderIndex)
 
   // Split into groups: consecutive two-column sections form a table, full-width sections are standalone
-  const flushRows = () => {
+  const flushRows = (): void => {
     if (rows.length > 0) {
       children.push(
         new Table({
@@ -6810,7 +6847,7 @@ export async function exportEndorsementDocx(
         properties: polMakePageProperties(),
         headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
         footers: adviceFooter ? { default: adviceFooter } : undefined,
-        children: children as any[]
+        children
       }
     ]
   })
@@ -6859,11 +6896,11 @@ export async function exportEndorsementDADocx(
   }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
-  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, data.signatureSnapshot)
 
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
-  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  const hdrSpacing = data.sectionTexts.docHeaderSpacing || 220
   if (hdrHtml) {
     hdrParas.push(
       ...parseHtmlToParagraphs(hdrHtml, {
@@ -6883,7 +6920,7 @@ export async function exportEndorsementDADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'DEBIT ADVICE',
@@ -6899,7 +6936,7 @@ export async function exportEndorsementDADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'In connection with',
@@ -6913,7 +6950,7 @@ export async function exportEndorsementDADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `Endorsement N° ${endorsement.endorsementNumber}`,
@@ -6927,7 +6964,7 @@ export async function exportEndorsementDADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `${headerTitle} ${data.policy.policyNumber}`,
@@ -6941,7 +6978,7 @@ export async function exportEndorsementDADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
@@ -6957,7 +6994,7 @@ export async function exportEndorsementDADocx(
   // Preamble
   children.push(
     new Paragraph({
-      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `This Debit Advice shall be deemed to be attached to and forming an integral part of Endorsement N° ${endorsement.endorsementNumber} - ${headerTitle} ${data.policy.policyNumber}`,
@@ -6970,7 +7007,12 @@ export async function exportEndorsementDADocx(
   )
 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -7021,7 +7063,7 @@ export async function exportEndorsementDADocx(
   const premLabel = premiumAmt < 0 ? 'CREDIT PREMIUM' : 'ADDITIONAL PREMIUM'
   const premiumContent: (Paragraph | Table)[] = [
     new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+      spacing: { after: 40, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: polFormatCurrency(absPremium, currency),
@@ -7078,7 +7120,7 @@ export async function exportEndorsementDADocx(
             borders: polNoBorders(),
             children: [
               new Paragraph({
-                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                 children: [
                   new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
                 ]
@@ -7090,7 +7132,7 @@ export async function exportEndorsementDADocx(
             borders: polNoBorders(),
             children: [
               new Paragraph({
-                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                spacing: { after: 0, line: 240, lineRule: 'auto' as const },
                 children: [
                   new TextRun({
                     text: amtText,
@@ -7131,7 +7173,7 @@ export async function exportEndorsementDADocx(
       if (line.trim())
         bankContent.push(
           new Paragraph({
-            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            spacing: { after: 0, line: 240, lineRule: 'auto' as const },
             children: [
               new TextRun({
                 text: line.trim(),
@@ -7175,7 +7217,7 @@ export async function exportEndorsementDADocx(
           default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] })
         },
         footers: { default: adviceFooter },
-        children: children as any[]
+        children
       }
     ]
   })
@@ -7226,11 +7268,11 @@ export async function exportEndorsementCADocx(
   }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
-  const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { signatureImageRun } = await polLoadSignature(policyId, data.signatureSnapshot)
 
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
-  const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
+  const hdrSpacing = data.sectionTexts.docHeaderSpacing || 220
   if (hdrHtml) {
     hdrParas.push(
       ...parseHtmlToParagraphs(hdrHtml, {
@@ -7250,7 +7292,7 @@ export async function exportEndorsementCADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `CREDIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`,
@@ -7266,7 +7308,7 @@ export async function exportEndorsementCADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: 'In connection with',
@@ -7280,7 +7322,7 @@ export async function exportEndorsementCADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `${headerTitle} ${data.policy.policyNumber}`,
@@ -7294,7 +7336,7 @@ export async function exportEndorsementCADocx(
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as const },
       children: [
         new TextRun({
           text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
@@ -7308,7 +7350,12 @@ export async function exportEndorsementCADocx(
   )
 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-  const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
+  const thinBorders = (): ITableCellBorders => ({
+    top: noBorder,
+    bottom: noBorder,
+    left: noBorder,
+    right: noBorder
+  })
 
   function makeRow(title: string, content: (Paragraph | Table)[]): TableRow {
     return new TableRow({
@@ -7323,7 +7370,7 @@ export async function exportEndorsementCADocx(
             new Paragraph({
               keepLines: true,
               alignment: AlignmentType.JUSTIFIED,
-              spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+              spacing: { after: 80, line: 240, lineRule: 'auto' as const },
               children: [
                 new TextRun({
                   text: title,
@@ -7403,7 +7450,7 @@ export async function exportEndorsementCADocx(
         properties: polMakePageProperties(),
         headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
         footers: adviceFooter ? { default: adviceFooter } : undefined,
-        children: children as any[]
+        children
       }
     ]
   })

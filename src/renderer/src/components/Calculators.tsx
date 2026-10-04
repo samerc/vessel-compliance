@@ -26,7 +26,7 @@ const calculators: { id: CalculatorType; label: string; description: string }[] 
   }
 ]
 
-export default function Calculators({ subTab, subTabNonce }: SubTabProps = {}) {
+export default function Calculators({ subTab, subTabNonce }: SubTabProps = {}): React.JSX.Element {
   const [activeCalc, setActiveCalc] = useState<CalculatorType>('premium')
   useRequestedSubTab(subTab, subTabNonce, ['premium', 'tlo', 'warbreach'] as const, setActiveCalc)
 

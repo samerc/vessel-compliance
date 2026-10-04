@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   RefreshCw,
   Download,
@@ -16,26 +16,9 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import XLSX from 'xlsx-js-style'
 import { formatDateOrDash } from '../utils/dateUtils'
+import type { PolicyRenewalRow } from '../../../shared/types'
 
-interface RenewalItem {
-  id: string
-  vesselId: string
-  vesselName: string
-  imoNumber: string
-  policyTypeName: string
-  policyTypeId: string
-  policyNumber: string
-  status: string
-  renewalStatusId: string | null
-  renewalStatusName: string | null
-  renewalStatusColor: string | null
-  endDate: string
-  customerName: string | null
-  customerType: string | null
-  fleetName: string | null
-  currency: string | null
-  premium: number | null
-}
+type RenewalItem = PolicyRenewalRow
 
 interface PolicyTypeOption {
   id: string
@@ -61,7 +44,7 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000)
 }
 
-function formatPremium(value: number | null, currency: string | null): string {
+function formatPremium(value: number | string | null, currency: string | null): string {
   if (value == null) return '-'
   const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
   const n = Number(value)
@@ -83,7 +66,7 @@ function KPI({
   label: string
   value: string | number
   sub?: string
-}) {
+}): React.JSX.Element {
   return (
     <div
       className="glass-card"
@@ -144,7 +127,7 @@ function KPI({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function RenewalPipelineReport() {
+export default function RenewalPipelineReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -173,9 +156,9 @@ export default function RenewalPipelineReport() {
   useEffect(() => {
     window.api
       .getPolicyTypes()
-      .then((types: any[]) => {
+      .then((types) => {
         if (Array.isArray(types)) {
-          setPolicyTypes(types.map((t: any) => ({ id: t.id, name: t.name })))
+          setPolicyTypes(types.map((t) => ({ id: t.id, name: t.name })))
         }
       })
       .catch(() => {})
@@ -209,25 +192,37 @@ export default function RenewalPipelineReport() {
 
   const [yearRenewals, setYearRenewals] = useState<RenewalItem[]>([])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [rangeData, yearData] = await Promise.all([
-        window.api.getRenewalPipeline(dateRange.from, dateRange.to),
-        window.api.getRenewalPipeline(yearRange.from, yearRange.to)
-      ])
-      if (Array.isArray(rangeData)) setRenewals(rangeData)
-      if (Array.isArray(yearData)) setYearRenewals(yearData)
-    } catch (err: any) {
-      showError('Failed to load renewal pipeline: ' + (err?.message || 'Unknown error'))
-    } finally {
-      setLoading(false)
-    }
-  }, [dateRange, yearRange])
+  // Bumped by the Refresh button to re-run the load effect
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const [rangeData, yearData] = await Promise.all([
+          window.api.getRenewalPipeline(dateRange.from, dateRange.to),
+          window.api.getRenewalPipeline(yearRange.from, yearRange.to)
+        ])
+        if (!alive) return
+        if (Array.isArray(rangeData)) setRenewals(rangeData)
+        if (Array.isArray(yearData)) setYearRenewals(yearData)
+      } catch (err) {
+        if (alive)
+          showError(
+            'Failed to load renewal pipeline: ' +
+              ((err instanceof Error ? err.message : '') || 'Unknown error')
+          )
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [dateRange, yearRange, showError, reloadKey])
 
   // Filtered & sorted data
   const filtered = useMemo(() => {
@@ -258,7 +253,7 @@ export default function RenewalPipelineReport() {
           cmp = (a.policyTypeName || '').localeCompare(b.policyTypeName || '')
           break
         case 'premium':
-          cmp = (a.premium || 0) - (b.premium || 0)
+          cmp = (Number(a.premium) || 0) - (Number(b.premium) || 0)
           break
         case 'endDate':
           cmp = (a.endDate || '').localeCompare(b.endDate || '')
@@ -289,7 +284,7 @@ export default function RenewalPipelineReport() {
     return { total, totalPremium, avgPremium, renewalRate }
   }, [yearRenewals, policyTypeFilter])
 
-  const toggleSort = (field: SortField) => {
+  const toggleSort = (field: SortField): void => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -298,7 +293,7 @@ export default function RenewalPipelineReport() {
     }
   }
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField): React.JSX.Element | null => {
     if (sortField !== field) return null
     return sortDir === 'asc' ? (
       <ChevronUp size={14} style={{ marginLeft: 4, opacity: 0.7 }} />
@@ -308,7 +303,7 @@ export default function RenewalPipelineReport() {
   }
 
   // Excel export
-  const exportExcel = () => {
+  const exportExcel = (): void => {
     if (filtered.length === 0) return
     const rows = filtered.map((r) => ({
       Vessel: r.vesselName,
@@ -570,7 +565,7 @@ export default function RenewalPipelineReport() {
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
           <button
-            onClick={loadData}
+            onClick={() => loadData()}
             disabled={loading}
             style={{
               padding: '6px 14px',
@@ -617,31 +612,31 @@ export default function RenewalPipelineReport() {
             <thead>
               <tr>
                 <th style={headerStyle} onClick={() => toggleSort('vesselName')}>
-                  Vessel <SortIcon field="vesselName" />
+                  Vessel {renderSortIcon('vesselName')}
                 </th>
                 <th style={headerStyle} onClick={() => toggleSort('customerName')}>
-                  Customer <SortIcon field="customerName" />
+                  Customer {renderSortIcon('customerName')}
                 </th>
                 <th style={headerStyle} onClick={() => toggleSort('policyTypeName')}>
-                  Policy Type <SortIcon field="policyTypeName" />
+                  Policy Type {renderSortIcon('policyTypeName')}
                 </th>
                 <th
                   style={{ ...headerStyle, textAlign: 'right' }}
                   onClick={() => toggleSort('premium')}
                 >
-                  Current Premium <SortIcon field="premium" />
+                  Current Premium {renderSortIcon('premium')}
                 </th>
                 <th style={headerStyle} onClick={() => toggleSort('endDate')}>
-                  End Date <SortIcon field="endDate" />
+                  End Date {renderSortIcon('endDate')}
                 </th>
                 <th style={headerStyle} onClick={() => toggleSort('renewalStatusName')}>
-                  Renewal Status <SortIcon field="renewalStatusName" />
+                  Renewal Status {renderSortIcon('renewalStatusName')}
                 </th>
                 <th
                   style={{ ...headerStyle, textAlign: 'right' }}
                   onClick={() => toggleSort('daysUntil')}
                 >
-                  Days Until Expiry <SortIcon field="daysUntil" />
+                  Days Until Expiry {renderSortIcon('daysUntil')}
                 </th>
               </tr>
             </thead>

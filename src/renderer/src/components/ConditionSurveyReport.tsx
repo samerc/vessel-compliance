@@ -6,7 +6,10 @@ import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import type { CellHookData } from 'jspdf-autotable'
 import * as XLSX from 'xlsx-js-style'
+
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
 // Display status derived from the survey's closure state (open defects), not the raw
 // warranty status: a survey with open defects reads "Carried Out"; all defects closed
@@ -64,7 +67,7 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export default function ConditionSurveyReport() {
+export default function ConditionSurveyReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -81,16 +84,16 @@ export default function ConditionSurveyReport() {
         const w = await window.api.surveyWarrantyGetAll()
         // Only active vessels — inactive vessels' warranties are excluded from the report
         const active = (Array.isArray(w) ? w : []).filter(
-          (x: any) => x.vesselIsActive !== 0 && x.vesselIsActive !== false
+          (x) => x.vesselIsActive !== 0 && x.vesselIsActive !== false
         )
         setWarranties(active)
-      } catch (err: any) {
-        showError(err?.message || 'Failed to load survey warranties')
+      } catch (err) {
+        showError((err instanceof Error && err.message) || 'Failed to load survey warranties')
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [showError])
 
   const rows = useMemo<ReportRow[]>(() => {
     return warranties.map((w) => {
@@ -179,12 +182,12 @@ export default function ConditionSurveyReport() {
     return { total: displayRows.length, surveyDone, carriedOut, pending }
   }, [displayRows])
 
-  const dueCell = (row: ReportRow) =>
+  const dueCell = (row: ReportRow): string =>
     row.dueDate ? fmtDate(row.dueDate) : row.deadlineText || 'No due date'
 
-  const exportExcel = () => {
+  const exportExcel = (): void => {
     if (displayRows.length === 0) return
-    const data: any[] = []
+    const data: Record<string, unknown>[] = []
     for (const g of groups) {
       for (const r of g.rows) {
         data.push({
@@ -218,7 +221,7 @@ export default function ConditionSurveyReport() {
     showSuccess('Exported to Excel')
   }
 
-  const exportPdf = async () => {
+  const exportPdf = async (): Promise<void> => {
     if (groups.length === 0) return
     try {
       const s = await getReportSettings()
@@ -229,7 +232,7 @@ export default function ConditionSurveyReport() {
       const teal: [number, number, number] = [0, 170, 200]
       const margin = 14
 
-      const drawHeader = () => {
+      const drawHeader = (): void => {
         doc.setFillColor(navy[0], navy[1], navy[2])
         doc.rect(0, 0, pw, 16, 'F')
         doc.setFillColor(teal[0], teal[1], teal[2])
@@ -244,7 +247,7 @@ export default function ConditionSurveyReport() {
         doc.text('Condition Survey Report', pw - margin, 10.5, { align: 'right' })
       }
 
-      const drawFooter = (pageNum: number, totalPages: number) => {
+      const drawFooter = (pageNum: number, totalPages: number): void => {
         doc.setDrawColor(200)
         doc.line(margin, ph - 12, pw - margin, ph - 12)
         doc.setFontSize(7)
@@ -338,7 +341,7 @@ export default function ConditionSurveyReport() {
             6: { cellWidth: 36 },
             7: { cellWidth: 24 }
           },
-          didParseCell: (d: any) => {
+          didParseCell: (d: CellHookData) => {
             if (d.section === 'body' && d.column.index === 7) {
               const meta = STATUS_META[g.rows[d.row.index].status]
               if (meta) {
@@ -353,7 +356,7 @@ export default function ConditionSurveyReport() {
             }
           }
         })
-        y = (doc as any).lastAutoTable.finalY + 6
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 6
       }
 
       const totalPages = doc.getNumberOfPages()
@@ -364,8 +367,8 @@ export default function ConditionSurveyReport() {
 
       doc.save('Condition Survey Report.pdf')
       showSuccess('Exported to PDF')
-    } catch (err: any) {
-      showError(err?.message || 'PDF export failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'PDF export failed')
     }
   }
 

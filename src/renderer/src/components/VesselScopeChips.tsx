@@ -15,13 +15,13 @@ export default function VesselScopeChips({
   vessels,
   vesselScope,
   onChange
-}: VesselScopeChipsProps) {
+}: VesselScopeChipsProps): React.JSX.Element | null {
   if (vessels.length < 2) return null
 
   const allSelected =
     !vesselScope || vesselScope.length === 0 || vesselScope.length === vessels.length
 
-  const toggle = (vesselId: string) => {
+  const toggle = (vesselId: string): void => {
     if (allSelected) {
       // Switching from "all" to specific: select only this one
       onChange([vesselId])
@@ -38,9 +38,10 @@ export default function VesselScopeChips({
     }
   }
 
-  const selectAll = () => onChange(null)
+  const selectAll = (): void => onChange(null)
 
-  const isChecked = (vesselId: string) => allSelected || (vesselScope || []).includes(vesselId)
+  const isChecked = (vesselId: string): boolean =>
+    allSelected || (vesselScope || []).includes(vesselId)
 
   return (
     <div

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import React, { ReactNode } from 'react'
 
 interface EmptyStateProps {
   icon?: ReactNode
@@ -9,7 +9,13 @@ interface EmptyStateProps {
   compact?: boolean
 }
 
-export default function EmptyState({ icon, title, text, action, compact }: EmptyStateProps) {
+export default function EmptyState({
+  icon,
+  title,
+  text,
+  action,
+  compact
+}: EmptyStateProps): React.JSX.Element {
   return (
     <div className="empty-state" style={compact ? { padding: '28px 16px' } : undefined}>
       {icon && <div className="empty-icon">{icon}</div>}

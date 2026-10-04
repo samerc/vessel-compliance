@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import XLSX from 'xlsx-js-style'
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import autoTable, { type RowInput, type Styles } from 'jspdf-autotable'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
@@ -65,7 +65,7 @@ function fmt(v: number): string {
 function parseExcel(buffer: ArrayBuffer): LossUWY[] {
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
   // Row 0 is the header; skip it and filter out empty rows (vessel = col B = index 1)
   const dataRows = rows.slice(1).filter((r) => String(r[1] || '').trim() !== '')
@@ -174,7 +174,7 @@ interface LossReportOpts {
   showClaimSubtotals: boolean
 }
 
-function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
+function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts): void {
   const primary = s.primaryColor
   const vesselBg = tintColor(primary, 0.82)
   const vesselText: [number, number, number] = [
@@ -247,7 +247,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
         `Total Incurred (${cur})`
       ]
 
-  const R: any = { halign: 'right' }
+  const R: Partial<Styles> = { halign: 'right' }
 
   const S = {
     uwyHeader: {
@@ -289,12 +289,12 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   }
 
   // ── Build table body ─────────────────────────────────────────────────────
-  const bodyRows: any[][] = []
+  const bodyRows: RowInput[] = []
   let grandPaid = 0,
     grandReserves = 0,
     grandIncurred = 0
 
-  const fmtCur = (v: number) =>
+  const fmtCur = (v: number): string =>
     `${cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$'}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   for (const uwy of data) {
@@ -418,8 +418,10 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   const startY = s.companySubtitle ? 64 : 60
 
   const numCol = { halign: 'right' as const, overflow: 'ellipsize' as const }
-  const w = colWidths as any
-  const columnStyles: Record<number, any> = showRes
+  const w: Partial<
+    Record<'claimId' | 'date' | 'dmg' | 'payType' | 'paid' | 'res' | 'total', number>
+  > = colWidths
+  const columnStyles: Record<number, Partial<Styles>> = showRes
     ? {
         0: { cellWidth: w.claimId, halign: 'center' },
         1: { cellWidth: w.date, overflow: 'ellipsize' },
@@ -483,7 +485,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function LossRecordReport() {
+export default function LossRecordReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -499,7 +501,7 @@ export default function LossRecordReport() {
   const [showReserves, setShowReserves] = useState(true)
   const [showClaimSubtotals, setShowClaimSubtotals] = useState(true)
 
-  const handleFile = (file: File) => {
+  const handleFile = (file: File): void => {
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
       setError('Please select an Excel file (.xlsx or .xls).')
       return
@@ -508,7 +510,7 @@ export default function LossRecordReport() {
     setFileName(file.name)
 
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = (e): void => {
       try {
         const buffer = e.target?.result as ArrayBuffer
         const parsed = parseExcel(buffer)
@@ -526,20 +528,20 @@ export default function LossRecordReport() {
     reader.readAsArrayBuffer(file)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
     if (file) handleFile(file)
     e.target.value = ''
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent): void => {
     e.preventDefault()
     setDragging(false)
     const file = e.dataTransfer.files?.[0]
     if (file) handleFile(file)
   }
 
-  const handleExport = async () => {
+  const handleExport = async (): Promise<void> => {
     if (!data) return
     setExporting(true)
     try {
@@ -550,7 +552,7 @@ export default function LossRecordReport() {
     }
   }
 
-  const clearData = () => {
+  const clearData = (): void => {
     setData(null)
     setFileName('')
     setError(null)

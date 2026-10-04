@@ -31,9 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   useEffect(() => {
     const checkSession = async (): Promise<void> => {
       try {
-        const session = await (window.api.getSession
-          ? window.api.getSession()
-          : window.api.authGetSession())
+        const session = await window.api.getSession()
         if (session) {
           setUser(session)
           await loadPermissions(session.id, session.role)
@@ -51,9 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     username: string
     password: string
   }): Promise<{ success: boolean; message?: string }> => {
-    const result = await (window.api.login
-      ? window.api.login(credentials.username, credentials.password)
-      : window.api.authLogin(credentials))
+    const result = await window.api.login(credentials.username, credentials.password)
     if (result.success && result.user) {
       setUser(result.user)
       await loadPermissions(result.user.id, result.user.role)
@@ -62,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   }
 
   const logout = async (): Promise<void> => {
-    await (window.api.logout ? window.api.logout() : window.api.authLogout())
+    await window.api.logout()
     setUser(null)
     setPermissions(new Set())
   }

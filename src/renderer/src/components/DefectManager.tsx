@@ -46,12 +46,34 @@ const severityColors: Record<string, string> = {
   Observation: '#90a4ae'
 }
 
+// Open defects first, closed at the bottom, each group sorted by the chosen field
+function sortDefects(
+  data: SurveyDefect[],
+  sortField: 'defectNumber' | 'createdAt',
+  sortOrder: 'asc' | 'desc'
+): SurveyDefect[] {
+  const sorter = (a: SurveyDefect, b: SurveyDefect): number => {
+    if (sortField === 'defectNumber') {
+      const numA = parseInt(a.defectNumber) || 0
+      const numB = parseInt(b.defectNumber) || 0
+      return sortOrder === 'asc' ? numA - numB : numB - numA
+    } else {
+      const dateA = new Date(a.createdAt || 0).getTime()
+      const dateB = new Date(b.createdAt || 0).getTime()
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
+    }
+  }
+  const open = data.filter((d) => d.status === 'OPEN').sort(sorter)
+  const closed = data.filter((d) => d.status !== 'OPEN').sort(sorter)
+  return [...open, ...closed]
+}
+
 export default function DefectManager({
   survey,
   vessel,
   onUpdate,
   refreshKey
-}: DefectManagerProps) {
+}: DefectManagerProps): React.JSX.Element {
   const { user, hasPermission } = useAuth()
   const { showError, showSuccess } = useToast()
   const canManageDefects = hasPermission('surveys:defects')
@@ -103,41 +125,26 @@ export default function DefectManager({
   const [editNotes, setEditNotes] = useState('')
 
   useEffect(() => {
-    loadDefects()
-  }, [survey.id])
-
-  useEffect(() => {
     if (showAddForm) defectNumberRef.current?.focus()
   }, [showAddForm])
 
-  const sortDefects = (data: SurveyDefect[]): SurveyDefect[] => {
-    const sorter = (a: SurveyDefect, b: SurveyDefect) => {
-      if (sortField === 'defectNumber') {
-        const numA = parseInt(a.defectNumber) || 0
-        const numB = parseInt(b.defectNumber) || 0
-        return sortOrder === 'asc' ? numA - numB : numB - numA
-      } else {
-        const dateA = new Date(a.createdAt || 0).getTime()
-        const dateB = new Date(b.createdAt || 0).getTime()
-        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
-      }
-    }
-    // Partition: open defects first, closed at bottom, sorted within each group
-    const open = data.filter((d) => d.status === 'OPEN').sort(sorter)
-    const closed = data.filter((d) => d.status !== 'OPEN').sort(sorter)
-    return [...open, ...closed]
-  }
-
-  const loadDefects = async () => {
-    const data = await window.api.getSurveyDefects(survey.id)
-    setDefects(sortDefects(data))
-  }
-
+  // Loads when the survey, sort or parent refreshKey changes, and whenever loadDefects() is called
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadDefects = (): void => setReloadKey((k) => k + 1)
+  const surveyId = survey.id
   useEffect(() => {
-    loadDefects()
-  }, [sortField, sortOrder, survey.id, refreshKey])
+    let alive = true
+    const run = async (): Promise<void> => {
+      const data = await window.api.getSurveyDefects(surveyId)
+      if (alive) setDefects(sortDefects(data, sortField, sortOrder))
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [sortField, sortOrder, surveyId, refreshKey, reloadKey])
 
-  const handleAddDefect = async (e: React.FormEvent) => {
+  const handleAddDefect = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newDescription.trim()) return
 
@@ -175,7 +182,7 @@ export default function DefectManager({
     onUpdate()
   }
 
-  const handleEditDefect = (defect: SurveyDefect) => {
+  const handleEditDefect = (defect: SurveyDefect): void => {
     setEditingDefectId(defect.id)
     setEditNumber(defect.defectNumber)
     setEditDescription(defect.description)
@@ -185,7 +192,7 @@ export default function DefectManager({
     setEditNotes(defect.notes || '')
   }
 
-  const handleSaveEdit = async (defectId: string) => {
+  const handleSaveEdit = async (defectId: string): Promise<void> => {
     if (!editDescription.trim() || !editNumber.trim()) return
 
     await window.api.updateSurveyDefect(defectId, {
@@ -204,11 +211,11 @@ export default function DefectManager({
     onUpdate()
   }
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (): void => {
     setEditingDefectId(null)
   }
 
-  const handleCloseDefect = async () => {
+  const handleCloseDefect = async (): Promise<void> => {
     if (!closeModalDefect) return
     await window.api.closeDefect(
       closeModalDefect.id,
@@ -224,12 +231,12 @@ export default function DefectManager({
   const [reopenModalDefect, setReopenModalDefect] = useState<SurveyDefect | null>(null)
   const [reopenReason, setReopenReason] = useState('')
 
-  const handleReopenDefect = (defect: SurveyDefect) => {
+  const handleReopenDefect = (defect: SurveyDefect): void => {
     setReopenModalDefect(defect)
     setReopenReason('')
   }
 
-  const handleConfirmReopen = async () => {
+  const handleConfirmReopen = async (): Promise<void> => {
     if (!reopenModalDefect) return
     await window.api.reopenDefect(reopenModalDefect.id, reopenReason || undefined)
     setReopenModalDefect(null)
@@ -238,7 +245,7 @@ export default function DefectManager({
     onUpdate()
   }
 
-  const handleBulkClose = async () => {
+  const handleBulkClose = async (): Promise<void> => {
     setBulkClosing(true)
     try {
       for (const id of selectedIds) {
@@ -256,7 +263,25 @@ export default function DefectManager({
     }
   }
 
-  const toggleSelectAll = () => {
+  // Filtered defects (status + search)
+  const filteredDefects = useMemo(() => {
+    let filtered = defects
+    if (statusFilter === 'open') filtered = filtered.filter((d) => d.status === 'OPEN')
+    else if (statusFilter === 'closed') filtered = filtered.filter((d) => d.status !== 'OPEN')
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (d) =>
+          d.defectNumber.toLowerCase().includes(q) ||
+          d.description.toLowerCase().includes(q) ||
+          (d.notes || '').toLowerCase().includes(q) ||
+          (d.closureNotes || '').toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }, [defects, statusFilter, searchQuery])
+
+  const toggleSelectAll = (): void => {
     const openFiltered = filteredDefects.filter((d) => d.status === 'OPEN')
     if (openFiltered.every((d) => selectedIds.has(d.id))) {
       setSelectedIds(new Set())
@@ -265,7 +290,7 @@ export default function DefectManager({
     }
   }
 
-  const handleDeleteDefect = (defect: SurveyDefect) => {
+  const handleDeleteDefect = (defect: SurveyDefect): void => {
     setConfirmation({
       show: true,
       title: 'Delete Defect',
@@ -280,7 +305,7 @@ export default function DefectManager({
     })
   }
 
-  const toggleExpanded = (defectId: string) => {
+  const toggleExpanded = (defectId: string): void => {
     setExpandedDefectIds((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(defectId)) {
@@ -292,7 +317,7 @@ export default function DefectManager({
     })
   }
 
-  const handleCopyDefect = async (defect: SurveyDefect) => {
+  const handleCopyDefect = async (defect: SurveyDefect): Promise<void> => {
     try {
       await navigator.clipboard.writeText(defect.description || '')
       setCopiedDefectId(defect.id)
@@ -303,7 +328,7 @@ export default function DefectManager({
     }
   }
 
-  const isOverdue = (defect: SurveyDefect) => {
+  const isOverdue = (defect: SurveyDefect): boolean => {
     if (defect.status !== 'OPEN' || !defect.dueDate) return false
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -315,7 +340,7 @@ export default function DefectManager({
   const [showPdfModal, setShowPdfModal] = useState(false)
   const [pdfNoteIds, setPdfNoteIds] = useState<Set<string>>(new Set())
 
-  const exportToPDF = () => {
+  const exportToPDF = (): void => {
     const defectsWithNotes = defects.filter((d) => d.notes || d.closureNotes)
     if (defectsWithNotes.length === 0) {
       ReportService.exportSurveyToPDF(vessel, survey, defects)
@@ -325,12 +350,12 @@ export default function DefectManager({
     }
   }
 
-  const handlePdfExport = () => {
+  const handlePdfExport = (): void => {
     setShowPdfModal(false)
     ReportService.exportSurveyToPDF(vessel, survey, defects, pdfNoteIds)
   }
 
-  const togglePdfNoteId = (id: string) => {
+  const togglePdfNoteId = (id: string): void => {
     setPdfNoteIds((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -338,7 +363,7 @@ export default function DefectManager({
     })
   }
 
-  const exportToExcel = () => {
+  const exportToExcel = (): void => {
     const rows = defects.map((d) => ({
       '#': d.defectNumber,
       Description: d.description,
@@ -361,25 +386,7 @@ export default function DefectManager({
   const closedCount = defects.filter((d) => d.status !== 'OPEN').length
   const overdueCount = defects.filter((d) => isOverdue(d)).length
 
-  // Filtered defects (status + search)
-  const filteredDefects = useMemo(() => {
-    let filtered = defects
-    if (statusFilter === 'open') filtered = filtered.filter((d) => d.status === 'OPEN')
-    else if (statusFilter === 'closed') filtered = filtered.filter((d) => d.status !== 'OPEN')
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (d) =>
-          d.defectNumber.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          (d.notes || '').toLowerCase().includes(q) ||
-          (d.closureNotes || '').toLowerCase().includes(q)
-      )
-    }
-    return filtered
-  }, [defects, statusFilter, searchQuery])
-
-  const formatDueDate = (dateStr: string) => {
+  const formatDueDate = (dateStr: string): string => {
     const d = new Date(dateStr + 'T00:00:00')
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
@@ -417,7 +424,10 @@ export default function DefectManager({
           <select
             value={`${sortField}-${sortOrder}`}
             onChange={(e) => {
-              const [field, order] = e.target.value.split('-') as [any, any]
+              const [field, order] = e.target.value.split('-') as [
+                'defectNumber' | 'createdAt',
+                'asc' | 'desc'
+              ]
               setSortField(field)
               setSortOrder(order)
             }}
@@ -652,7 +662,7 @@ export default function DefectManager({
             />
             <select
               value={newSeverity}
-              onChange={(e) => setNewSeverity(e.target.value as any)}
+              onChange={(e) => setNewSeverity(e.target.value as typeof newSeverity)}
               style={{ color: 'var(--text-primary)', minWidth: '130px' }}
               aria-label="Severity"
             >
@@ -755,7 +765,7 @@ export default function DefectManager({
                     />
                     <select
                       value={editSeverity}
-                      onChange={(e) => setEditSeverity(e.target.value as any)}
+                      onChange={(e) => setEditSeverity(e.target.value as typeof editSeverity)}
                       style={{ color: 'var(--text-primary)', minWidth: '130px' }}
                       aria-label="Severity"
                     >
@@ -1685,7 +1695,7 @@ function StatBadge({
   value: number
   color?: string
   alert?: boolean
-}) {
+}): React.JSX.Element {
   return (
     <div
       style={{
@@ -1734,13 +1744,13 @@ function FormattedTextArea({
   ariaLabel?: string
   isLight: boolean
   marginBottom?: string
-}) {
+}): React.JSX.Element {
   const [showTools, setShowTools] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
   const bulletRe = /^(\s*)•\s+/
   const numRe = /^(\s*)\d+\.\s+/
 
-  const applyLinePrefix = (mode: 'bullet' | 'number') => {
+  const applyLinePrefix = (mode: 'bullet' | 'number'): void => {
     const ta = ref.current
     if (!ta) return
     const selStart = ta.selectionStart
@@ -1767,27 +1777,6 @@ function FormattedTextArea({
       ta.setSelectionRange(lineStart, lineStart + newBlock.length)
     })
   }
-
-  const toolBtn = (icon: React.ReactNode, label: string, onClick: () => void) => (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: '3px 8px',
-        fontSize: '0.72rem',
-        borderRadius: '6px',
-        border: '1px solid var(--input-border)',
-        background: 'transparent',
-        color: 'var(--text-primary)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px'
-      }}
-    >
-      {icon} {label}
-    </button>
-  )
 
   return (
     <div style={{ marginBottom }}>
@@ -1818,8 +1807,16 @@ function FormattedTextArea({
       </div>
       {showTools && (
         <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-          {toolBtn(<List size={13} />, 'Bullets', () => applyLinePrefix('bullet'))}
-          {toolBtn(<ListOrdered size={13} />, 'Numbered', () => applyLinePrefix('number'))}
+          <FormatToolButton
+            icon={<List size={13} />}
+            label="Bullets"
+            onClick={() => applyLinePrefix('bullet')}
+          />
+          <FormatToolButton
+            icon={<ListOrdered size={13} />}
+            label="Numbered"
+            onClick={() => applyLinePrefix('number')}
+          />
         </div>
       )}
       <textarea
@@ -1836,6 +1833,39 @@ function FormattedTextArea({
   )
 }
 
+function FormatToolButton({
+  icon,
+  label,
+  onClick
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        borderRadius: '6px',
+        border: '1px solid var(--input-border)',
+        background: 'transparent',
+        color: 'var(--text-primary)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}
+    >
+      {icon} {label}
+    </button>
+  )
+}
+
+type DefectAttachment = Awaited<ReturnType<typeof window.api.defectGetAttachments>>[number]
+
 // Optional rectification-evidence attachments per defect. Path-based (drag-drop a
 // file or pick one), mirroring survey attachments — never required to close a defect.
 function DefectAttachments({
@@ -1850,12 +1880,12 @@ function DefectAttachments({
   isLight: boolean
   uploadedBy: string
   showError: (m: string) => void
-}) {
-  const [items, setItems] = useState<any[]>([])
+}): React.JSX.Element {
+  const [items, setItems] = useState<DefectAttachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const load = async () => {
+  const load = async (): Promise<void> => {
     try {
       const r = await window.api.defectGetAttachments(defectId)
       setItems(Array.isArray(r) ? r : [])
@@ -1863,25 +1893,40 @@ function DefectAttachments({
       setItems([])
     }
   }
+  // Initial load when the defect changes (handlers await load() after uploads)
   useEffect(() => {
-    load()
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const r = await window.api.defectGetAttachments(defectId)
+        if (alive) setItems(Array.isArray(r) ? r : [])
+      } catch {
+        if (alive) setItems([])
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
   }, [defectId])
 
-  const addByPath = async (filePath: string, fileName: string) => {
-    const validation = await window.api.fileTypesValidateFile(filePath)
+  const addByPath = async (filePath: string, fileName: string): Promise<void> => {
+    // The handler also returns canonicalPath (the path to store) for valid files
+    const validation: { valid: boolean; reason?: string; canonicalPath?: string } =
+      await window.api.fileTypesValidateFile(filePath)
     if (!validation.valid) {
       showError(`File rejected: ${validation.reason}`)
       return
     }
     await window.api.defectAddAttachment({
       defectId,
-      filePath: (validation as any).canonicalPath || filePath,
+      filePath: validation.canonicalPath || filePath,
       fileName,
       uploadedBy
     })
   }
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
     setDragOver(false)
@@ -1896,14 +1941,14 @@ function DefectAttachments({
         if (p) await addByPath(p, f.name)
       }
       await load()
-    } catch (err: any) {
-      showError(err.message || 'Upload failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Upload failed')
     } finally {
       setBusy(false)
     }
   }
 
-  const handlePick = async () => {
+  const handlePick = async (): Promise<void> => {
     if (!canManage) return
     try {
       const p = await window.api.dialogOpenFileAny()
@@ -1911,23 +1956,23 @@ function DefectAttachments({
       setBusy(true)
       await addByPath(p, p.split(/[\\/]/).pop() || 'file')
       await load()
-    } catch (err: any) {
-      showError(err.message || 'Upload failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Upload failed')
     } finally {
       setBusy(false)
     }
   }
 
-  const remove = async (id: string) => {
+  const remove = async (id: string): Promise<void> => {
     try {
       await window.api.defectDeleteAttachment(id)
       setItems((prev) => prev.filter((a) => a.id !== id))
-    } catch (err: any) {
-      showError(err.message || 'Delete failed')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Delete failed')
     }
   }
 
-  const isImg = (name: string) => /\.(png|jpe?g|gif|bmp|webp|heic|tiff?)$/i.test(name)
+  const isImg = (name: string): boolean => /\.(png|jpe?g|gif|bmp|webp|heic|tiff?)$/i.test(name)
 
   return (
     <div style={{ marginTop: '12px' }}>
@@ -2041,7 +2086,7 @@ function CloseDefectModal({
   onClosureNotesChange: (v: string) => void
   onClose: () => void
   onConfirm: () => void
-}) {
+}): React.JSX.Element {
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -2054,7 +2099,7 @@ function CloseDefectModal({
     const last = focusable[focusable.length - 1]
     first?.focus()
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onClose()
         return

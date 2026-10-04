@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { FileText, Settings, List } from 'lucide-react'
 import { Quotation } from '../../../shared/types'
@@ -34,10 +34,11 @@ export default function QuotationManager({
   onCreateConsumed,
   subTab,
   subTabNonce
-}: QuotationManagerProps) {
+}: QuotationManagerProps): React.JSX.Element {
   const { hasPermission } = useAuth()
   const canSettings = hasPermission('quotations:settings')
   const [view, setView] = useState<QuotationView>('list')
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
   useRequestedSubTab(
     subTab,
     subTabNonce,
@@ -47,7 +48,6 @@ export default function QuotationManager({
       setView(v)
     }
   )
-  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
   const [activePolicyContext, setActivePolicyContext] = useState<{
     policyId: string
     policyNumber: string
@@ -60,9 +60,9 @@ export default function QuotationManager({
   useEffect(() => {
     if (initialQuotationId && !initialLoadRef.current) {
       initialLoadRef.current = true
-      if (policyContext) setActivePolicyContext(policyContext)
       window.api.getQuotation(initialQuotationId).then((q) => {
-        if (q && !(q as any).error) {
+        if (policyContext) setActivePolicyContext(policyContext)
+        if (q && !(q as { error?: unknown }).error) {
           setEditingQuotation(q)
           setView('editor')
         }
@@ -70,14 +70,15 @@ export default function QuotationManager({
         if (onClearPolicyContext) onClearPolicyContext()
       })
     }
-  }, [initialQuotationId])
+    // initialLoadRef makes this run once, so the callbacks/context changing never re-triggers it
+  }, [initialQuotationId, policyContext, onClearInitialQuotation, onClearPolicyContext])
 
-  const handleOpenEditor = (quotation: Quotation) => {
+  const handleOpenEditor = (quotation: Quotation): void => {
     setEditingQuotation(quotation)
     setView('editor')
   }
 
-  const handleBackToList = () => {
+  const handleBackToList = (): void => {
     setEditingQuotation(null)
     setActivePolicyContext(null)
     setView('list')

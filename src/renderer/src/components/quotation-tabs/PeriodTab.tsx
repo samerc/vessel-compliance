@@ -9,49 +9,48 @@ export default function PeriodTab({
   setQ
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   const [suggestion, setSuggestion] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    buildSuggestion()
-  }, [])
-
-  const buildSuggestion = async () => {
-    setLoading(true)
-    try {
-      const qv: QuotationVessel[] = await window.api.getQuotationVessels(quotation.id)
-      const withVessel = qv.filter((v) => v.vesselId)
-      if (withVessel.length === 0) {
-        setSuggestion('12 months from date to be advised')
-        return
-      }
-      const dates: { label: string; date: string }[] = []
-      for (const v of withVessel) {
-        const policies = await window.api.getVesselDynamicPolicies(v.vesselId!)
-        const endDate = resolveEffectivePolicyExpiry(policies)
-        if (endDate) dates.push({ label: v.vesselLabel, date: endDate })
-      }
-      if (dates.length === 0) {
-        setSuggestion('12 months from date to be advised')
-      } else {
-        const unique = [...new Set(dates.map((d) => d.date))]
-        if (unique.length === 1) {
-          setSuggestion(`12 months from ${fmtNiceDate(unique[0])}`)
-        } else {
-          setSuggestion(
-            dates.map((d) => `${d.label}: 12 months from ${fmtNiceDate(d.date)}`).join('\n')
-          )
+    const buildSuggestion = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const qv: QuotationVessel[] = await window.api.getQuotationVessels(quotation.id)
+        const withVessel = qv.filter((v) => v.vesselId)
+        if (withVessel.length === 0) {
+          setSuggestion('12 months from date to be advised')
+          return
         }
+        const dates: { label: string; date: string }[] = []
+        for (const v of withVessel) {
+          const policies = await window.api.getVesselDynamicPolicies(v.vesselId!)
+          const endDate = resolveEffectivePolicyExpiry(policies)
+          if (endDate) dates.push({ label: v.vesselLabel, date: endDate })
+        }
+        if (dates.length === 0) {
+          setSuggestion('12 months from date to be advised')
+        } else {
+          const unique = [...new Set(dates.map((d) => d.date))]
+          if (unique.length === 1) {
+            setSuggestion(`12 months from ${fmtNiceDate(unique[0])}`)
+          } else {
+            setSuggestion(
+              dates.map((d) => `${d.label}: 12 months from ${fmtNiceDate(d.date)}`).join('\n')
+            )
+          }
+        }
+      } finally {
+        setLoading(false)
       }
-    } finally {
-      setLoading(false)
     }
-  }
+    void buildSuggestion()
+  }, [quotation.id])
 
-  const useSuggestion = () => {
+  const useSuggestion = (): void => {
     setQ((p) => ({ ...p, periodText: suggestion }))
     updateField('periodText', suggestion)
   }

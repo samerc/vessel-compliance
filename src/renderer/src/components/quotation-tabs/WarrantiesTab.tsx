@@ -26,7 +26,7 @@ import RichTextEditor from '../RichTextEditor'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 import { ALT_COLORS } from './sharedUtils'
-import { ok } from '../../utils/ipc'
+import { ok, isIpcError } from '../../utils/ipc'
 
 export default function WarrantiesTab({
   quotation,
@@ -41,12 +41,12 @@ export default function WarrantiesTab({
   quotation: Quotation
   showSuccess: (m: string) => void
   showError: (m: string) => void
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   getEffectiveText: (key: keyof PISectionTexts) => string
   piAlternatives?: QuotationPIAlternative[]
   selectedPIAltId?: string | null
-}) {
+}): React.JSX.Element {
   const altStyle = (altId: string | null | undefined): React.CSSProperties => {
     if (piAlternatives.length < 2 || !selectedPIAltId) return {}
     const matches = !altId || altId === selectedPIAltId
@@ -80,103 +80,106 @@ export default function WarrantiesTab({
   const [showAdditionalText, setShowAdditionalText] = useState(false)
   const defaultsApplied = useRef(false)
 
+  // Bumped after a custom warranty change to reload everything
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
+
   useEffect(() => {
-    loadData()
-  }, [])
+    const loadData = async (): Promise<void> => {
+      const [all, allTags, sets, selectedRows, custom, qv] = await Promise.all([
+        window.api.piGetWarranties(),
+        window.api.piGetWarrantyTags(),
+        window.api.piGetWarrantySets(),
+        window.api.getQuotationWarranties(quotation.id),
+        window.api.getQuotationCustomWarranties(quotation.id),
+        window.api.getQuotationVessels(quotation.id)
+      ])
+      setQVessels(Array.isArray(qv) ? qv : [])
+      const safeAll = Array.isArray(all) ? all : []
+      const safeTags = Array.isArray(allTags) ? allTags : []
+      const safeSets = Array.isArray(sets) ? sets : []
+      const loadError = !Array.isArray(selectedRows) && isIpcError(selectedRows)
+      const safeSelectedRows = Array.isArray(selectedRows) ? selectedRows : []
+      const safeSelected = safeSelectedRows.map((r) => r.piWarrantyId)
+      const scopes: Record<string, string[] | null> = {}
+      const altIds: Record<string, string | null> = {}
+      for (const r of safeSelectedRows) {
+        if (r.vesselScope) scopes[r.piWarrantyId] = r.vesselScope
+        altIds[r.piWarrantyId] = r.alternativeId || null
+      }
+      const safeCustom = Array.isArray(custom) ? custom : []
+      setAllWarranties(safeAll)
+      setTags(safeTags)
+      setWarrantySets(safeSets)
+      setSelectedIds(safeSelected)
+      setWarrantyVesselScopes(scopes)
+      setWarrantyAltIds(altIds)
+      setCustomWarranties(safeCustom)
 
-  const loadData = async () => {
-    const [all, allTags, sets, selectedRows, custom, qv] = await Promise.all([
-      window.api.piGetWarranties(),
-      window.api.piGetWarrantyTags(),
-      window.api.piGetWarrantySets(),
-      window.api.getQuotationWarranties(quotation.id),
-      window.api.getQuotationCustomWarranties(quotation.id),
-      window.api.getQuotationVessels(quotation.id)
-    ])
-    setQVessels(Array.isArray(qv) ? qv : [])
-    const safeAll = Array.isArray(all) ? all : []
-    const safeTags = Array.isArray(allTags) ? allTags : []
-    const safeSets = Array.isArray(sets) ? sets : []
-    const loadError = !Array.isArray(selectedRows) && selectedRows && (selectedRows as any).error
-    const safeSelectedRows = Array.isArray(selectedRows) ? selectedRows : []
-    const safeSelected = safeSelectedRows.map((r: any) => r.piWarrantyId)
-    const scopes: Record<string, string[] | null> = {}
-    const altIds: Record<string, string | null> = {}
-    for (const r of safeSelectedRows) {
-      if (r.vesselScope) scopes[r.piWarrantyId] = r.vesselScope
-      altIds[r.piWarrantyId] = r.alternativeId || null
-    }
-    const safeCustom = Array.isArray(custom) ? custom : []
-    setAllWarranties(safeAll)
-    setTags(safeTags)
-    setWarrantySets(safeSets)
-    setSelectedIds(safeSelected)
-    setWarrantyVesselScopes(scopes)
-    setWarrantyAltIds(altIds)
-    setCustomWarranties(safeCustom)
-
-    // Apply default-selected sets on first load if quotation has no warranties yet
-    // Skip if load failed (error from safeHandle) to avoid destructive re-application
-    if (
-      !defaultsApplied.current &&
-      !loadError &&
-      safeSelected.length === 0 &&
-      safeSets.length > 0
-    ) {
-      defaultsApplied.current = true
-      // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
-      const tc =
-        quotation.quotationTypeCode?.toLowerCase() === 'h'
-          ? 'hull'
-          : quotation.quotationTypeCode?.toLowerCase() === 'w'
-            ? 'war'
-            : 'pi'
-      const scopeValid = new Set(
-        safeAll
-          .filter(
-            (w) => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(tc)
-          )
-          .map((w) => w.id)
-      )
-      const defaultIds: string[] = []
-      for (const ws of safeSets) {
-        if (ws.defaultSelected && ws.warrantyIds) {
-          for (const wid of ws.warrantyIds) {
-            if (!defaultIds.includes(wid) && scopeValid.has(wid)) defaultIds.push(wid)
+      // Apply default-selected sets on first load if quotation has no warranties yet
+      // Skip if load failed (error from safeHandle) to avoid destructive re-application
+      if (
+        !defaultsApplied.current &&
+        !loadError &&
+        safeSelected.length === 0 &&
+        safeSets.length > 0
+      ) {
+        defaultsApplied.current = true
+        // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
+        const tc =
+          quotation.quotationTypeCode?.toLowerCase() === 'h'
+            ? 'hull'
+            : quotation.quotationTypeCode?.toLowerCase() === 'w'
+              ? 'war'
+              : 'pi'
+        const scopeValid = new Set(
+          safeAll
+            .filter(
+              (w) => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(tc)
+            )
+            .map((w) => w.id)
+        )
+        const defaultIds: string[] = []
+        for (const ws of safeSets) {
+          if (ws.defaultSelected && ws.warrantyIds) {
+            for (const wid of ws.warrantyIds) {
+              if (!defaultIds.includes(wid) && scopeValid.has(wid)) defaultIds.push(wid)
+            }
           }
         }
+        // Sort by master list order so warranties appear in the configured sequence
+        const masterOrder = new Map(safeAll.map((w, idx) => [w.id, idx]))
+        defaultIds.sort((a, b) => (masterOrder.get(a) ?? 999) - (masterOrder.get(b) ?? 999))
+        if (defaultIds.length > 0) {
+          setSelectedIds(defaultIds)
+          await window.api.setQuotationWarranties(quotation.id, defaultIds)
+        }
+      } else {
+        defaultsApplied.current = true
       }
-      // Sort by master list order so warranties appear in the configured sequence
-      const masterOrder = new Map(safeAll.map((w, idx) => [w.id, idx]))
-      defaultIds.sort((a, b) => (masterOrder.get(a) ?? 999) - (masterOrder.get(b) ?? 999))
-      if (defaultIds.length > 0) {
-        setSelectedIds(defaultIds)
-        await window.api.setQuotationWarranties(quotation.id, defaultIds)
-      }
-    } else {
-      defaultsApplied.current = true
     }
-  }
+    void loadData()
+  }, [quotation.id, quotation.quotationTypeCode, reloadKey])
 
-  const saveSelected = async (ids: string[]) => {
+  const saveSelected = async (ids: string[]): Promise<void> => {
     setSelectedIds(ids)
     await window.api.setQuotationWarranties(quotation.id, ids)
   }
 
   // Sort warranty IDs by their position in the master list
-  const sortByMasterOrder = (ids: string[]) => {
+  const sortByMasterOrder = (ids: string[]): string[] => {
     const masterOrder = new Map(allWarranties.map((w, idx) => [w.id, idx]))
     return [...ids].sort((a, b) => (masterOrder.get(a) ?? 999) - (masterOrder.get(b) ?? 999))
   }
 
-  const toggle = async (id: string) => {
+  const toggle = async (id: string): Promise<void> => {
     const newIds = selectedIds.includes(id)
       ? selectedIds.filter((i) => i !== id)
       : sortByMasterOrder([...selectedIds, id])
     await saveSelected(newIds)
   }
 
-  const selectAllInTab = async () => {
+  const selectAllInTab = async (): Promise<void> => {
     const tabWarranties = getTabWarranties()
     const newIds = [...selectedIds]
     for (const w of tabWarranties) {
@@ -185,13 +188,13 @@ export default function WarrantiesTab({
     await saveSelected(sortByMasterOrder(newIds))
   }
 
-  const deselectAllInTab = async () => {
+  const deselectAllInTab = async (): Promise<void> => {
     const tabWarranties = getTabWarranties()
     const tabIds = new Set(tabWarranties.map((w) => w.id))
     await saveSelected(selectedIds.filter((id) => !tabIds.has(id)))
   }
 
-  const applySet = async (setId: string) => {
+  const applySet = async (setId: string): Promise<void> => {
     const ws = warrantySets.find((s) => s.id === setId)
     if (!ws?.warrantyIds) return
     const newIds = [...selectedIds]
@@ -203,10 +206,10 @@ export default function WarrantiesTab({
   }
 
   const dragWarrantyRef = useRef<number | null>(null)
-  const handleWarrantyDragStart = (globalIdx: number) => {
+  const handleWarrantyDragStart = (globalIdx: number): void => {
     dragWarrantyRef.current = globalIdx
   }
-  const handleWarrantyDrop = async (targetIdx: number) => {
+  const handleWarrantyDrop = async (targetIdx: number): Promise<void> => {
     const fromIdx = dragWarrantyRef.current
     dragWarrantyRef.current = null
     if (fromIdx === null || fromIdx === targetIdx) return
@@ -216,43 +219,46 @@ export default function WarrantiesTab({
     await saveSelected(newIds)
   }
 
-  const updateWarrantyScope = async (piWarrantyId: string, scope: string[] | null) => {
+  const updateWarrantyScope = async (
+    piWarrantyId: string,
+    scope: string[] | null
+  ): Promise<void> => {
     setWarrantyVesselScopes((prev) => ({ ...prev, [piWarrantyId]: scope }))
     await window.api.updateQuotationWarrantyVesselScope(quotation.id, piWarrantyId, scope)
   }
 
-  const updateWarrantyAltId = async (piWarrantyId: string, altId: string | null) => {
+  const updateWarrantyAltId = async (piWarrantyId: string, altId: string | null): Promise<void> => {
     const rows = await window.api.getQuotationWarranties(quotation.id)
-    const row = (Array.isArray(rows) ? rows : []).find((r: any) => r.piWarrantyId === piWarrantyId)
+    const row = (Array.isArray(rows) ? rows : []).find((r) => r.piWarrantyId === piWarrantyId)
     if (row) {
       ok(await window.api.updateQuotationItemAlternativeId('quotation_warranties', row.id, altId))
       setWarrantyAltIds((prev) => ({ ...prev, [piWarrantyId]: altId }))
     }
   }
 
-  const updateCustomWarrantyAltId = async (id: string, altId: string | null) => {
+  const updateCustomWarrantyAltId = async (id: string, altId: string | null): Promise<void> => {
     ok(await window.api.updateQuotationItemAlternativeId('quotation_custom_warranties', id, altId))
     setCustomWarranties((prev) =>
       prev.map((cw) => (cw.id === id ? { ...cw, alternativeId: altId } : cw))
     )
   }
 
-  const updateCustomWarrantyScope = async (id: string, scope: string[] | null) => {
+  const updateCustomWarrantyScope = async (id: string, scope: string[] | null): Promise<void> => {
     setCustomWarranties((prev) =>
       prev.map((cw) => (cw.id === id ? { ...cw, vesselScope: scope } : cw))
     )
     await window.api.updateQuotationCustomWarranty(id, { vesselScope: scope })
   }
 
-  const addCustom = async () => {
+  const addCustom = async (): Promise<void> => {
     if (!newCustomText.trim()) return
     const result = await window.api.addQuotationCustomWarranty({
       quotationId: quotation.id,
       text: newCustomText.trim(),
       order: customWarranties.length
     })
-    if (result && (result as any).error) {
-      showError((result as any).message || 'Failed to add custom warranty')
+    if (isIpcError(result)) {
+      showError(result.message || 'Failed to add custom warranty')
       return
     }
     setNewCustomText('')
@@ -260,18 +266,18 @@ export default function WarrantiesTab({
     loadData()
   }
 
-  const saveCustomEdit = async (id: string) => {
+  const saveCustomEdit = async (id: string): Promise<void> => {
     ok(await window.api.updateQuotationCustomWarranty(id, { text: editCustomText }))
     setEditingCustomId(null)
     loadData()
   }
 
-  const deleteCustom = async (id: string) => {
+  const deleteCustom = async (id: string): Promise<void> => {
     await window.api.deleteQuotationCustomWarranty(id)
     loadData()
   }
 
-  const moveCustom = async (index: number, direction: 'up' | 'down') => {
+  const moveCustom = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= customWarranties.length) return
     const newOrder = [...customWarranties]
@@ -280,15 +286,15 @@ export default function WarrantiesTab({
     await window.api.reorderQuotationCustomWarranties(newOrder.map((c) => c.id))
   }
 
-  const parseImportText = () => {
+  const parseImportText = (): void => {
     const lines = importText
       .split('\n')
-      .map((l) => l.replace(/^[\s•\-–—\*\d+\.\)]+/, '').trim())
+      .map((l) => l.replace(/^[\s•\-–—*\d+.)]+/, '').trim())
       .filter((l) => l.length > 0)
     setImportedItems(lines)
   }
 
-  const confirmImport = async () => {
+  const confirmImport = async (): Promise<void> => {
     let order = customWarranties.length
     for (const text of importedItems) {
       ok(
@@ -313,10 +319,8 @@ export default function WarrantiesTab({
   const isCargo = qTypeCode === 'c'
   const [hasCargoClauseSelected, setHasCargoClauseSelected] = useState(false)
   useEffect(() => {
-    if (isCargo) {
-      setHasCargoClauseSelected(true)
-      return
-    }
+    // A cargo quotation always shows cargo warranties (showCargoWarranties below)
+    if (isCargo) return
     // Check if any cargo-related clause is selected in Conditions tab
     ;(async () => {
       try {
@@ -326,7 +330,7 @@ export default function WarrantiesTab({
         ])
         const safeClauses = Array.isArray(clauses) ? clauses : []
         const safeSelected = Array.isArray(selected) ? selected : []
-        const selectedClauseIds = new Set(safeSelected.map((r: any) => r.piClauseId))
+        const selectedClauseIds = new Set(safeSelected.map((r) => r.piClauseId))
         setHasCargoClauseSelected(
           safeClauses.some((c) => c.isCargoRelated && selectedClauseIds.has(c.id))
         )
@@ -343,7 +347,7 @@ export default function WarrantiesTab({
     return !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode)
   })
 
-  const getTabWarranties = () => {
+  const getTabWarranties = (): PIWarranty[] => {
     if (activeTab === 'all') return visibleWarranties
     if (activeTab === 'untagged')
       return visibleWarranties.filter(
@@ -381,7 +385,7 @@ export default function WarrantiesTab({
   const [searchTerm, setSearchTerm] = useState('')
   const [collapsedSetGroups, setCollapsedSetGroups] = useState<Set<string>>(new Set())
 
-  const toggleSetCollapse = (setId: string) => {
+  const toggleSetCollapse = (setId: string): void => {
     setCollapsedSetGroups((prev) => {
       const next = new Set(prev)
       if (next.has(setId)) next.delete(setId)
@@ -394,7 +398,12 @@ export default function WarrantiesTab({
     ? tabWarranties.filter((w) => w.text.toLowerCase().includes(searchTerm.toLowerCase()))
     : tabWarranties
 
-  const getAppliedSets = () => {
+  const getAppliedSets = (): {
+    set: PIWarrantySet
+    startIdx: number
+    endIdx: number
+    idsInSelected: string[]
+  }[] => {
     const result: {
       set: PIWarrantySet
       startIdx: number
@@ -419,19 +428,19 @@ export default function WarrantiesTab({
   // Loose items: selected but not in any applied set
   const looseSelectedIds = selectedIds.filter((id) => !appliedSetWarrantyIds.has(id))
 
-  const isSetFullyApplied = (ws: PIWarrantySet) => {
+  const isSetFullyApplied = (ws: PIWarrantySet): boolean => {
     if (!ws.warrantyIds?.length) return false
     return ws.warrantyIds.every((wid) => selectedIds.includes(wid))
   }
 
-  const removeSetWarranties = async (setId: string) => {
+  const removeSetWarranties = async (setId: string): Promise<void> => {
     const ws = warrantySets.find((s) => s.id === setId)
     if (!ws?.warrantyIds) return
     const toRemove = new Set(ws.warrantyIds)
     await saveSelected(selectedIds.filter((id) => !toRemove.has(id)))
   }
 
-  const moveSetGroup = async (setId: string, direction: 'up' | 'down') => {
+  const moveSetGroup = async (setId: string, direction: 'up' | 'down'): Promise<void> => {
     // Build a lookup: warrantyId → setId for all applied sets
     const idToSet = new Map<string, string>()
     for (const as of appliedSets) {
@@ -666,7 +675,7 @@ export default function WarrantiesTab({
                 </button>
                 {tags.map((tag) => {
                   const isCargoTag = tag.name.toLowerCase() === 'cargo'
-                  const matchesTag = (w: PIWarranty) =>
+                  const matchesTag = (w: PIWarranty): boolean =>
                     (w.tagIds || []).includes(tag.id) || (isCargoTag && w.isCargoRelated)
                   const count = visibleWarranties.filter(matchesTag).length
                   if (count === 0) return null

@@ -39,7 +39,32 @@ interface CustomerGroup {
   vessels: Vessel[]
 }
 
-export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) {
+interface FleetPageData {
+  fleets: Fleet[]
+  vessels: Vessel[]
+  entities: Entity[]
+  flagStates: FlagState[]
+  policies: VesselDynamicPolicy[]
+}
+
+async function fetchFleetPageData(): Promise<FleetPageData> {
+  const [fData, vData, eData, fsData, pData] = await Promise.all([
+    window.api.getFleets(),
+    window.api.getVessels(),
+    window.api.getEntities(),
+    window.api.getFlagStates(),
+    window.api.getAllVesselDynamicPolicies()
+  ])
+  return {
+    fleets: Array.isArray(fData) ? fData : [],
+    vessels: Array.isArray(vData) ? vData : [],
+    entities: Array.isArray(eData) ? eData : [],
+    flagStates: Array.isArray(fsData) ? fsData : [],
+    policies: Array.isArray(pData) ? pData : []
+  }
+}
+
+export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess } = useToast()
@@ -91,38 +116,47 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     new Set(['Brokers', 'Direct Clients', 'Unassigned'])
   )
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async (): Promise<Vessel[]> => {
-    const [fData, vData, eData, fsData, pData] = await Promise.all([
-      window.api.getFleets(),
-      window.api.getVessels(),
-      window.api.getEntities(),
-      window.api.getFlagStates(),
-      window.api.getAllVesselDynamicPolicies()
-    ])
-    setFleets(Array.isArray(fData) ? fData : [])
-    setVessels(Array.isArray(vData) ? vData : [])
-    setEntities(Array.isArray(eData) ? eData : [])
-    setFlagStates(Array.isArray(fsData) ? fsData : [])
-    setAllPolicies(Array.isArray(pData) ? pData : [])
-    return Array.isArray(vData) ? vData : []
+  const applyData = (d: FleetPageData): void => {
+    setFleets(d.fleets)
+    setVessels(d.vessels)
+    setEntities(d.entities)
+    setFlagStates(d.flagStates)
+    setAllPolicies(d.policies)
   }
 
-  const openPanel = (fleet: Fleet) => {
+  const loadData = async (): Promise<Vessel[]> => {
+    const d = await fetchFleetPageData()
+    applyData(d)
+    return d.vessels
+  }
+
+  useEffect(() => {
+    let alive = true
+    void fetchFleetPageData().then((d) => {
+      if (!alive) return
+      setFleets(d.fleets)
+      setVessels(d.vessels)
+      setEntities(d.entities)
+      setFlagStates(d.flagStates)
+      setAllPolicies(d.policies)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const openPanel = (fleet: Fleet): void => {
     setPanelFleet(fleet)
     setAddOpen(false)
     setAddSearch('')
     setPendingAdd(new Set())
   }
 
-  const handleAddFleet = async (e: React.FormEvent) => {
+  const handleAddFleet = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newFleetName.trim()) return
     const fleet = await window.api.addFleet({ name: newFleetName })
-    if (!fleet || (fleet as any).error) {
+    if (!fleet || 'error' in fleet) {
       return
     }
     setNewFleetName('')
@@ -132,7 +166,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     showSuccess(`Fleet "${fleet.name}" created`)
   }
 
-  const handleDeleteFleet = async (fleet: Fleet) => {
+  const handleDeleteFleet = async (fleet: Fleet): Promise<void> => {
     if (!(await confirmDialog(`Delete "${fleet.name}"? All vessels will be unassigned.`))) return
     await window.api.deleteFleet(fleet.id)
     if (panelFleet?.id === fleet.id) setPanelFleet(null)
@@ -140,10 +174,11 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     showSuccess(`Fleet "${fleet.name}" deleted`)
   }
 
-  const handleRemoveVessel = async (vessel: Vessel) => {
+  const handleRemoveVessel = async (vessel: Vessel): Promise<void> => {
     setRemovingId(vessel.id)
     try {
-      await window.api.updateVessel(vessel.id, { fleetId: null as any })
+      // null clears the fleet in the adapter; the shared Vessel type only allows string | undefined
+      await window.api.updateVessel(vessel.id, { fleetId: null } as unknown as Partial<Vessel>)
       await loadData()
       showSuccess(`${vessel.name} removed from fleet`)
     } finally {
@@ -151,7 +186,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     }
   }
 
-  const handleAddSelected = async () => {
+  const handleAddSelected = async (): Promise<void> => {
     if (!panelFleet || pendingAdd.size === 0) return
     setAddSaving(true)
     try {
@@ -170,7 +205,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     }
   }
 
-  const togglePending = (id: string) => {
+  const togglePending = (id: string): void => {
     setPendingAdd((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -219,7 +254,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     })
   }, [filteredFleets, fleetSortKey, fleetSortDir, fleetCounts])
 
-  const toggleFleetSort = (key: 'name' | 'vessels') => {
+  const toggleFleetSort = (key: 'name' | 'vessels'): void => {
     if (fleetSortKey === key) {
       setFleetSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -292,7 +327,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       return true
     })
 
-    const sortGroups = (g: CustomerGroup[]) =>
+    const sortGroups = (g: CustomerGroup[]): CustomerGroup[] =>
       g.sort((a, b) => a.entity.name.localeCompare(b.entity.name))
 
     return {
@@ -329,13 +364,13 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
 
   // ------- Helpers -------
 
-  const VesselFlag = ({ vessel }: { vessel: Vessel }) => {
+  const renderVesselFlag = (vessel: Vessel): React.JSX.Element | null => {
     const fs = vessel.flagStateId ? flagById.get(vessel.flagStateId) : undefined
     const cls = fs ? getFlagClass(fs.iso3Code) : ''
     return cls ? <span className={cls} style={{ fontSize: '0.95rem', opacity: 0.85 }} /> : null
   }
 
-  const renderCustomerVesselRow = (vessel: Vessel) => {
+  const renderCustomerVesselRow = (vessel: Vessel): React.JSX.Element => {
     const fleet = vessel.fleetId ? fleetById.get(vessel.fleetId) : undefined
     const fs = vessel.flagStateId ? flagById.get(vessel.flagStateId) : undefined
     const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
@@ -407,7 +442,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     )
   }
 
-  const renderCustomerGroup = (group: CustomerGroup) => {
+  const renderCustomerGroup = (group: CustomerGroup): React.JSX.Element => {
     const isExpanded = expandedCustomers.has(group.entity.id)
     return (
       <div
@@ -511,7 +546,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     icon: React.ReactNode,
     groups: CustomerGroup[],
     badge?: string
-  ) => {
+  ): React.JSX.Element | null => {
     if (groups.length === 0) return null
     const isCollapsed = collapsedSections.has(title)
     const totalVessels = groups.reduce((sum, g) => sum + g.vessels.length, 0)
@@ -1352,7 +1387,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                           )}
                         </div>
                       </div>
-                      <VesselFlag vessel={vessel} />
+                      {renderVesselFlag(vessel)}
                       <button
                         onClick={() => setSelectedVessel(vessel)}
                         style={{
@@ -1551,7 +1586,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                                       IMO {vessel.imoNumber}
                                     </div>
                                   </div>
-                                  <VesselFlag vessel={vessel} />
+                                  {renderVesselFlag(vessel)}
                                 </div>
                               )
                             })

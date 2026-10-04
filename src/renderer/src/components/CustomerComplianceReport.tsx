@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import autoTable, { type RowInput } from 'jspdf-autotable'
 import XLSX from 'xlsx-js-style'
 import JSZip from 'jszip'
 import {
@@ -20,9 +20,12 @@ import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
 import { ReportService } from '../services/ReportService'
 import { formatDate } from '../utils/dateUtils'
+import type { VesselDocument } from '../../../shared/types'
 import { buildVesselRow, type CustomerGroup } from '../services/CustomerComplianceExport'
 
-export default function CustomerComplianceReport() {
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
+
+export default function CustomerComplianceReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
@@ -43,28 +46,27 @@ export default function CustomerComplianceReport() {
   const [exportingPortfolio, setExportingPortfolio] = useState<string | null>(null)
 
   useEffect(() => {
+    const loadCustomers = async (): Promise<void> => {
+      const [entitiesRaw, policiesRaw] = await Promise.all([
+        window.api.getEntities(),
+        window.api.getAllVesselDynamicPolicies()
+      ])
+      const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
+      const policies = Array.isArray(policiesRaw) ? policiesRaw : []
+      const customerIds = new Set(
+        policies
+          .filter((p) => p.status === 'active' && p.customerEntityId)
+          .map((p) => p.customerEntityId!)
+      )
+      const list = entities
+        .filter((e) => customerIds.has(e.id))
+        .sort((a, b) => a.name.localeCompare(b.name))
+      setCustomers(list)
+    }
     loadCustomers()
   }, [])
 
-  const loadCustomers = async () => {
-    const [entitiesRaw, policiesRaw] = await Promise.all([
-      window.api.getEntities(),
-      window.api.getAllVesselDynamicPolicies()
-    ])
-    const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
-    const policies = Array.isArray(policiesRaw) ? policiesRaw : []
-    const customerIds = new Set(
-      policies
-        .filter((p) => p.status === 'active' && p.customerEntityId)
-        .map((p) => p.customerEntityId!)
-    )
-    const list = entities
-      .filter((e) => customerIds.has(e.id))
-      .sort((a, b) => a.name.localeCompare(b.name))
-    setCustomers(list)
-  }
-
-  const loadReport = async () => {
+  const loadReport = async (): Promise<void> => {
     setLoading(true)
     try {
       const [vesselsRaw, entitiesRaw, docTypesRaw, allVesselDocsRaw, allAssuredsRaw, policiesRaw] =
@@ -108,7 +110,7 @@ export default function CustomerComplianceReport() {
             })
 
       const customDocResults = await Promise.all(
-        filtered.map((v: any) => window.api.getVesselCustomDocTypes(v.id))
+        filtered.map((v) => window.api.getVesselCustomDocTypes(v.id))
       )
       const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
 
@@ -173,7 +175,7 @@ export default function CustomerComplianceReport() {
     }
   }
 
-  const exportToPDF = async () => {
+  const exportToPDF = async (): Promise<void> => {
     if (groups.length === 0) return
     setExporting(true)
     try {
@@ -208,7 +210,7 @@ export default function CustomerComplianceReport() {
       let startY = s.companySubtitle ? 64 : 60
 
       for (const group of groups) {
-        const bodyRows: any[][] = []
+        const bodyRows: RowInput[] = []
 
         // Customer header row (colSpan all 7 columns)
         bodyRows.push([
@@ -302,7 +304,7 @@ export default function CustomerComplianceReport() {
           alternateRowStyles: { fillColor: [250, 251, 252] }
         })
 
-        startY = (doc as any).lastAutoTable.finalY + 12
+        startY = (doc as DocWithAutoTable).lastAutoTable.finalY + 12
       }
 
       // Page footers
@@ -325,8 +327,8 @@ export default function CustomerComplianceReport() {
     }
   }
 
-  const exportToExcel = () => {
-    const rows: any[] = []
+  const exportToExcel = (): void => {
+    const rows: Record<string, string | number>[] = []
     for (const group of groups) {
       rows.push({
         Customer: group.customerName,
@@ -363,7 +365,11 @@ export default function CustomerComplianceReport() {
     XLSX.writeFile(wb, `Customer_Compliance_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  const handlePortfolioPDF = async (custId: string, custName: string, custType: string | null) => {
+  const handlePortfolioPDF = async (
+    custId: string,
+    custName: string,
+    custType: string | null
+  ): Promise<void> => {
     setExportingPortfolio(custId)
     try {
       await exportCustomerPortfolioPDF(custId, custName, custType)
@@ -378,7 +384,7 @@ export default function CustomerComplianceReport() {
     [groups]
   )
 
-  const handleOpenZipModal = () => {
+  const handleOpenZipModal = (): void => {
     if (reportVesselIds.length === 0) return
     setZipSelectedIds(new Set(reportVesselIds))
     setZipSearch('')
@@ -394,7 +400,7 @@ export default function CustomerComplianceReport() {
     )
   }, [groups, zipSearch])
 
-  const handleExportZip = async () => {
+  const handleExportZip = async (): Promise<void> => {
     const allVessels = groups.flatMap((g) => g.vessels)
     const selected = allVessels.filter((v) => zipSelectedIds.has(v.vesselId))
     if (selected.length === 0) return
@@ -413,9 +419,7 @@ export default function CustomerComplianceReport() {
         const sv = selected[i]
         setZipProgress({ current: i + 1, total: selected.length })
         try {
-          const vessel = (Array.isArray(vessels) ? vessels : []).find(
-            (v: any) => v.id === sv.vesselId
-          )
+          const vessel = (Array.isArray(vessels) ? vessels : []).find((v) => v.id === sv.vesselId)
           if (!vessel) {
             failed++
             continue
@@ -471,15 +475,15 @@ export default function CustomerComplianceReport() {
       URL.revokeObjectURL(url)
       if (failed > 0) showError(`${failed} PDF(s) failed to generate`)
       else showSuccess(`${selected.length} PDFs zipped and downloaded`)
-    } catch (err: any) {
-      showError(err.message || 'Failed to export')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to export')
     } finally {
       setExportingZip(false)
       setZipProgress(null)
     }
   }
 
-  const copyMissingDocuments = async () => {
+  const copyMissingDocuments = async (): Promise<void> => {
     setCopyingMissing(true)
     try {
       const allVessels = await window.api.getVessels()
@@ -492,7 +496,7 @@ export default function CustomerComplianceReport() {
       const safeFleets = Array.isArray(fleets) ? fleets : []
       const edTypes = await window.api.getEntityDocumentTypes()
       const safeEdTypes = (Array.isArray(edTypes) ? edTypes : []).filter(
-        (t: any) => t.isActive && t.isRequired
+        (t) => t.isActive && t.isRequired
       )
       const edDocs = await window.api.getEntityDocuments()
       const safeEdDocs = Array.isArray(edDocs) ? edDocs : []
@@ -530,7 +534,7 @@ export default function CustomerComplianceReport() {
       const shortCycle = (
         expiry: string | null | undefined,
         received: string | null | undefined
-      ) => {
+      ): boolean => {
         if (!expiry || !received) return false
         const e = new Date(expiry + 'T00:00:00')
         const r = new Date(received.split('T')[0] + 'T00:00:00')
@@ -544,18 +548,18 @@ export default function CustomerComplianceReport() {
 
       // All vessel documents once (was one IPC round-trip per vessel)
       const allDocsRaw = await window.api.getVesselDocuments()
-      const docsByVessel = new Map<string, any[]>()
-      for (const d of (Array.isArray(allDocsRaw) ? allDocsRaw : []) as any[]) {
+      const docsByVessel = new Map<string, VesselDocument[]>()
+      for (const d of Array.isArray(allDocsRaw) ? allDocsRaw : []) {
         const list = docsByVessel.get(d.vesselId) || []
         list.push(d)
         docsByVessel.set(d.vesselId, list)
       }
 
-      const buildVesselMissing = async (v: (typeof reportVessels)[0]) => {
+      const buildVesselMissing = async (v: (typeof reportVessels)[0]): Promise<string[]> => {
         const vLines: string[] = []
         // Resolve P&I expiry for annual docs — from the policies already loaded in bulk (with values)
         const effectiveExpiry = resolveEffectivePolicyExpiry(
-          copyPolicies.filter((p: any) => p.vesselId === v.id)
+          copyPolicies.filter((p) => p.vesselId === v.id)
         )
         // Vessel docs
         const vDocs = docsByVessel.get(v.id) || []
@@ -583,7 +587,7 @@ export default function CustomerComplianceReport() {
         }
         const allTypes = [
           ...relevantDocTypes,
-          ...(Array.isArray(customTypes) ? customTypes : []).map((c: any) => ({
+          ...(Array.isArray(customTypes) ? customTypes : []).map((c) => ({
             id: c.id,
             name: c.name,
             annualRenewal: false
@@ -592,18 +596,17 @@ export default function CustomerComplianceReport() {
         const safeVDocs = Array.isArray(vDocs) ? vDocs : []
         const issues: string[] = []
         for (const dt of allTypes) {
-          if (!(dt as any).required) continue // skip optional documents
-          const doc = safeVDocs.find((d: any) => d.documentTypeId === dt.id)
+          if (!('required' in dt && dt.required)) continue // skip optional documents
+          const doc = safeVDocs.find((d) => d.documentTypeId === dt.id)
           if (!doc?.filePath) {
             issues.push(`${dt.name} — MISSING`)
             continue
           }
           let expiryDate = doc.expiryDate || null
-          if ((dt as any).annualRenewal && effectiveExpiry) expiryDate = effectiveExpiry
+          if (dt.annualRenewal && effectiveExpiry) expiryDate = effectiveExpiry
           if (expiryDate) {
             const docReceived = doc.receivedDate || doc.uploadedDate?.split('T')[0]
-            if ((dt as any).annualRenewal && docReceived && shortCycle(expiryDate, docReceived))
-              continue
+            if (dt.annualRenewal && docReceived && shortCycle(expiryDate, docReceived)) continue
             const exp = new Date(expiryDate + 'T00:00:00')
             if (exp < today) issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
             else if (exp <= threshold) issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
@@ -616,15 +619,15 @@ export default function CustomerComplianceReport() {
         // Entity docs
         const assureds = await window.api.getVesselAssureds(v.id)
         for (const va of Array.isArray(assureds) ? assureds : []) {
-          const entity = safeEntities.find((e: any) => e.id === va.entityId)
+          const entity = safeEntities.find((e) => e.id === va.entityId)
           if (!entity) continue
           const missing: string[] = []
           const applicable = safeEdTypes.filter(
-            (t: any) => t.entityScope === 'both' || t.entityScope === entity.type
+            (t) => t.entityScope === 'both' || t.entityScope === entity.type
           )
-          const docsForEnt = safeEdDocs.filter((d: any) => d.entityId === entity.id)
+          const docsForEnt = safeEdDocs.filter((d) => d.entityId === entity.id)
           for (const t of applicable) {
-            if (!docsForEnt.some((d: any) => d.documentTypeId === t.id && d.filePath))
+            if (!docsForEnt.some((d) => d.documentTypeId === t.id && d.filePath))
               missing.push(t.name)
           }
           if (missing.length > 0) {
@@ -674,8 +677,8 @@ export default function CustomerComplianceReport() {
         await navigator.clipboard.writeText(lines.join('\n'))
         showSuccess('Missing documents copied to clipboard')
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to copy missing documents')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to copy missing documents')
     } finally {
       setCopyingMissing(false)
     }

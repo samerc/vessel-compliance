@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { Quotation, WarSettings } from '../../../../shared/types'
 
 export default function WarTradingTab({
@@ -7,44 +7,51 @@ export default function WarTradingTab({
   setQ
 }: {
   quotation: Quotation
-  updateField: (field: string, value: any) => void
+  updateField: (field: string, value: unknown) => void
   setQ: (fn: (q: Quotation) => Quotation) => void
-}) {
+}): React.JSX.Element {
   const [warSettings, setWarSettings] = useState<WarSettings | null>(null)
   const [customText, setCustomText] = useState(quotation.tradingWarrantyIntro || '')
   const [loaded, setLoaded] = useState(false)
 
+  // Set default text from war settings if no custom override yet (reads the latest props).
+  const applyDefaultText = useEffectEvent((settings: WarSettings): void => {
+    if (!quotation.tradingWarrantyIntro) {
+      const resolved = settings.tradingWarrantyText
+        .replace(/\{jwla_code\}/g, settings.jwlaCode)
+        .replace(/\{jwla_date\}/g, settings.jwlaDate)
+      setCustomText(resolved)
+      updateField('tradingWarrantyIntro', resolved)
+      setQ((q) => ({ ...q, tradingWarrantyIntro: resolved }))
+    }
+  })
+
+  // Runs once on mount.
   useEffect(() => {
     ;(async () => {
       try {
         const settings = await window.api.warGetSettings()
-        if (settings && !(settings as any).error) {
+        if (settings && !('error' in settings && settings.error)) {
           setWarSettings(settings)
-          // Set default text from war settings if no custom override yet
-          if (!quotation.tradingWarrantyIntro) {
-            const resolved = settings.tradingWarrantyText
-              .replace(/\{jwla_code\}/g, settings.jwlaCode)
-              .replace(/\{jwla_date\}/g, settings.jwlaDate)
-            setCustomText(resolved)
-            updateField('tradingWarrantyIntro', resolved)
-            setQ((q) => ({ ...q, tradingWarrantyIntro: resolved }))
-          }
+          applyDefaultText(settings)
         }
-      } catch {}
+      } catch {
+        /* settings are optional: the tab still works with the stored text */
+      }
       setLoaded(true)
     })()
   }, [])
 
-  const handleChange = (text: string) => {
+  const handleChange = (text: string): void => {
     setCustomText(text)
     setQ((q) => ({ ...q, tradingWarrantyIntro: text }))
   }
 
-  const handleBlur = () => {
+  const handleBlur = (): void => {
     updateField('tradingWarrantyIntro', customText)
   }
 
-  const handleResetToDefault = () => {
+  const handleResetToDefault = (): void => {
     if (!warSettings) return
     const resolved = warSettings.tradingWarrantyText
       .replace(/\{jwla_code\}/g, warSettings.jwlaCode)

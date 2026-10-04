@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 
 const DocumentTemplateManager = lazy(() => import('./DocumentTemplateManager'))
 
-export default function TemplatesPage() {
+export default function TemplatesPage(): React.JSX.Element {
   return (
     <div className="fade-in">
       <Suspense

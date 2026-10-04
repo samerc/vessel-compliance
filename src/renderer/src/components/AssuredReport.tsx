@@ -6,7 +6,10 @@ import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import type { CellHookData } from 'jspdf-autotable'
 import * as XLSX from 'xlsx-js-style'
+
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
 interface AssuredRow {
   vesselName: string
@@ -19,7 +22,7 @@ interface AssuredRow {
   phone: string
 }
 
-export default function AssuredReport() {
+export default function AssuredReport(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -42,30 +45,34 @@ export default function AssuredReport() {
   const [assuredSearch, setAssuredSearch] = useState('')
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [v, a, e, f, r] = await Promise.all([
-        window.api.getVessels(),
-        window.api.getVesselAssureds(),
-        window.api.getEntities(),
-        window.api.getFleets(),
-        window.api.getAssuredRoles()
-      ])
-      setVessels((Array.isArray(v) ? v : []).filter((vv: Vessel) => vv.isActive))
-      setAllAssureds(Array.isArray(a) ? a : [])
-      setEntities(Array.isArray(e) ? e : [])
-      setFleets(Array.isArray(f) ? f : [])
-      setAssuredRoles(Array.isArray(r) ? r : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to load data')
-    } finally {
-      setLoading(false)
+    let alive = true
+    const loadData = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const [v, a, e, f, r] = await Promise.all([
+          window.api.getVessels(),
+          window.api.getVesselAssureds(),
+          window.api.getEntities(),
+          window.api.getFleets(),
+          window.api.getAssuredRoles()
+        ])
+        if (!alive) return
+        setVessels((Array.isArray(v) ? v : []).filter((vv: Vessel) => vv.isActive))
+        setAllAssureds(Array.isArray(a) ? a : [])
+        setEntities(Array.isArray(e) ? e : [])
+        setFleets(Array.isArray(f) ? f : [])
+        setAssuredRoles(Array.isArray(r) ? r : [])
+      } catch (err) {
+        if (alive) showError((err instanceof Error ? err.message : '') || 'Failed to load data')
+      } finally {
+        if (alive) setLoading(false)
+      }
     }
-  }
+    void loadData()
+    return () => {
+      alive = false
+    }
+  }, [showError])
 
   const entityMap = useMemo(() => {
     const m = new Map<string, Entity>()
@@ -131,7 +138,7 @@ export default function AssuredReport() {
       }
     }
     return result
-  }, [filteredVessels, allAssureds, entityMap, fleetMap])
+  }, [filteredVessels, allAssureds, entityMap, fleetMap, roleOrder])
 
   const displayRows = useMemo(() => {
     if (!assuredSearch) return rows
@@ -170,14 +177,14 @@ export default function AssuredReport() {
     return names.size
   }, [displayRows])
 
-  const getLabel = () =>
+  const getLabel = (): string =>
     filterMode === 'fleet' && selectedFleetId
       ? fleetMap.get(selectedFleetId) || 'Fleet'
       : filterMode === 'vessels'
         ? 'Selected Vessels'
         : 'All Vessels'
 
-  const exportExcel = () => {
+  const exportExcel = (): void => {
     if (displayRows.length === 0) return
     const data = displayRows.map((r) => ({
       Vessel: r.vesselName,
@@ -206,7 +213,7 @@ export default function AssuredReport() {
     showSuccess('Exported to Excel')
   }
 
-  const exportPdf = async () => {
+  const exportPdf = async (): Promise<void> => {
     if (groupedByVessel.length === 0) return
     try {
       const s = await getReportSettings()
@@ -217,7 +224,7 @@ export default function AssuredReport() {
       const teal: [number, number, number] = [0, 170, 200]
       const margin = 14
 
-      const drawHeader = () => {
+      const drawHeader = (): void => {
         doc.setFillColor(navy[0], navy[1], navy[2])
         doc.rect(0, 0, pw, 16, 'F')
         doc.setFillColor(teal[0], teal[1], teal[2])
@@ -232,7 +239,7 @@ export default function AssuredReport() {
         doc.text(`Assured Report — ${getLabel()}`, pw - margin, 10.5, { align: 'right' })
       }
 
-      const drawFooter = (pageNum: number, totalPages: number) => {
+      const drawFooter = (pageNum: number, totalPages: number): void => {
         doc.setDrawColor(200)
         doc.line(margin, ph - 12, pw - margin, ph - 12)
         doc.setFontSize(7)
@@ -317,14 +324,14 @@ export default function AssuredReport() {
             3: { cellWidth: 45 },
             4: { cellWidth: 25 }
           },
-          didParseCell: (data: any) => {
+          didParseCell: (data: CellHookData) => {
             if (assuredRows.length === 0 && data.section === 'body') {
               data.cell.styles.textColor = [150, 150, 150]
               data.cell.styles.fontStyle = 'italic'
             }
           }
         })
-        y = (doc as any).lastAutoTable.finalY + 6
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 6
       }
 
       // Post-process: add footers with correct total page count
@@ -336,8 +343,8 @@ export default function AssuredReport() {
 
       doc.save(`Assured Report - ${getLabel()}.pdf`)
       showSuccess('Exported to PDF')
-    } catch (err: any) {
-      showError(err.message || 'PDF export failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'PDF export failed')
     }
   }
 

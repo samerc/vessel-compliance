@@ -8,23 +8,23 @@ export default function SanctionsTab({
   sanctionsVersions
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   sanctionsVersions: PISanctionsVersion[]
-}) {
+}): React.JSX.Element {
   const selectedVersion = sanctionsVersions.find((v) => v.key === quotation.sanctionsClauseVersion)
   const defaultText = selectedVersion?.text || ''
   const displayText = quotation.sanctionsTextOverride ?? defaultText
   const isOverridden =
     quotation.sanctionsTextOverride !== undefined && quotation.sanctionsTextOverride !== null
 
-  const handleVersionChange = (key: string) => {
+  const handleVersionChange = (key: string): void => {
     setQ((p) => ({ ...p, sanctionsClauseVersion: key, sanctionsTextOverride: undefined }))
     updateField('sanctionsClauseVersion', key)
     updateField('sanctionsTextOverride', null)
   }
 
-  const handleTextChange = (text: string) => {
+  const handleTextChange = (text: string): void => {
     if (text === defaultText) {
       setQ((p) => ({ ...p, sanctionsTextOverride: undefined }))
       updateField('sanctionsTextOverride', null)
@@ -34,7 +34,7 @@ export default function SanctionsTab({
     }
   }
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     setQ((p) => ({ ...p, sanctionsTextOverride: undefined }))
     updateField('sanctionsTextOverride', null)
   }

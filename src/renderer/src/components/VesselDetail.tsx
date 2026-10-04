@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ArrowLeft,
   Eye,
@@ -52,7 +52,9 @@ import {
   PolicyTypeCondition,
   Entity,
   ClassificationSociety,
-  VesselType
+  VesselType,
+  VesselNote,
+  DocumentTemplate
 } from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
@@ -71,6 +73,9 @@ import VesselQuotationsView from './VesselQuotationsView'
 import ReceiptManager from './ReceiptManager'
 import { ok } from '../utils/ipc'
 
+/** Vessel update where null clears the column (updateVessel accepts it at runtime) */
+type NullableVesselUpdate = { [K in keyof Vessel]?: Vessel[K] | null }
+
 interface VesselDetailProps {
   vessel: Vessel
   onBack: () => void
@@ -82,13 +87,20 @@ interface VesselDetailProps {
 }
 
 export default function VesselDetail({
-  vessel,
+  vessel: vesselProp,
   onBack,
   backLabel = 'Back to Vessels',
   initialSection,
   initialEditing = false,
   onNavigateToQuotation
-}: VesselDetailProps) {
+}: VesselDetailProps): React.JSX.Element {
+  // Local copy: saves update it instead of mutating the parent's vessel object
+  const [vessel, setVessel] = useState<Vessel>(vesselProp)
+  const [prevVesselProp, setPrevVesselProp] = useState<Vessel>(vesselProp)
+  if (vesselProp !== prevVesselProp) {
+    setPrevVesselProp(vesselProp)
+    setVessel(vesselProp)
+  }
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -125,26 +137,378 @@ export default function VesselDetail({
     }>
   }>({ show: false, changes: [], policies: [] })
 
-  useEffect(() => {
-    loadData()
-  }, [vessel])
-
   // Track recent item view
   useEffect(() => {
     window.api
       .recentItemsAdd(
         'vessel',
-        vessel.id,
-        vessel.name,
-        vessel.imoNumber ? 'IMO: ' + vessel.imoNumber : undefined
+        vesselProp.id,
+        vesselProp.name,
+        vesselProp.imoNumber ? 'IMO: ' + vesselProp.imoNumber : undefined
       )
       .then(() => {
         window.dispatchEvent(new Event('recent-item-added'))
       })
       .catch(() => {})
-  }, [vessel.id])
+  }, [vesselProp.id, vesselProp.name, vesselProp.imoNumber])
 
-  const loadData = async () => {
+  const handleExportAllPolicies = async (): Promise<void> => {
+    try {
+      const policies = await window.api.getVesselDynamicPolicies(vessel.id)
+      if (!Array.isArray(policies) || policies.length === 0) {
+        showError('No policies found for this vessel')
+        return
+      }
+      const allChars = await window.api.getPolicyTypeCharacteristics()
+      const rows: Record<string, string>[] = []
+      for (const p of policies) {
+        const chars = Array.isArray(allChars)
+          ? allChars.filter((c) => c.policyTypeId === p.policyTypeId)
+          : []
+        const inceptionChar = chars.find(
+          (c) => /inception|start/i.test(c.name) && c.fieldType === 'date'
+        )
+        const expiryChar = chars.find((c) => /expiry|end/i.test(c.name) && c.fieldType === 'date')
+        const premiumChar = chars.find(
+          (c) =>
+            /premium|amount/i.test(c.name) && (c.fieldType === 'amount' || c.fieldType === 'text')
+        )
+        const deductibleChar = chars.find((c) => /deductible|excess/i.test(c.name))
+        const vals = Array.isArray(p.values) ? p.values : []
+        const getVal = (charId?: string): string => {
+          if (!charId) return ''
+          const v = vals.find((v) => v.characteristicId === charId)
+          if (!v) return ''
+          return (
+            v.valueDate || (v.valueAmount != null ? String(v.valueAmount) : '') || v.valueText || ''
+          )
+        }
+        rows.push({
+          'Policy Type': p.policyTypeName || '',
+          'Policy Number': p.policyNumber || '',
+          Status: p.status,
+          Inception: getVal(inceptionChar?.id),
+          Expiry: getVal(expiryChar?.id),
+          Premium: getVal(premiumChar?.id),
+          Currency: p.currency || '',
+          'Customer/Broker': p.customerName || p.brokerName || '',
+          Deductible: getVal(deductibleChar?.id),
+          Condition: p.conditionName || '',
+          Notes: p.notes || ''
+        })
+      }
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
+      XLSX.utils.book_append_sheet(wb, ws, 'Policies')
+      XLSX.writeFile(wb, `${vessel.name.replace(/[^a-zA-Z0-9]/g, '_')}_Policies.xlsx`)
+      showSuccess('Policies exported to Excel')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to export policies')
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent, id: string): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    if (dragOverId !== id) {
+      setDragOverId(id)
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent, id: string): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    setDragOverId(id)
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, docTypeId: string): Promise<void> => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(null)
+
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+    const file = files[0]
+
+    const filePath = window.api.getFilePath(file)
+
+    if (!filePath) {
+      console.error('Could not retrieve file path. Check Electron security settings.')
+      return
+    }
+
+    // Security: Validate file type
+    const validation = await window.api.fileTypesValidateFile(filePath)
+    if (!validation.valid) {
+      showError(`File rejected: ${validation.reason}`)
+      return
+    }
+
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
+
+    const newDoc: VesselDocument = {
+      vesselId: vessel.id,
+      documentTypeId: docTypeId,
+      filePath: filePath,
+      sent: existing?.sent || false,
+      required: existing
+        ? existing.required
+        : isCustom
+          ? true
+          : docTypes.find((t) => t.id === docTypeId)?.required || false,
+      expiryDate: undefined,
+      uploadedDate: new Date().toISOString(),
+      uploadedBy: user?.username || 'Unknown',
+      receivedDate: new Date().toISOString().split('T')[0]
+    }
+
+    if (!newDoc.filePath) {
+      console.error('File path is missing from dropped file')
+      return
+    }
+
+    await window.api.upsertVesselDocument(newDoc)
+    await loadData()
+  }
+
+  const handleClickUpload = async (docTypeId: string): Promise<void> => {
+    const filePath = await window.api.dialogOpenFileAny()
+    if (!filePath) return
+
+    const validation = await window.api.fileTypesValidateFile(filePath)
+    if (!validation.valid) {
+      showError(`File rejected: ${validation.reason}`)
+      return
+    }
+
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
+
+    const newDoc: VesselDocument = {
+      vesselId: vessel.id,
+      documentTypeId: docTypeId,
+      filePath: filePath,
+      sent: existing?.sent || false,
+      required: existing
+        ? existing.required
+        : isCustom
+          ? true
+          : docTypes.find((t) => t.id === docTypeId)?.required || false,
+      expiryDate: undefined,
+      uploadedDate: new Date().toISOString(),
+      uploadedBy: user?.username || 'Unknown',
+      receivedDate: new Date().toISOString().split('T')[0]
+    }
+
+    await window.api.upsertVesselDocument(newDoc)
+    showSuccess('Document linked successfully')
+    await loadData()
+  }
+
+  const handleToggleRequired = async (docTypeId: string): Promise<void> => {
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const docType = docTypes.find((t) => t.id === docTypeId)
+
+    if (existing) {
+      const updated = { ...existing, required: !existing.required }
+      await window.api.upsertVesselDocument(updated)
+    } else {
+      const newDoc: VesselDocument = {
+        vesselId: vessel.id,
+        documentTypeId: docTypeId,
+        filePath: '',
+        sent: false,
+        required: docType ? !docType.required : true,
+        uploadedDate: new Date().toISOString(),
+        uploadedBy: user?.username || 'System'
+      }
+      await window.api.upsertVesselDocument(newDoc)
+    }
+    loadData()
+  }
+
+  const handleUpdateExpiry = async (docTypeId: string, expiryDate: string): Promise<void> => {
+    await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
+    loadData()
+  }
+
+  const handleDeleteDoc = async (doc: VesselDocument): Promise<void> => {
+    setConfirmation({
+      show: true,
+      title: 'Unlink File?',
+      message:
+        'Are you sure you want to unlink this file? The document record will remain but the file path will be cleared.',
+      onConfirm: async () => {
+        const updated = { ...doc, filePath: '' }
+        await window.api.upsertVesselDocument(updated)
+        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
+
+  const handleDuplicateDoc = async (doc: VesselDocument): Promise<void> => {
+    try {
+      await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
+      showSuccess('Document duplicated')
+      loadData()
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to duplicate document')
+    }
+  }
+
+  const handleDeleteDocById = async (doc: VesselDocument): Promise<void> => {
+    setConfirmation({
+      show: true,
+      title: 'Remove Document?',
+      message: 'Are you sure you want to remove this document entry?',
+      isDangerous: true,
+      onConfirm: async () => {
+        await window.api.deleteVesselDocumentById(doc.id!)
+        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
+
+  const openFile = async (path: string): Promise<void> => {
+    if (!path) return
+    console.log('[OpenFile]', path)
+    // fsOpen may resolve to an error object or a shell error string despite its void typing
+    const res: unknown = await window.api.fsOpen(path)
+    if (res && typeof res === 'object' && 'error' in res && res.error) {
+      showError(
+        ('message' in res && typeof res.message === 'string' && res.message) ||
+          `Cannot open: ${path}`
+      )
+    } else if (typeof res === 'string' && res) {
+      showError(`Failed to open: ${res}`)
+    }
+  }
+
+  const [isEditing, setIsEditing] = useState(initialEditing)
+  const [prevInitialEditing, setPrevInitialEditing] = useState(initialEditing)
+  if (initialEditing !== prevInitialEditing) {
+    setPrevInitialEditing(initialEditing)
+    if (initialEditing) setIsEditing(true)
+  }
+  const [editName, setEditName] = useState(vessel.name)
+  const [editImo, setEditImo] = useState(vessel.imoNumber)
+  const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
+  const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
+  const [detailView, setDetailView] = useState<
+    'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
+  >(
+    (initialSection as string | undefined) === 'history'
+      ? 'timeline'
+      : initialSection || 'documents'
+  )
+  // A new initialSection from outside switches the tab (store-previous-prop pattern)
+  const [prevInitialSection, setPrevInitialSection] = useState(initialSection)
+  if (initialSection !== prevInitialSection) {
+    setPrevInitialSection(initialSection)
+    if (initialSection) setDetailView(initialSection)
+  }
+  const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
+  // auditLog removed — merged into Activity (timeline) tab
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
+  const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
+  const [showNotesModal, setShowNotesModal] = useState(false)
+  const [vesselNotesList, setVesselNotesList] = useState<VesselNote[]>([])
+  const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
+  const [newVesselNoteText, setNewVesselNoteText] = useState('')
+  const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
+  const [replyingToNoteId, setReplyingToNoteId] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
+  const [vesselNoteCount, setVesselNoteCount] = useState(0)
+  const [flagStates, setFlagStates] = useState<FlagState[]>([])
+  const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
+  const [showAddFlagModal, setShowAddFlagModal] = useState(false)
+  const [newFlagName, setNewFlagName] = useState('')
+  const [newFlagIso3, setNewFlagIso3] = useState('')
+  const [newFlagAddress, setNewFlagAddress] = useState('')
+  const [newFlagEmail, setNewFlagEmail] = useState('')
+  const [editBuiltYear, setEditBuiltYear] = useState(vessel.builtYear?.toString() || '')
+  const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
+  const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
+  const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
+  const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
+  const [showAddVesselType, setShowAddVesselType] = useState(false)
+  const [newVesselTypeName, setNewVesselTypeName] = useState('')
+  const [showAddClass, setShowAddClass] = useState(false)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassAbbr, setNewClassAbbr] = useState('')
+  const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
+  const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
+  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
+  const [classSearch, setClassSearch] = useState('')
+  const [classConfirm, setClassConfirm] = useState<{
+    show: boolean
+    newId: string
+    newName: string
+  } | null>(null)
+  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+  const [flagSearch, setFlagSearch] = useState('')
+  const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
+  const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
+  const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
+  const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
+  const [useCardDocs, setUseCardDocs] = useState(
+    () => localStorage.getItem('vessel_doc_card_view') === '1'
+  )
+  const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
+  const [newCustomDocName, setNewCustomDocName] = useState('')
+  const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+
+  // Seed classification IDs from legacy text field if junction table is empty OR has stale IDs
+  // (stale = IDs exist in junction but don't match any current classSociety record).
+  // Runs when the society list or the legacy text changes (adjust-state-during-render pattern).
+  const [classSeedSource, setClassSeedSource] = useState<{
+    list: ClassificationSociety[]
+    text: string | undefined
+  } | null>(null)
+  if (
+    !classSeedSource ||
+    classSeedSource.list !== classSocieties ||
+    classSeedSource.text !== vessel.classificationSociety
+  ) {
+    setClassSeedSource({ list: classSocieties, text: vessel.classificationSociety })
+    if (classSocieties.length > 0) {
+      const validIds = classSocieties.filter((cs) => vesselClassificationIds.has(cs.id))
+      if (validIds.length === 0 && vessel.classificationSociety) {
+        const text = vessel.classificationSociety.trim().toLowerCase()
+        const matched = classSocieties.find(
+          (cs) =>
+            cs.name.toLowerCase() === text ||
+            (cs.abbreviation && cs.abbreviation.toLowerCase() === text)
+        )
+        if (matched) setVesselClassificationIds(new Set([matched.id]))
+      }
+    }
+  }
+  const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
+  const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
+  const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
+
+  const loadData = useCallback(async (): Promise<void> => {
     const types = await window.api.getDocumentTypes()
     const docs = await window.api.getVesselDocuments(vessel.id)
     const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
@@ -204,7 +568,7 @@ export default function VesselDetail({
     try {
       const vcs = await window.api.getVesselClassifications(vessel.id)
       setVesselClassificationIds(
-        new Set(Array.isArray(vcs) ? vcs.map((vc: any) => vc.classificationSocietyId) : [])
+        new Set(Array.isArray(vcs) ? vcs.map((vc) => vc.classificationSocietyId) : [])
       )
     } catch {
       /* ignore */
@@ -240,354 +604,39 @@ export default function VesselDetail({
     } catch {
       /* ignore */
     }
-  }
+  }, [vessel.id, setVesselClassificationIds])
 
-  const loadDynamicPolicies = async () => {
+  const loadDynamicPolicies = useCallback(async (): Promise<void> => {
     try {
       const dp = await window.api.getVesselDynamicPolicies(vessel.id)
       setDynamicPolicies(Array.isArray(dp) ? dp : [])
     } catch {
       /* ignore */
     }
-  }
+  }, [vessel.id])
 
-  const handleExportAllPolicies = async () => {
-    try {
-      const policies = await window.api.getVesselDynamicPolicies(vessel.id)
-      if (!Array.isArray(policies) || policies.length === 0) {
-        showError('No policies found for this vessel')
-        return
-      }
-      const allChars = await window.api.getPolicyTypeCharacteristics()
-      const rows: Record<string, string>[] = []
-      for (const p of policies) {
-        const chars = Array.isArray(allChars)
-          ? allChars.filter((c) => c.policyTypeId === p.policyTypeId)
-          : []
-        const inceptionChar = chars.find(
-          (c) => /inception|start/i.test(c.name) && c.fieldType === 'date'
-        )
-        const expiryChar = chars.find((c) => /expiry|end/i.test(c.name) && c.fieldType === 'date')
-        const premiumChar = chars.find(
-          (c) =>
-            /premium|amount/i.test(c.name) && (c.fieldType === 'amount' || c.fieldType === 'text')
-        )
-        const deductibleChar = chars.find((c) => /deductible|excess/i.test(c.name))
-        const vals = Array.isArray(p.values) ? p.values : []
-        const getVal = (charId?: string) => {
-          if (!charId) return ''
-          const v = vals.find((v) => v.characteristicId === charId)
-          if (!v) return ''
-          return (
-            v.valueDate || (v.valueAmount != null ? String(v.valueAmount) : '') || v.valueText || ''
-          )
-        }
-        rows.push({
-          'Policy Type': p.policyTypeName || '',
-          'Policy Number': p.policyNumber || '',
-          Status: p.status,
-          Inception: getVal(inceptionChar?.id),
-          Expiry: getVal(expiryChar?.id),
-          Premium: getVal(premiumChar?.id),
-          Currency: p.currency || '',
-          'Customer/Broker': p.customerName || p.brokerName || '',
-          Deductible: getVal(deductibleChar?.id),
-          Condition: p.conditionName || '',
-          Notes: p.notes || ''
-        })
-      }
-      const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.json_to_sheet(rows)
-      ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
-      XLSX.utils.book_append_sheet(wb, ws, 'Policies')
-      XLSX.writeFile(wb, `${vessel.name.replace(/[^a-zA-Z0-9]/g, '_')}_Policies.xlsx`)
-      showSuccess('Policies exported to Excel')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export policies')
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy'
-    }
-    if (dragOverId !== id) {
-      setDragOverId(id)
-    }
-  }
-
-  const handleDragEnter = (e: React.DragEvent, id: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy'
-    }
-    setDragOverId(id)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverId(null)
-  }
-
-  const handleDrop = async (e: React.DragEvent, docTypeId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverId(null)
-
-    const files = e.dataTransfer.files
-    if (files.length === 0) return
-    const file = files[0]
-
-    const filePath = window.api.getFilePath(file)
-
-    if (!filePath) {
-      console.error('Could not retrieve file path. Check Electron security settings.')
-      return
-    }
-
-    // Security: Validate file type
-    const validation = await window.api.fileTypesValidateFile(filePath)
-    if (!validation.valid) {
-      showError(`File rejected: ${validation.reason}`)
-      return
-    }
-
-    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
-    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
-
-    const newDoc: VesselDocument = {
-      vesselId: vessel.id,
-      documentTypeId: docTypeId,
-      filePath: filePath,
-      sent: existing?.sent || false,
-      required: existing
-        ? existing.required
-        : isCustom
-          ? true
-          : docTypes.find((t) => t.id === docTypeId)?.required || false,
-      expiryDate: undefined,
-      uploadedDate: new Date().toISOString(),
-      uploadedBy: user?.username || 'Unknown',
-      receivedDate: new Date().toISOString().split('T')[0]
-    }
-
-    if (!newDoc.filePath) {
-      console.error('File path is missing from dropped file')
-      return
-    }
-
-    await window.api.upsertVesselDocument(newDoc)
-    await loadData()
-  }
-
-  const handleClickUpload = async (docTypeId: string) => {
-    const filePath = await window.api.dialogOpenFileAny()
-    if (!filePath) return
-
-    const validation = await window.api.fileTypesValidateFile(filePath)
-    if (!validation.valid) {
-      showError(`File rejected: ${validation.reason}`)
-      return
-    }
-
-    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
-    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
-
-    const newDoc: VesselDocument = {
-      vesselId: vessel.id,
-      documentTypeId: docTypeId,
-      filePath: filePath,
-      sent: existing?.sent || false,
-      required: existing
-        ? existing.required
-        : isCustom
-          ? true
-          : docTypes.find((t) => t.id === docTypeId)?.required || false,
-      expiryDate: undefined,
-      uploadedDate: new Date().toISOString(),
-      uploadedBy: user?.username || 'Unknown',
-      receivedDate: new Date().toISOString().split('T')[0]
-    }
-
-    await window.api.upsertVesselDocument(newDoc)
-    showSuccess('Document linked successfully')
-    await loadData()
-  }
-
-  const handleToggleRequired = async (docTypeId: string) => {
-    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
-    const docType = docTypes.find((t) => t.id === docTypeId)
-
-    if (existing) {
-      const updated = { ...existing, required: !existing.required }
-      await window.api.upsertVesselDocument(updated)
-    } else {
-      const newDoc: VesselDocument = {
-        vesselId: vessel.id,
-        documentTypeId: docTypeId,
-        filePath: '',
-        sent: false,
-        required: docType ? !docType.required : true,
-        uploadedDate: new Date().toISOString(),
-        uploadedBy: user?.username || 'System'
-      }
-      await window.api.upsertVesselDocument(newDoc)
-    }
-    loadData()
-  }
-
-  const handleUpdateExpiry = async (docTypeId: string, expiryDate: string) => {
-    await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
-    loadData()
-  }
-
-  const handleDeleteDoc = async (doc: VesselDocument) => {
-    setConfirmation({
-      show: true,
-      title: 'Unlink File?',
-      message:
-        'Are you sure you want to unlink this file? The document record will remain but the file path will be cleared.',
-      onConfirm: async () => {
-        const updated = { ...doc, filePath: '' }
-        await window.api.upsertVesselDocument(updated)
-        loadData()
-        setConfirmation((prev) => ({ ...prev, show: false }))
-      }
-    })
-  }
-
-  const handleDuplicateDoc = async (doc: VesselDocument) => {
-    try {
-      await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
-      showSuccess('Document duplicated')
-      loadData()
-    } catch (error: any) {
-      showError(error.message || 'Failed to duplicate document')
-    }
-  }
-
-  const handleDeleteDocById = async (doc: VesselDocument) => {
-    setConfirmation({
-      show: true,
-      title: 'Remove Document?',
-      message: 'Are you sure you want to remove this document entry?',
-      isDangerous: true,
-      onConfirm: async () => {
-        await window.api.deleteVesselDocumentById(doc.id!)
-        loadData()
-        setConfirmation((prev) => ({ ...prev, show: false }))
-      }
-    })
-  }
-
-  const openFile = async (path: string) => {
-    if (!path) return
-    console.log('[OpenFile]', path)
-    const res: any = await window.api.fsOpen(path)
-    if (res?.error) {
-      showError(res.message || `Cannot open: ${path}`)
-    } else if (typeof res === 'string' && res) {
-      showError(`Failed to open: ${res}`)
-    }
-  }
-
-  const [isEditing, setIsEditing] = useState(initialEditing)
   useEffect(() => {
-    if (initialEditing) setIsEditing(true)
-  }, [initialEditing])
-  const [editName, setEditName] = useState(vessel.name)
-  const [editImo, setEditImo] = useState(vessel.imoNumber)
-  const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
-  const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-  const [detailView, setDetailView] = useState<
-    'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
-  >(initialSection === ('history' as any) ? 'timeline' : initialSection || 'documents')
-  useEffect(() => {
-    if (initialSection) {
-      setDetailView(initialSection)
-      if (initialSection === 'policies' || initialSection === 'surveys') loadDynamicPolicies()
-      // History merged into Activity (timeline)
-    }
-  }, [initialSection])
-  const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
-  // auditLog removed — merged into Activity (timeline) tab
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
-  const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
-  const [showNotesModal, setShowNotesModal] = useState(false)
-  const [vesselNotesList, setVesselNotesList] = useState<any[]>([])
-  const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
-  const [newVesselNoteText, setNewVesselNoteText] = useState('')
-  const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
-  const [replyingToNoteId, setReplyingToNoteId] = useState<string | null>(null)
-  const [replyText, setReplyText] = useState('')
-  const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
-  const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
-  const [vesselNoteCount, setVesselNoteCount] = useState(0)
-  const [flagStates, setFlagStates] = useState<FlagState[]>([])
-  const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
-  const [showAddFlagModal, setShowAddFlagModal] = useState(false)
-  const [newFlagName, setNewFlagName] = useState('')
-  const [newFlagIso3, setNewFlagIso3] = useState('')
-  const [newFlagAddress, setNewFlagAddress] = useState('')
-  const [newFlagEmail, setNewFlagEmail] = useState('')
-  const [editBuiltYear, setEditBuiltYear] = useState(vessel.builtYear?.toString() || '')
-  const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
-  const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
-  const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
-  const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
-  const [showAddVesselType, setShowAddVesselType] = useState(false)
-  const [newVesselTypeName, setNewVesselTypeName] = useState('')
-  const [showAddClass, setShowAddClass] = useState(false)
-  const [newClassName, setNewClassName] = useState('')
-  const [newClassAbbr, setNewClassAbbr] = useState('')
-  const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
-  const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
-  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
-  const [classSearch, setClassSearch] = useState('')
-  const [classConfirm, setClassConfirm] = useState<{
-    show: boolean
-    newId: string
-    newName: string
-  } | null>(null)
-  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
-  const [flagSearch, setFlagSearch] = useState('')
-  const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
-  const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
-  const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
-  const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
-  const [useCardDocs, setUseCardDocs] = useState(
-    () => localStorage.getItem('vessel_doc_card_view') === '1'
-  )
-  const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
-  const [newCustomDocName, setNewCustomDocName] = useState('')
-  const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+    void loadData()
+    // vesselProp: reload whenever the parent hands in a vessel object (as before)
+  }, [loadData, vesselProp])
 
-  // Seed classification IDs from legacy text field if junction table is empty OR has stale IDs
-  // (stale = IDs exist in junction but don't match any current classSociety record)
   useEffect(() => {
-    if (classSocieties.length === 0) return
-    const validIds = classSocieties.filter((cs) => vesselClassificationIds.has(cs.id))
-    if (validIds.length === 0 && vessel.classificationSociety) {
-      const text = vessel.classificationSociety.trim().toLowerCase()
-      const matched = classSocieties.find(
-        (cs) =>
-          cs.name.toLowerCase() === text ||
-          (cs.abbreviation && cs.abbreviation.toLowerCase() === text)
-      )
-      if (matched) setVesselClassificationIds(new Set([matched.id]))
+    if (initialSection !== 'policies' && initialSection !== 'surveys') return
+    let alive = true
+    window.api
+      .getVesselDynamicPolicies(vessel.id)
+      .then((dp) => {
+        if (alive) setDynamicPolicies(Array.isArray(dp) ? dp : [])
+      })
+      .catch(() => {
+        /* ignore */
+      })
+    return () => {
+      alive = false
     }
-  }, [classSocieties, vessel.classificationSociety])
-  const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
-  const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
-  const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
+  }, [initialSection, vessel.id])
 
-  const handleTogglePolicy = async (policyTypeId: string) => {
+  const handleTogglePolicy = async (policyTypeId: string): Promise<void> => {
     try {
       if (assignedPolicyTypeIds.has(policyTypeId)) {
         // Remove
@@ -607,12 +656,12 @@ export default function VesselDetail({
         setVesselPolicies((prev) => [...prev, vp])
         setAssignedPolicyTypeIds((prev) => new Set([...prev, policyTypeId]))
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to update policies')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to update policies')
     }
   }
 
-  const handleAddVesselType = async () => {
+  const handleAddVesselType = async (): Promise<void> => {
     if (!newVesselTypeName.trim()) return
     try {
       const created = await window.api.addVesselType({
@@ -624,31 +673,32 @@ export default function VesselDetail({
       setShowAddVesselType(false)
       setNewVesselTypeName('')
       showSuccess('Vessel type added')
-    } catch (err: any) {
-      showError(err.message || 'Failed to add vessel type')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add vessel type')
     }
   }
 
-  const handleAddClassSociety = async () => {
+  const handleAddClassSociety = async (): Promise<void> => {
     if (!newClassName.trim()) return
     try {
       const created = await window.api.addClassificationSociety({
         name: newClassName.trim(),
         abbreviation: newClassAbbr.trim() || undefined,
         isIacs: false
-      } as any)
+        // The adapter fills order and accepts a missing abbreviation; the shared type requires both
+      } as Omit<ClassificationSociety, 'id'>)
       setClassSocieties((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
       setVesselClassificationIds((prev) => new Set(prev).add(created.id))
       setShowAddClass(false)
       setNewClassName('')
       setNewClassAbbr('')
       showSuccess('Classification society added')
-    } catch (err: any) {
-      showError(err.message || 'Failed to add classification society')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add classification society')
     }
   }
 
-  const handleAddFlag = async () => {
+  const handleAddFlag = async (): Promise<void> => {
     if (!newFlagName.trim() || !newFlagIso3.trim()) return
     try {
       const created = ok(
@@ -661,20 +711,20 @@ export default function VesselDetail({
       )
       setFlagStates((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
       setSelectedFlagStateId(created.id)
-      vessel.flagStateId = created.id
-      await window.api.updateVessel(vessel.id, { flagStateId: created.id as any })
+      setVessel((v) => ({ ...v, flagStateId: created.id }))
+      await window.api.updateVessel(vessel.id, { flagStateId: created.id })
       setShowAddFlagModal(false)
       setNewFlagName('')
       setNewFlagIso3('')
       setNewFlagAddress('')
       setNewFlagEmail('')
       showSuccess('Flag state created and assigned')
-    } catch (err: any) {
-      showError(err.message || 'Failed to create flag state')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to create flag state')
     }
   }
 
-  const handleAddCustomDocType = async () => {
+  const handleAddCustomDocType = async (): Promise<void> => {
     if (!newCustomDocName.trim()) return
     await window.api.addVesselCustomDocType({
       vesselId: vessel.id,
@@ -687,7 +737,7 @@ export default function VesselDetail({
     loadData()
   }
 
-  const handleDeleteCustomDocType = async (customType: VesselCustomDocType) => {
+  const handleDeleteCustomDocType = async (customType: VesselCustomDocType): Promise<void> => {
     setConfirmation({
       show: true,
       title: 'Remove Custom Document Type?',
@@ -707,7 +757,7 @@ export default function VesselDetail({
     })
   }
 
-  const handleSaveVessel = async () => {
+  const handleSaveVessel = async (): Promise<void> => {
     if (!editName.trim() || !editImo.trim()) return
     // Capture old values before save for endorsement trigger check
     const oldValues: Record<string, string> = {
@@ -734,17 +784,21 @@ export default function VesselDetail({
       classificationSociety: classText,
       callSign: editCallSign || null,
       flagStateId: selectedFlagStateId || null
-    } as any)
-    vessel.name = editName
-    vessel.imoNumber = editImo
-    vessel.builtYear = editBuiltYear ? parseInt(editBuiltYear) : undefined
-    vessel.rebuiltYear = editRebuiltYear ? parseInt(editRebuiltYear) : undefined
-    vessel.grossTonnage = editGrossTonnage ? parseFloat(editGrossTonnage) : undefined
-    vessel.vesselTypeId = editVesselType || undefined
-    vessel.vesselType = vesselTypes.find((vt) => vt.id === editVesselType)?.name || undefined
-    vessel.classificationSociety = editClassification || undefined
-    vessel.callSign = editCallSign || undefined
-    vessel.flagStateId = selectedFlagStateId || undefined
+      // null clears a column; Partial<Vessel> has no null for these fields
+    } satisfies NullableVesselUpdate as Partial<Vessel>)
+    setVessel((v) => ({
+      ...v,
+      name: editName,
+      imoNumber: editImo,
+      builtYear: editBuiltYear ? parseInt(editBuiltYear) : undefined,
+      rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : undefined,
+      grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : undefined,
+      vesselTypeId: editVesselType || undefined,
+      vesselType: vesselTypes.find((vt) => vt.id === editVesselType)?.name || undefined,
+      classificationSociety: editClassification || undefined,
+      callSign: editCallSign || undefined,
+      flagStateId: selectedFlagStateId || undefined
+    }))
     await window.api.setVesselClassifications(vessel.id, [...vesselClassificationIds])
     setIsEditing(false)
     showSuccess('Vessel details updated')
@@ -811,17 +865,17 @@ export default function VesselDetail({
     }
   }
 
-  const handleToggleVesselActive = async () => {
+  const handleToggleVesselActive = async (): Promise<void> => {
     const newStatus = !vesselActive
     await window.api.updateVessel(vessel.id, { isActive: newStatus })
     setVesselActive(newStatus)
-    vessel.isActive = newStatus
+    setVessel((v) => ({ ...v, isActive: newStatus }))
     showSuccess(`Vessel is now ${newStatus ? 'ACTIVE' : 'INACTIVE'}`)
     // Refresh policies so cascade changes (active ↔ inactive) are reflected immediately
     loadDynamicPolicies()
   }
 
-  const handleDeleteVessel = async (e: React.MouseEvent) => {
+  const handleDeleteVessel = async (e: React.MouseEvent): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
     const confirmMsg =
@@ -845,7 +899,7 @@ export default function VesselDetail({
     })
   }
 
-  const handleOpenVesselNotes = async () => {
+  const handleOpenVesselNotes = async (): Promise<void> => {
     setShowNotesModal(true)
     setVesselNotesList([])
     setNewVesselNoteText('')
@@ -866,7 +920,7 @@ export default function VesselDetail({
     }
   }
 
-  const handleAddVesselNote = async () => {
+  const handleAddVesselNote = async (): Promise<void> => {
     if (!newVesselNoteText.trim()) return
     setVesselNotesSaving(true)
     try {
@@ -882,7 +936,7 @@ export default function VesselDetail({
     }
   }
 
-  const handleDeleteVesselNote = async (noteId: string) => {
+  const handleDeleteVesselNote = async (noteId: string): Promise<void> => {
     await window.api.deleteVesselNote(noteId)
     setVesselNotesList((prev) => {
       const next = prev.filter((n) => n.id !== noteId && n.parentNoteId !== noteId)
@@ -891,7 +945,7 @@ export default function VesselDetail({
     })
   }
 
-  const handleAddReply = async (parentId: string) => {
+  const handleAddReply = async (parentId: string): Promise<void> => {
     if (!replyText.trim()) return
     setVesselNotesSaving(true)
     try {
@@ -904,7 +958,7 @@ export default function VesselDetail({
     }
   }
 
-  const handleMentionCheck = (text: string, target: 'new' | 'reply') => {
+  const handleMentionCheck = (text: string, target: 'new' | 'reply'): void => {
     if (target === 'new') setNewVesselNoteText(text)
     else setReplyText(text)
     setMentionTarget(target)
@@ -916,7 +970,7 @@ export default function VesselDetail({
     else setMentionQuery(null)
   }
 
-  const insertMention = (username: string) => {
+  const insertMention = (username: string): void => {
     const getter = mentionTarget === 'new' ? newVesselNoteText : replyText
     const setter = mentionTarget === 'new' ? setNewVesselNoteText : setReplyText
     const cursorEl = document.activeElement as HTMLTextAreaElement
@@ -938,7 +992,7 @@ export default function VesselDetail({
           .slice(0, 6)
       : []
 
-  const renderMentionDropdown = () => {
+  const renderMentionDropdown = (): React.JSX.Element | null => {
     if (mentionQuery === null || filteredMentionUsers.length === 0) return null
     return (
       <div
@@ -970,7 +1024,7 @@ export default function VesselDetail({
     )
   }
 
-  const highlightMentions = (text: string) => {
+  const highlightMentions = (text: string): (string | React.JSX.Element)[] => {
     const parts = text.split(/(@\w+)/g)
     return parts.map((part, i) =>
       part.startsWith('@') ? (
@@ -985,7 +1039,7 @@ export default function VesselDetail({
 
   // Group notes into threads
   const parentVesselNotes = vesselNotesList.filter((n) => !n.parentNoteId)
-  const vesselRepliesMap = new Map<string, any[]>()
+  const vesselRepliesMap = new Map<string, VesselNote[]>()
   for (const n of vesselNotesList) {
     if (n.parentNoteId) {
       const existing = vesselRepliesMap.get(n.parentNoteId) || []
@@ -1861,7 +1915,7 @@ export default function VesselDetail({
                   setEditCallSign(vessel.callSign || '')
                   const vcs = await window.api.getVesselClassifications(vessel.id)
                   setVesselClassificationIds(
-                    new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))
+                    new Set((vcs || []).map((vc) => vc.classificationSocietyId))
                   )
                 }}
                 className="btn-secondary"
@@ -2084,7 +2138,7 @@ export default function VesselDetail({
                             const shortCycle = (
                               expiry: string | null | undefined,
                               received: string | null | undefined
-                            ) => {
+                            ): boolean => {
                               if (!expiry || !received) return false
                               const e = new Date(expiry + 'T00:00:00')
                               const r = new Date(received.split('T')[0] + 'T00:00:00')
@@ -2102,18 +2156,16 @@ export default function VesselDetail({
                             )
                             const allDocTypes = [
                               ...docTypes,
-                              ...(Array.isArray(customDocTypes) ? customDocTypes : []).map(
-                                (c: any) => ({
-                                  id: c.id,
-                                  name: c.name,
-                                  required: true,
-                                  annualRenewal: false
-                                })
-                              )
+                              ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c) => ({
+                                id: c.id,
+                                name: c.name,
+                                required: true,
+                                annualRenewal: false
+                              }))
                             ]
                             const issues: string[] = []
                             for (const dt of allDocTypes) {
-                              if (!(dt as any).required) continue // skip optional documents
+                              if (!dt.required) continue // skip optional documents
                               const doc = vesselDocs.find((d) => d.documentTypeId === dt.id)
                               if (!doc?.filePath) {
                                 issues.push(`${dt.name} — MISSING`)
@@ -2121,7 +2173,7 @@ export default function VesselDetail({
                               }
                               // Check expiry
                               let expiryDate = doc.expiryDate || null
-                              if ((dt as any).annualRenewal && effectiveExpiry) {
+                              if (dt.annualRenewal && effectiveExpiry) {
                                 expiryDate = effectiveExpiry
                               }
                               if (expiryDate) {
@@ -2130,7 +2182,7 @@ export default function VesselDetail({
                                 const docReceived =
                                   doc.receivedDate || doc.uploadedDate?.split('T')[0]
                                 if (
-                                  (dt as any).annualRenewal &&
+                                  dt.annualRenewal &&
                                   docReceived &&
                                   shortCycle(expiryDate, docReceived)
                                 ) {
@@ -2159,19 +2211,18 @@ export default function VesselDetail({
                             const edDocsRaw = await window.api.getEntityDocuments()
                             const activeEdTypes = (
                               Array.isArray(edTypesRaw) ? edTypesRaw : []
-                            ).filter((t: any) => t.isActive && t.isRequired)
+                            ).filter((t) => t.isActive && t.isRequired)
                             const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
                             for (const va of safeAssureds) {
-                              const entity = safeEntities.find((e: any) => e.id === va.entityId)
+                              const entity = safeEntities.find((e) => e.id === va.entityId)
                               if (!entity) continue
                               const missing: string[] = []
                               for (const edt of activeEdTypes.filter(
-                                (t: any) =>
-                                  t.entityScope === 'both' || t.entityScope === entity.type
+                                (t) => t.entityScope === 'both' || t.entityScope === entity.type
                               )) {
                                 if (
                                   !allEdDocs.some(
-                                    (d: any) =>
+                                    (d) =>
                                       d.entityId === entity.id &&
                                       d.documentTypeId === edt.id &&
                                       d.filePath
@@ -2194,8 +2245,8 @@ export default function VesselDetail({
 
                             await navigator.clipboard.writeText(lines.join('\n'))
                             showSuccess('Missing documents list copied to clipboard')
-                          } catch (err: any) {
-                            showError(err.message || 'Failed to copy')
+                          } catch (err) {
+                            showError((err instanceof Error && err.message) || 'Failed to copy')
                           }
                         }}
                         style={{
@@ -2309,7 +2360,7 @@ export default function VesselDetail({
                 try {
                   const assureds = await window.api.getVesselAssureds(vessel.id)
                   const eIds = (Array.isArray(assureds) ? assureds : [])
-                    .map((a: any) => a.entityId)
+                    .map((a) => a.entityId)
                     .filter(Boolean)
                   setRemapEntityIds([...new Set(eIds)])
                 } catch {
@@ -2439,11 +2490,11 @@ export default function VesselDetail({
                   rowType: DocumentType,
                   isExtra: boolean,
                   key: string
-                ) => {
+                ): React.JSX.Element => {
                   const rowHasFile = !!rowDoc?.filePath
                   const rowExists = fileStatus[rowType.id]
                   // Determine left border color based on document status
-                  const getRowBorderColor = () => {
+                  const getRowBorderColor = (): string => {
                     if (isExtra) return 'transparent'
                     if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
                     if (rowDoc?.expiryDate) {
@@ -4230,7 +4281,13 @@ export default function VesselDetail({
 
 /** Visible EXPIRED / EXPIRING SOON badge for a document row (same thresholds as the row's
  *  left border: past = expired, within 30 days = expiring soon). Null when fine or no date. */
-function DocExpiryBadge({ expiryDate, isLight }: { expiryDate?: string | null; isLight: boolean }) {
+function DocExpiryBadge({
+  expiryDate,
+  isLight
+}: {
+  expiryDate?: string | null
+  isLight: boolean
+}): React.JSX.Element | null {
   if (!expiryDate || expiryDate === '0000-00-00') return null
   const exp = new Date(expiryDate)
   if (isNaN(exp.getTime())) return null
@@ -4277,6 +4334,9 @@ function formatCurrency(value?: number, currency?: string): string {
   return `${sym}${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
+/** One characteristic value in the policy add/edit form (shape depends on the field type) */
+type PolicyFormValue = string | number | boolean | null | undefined
+
 function DynamicPoliciesView({
   vesselId,
   dynamicPolicies,
@@ -4291,7 +4351,7 @@ function DynamicPoliciesView({
   onReload: () => void
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
   const [characteristics, setCharacteristics] = useState<PolicyTypeCharacteristic[]>([])
   const [conditions, setConditions] = useState<PolicyTypeCondition[]>([])
@@ -4314,7 +4374,7 @@ function DynamicPoliciesView({
   const [brokerSearch, setBrokerSearch] = useState('')
   const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
   const [formNotes, setFormNotes] = useState('')
-  const [formValues, setFormValues] = useState<Record<string, any>>({})
+  const [formValues, setFormValues] = useState<Record<string, PolicyFormValue>>({})
   const modalRef = useRef<HTMLDivElement>(null)
 
   // Confirmation modal state
@@ -4327,7 +4387,23 @@ function DynamicPoliciesView({
   }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
   useEffect(() => {
-    loadMeta()
+    const loadMeta = async (): Promise<void> => {
+      try {
+        const [pt, allChars, allConds, ent] = await Promise.all([
+          window.api.getPolicyTypes(),
+          window.api.getPolicyTypeCharacteristics(),
+          window.api.getPolicyTypeConditions(),
+          window.api.getEntities()
+        ])
+        setPolicyTypes(Array.isArray(pt) ? pt : [])
+        setCharacteristics(Array.isArray(allChars) ? allChars : [])
+        setConditions(Array.isArray(allConds) ? allConds : [])
+        setEntities(Array.isArray(ent) ? ent : [])
+      } catch {
+        /* ignore */
+      }
+    }
+    void loadMeta()
   }, [])
 
   // Focus trap for modal
@@ -4345,7 +4421,7 @@ function DynamicPoliciesView({
       const last = focusable[focusable.length - 1]
       first?.focus()
 
-      const handleKeyDown = (e: KeyboardEvent) => {
+      const handleKeyDown = (e: KeyboardEvent): void => {
         if (e.key === 'Escape') {
           setShowAddModal(false)
           return
@@ -4369,24 +4445,7 @@ function DynamicPoliciesView({
     }, 50)
   }, [showAddModal])
 
-  const loadMeta = async () => {
-    try {
-      const [pt, allChars, allConds, ent] = await Promise.all([
-        window.api.getPolicyTypes(),
-        window.api.getPolicyTypeCharacteristics(),
-        window.api.getPolicyTypeConditions(),
-        window.api.getEntities()
-      ])
-      setPolicyTypes(Array.isArray(pt) ? pt : [])
-      setCharacteristics(Array.isArray(allChars) ? allChars : [])
-      setConditions(Array.isArray(allConds) ? allConds : [])
-      setEntities(Array.isArray(ent) ? ent : [])
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const toggleCollapse = (id: string) => {
+  const toggleCollapse = (id: string): void => {
     setCollapsedPolicies((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -4409,7 +4468,7 @@ function DynamicPoliciesView({
     groupedByType.get(key)!.push(p)
   }
 
-  const openAddModal = () => {
+  const openAddModal = (): void => {
     setEditingPolicyId(null)
     setFormTypeId(policyTypes[0]?.id || '')
     setFormNumber('')
@@ -4424,7 +4483,7 @@ function DynamicPoliciesView({
     setShowAddModal(true)
   }
 
-  const openEditModal = (p: VesselDynamicPolicy) => {
+  const openEditModal = (p: VesselDynamicPolicy): void => {
     setEditingPolicyId(p.id)
     setFormTypeId(p.policyTypeId)
     // Strip the warning suffix if present so it doesn't persist after edit
@@ -4436,7 +4495,7 @@ function DynamicPoliciesView({
     setFormBrokerId(p.customerEntityId || p.brokerEntityId || '')
     setFormCustomerType(p.customerType || (p.brokerEntityId ? 'broker' : ''))
     setFormNotes(p.notes || '')
-    const vals: Record<string, any> = {}
+    const vals: Record<string, PolicyFormValue> = {}
     if (p.values) {
       for (const v of p.values) {
         if (v.fieldType === 'amount') vals[v.characteristicId] = v.valueAmount
@@ -4450,7 +4509,7 @@ function DynamicPoliciesView({
     setShowAddModal(true)
   }
 
-  const handleSavePolicy = async () => {
+  const handleSavePolicy = async (): Promise<void> => {
     if (!formTypeId) return
     try {
       const typeChars = characteristics.filter((c) => c.policyTypeId === formTypeId)
@@ -4470,11 +4529,16 @@ function DynamicPoliciesView({
         const vals = typeChars.map((c) => ({
           characteristicId: c.id,
           valueText:
-            c.fieldType === 'text' || c.fieldType === 'select' ? formValues[c.id] || '' : undefined,
+            c.fieldType === 'text' || c.fieldType === 'select'
+              ? (formValues[c.id] as string) || ''
+              : undefined,
           valueAmount:
-            c.fieldType === 'amount' ? parseFloat(formValues[c.id]) || undefined : undefined,
-          valueDate: c.fieldType === 'date' ? formValues[c.id] || undefined : undefined,
-          valueBoolean: c.fieldType === 'boolean' ? formValues[c.id] || false : undefined
+            c.fieldType === 'amount'
+              ? parseFloat(formValues[c.id] as string) || undefined
+              : undefined,
+          valueDate: c.fieldType === 'date' ? (formValues[c.id] as string) || undefined : undefined,
+          valueBoolean:
+            c.fieldType === 'boolean' ? (formValues[c.id] as boolean) || false : undefined
         }))
         ok(await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals))
         showSuccess('Policy updated')
@@ -4494,23 +4558,28 @@ function DynamicPoliciesView({
         const vals = typeChars.map((c) => ({
           characteristicId: c.id,
           valueText:
-            c.fieldType === 'text' || c.fieldType === 'select' ? formValues[c.id] || '' : undefined,
+            c.fieldType === 'text' || c.fieldType === 'select'
+              ? (formValues[c.id] as string) || ''
+              : undefined,
           valueAmount:
-            c.fieldType === 'amount' ? parseFloat(formValues[c.id]) || undefined : undefined,
-          valueDate: c.fieldType === 'date' ? formValues[c.id] || undefined : undefined,
-          valueBoolean: c.fieldType === 'boolean' ? formValues[c.id] || false : undefined
+            c.fieldType === 'amount'
+              ? parseFloat(formValues[c.id] as string) || undefined
+              : undefined,
+          valueDate: c.fieldType === 'date' ? (formValues[c.id] as string) || undefined : undefined,
+          valueBoolean:
+            c.fieldType === 'boolean' ? (formValues[c.id] as boolean) || false : undefined
         }))
         await window.api.setVesselDynamicPolicyValues(newId, vals)
         showSuccess('Policy added')
       }
       setShowAddModal(false)
       onReload()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save policy')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to save policy')
     }
   }
 
-  const handleDeletePolicy = (id: string) => {
+  const handleDeletePolicy = (id: string): void => {
     setConfirmation({
       show: true,
       title: 'Delete Policy',
@@ -4525,7 +4594,7 @@ function DynamicPoliciesView({
     })
   }
 
-  const handleRenewPolicy = (p: VesselDynamicPolicy) => {
+  const handleRenewPolicy = (p: VesselDynamicPolicy): void => {
     setConfirmation({
       show: true,
       title: 'Renew Policy',
@@ -4628,8 +4697,8 @@ function DynamicPoliciesView({
           // 4. Reload and notify
           onReload()
           showSuccess('Policy renewed. Please review and edit the new policy details.')
-        } catch (err: any) {
-          showError(err.message || 'Failed to renew policy')
+        } catch (err) {
+          showError((err instanceof Error && err.message) || 'Failed to renew policy')
         }
       }
     })
@@ -5020,7 +5089,7 @@ function DynamicPoliciesView({
                   </label>
                   <select
                     value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as any)}
+                    onChange={(e) => setFormStatus(e.target.value as typeof formStatus)}
                     style={{
                       width: '100%',
                       padding: '10px',
@@ -5287,7 +5356,7 @@ function DynamicPoliciesView({
                           <input
                             type="text"
                             name={`policy_${c.id}`}
-                            value={formValues[c.id] || ''}
+                            value={(formValues[c.id] as string | number) || ''}
                             onChange={(e) =>
                               setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
                             }
@@ -5305,7 +5374,7 @@ function DynamicPoliciesView({
                         {c.fieldType === 'date' && (
                           <input
                             type="date"
-                            value={formValues[c.id] || ''}
+                            value={(formValues[c.id] as string | number) || ''}
                             onChange={(e) =>
                               setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
                             }
@@ -5325,7 +5394,7 @@ function DynamicPoliciesView({
                           <input
                             type="number"
                             step="0.01"
-                            value={formValues[c.id] || ''}
+                            value={(formValues[c.id] as string | number) || ''}
                             onChange={(e) =>
                               setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
                             }
@@ -5361,7 +5430,7 @@ function DynamicPoliciesView({
                         )}
                         {c.fieldType === 'select' && c.selectOptions && (
                           <select
-                            value={formValues[c.id] || ''}
+                            value={(formValues[c.id] as string | number) || ''}
                             onChange={(e) =>
                               setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
                             }
@@ -5468,8 +5537,8 @@ function VesselTemplateGenerateModal({
   onClose: () => void
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-}) {
-  const [templates, setTemplates] = useState<any[]>([])
+}): React.JSX.Element {
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
 
@@ -5483,7 +5552,7 @@ function VesselTemplateGenerateModal({
       .finally(() => setLoading(false))
   }, [])
 
-  const handleGenerate = async (templateId: string) => {
+  const handleGenerate = async (templateId: string): Promise<void> => {
     try {
       setGenerating(templateId)
       const tpl = templates.find((t) => t.id === templateId)
@@ -5616,7 +5685,7 @@ function VesselTemplateGenerateModal({
                     >
                       {t.category}
                     </span>
-                    {t.placeholders?.length > 0 && (
+                    {t.placeholders && t.placeholders.length > 0 && (
                       <span>
                         {t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}
                       </span>
@@ -5695,13 +5764,19 @@ const TIMELINE_TYPE_META: Record<string, { label: string; color: string }> = {
   sanctions: { label: 'Sanctions', color: '#ef4444' }
 }
 
-function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: boolean }) {
+function VesselTimeline({
+  vesselId,
+  isLight
+}: {
+  vesselId: string
+  isLight: boolean
+}): React.JSX.Element {
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
   const [typeFilter, setTypeFilter] = useState<string>('all')
   // Local YYYY-MM-DD (NOT UTC) so the range matches the server-local audit timestamps
-  const localDateKey = (d: Date) =>
+  const localDateKey = (d: Date): string =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const [dateFrom, setDateFrom] = useState<string>(() => {
     const d = new Date()
@@ -5712,12 +5787,18 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [activitySearch, setActivitySearch] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
+  // A different vessel restarts the timeline (store-previous-prop pattern)
+  const [prevVesselId, setPrevVesselId] = useState(vesselId)
+  if (vesselId !== prevVesselId) {
+    setPrevVesselId(vesselId)
     setLoading(true)
     setVisibleCount(TIMELINE_PAGE_SIZE)
+  }
 
-    const load = async () => {
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async (): Promise<void> => {
       const allEvents: TimelineEvent[] = []
 
       try {
@@ -5757,8 +5838,8 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
         }
 
         // Document uploads
-        const allDocTypes = await window.api.getDocumentTypes().catch(() => [])
-        const docTypeMap = new Map((allDocTypes as any[]).map((dt: any) => [dt.id, dt.name]))
+        const allDocTypes = await window.api.getDocumentTypes().catch((): DocumentType[] => [])
+        const docTypeMap = new Map(allDocTypes.map((dt) => [dt.id, dt.name] as const))
         if (Array.isArray(docs)) {
           for (const doc of docs) {
             if (doc.uploadedDate) {
@@ -5828,7 +5909,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
         // Sanctions check results for this vessel
         if (Array.isArray(sanctionsResults)) {
           const vesselResults = sanctionsResults.filter(
-            (r: any) => r.entityType === 'vessel' && r.entityId === vesselId
+            (r) => r.entityType === 'vessel' && r.entityId === vesselId
           )
           for (const r of vesselResults) {
             const isPending = r.status === 'pending_review'
@@ -5957,7 +6038,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     }
   }
 
-  const toggleExpanded = (key: string) => {
+  const toggleExpanded = (key: string): void => {
     setExpandedKeys((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -5966,7 +6047,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
     })
   }
 
-  const getIcon = (iconType: string) => {
+  const getIcon = (iconType: string): React.JSX.Element => {
     switch (iconType) {
       case 'audit':
         return <Edit3 size={14} />

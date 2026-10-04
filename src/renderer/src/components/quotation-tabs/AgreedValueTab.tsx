@@ -18,11 +18,11 @@ export default function AgreedValueTab({
   showError
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
-}) {
+}): React.JSX.Element {
   const [items, setItems] = useState<QuotationAgreedValueItem[]>([])
   const [allTexts, setAllTexts] = useState<HullAgreedValueText[]>([])
   const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
@@ -32,83 +32,86 @@ export default function AgreedValueTab({
   const defaultsApplied = useRef(false)
 
   useEffect(() => {
-    loadData()
-  }, [])
+    const loadData = async (): Promise<void> => {
+      const [texts, existingItems, qv, alts, opts] = await Promise.all([
+        window.api.hullGetAgreedValueTexts(),
+        window.api.hullGetQuotationAgreedValueItems(quotation.id),
+        window.api.getQuotationVessels(quotation.id),
+        window.api.hullGetQuotationAlternatives(quotation.id),
+        window.api.hullGetAgreedValueOptions(quotation.id)
+      ])
+      const safeTexts = Array.isArray(texts) ? texts : []
+      const safeItems = Array.isArray(existingItems) ? existingItems : []
+      setAllTexts(safeTexts)
+      setItems(safeItems)
+      setQVessels(Array.isArray(qv) ? qv : [])
+      setHullAlts(Array.isArray(alts) ? alts : [])
+      setValueOptions(Array.isArray(opts) ? opts : [])
 
-  const loadData = async () => {
-    const [texts, existingItems, qv, alts, opts] = await Promise.all([
-      window.api.hullGetAgreedValueTexts(),
-      window.api.hullGetQuotationAgreedValueItems(quotation.id),
-      window.api.getQuotationVessels(quotation.id),
-      window.api.hullGetQuotationAlternatives(quotation.id),
-      window.api.hullGetAgreedValueOptions(quotation.id)
-    ])
-    const safeTexts = Array.isArray(texts) ? texts : []
-    const safeItems = Array.isArray(existingItems) ? existingItems : []
-    setAllTexts(safeTexts)
-    setItems(safeItems)
-    setQVessels(Array.isArray(qv) ? qv : [])
-    setHullAlts(Array.isArray(alts) ? alts : [])
-    setValueOptions(Array.isArray(opts) ? opts : [])
-
-    // Sync sections from master texts (fixes items saved before section was tracked)
-    if (safeItems.length > 0 && safeTexts.length > 0) {
-      const masterMap = new Map(safeTexts.map((t) => [t.id, t.section || 'hm']))
-      let needsSave = false
-      const synced = safeItems.map((it) => {
-        if (it.hullTextId && masterMap.has(it.hullTextId)) {
-          const masterSec = masterMap.get(it.hullTextId)!
-          if ((it.section || 'hm') !== masterSec) {
-            needsSave = true
-            return { ...it, section: masterSec }
+      // Sync sections from master texts (fixes items saved before section was tracked)
+      if (safeItems.length > 0 && safeTexts.length > 0) {
+        const masterMap = new Map(safeTexts.map((t) => [t.id, t.section || 'hm']))
+        let needsSave = false
+        const synced = safeItems.map((it) => {
+          if (it.hullTextId && masterMap.has(it.hullTextId)) {
+            const masterSec = masterMap.get(it.hullTextId)!
+            if ((it.section || 'hm') !== masterSec) {
+              needsSave = true
+              return { ...it, section: masterSec }
+            }
+          }
+          return it
+        })
+        if (needsSave) {
+          try {
+            await window.api.hullSetQuotationAgreedValueItems(
+              quotation.id,
+              synced.map((it) => ({
+                hullTextId: it.hullTextId,
+                text: it.text,
+                section: it.section || 'hm',
+                vesselScope: it.vesselScope
+              }))
+            )
+            const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+            setItems(Array.isArray(fresh) ? fresh : [])
+          } catch {
+            /* best-effort defaults; the tab still works without them */
           }
         }
-        return it
-      })
-      if (needsSave) {
-        try {
-          await window.api.hullSetQuotationAgreedValueItems(
-            quotation.id,
-            synced.map((it) => ({
-              hullTextId: it.hullTextId,
-              text: it.text,
-              section: it.section || 'hm',
-              vesselScope: it.vesselScope
-            }))
-          )
-          const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-          setItems(Array.isArray(fresh) ? fresh : [])
-        } catch {}
+      }
+
+      // Auto-populate default texts on first load if no items exist
+      if (
+        !defaultsApplied.current &&
+        Array.isArray(existingItems) &&
+        safeItems.length === 0 &&
+        safeTexts.length > 0
+      ) {
+        defaultsApplied.current = true
+        const defaults = safeTexts.filter((t) => t.defaultSelected)
+        if (defaults.length > 0) {
+          const newItems = defaults.map((t) => ({
+            hullTextId: t.id,
+            text: t.text,
+            section: t.section || 'hm'
+          }))
+          try {
+            await window.api.hullSetQuotationAgreedValueItems(quotation.id, newItems)
+            const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+            setItems(Array.isArray(fresh) ? fresh : [])
+          } catch {
+            /* best-effort defaults; the tab still works without them */
+          }
+        }
+      } else {
+        defaultsApplied.current = true
       }
     }
+    void loadData()
+  }, [quotation.id])
 
-    // Auto-populate default texts on first load if no items exist
-    if (
-      !defaultsApplied.current &&
-      Array.isArray(existingItems) &&
-      safeItems.length === 0 &&
-      safeTexts.length > 0
-    ) {
-      defaultsApplied.current = true
-      const defaults = safeTexts.filter((t) => t.defaultSelected)
-      if (defaults.length > 0) {
-        const newItems = defaults.map((t) => ({
-          hullTextId: t.id,
-          text: t.text,
-          section: t.section || 'hm'
-        }))
-        try {
-          await window.api.hullSetQuotationAgreedValueItems(quotation.id, newItems)
-          const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-          setItems(Array.isArray(fresh) ? fresh : [])
-        } catch {}
-      }
-    } else {
-      defaultsApplied.current = true
-    }
-  }
-
-  const saveItems = async (updated: QuotationAgreedValueItem[]) => {
+  const saveItems = async (updated: QuotationAgreedValueItem[]): Promise<void> => {
     try {
       await window.api.hullSetQuotationAgreedValueItems(
         quotation.id,
@@ -121,12 +124,12 @@ export default function AgreedValueTab({
       )
       const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
       setItems(Array.isArray(fresh) ? fresh : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save')
     }
   }
 
-  const addFromTemplate = async (tmpl: HullAgreedValueText) => {
+  const addFromTemplate = async (tmpl: HullAgreedValueText): Promise<void> => {
     const already = items.some((it) => it.hullTextId === tmpl.id)
     if (already) return
     const updated = [
@@ -143,7 +146,7 @@ export default function AgreedValueTab({
     await saveItems(updated)
   }
 
-  const addCustomText = async () => {
+  const addCustomText = async (): Promise<void> => {
     if (!newText.trim()) return
     const updated = [
       ...items,
@@ -159,21 +162,21 @@ export default function AgreedValueTab({
     setNewText('')
   }
 
-  const removeItem = async (idx: number) => {
+  const removeItem = async (idx: number): Promise<void> => {
     const updated = items.filter((_, i) => i !== idx)
     await saveItems(updated)
   }
 
-  const updateItemText = async (idx: number, text: string) => {
+  const updateItemText = async (idx: number, text: string): Promise<void> => {
     const updated = items.map((it, i) => (i === idx ? { ...it, text } : it))
     setItems(updated)
   }
 
-  const blurSave = async () => {
+  const blurSave = async (): Promise<void> => {
     await saveItems(items)
   }
 
-  const moveItem = async (idx: number, dir: 'up' | 'down') => {
+  const moveItem = async (idx: number, dir: 'up' | 'down'): Promise<void> => {
     const arr = [...items]
     const swap = dir === 'up' ? idx - 1 : idx + 1
     if (swap < 0 || swap >= arr.length) return
@@ -181,7 +184,7 @@ export default function AgreedValueTab({
     await saveItems(arr)
   }
 
-  const updateScope = async (idx: number, scope: string[] | null) => {
+  const updateScope = async (idx: number, scope: string[] | null): Promise<void> => {
     const updated = items.map((it, i) => (i === idx ? { ...it, vesselScope: scope } : it))
     await saveItems(updated)
   }
@@ -196,12 +199,12 @@ export default function AgreedValueTab({
   // alternatives only affect conditions/premium, not the value. Currency can be overridden
   // per vessel; untouched vessels inherit the quotation default.
   const perVesselMode = valueOptions.length === 0 && qVessels.length > 1
-  const curOf = (qv: QuotationVessel) =>
+  const curOf = (qv: QuotationVessel): string =>
     qv.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'
-  const sumByCur = (field: 'agreedValue' | 'ivValue') => {
+  const sumByCur = (field: 'agreedValue' | 'ivValue'): Record<string, number> => {
     const m: Record<string, number> = {}
     qVessels.forEach((qv) => {
-      const val = (qv as any)[field]
+      const val = qv[field]
       if (val) {
         const c = curOf(qv)
         m[c] = (m[c] || 0) + Number(val)
@@ -209,7 +212,7 @@ export default function AgreedValueTab({
     })
     return m
   }
-  const fmtSums = (m: Record<string, number>) => {
+  const fmtSums = (m: Record<string, number>): string => {
     const keys = Object.keys(m).filter((c) => m[c])
     if (keys.length === 0)
       return (0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -225,7 +228,7 @@ export default function AgreedValueTab({
       )
       .join(' · ')
   }
-  const saveVesselCurrency = async (qv: QuotationVessel, cur: string) => {
+  const saveVesselCurrency = async (qv: QuotationVessel, cur: string): Promise<void> => {
     const val = cur.trim().toUpperCase() || null
     setQVessels((prev) =>
       prev.map((v) => (v.id === qv.id ? { ...v, agreedValueCurrency: val } : v))
@@ -347,7 +350,8 @@ export default function AgreedValueTab({
                 0,
                 quotation.agreedValueCurrency || 'USD'
               )
-              if (result && !(result as any).error) setValueOptions((prev) => [...prev, result])
+              if (result && !('error' in result && result.error))
+                setValueOptions((prev) => [...prev, result])
             }}
             className="btn-secondary"
             style={{ fontSize: '0.78rem', padding: '4px 10px', marginTop: '6px' }}
@@ -486,7 +490,7 @@ export default function AgreedValueTab({
                 cur,
                 'Option 1'
               )
-              if (result && !(result as any).error) setValueOptions([result])
+              if (result && !('error' in result && result.error)) setValueOptions([result])
             }}
             style={{
               background: 'none',
@@ -672,7 +676,7 @@ export default function AgreedValueTab({
                 cur,
                 'Option 1'
               )
-              if (result && !(result as any).error) setValueOptions([result])
+              if (result && !('error' in result && result.error)) setValueOptions([result])
             }}
             style={{
               background: 'none',
@@ -761,7 +765,7 @@ export default function AgreedValueTab({
                 cur,
                 'Option 1'
               )
-              if (result && !(result as any).error) setValueOptions([result])
+              if (result && !('error' in result && result.error)) setValueOptions([result])
             }}
             style={{
               background: 'none',
@@ -1054,7 +1058,7 @@ export default function AgreedValueTab({
             No text items yet. Add from templates above or write custom text below.
           </div>
         ) : (
-          visibleItems.map((it, _vIdx) => {
+          visibleItems.map((it) => {
             const idx = items.indexOf(it)
             return (
               <div

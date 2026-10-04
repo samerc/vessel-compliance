@@ -29,22 +29,31 @@ import { formatDateShort } from '../utils/dateUtils'
 // Helpers
 // ---------------------------------------------------------------------------
 
-const formatSize = (bytes: number) => {
+const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const formatDate = (iso?: string) => {
+const formatDate = (iso?: string): string => {
   return formatDateShort(iso) || ''
 }
 
-const baseName = (p: string) => {
+/** safeHandle returns `{ error: true, message }` instead of throwing; null when the call succeeded. */
+const ipcErrorMessage = (result: unknown): string | null => {
+  if (result && typeof result === 'object' && 'error' in result && result.error) {
+    const message = 'message' in result ? result.message : undefined
+    return (typeof message === 'string' && message) || 'Unknown error'
+  }
+  return null
+}
+
+const baseName = (p: string): string => {
   const parts = p.replace(/\\/g, '/').split('/')
   return parts[parts.length - 1] || p
 }
 
-const getFileIcon = (name: string) => {
+const getFileIcon = (name: string): React.JSX.Element => {
   const ext = name.split('.').pop()?.toLowerCase() || ''
   if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp'].includes(ext))
     return <Image size={16} style={{ color: '#ff64c8' }} />
@@ -80,7 +89,7 @@ function TreeNode({
   onToggle,
   onContextMenu,
   isLight
-}: TreeNodeProps) {
+}: TreeNodeProps): React.JSX.Element | null {
   if (!node.isDirectory) return null
   const isExpanded = expandedPaths.has(node.path)
   const isSelected = selectedPath === node.path
@@ -160,7 +169,7 @@ function TreeNode({
 // FileManager
 // ---------------------------------------------------------------------------
 
-export default function FileManager() {
+export default function FileManager(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError, showToast } = useToast()
@@ -230,8 +239,10 @@ export default function FileManager() {
           next.add(r)
           return next
         })
-      } catch (err: any) {
-        showError('Failed to read directory tree: ' + (err?.message || err))
+      } catch (err) {
+        showError(
+          'Failed to read directory tree: ' + (err instanceof Error ? err.message : String(err))
+        )
       } finally {
         setLoading(false)
       }
@@ -244,26 +255,33 @@ export default function FileManager() {
       try {
         const items = await window.api.fileManagerReadDirectory(dirPath)
         setContents(items)
-      } catch (err: any) {
-        showError('Failed to read directory: ' + (err?.message || err))
+      } catch (err) {
+        showError('Failed to read directory: ' + (err instanceof Error ? err.message : String(err)))
         setContents([])
       }
     },
     [showError]
   )
 
+  // Latest loadTree for the mount-only initial load (it is always given the root explicitly,
+  // so a newer rootPath in its closure does not matter)
+  const loadTreeRef = useRef(loadTree)
+  useEffect(() => {
+    loadTreeRef.current = loadTree
+  }, [loadTree])
+
   // Initial load
   useEffect(() => {
     ;(async () => {
       const root = await loadRoot()
       if (root) {
-        await loadTree(root)
+        await loadTreeRef.current(root)
         setSelectedPath(root)
         const items = await window.api.fileManagerReadDirectory(root)
         setContents(items)
       }
     })()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadRoot])
 
   // -------------------------------------------------------------------------
   // Tree interaction
@@ -303,14 +321,14 @@ export default function FileManager() {
 
   // Close context menu on any click
   useEffect(() => {
-    const handler = () => setContextMenu(null)
+    const handler = (): void => setContextMenu(null)
     window.addEventListener('click', handler)
     return () => window.removeEventListener('click', handler)
   }, [])
 
   // Close modals on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         setContextMenu(null)
         setRenameModal(null)
@@ -337,8 +355,9 @@ export default function FileManager() {
     }
     try {
       const result = await window.api.fileManagerRenameFolder(renameModal.path, newName)
-      if ((result as any)?.error) {
-        showError('Rename failed: ' + ((result as any).message || 'Unknown error'))
+      const renameError = ipcErrorMessage(result)
+      if (renameError !== null) {
+        showError('Rename failed: ' + renameError)
         return
       }
       showSuccess(
@@ -353,8 +372,8 @@ export default function FileManager() {
       } else if (selectedPath) {
         await loadContents(selectedPath)
       }
-    } catch (err: any) {
-      showError('Rename failed: ' + (err?.message || err))
+    } catch (err) {
+      showError('Rename failed: ' + (err instanceof Error ? err.message : String(err)))
     }
   }, [renameModal, loadTree, selectedPath, loadContents, showSuccess, showError])
 
@@ -362,8 +381,9 @@ export default function FileManager() {
     if (!moveModal || !moveDestination) return
     try {
       const result = await window.api.fileManagerMoveFolder(moveModal.sourcePath, moveDestination)
-      if ((result as any)?.error) {
-        showError('Move failed: ' + ((result as any).message || 'Unknown error'))
+      const moveError = ipcErrorMessage(result)
+      if (moveError !== null) {
+        showError('Move failed: ' + moveError)
         return
       }
       showSuccess(
@@ -381,8 +401,8 @@ export default function FileManager() {
       } else if (selectedPath) {
         await loadContents(selectedPath)
       }
-    } catch (err: any) {
-      showError('Move failed: ' + (err?.message || err))
+    } catch (err) {
+      showError('Move failed: ' + (err instanceof Error ? err.message : String(err)))
     }
   }, [
     moveModal,
@@ -408,8 +428,8 @@ export default function FileManager() {
       if (selectedPath === newFolderModal) {
         await loadContents(newFolderModal)
       }
-    } catch (err: any) {
-      showError('Create folder failed: ' + (err?.message || err))
+    } catch (err) {
+      showError('Create folder failed: ' + (err instanceof Error ? err.message : String(err)))
     }
   }, [newFolderModal, newFolderName, loadTree, selectedPath, loadContents, showSuccess, showError])
 
@@ -418,8 +438,8 @@ export default function FileManager() {
     try {
       const results = await window.api.fileManagerHealthCheck()
       setHealthCheckResults(results)
-    } catch (err: any) {
-      showError('Health check failed: ' + (err?.message || err))
+    } catch (err) {
+      showError('Health check failed: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setHealthLoading(false)
     }
@@ -429,8 +449,8 @@ export default function FileManager() {
     async (path: string) => {
       try {
         await window.api.fileManagerOpenInExplorer(path)
-      } catch (err: any) {
-        showError('Failed to open: ' + (err?.message || err))
+      } catch (err) {
+        showError('Failed to open: ' + (err instanceof Error ? err.message : String(err)))
       }
     },
     [showError]
@@ -440,8 +460,8 @@ export default function FileManager() {
     async (path: string) => {
       try {
         await window.api.fileManagerOpenFile(path)
-      } catch (err: any) {
-        showError('Failed to open file: ' + (err?.message || err))
+      } catch (err) {
+        showError('Failed to open file: ' + (err instanceof Error ? err.message : String(err)))
       }
     },
     [showError]
@@ -458,8 +478,8 @@ export default function FileManager() {
       await loadTree(val)
       setSelectedPath(val)
       await loadContents(val)
-    } catch (err: any) {
-      showError('Failed to set root: ' + (err?.message || err))
+    } catch (err) {
+      showError('Failed to set root: ' + (err instanceof Error ? err.message : String(err)))
     }
   }, [newRootInput, loadTree, loadContents, showSuccess, showError])
 
@@ -702,7 +722,7 @@ export default function FileManager() {
     node: FileNode
     depth: number
     sourcePath: string
-  }) {
+  }): React.JSX.Element | null {
     const [expanded, setExpanded] = useState(depth < 2)
     if (!node.isDirectory) return null
     // Don't allow moving into itself or its children
@@ -1065,7 +1085,7 @@ export default function FileManager() {
               </div>
             ) : (
               filteredContents.map((item, idx) => {
-                const btnStyle = (color: string) => ({
+                const btnStyle = (color: string): React.CSSProperties => ({
                   background: 'none' as const,
                   border: 'none' as const,
                   cursor: 'pointer' as const,

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { StrMoneyInput } from './quotation-tabs/shared'
 
-export default function TLORateCalculator() {
+export default function TLORateCalculator(): React.JSX.Element {
   const [currentValue, setCurrentValue] = useState('')
   const [premium, setPremium] = useState('')
   const [newValue, setNewValue] = useState('')
@@ -37,9 +37,9 @@ export default function TLORateCalculator() {
     return { rate, rateDiv3, diff, additionalPremium, newPremium, newRate }
   }, [currentValue, premium, newValue])
 
-  const fmt = (n: number) =>
+  const fmt = (n: number): string =>
     n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const fmtRate = (n: number) => n.toFixed(4) + '%'
+  const fmtRate = (n: number): string => n.toFixed(4) + '%'
 
   const cardStyle = {
     padding: '16px 20px',

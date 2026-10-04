@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useEffectEvent, useRef, useMemo } from 'react'
 import {
   Plus,
   Trash2,
@@ -18,7 +18,8 @@ import {
   QuotationHullCondition,
   QuotationHullAdditionalCondition,
   QuotationHullAlternative,
-  QuotationVessel
+  QuotationVessel,
+  HullConditionSection
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
@@ -38,7 +39,7 @@ function HullClauseDropdown({
   onChange: (id: string) => void
   description?: string
   hideLabel?: boolean
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -48,7 +49,7 @@ function HullClauseDropdown({
 
   useEffect(() => {
     if (!open) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -182,9 +183,39 @@ function HullClauseDropdown({
   )
 }
 
+/** One quotation hull condition as sent to hullSetQuotationHullConditions */
+interface HullCondSaveItem {
+  hullConditionId: string
+  textOverride?: string
+  conditionSection: HullConditionSection
+  amount?: number
+  vesselAmounts?: Record<string, number> | null
+  vesselScope?: string[] | null
+  alternativeId?: string | null
+}
+
+/** One quotation additional condition as sent to hullSetQuotationHullAdditionalConditions */
+interface HullAddSaveItem {
+  hullAdditionalConditionId: string
+  textOverride?: string
+  vesselScope?: string[] | null
+  alternativeId?: string | null
+  amount?: number | null
+  order?: number
+}
+
+/** A row in the hull condition picker */
+interface HullPickerItem {
+  id: string
+  label: string
+  text: string
+  hasAmount?: boolean
+  amountPlaceholder?: string
+}
+
 // ==================== Hull Condition Picker (shared) ====================
 
-const stripTags = (html: string) =>
+const stripTags = (html: string): string =>
   html
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
@@ -205,7 +236,6 @@ function HullConditionPicker({
   amounts,
   onAmountChange,
   onAmountBlur,
-  allConditions: _allConds,
   vesselAmountsMap,
   onVesselAmountChange,
   onVesselAmountBlur
@@ -234,7 +264,7 @@ function HullConditionPicker({
   vesselAmountsMap?: Record<string, Record<string, number> | null>
   onVesselAmountChange?: (condId: string, vesselId: string, amount: number | undefined) => void
   onVesselAmountBlur?: () => void
-}) {
+}): React.JSX.Element {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { theme } = useTheme()
@@ -664,10 +694,10 @@ export default function HullConditionsTab({
   showError
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
-}) {
+}): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [hullClauses, setHullClauses] = useState<HullClause[]>([])
@@ -697,55 +727,10 @@ export default function HullConditionsTab({
   const addDefaultsApplied = useRef(false)
   const orderNormalized = useRef(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  // Normalize the additional + custom order into a single shared, gap-free namespace.
-  // Legacy data has two independent 0-based namespaces that overlap, which makes
-  // interleaving impossible. Runs once when overlap is first detected, then persists.
-  useEffect(() => {
-    if (orderNormalized.current) return
-    if (qAdditional.length === 0 && customConditions.length === 0) return
-    const aOrders = qAdditional.map((c) => c.order ?? 0)
-    const cOrders = customConditions.map((c) => c.order ?? 0)
-    const overlap = cOrders.some((o) => aOrders.includes(o))
-    orderNormalized.current = true
-    if (!overlap) return
-    const sortedA = [...qAdditional].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    const sortedC = [...customConditions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    const newA = sortedA.map((c, i) => ({ ...c, order: i }))
-    const newC = sortedC.map((c, i) => ({ ...c, order: sortedA.length + i }))
-    setQAdditional(newA)
-    setCustomConditions(newC)
-    window.api
-      .hullSetQuotationHullAdditionalConditions(
-        quotation.id,
-        newA.map((c) => ({
-          hullAdditionalConditionId: c.hullAdditionalConditionId,
-          textOverride: c.textOverride,
-          vesselScope: c.vesselScope,
-          alternativeId: c.alternativeId,
-          amount: c.amount,
-          order: c.order
-        }))
-      )
-      .then(ok)
-      .catch(() => {})
-    if (newC.length > 0) {
-      window.api
-        .hullReorderQuotationCustomConditions(
-          quotation.id,
-          newC.map((c) => ({ id: c.id, order: c.order! }))
-        )
-        .catch(() => {})
-    }
-  }, [qAdditional, customConditions, quotation.id])
-
   // Close add-override dropdown on outside click
   useEffect(() => {
     if (!addOverrideOpen) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: MouseEvent): void => {
       if (addOverrideRef.current && !addOverrideRef.current.contains(e.target as Node))
         setAddOverrideOpen(false)
     }
@@ -753,7 +738,7 @@ export default function HullConditionsTab({
     return () => document.removeEventListener('mousedown', handler)
   }, [addOverrideOpen])
 
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     const [clauses, conditions, additional, existCond, existAdd, qv, alts, customConds] =
       await Promise.all([
         window.api.hullGetClauses(),
@@ -765,7 +750,8 @@ export default function HullConditionsTab({
         window.api.hullGetQuotationAlternatives(quotation.id),
         window.api.hullGetQuotationCustomConditions(quotation.id)
       ])
-    setCustomConditions(Array.isArray(customConds) ? customConds : [])
+    const safeCustom = Array.isArray(customConds) ? customConds : []
+    setCustomConditions(safeCustom)
     const safeClauses = Array.isArray(clauses) ? clauses : []
     const safeConds = Array.isArray(conditions) ? conditions : []
     const safeAdd = Array.isArray(additional) ? additional : []
@@ -779,6 +765,45 @@ export default function HullConditionsTab({
     setQAdditional(safeExistAdd)
     setQVessels(Array.isArray(qv) ? qv : [])
 
+    // Normalize the additional + custom order into a single shared, gap-free namespace.
+    // Legacy data has two independent 0-based namespaces that overlap, which makes
+    // interleaving impossible. Runs once on the first loaded data, then persists.
+    if (!orderNormalized.current && (safeExistAdd.length > 0 || safeCustom.length > 0)) {
+      orderNormalized.current = true
+      const aOrders = safeExistAdd.map((c) => c.order ?? 0)
+      const overlap = safeCustom.some((c) => aOrders.includes(c.order ?? 0))
+      if (overlap) {
+        const sortedA = [...safeExistAdd].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const sortedC = [...safeCustom].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const newA = sortedA.map((c, i) => ({ ...c, order: i }))
+        const newC = sortedC.map((c, i) => ({ ...c, order: sortedA.length + i }))
+        setQAdditional(newA)
+        setCustomConditions(newC)
+        window.api
+          .hullSetQuotationHullAdditionalConditions(
+            quotation.id,
+            newA.map((c) => ({
+              hullAdditionalConditionId: c.hullAdditionalConditionId,
+              textOverride: c.textOverride,
+              vesselScope: c.vesselScope,
+              alternativeId: c.alternativeId,
+              amount: c.amount,
+              order: c.order
+            }))
+          )
+          .then(ok)
+          .catch(() => {})
+        if (newC.length > 0) {
+          window.api
+            .hullReorderQuotationCustomConditions(
+              quotation.id,
+              newC.map((c) => ({ id: c.id, order: c.order }))
+            )
+            .catch(() => {})
+        }
+      }
+    }
+
     // If no alternatives exist yet, create one shared from the quotation's hullClauseId or first H&M clause
     if (safeAlts.length === 0) {
       // No alternatives yet — don't auto-create, let user choose
@@ -790,11 +815,15 @@ export default function HullConditionsTab({
       if (sharedAlts.length === 1 && sharedAlts[0].hullClauseId !== quotation.hullClauseId) {
         try {
           updateField('hullClauseId', sharedAlts[0].hullClauseId)
-        } catch {}
+        } catch {
+          /* best-effort sync of the quotation field; the tab state is already correct */
+        }
       } else if (sharedAlts.length > 1 && quotation.hullClauseId) {
         try {
           updateField('hullClauseId', null)
-        } catch {}
+        } catch {
+          /* best-effort sync of the quotation field; the tab state is already correct */
+        }
       }
     }
 
@@ -806,7 +835,9 @@ export default function HullConditionsTab({
       setSelectedIvClauseId(ivClauses[0].id)
       try {
         updateField('ivClauseId', ivClauses[0].id)
-      } catch {}
+      } catch {
+        /* best-effort sync of the quotation field; the tab state is already correct */
+      }
     }
 
     // Auto-apply default conditions when none exist yet — only if alternatives exist
@@ -818,7 +849,7 @@ export default function HullConditionsTab({
       safeAlts.length > 0
     ) {
       condDefaultsApplied.current = true
-      const defaults = safeConds.filter((c: any) => c.defaultSelected)
+      const defaults = safeConds.filter((c) => c.defaultSelected)
       if (defaults.length > 0) {
         // Assign defaults to the first alternative instead of null scope
         const firstAlt = safeAlts[0]
@@ -826,7 +857,7 @@ export default function HullConditionsTab({
           ok(
             await window.api.hullSetQuotationHullConditions(
               quotation.id,
-              defaults.map((c: any) => ({
+              defaults.map((c) => ({
                 hullConditionId: c.id,
                 conditionSection: c.conditionSection || 'both',
                 alternativeId: firstAlt.id
@@ -835,7 +866,9 @@ export default function HullConditionsTab({
           )
           const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
           setQConditions(Array.isArray(fresh) ? fresh : [])
-        } catch {}
+        } catch {
+          /* applying defaults is optional; the user can still pick conditions by hand */
+        }
       }
     } else if (safeExistCond.length > 0) {
       condDefaultsApplied.current = true
@@ -855,12 +888,22 @@ export default function HullConditionsTab({
           )
           const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
           setQAdditional(Array.isArray(fresh) ? fresh : [])
-        } catch {}
+        } catch {
+          /* applying defaults is optional; the user can still pick conditions by hand */
+        }
       }
     } else if (safeExistAdd.length > 0) {
       addDefaultsApplied.current = true
     }
   }
+
+  // Initial load, once on mount (loadData reads the latest props).
+  const loadOnMount = useEffectEvent(loadData)
+  useEffect(() => {
+    void (async () => {
+      await loadOnMount()
+    })()
+  }, [])
 
   // Derived: which vessels have overrides
   const multiVessel = qVessels.length >= 2
@@ -883,7 +926,7 @@ export default function HullConditionsTab({
   )
 
   // Copy shared alternatives + conditions to a specific vessel
-  const handleCopyFromShared = async (vesselId: string) => {
+  const handleCopyFromShared = async (vesselId: string): Promise<void> => {
     const hmClauses = hullClauses.filter((c) => c.conditionSection !== 'iv')
     if (hmClauses.length === 0) return
     const sharedAlts = alternatives.filter((a) => !a.vesselScopeId)
@@ -901,7 +944,7 @@ export default function HullConditionsTab({
           srcAlt.label,
           vesselId
         )
-        if (newAlt && !(newAlt as any).error) {
+        if (newAlt && !(newAlt as { error?: unknown }).error) {
           newAlts.push(newAlt)
           // Clone conditions for this alternative
           const altConds = qConditions.filter((c) => c.alternativeId === srcAlt.id)
@@ -928,13 +971,13 @@ export default function HullConditionsTab({
       setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
       setSelectedVesselScope(vesselId)
       showSuccess('Copied shared conditions to vessel override')
-    } catch (err: any) {
-      showError(err.message || 'Failed to copy from shared')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to copy from shared')
     }
   }
 
   // Start fresh: create an empty alternative for a vessel
-  const handleStartFresh = async (vesselId: string) => {
+  const handleStartFresh = async (vesselId: string): Promise<void> => {
     const hmClauses = hullClauses.filter((c) => c.conditionSection !== 'iv')
     if (hmClauses.length === 0) return
     try {
@@ -944,17 +987,17 @@ export default function HullConditionsTab({
         undefined,
         vesselId
       )
-      if (newAlt && !(newAlt as any).error) {
+      if (newAlt && !(newAlt as { error?: unknown }).error) {
         setAlternatives((prev) => [...prev, newAlt])
         setSelectedVesselScope(vesselId)
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to create vessel override')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to create vessel override')
     }
   }
 
   // Remove all overrides for a vessel (falls back to shared)
-  const handleRemoveOverride = async (vesselId: string) => {
+  const handleRemoveOverride = async (vesselId: string): Promise<void> => {
     const vesselAlts = alternatives.filter((a) => a.vesselScopeId === vesselId)
     try {
       for (const alt of vesselAlts) {
@@ -971,13 +1014,13 @@ export default function HullConditionsTab({
       setQConditions(Array.isArray(freshCond) ? freshCond : [])
       setQAdditional(Array.isArray(freshAdd) ? freshAdd : [])
       showSuccess('Vessel override removed, using shared conditions')
-    } catch (err: any) {
-      showError(err.message || 'Failed to remove override')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to remove override')
     }
   }
 
   // Alternative management
-  const addAlternative = async (vesselScopeId?: string | null) => {
+  const addAlternative = async (vesselScopeId?: string | null): Promise<void> => {
     try {
       const newAlt = await window.api.hullAddQuotationAlternative(
         quotation.id,
@@ -985,22 +1028,24 @@ export default function HullConditionsTab({
         undefined,
         vesselScopeId
       )
-      if (newAlt && !(newAlt as any).error) {
+      if (newAlt && !(newAlt as { error?: unknown }).error) {
         const updated = [...alternatives, newAlt]
         setAlternatives(updated)
         // Clear hullClauseId when we have multiple shared alternatives
         if (updated.filter((a) => !a.vesselScopeId).length > 1) {
           try {
             updateField('hullClauseId', null)
-          } catch {}
+          } catch {
+            /* best-effort sync of the quotation field; the tab state is already correct */
+          }
         }
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to add alternative')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to add alternative')
     }
   }
 
-  const removeAlternative = async (altId: string) => {
+  const removeAlternative = async (altId: string): Promise<void> => {
     const alt = alternatives.find((a) => a.id === altId)
     // Each scope must keep at least one alternative
     if (alt?.vesselScopeId) {
@@ -1025,14 +1070,16 @@ export default function HullConditionsTab({
       if (nonVesselAlts.length === 1) {
         try {
           updateField('hullClauseId', nonVesselAlts[0].hullClauseId)
-        } catch {}
+        } catch {
+          /* best-effort sync of the quotation field; the tab state is already correct */
+        }
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to remove alternative')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to remove alternative')
     }
   }
 
-  const changeAlternativeClause = async (altId: string, clauseId: string) => {
+  const changeAlternativeClause = async (altId: string, clauseId: string): Promise<void> => {
     try {
       await window.api.hullUpdateQuotationAlternative(altId, { hullClauseId: clauseId })
       setAlternatives((prev) =>
@@ -1043,7 +1090,9 @@ export default function HullConditionsTab({
       if (sharedCount === 1 && !alternatives.find((a) => a.id === altId)?.vesselScopeId) {
         try {
           updateField('hullClauseId', clauseId)
-        } catch {}
+        } catch {
+          /* best-effort sync of the quotation field; the tab state is already correct */
+        }
       }
       // Auto-select default conditions for the new clause
       const clauseConds = allConditions.filter((c) => c.hullClauseId === clauseId)
@@ -1076,50 +1125,58 @@ export default function HullConditionsTab({
             )
             const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
             setQConditions(Array.isArray(fresh) ? fresh : [])
-          } catch {}
+          } catch {
+            /* applying defaults is optional; the user can still pick conditions by hand */
+          }
         }
       }
-    } catch {}
+    } catch {
+      showError('Failed to change the hull clause')
+    }
   }
 
-  const handleIvClauseChange = async (clauseId: string) => {
+  const handleIvClauseChange = async (clauseId: string): Promise<void> => {
     setSelectedIvClauseId(clauseId)
     try {
       updateField('ivClauseId', clauseId)
-    } catch {}
+    } catch {
+      /* best-effort sync of the quotation field; the tab state is already correct */
+    }
   }
 
   // Clause conditions toggle — include amount and alternativeId in save
-  const getCondSection = (condId: string) =>
+  const getCondSection = (condId: string): HullConditionSection =>
     allConditions.find((c) => c.id === condId)?.conditionSection || 'both'
 
   // Per-alternative helpers for selectedIds, overrides, amounts, scopes
-  const getAltConditions = (altId: string | null) =>
+  const getAltConditions = (altId: string | null): QuotationHullCondition[] =>
     qConditions.filter((c) => c.alternativeId === altId)
-  const getAltSelectedIds = (altId: string | null) =>
+  const getAltSelectedIds = (altId: string | null): Set<string> =>
     new Set(getAltConditions(altId).map((c) => c.hullConditionId))
-  const getAltOverrides = (altId: string | null) => {
+  const getAltOverrides = (altId: string | null): Record<string, string> => {
     const m: Record<string, string> = {}
     getAltConditions(altId).forEach((c) => {
       if (c.textOverride) m[c.hullConditionId] = c.textOverride
     })
     return m
   }
-  const getAltAmounts = (altId: string | null) => {
+  const getAltAmounts = (altId: string | null): Record<string, number | undefined> => {
     const m: Record<string, number | undefined> = {}
     getAltConditions(altId).forEach((c) => {
       if (c.amount != null) m[c.hullConditionId] = c.amount
     })
     return m
   }
-  const getAltVesselAmounts = (altId: string | null) => {
+  const getAltVesselAmounts = (
+    altId: string | null
+  ): Record<string, Record<string, number> | null> => {
     const m: Record<string, Record<string, number> | null> = {}
     getAltConditions(altId).forEach((c) => {
       m[c.hullConditionId] = c.vesselAmounts || null
     })
     return m
   }
-  const getAltScopes = (altId: string | null) => {
+  const getAltScopes = (altId: string | null): Record<string, string[] | null> => {
     const m: Record<string, string[] | null> = {}
     getAltConditions(altId).forEach((c) => {
       if (c.vesselScope) m[c.hullConditionId] = c.vesselScope
@@ -1127,7 +1184,7 @@ export default function HullConditionsTab({
     return m
   }
 
-  const mapCondForSave = (c: QuotationHullCondition) => ({
+  const mapCondForSave = (c: QuotationHullCondition): HullCondSaveItem => ({
     hullConditionId: c.hullConditionId,
     textOverride: c.textOverride,
     conditionSection: c.conditionSection || getCondSection(c.hullConditionId),
@@ -1137,7 +1194,7 @@ export default function HullConditionsTab({
     alternativeId: c.alternativeId
   })
 
-  const toggleCondition = async (condId: string, alternativeId?: string | null) => {
+  const toggleCondition = async (condId: string, alternativeId?: string | null): Promise<void> => {
     const altId = alternativeId || null
     const existing = qConditions.find(
       (c) => c.hullConditionId === condId && c.alternativeId === altId
@@ -1164,12 +1221,12 @@ export default function HullConditionsTab({
       await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave))
       const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
       setQConditions(Array.isArray(fresh) ? fresh : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to update')
     }
   }
 
-  const updateConditionOverride = (condId: string, text: string) => {
+  const updateConditionOverride = (condId: string, text: string): void => {
     setQConditions((prev) =>
       prev.map((c) =>
         c.hullConditionId === condId ? { ...c, textOverride: text || undefined } : c
@@ -1177,7 +1234,7 @@ export default function HullConditionsTab({
     )
   }
 
-  const updateConditionAmount = (condId: string, amount: number | undefined) => {
+  const updateConditionAmount = (condId: string, amount: number | undefined): void => {
     setQConditions((prev) => prev.map((c) => (c.hullConditionId === condId ? { ...c, amount } : c)))
   }
 
@@ -1185,7 +1242,7 @@ export default function HullConditionsTab({
     condId: string,
     vesselId: string,
     amount: number | undefined
-  ) => {
+  ): void => {
     setQConditions((prev) =>
       prev.map((c) => {
         if (c.hullConditionId !== condId) return c
@@ -1209,7 +1266,7 @@ export default function HullConditionsTab({
     )
   }
 
-  const saveConditionOverrides = async () => {
+  const saveConditionOverrides = async (): Promise<void> => {
     try {
       ok(
         await window.api.hullSetQuotationHullConditions(
@@ -1217,10 +1274,12 @@ export default function HullConditionsTab({
           qConditions.map(mapCondForSave)
         )
       )
-    } catch {}
+    } catch {
+      showError('Failed to save the condition')
+    }
   }
 
-  const updateConditionScope = async (condId: string, scope: string[] | null) => {
+  const updateConditionScope = async (condId: string, scope: string[] | null): Promise<void> => {
     const updated = qConditions.map((c) =>
       c.hullConditionId === condId ? { ...c, vesselScope: scope } : c
     )
@@ -1228,7 +1287,9 @@ export default function HullConditionsTab({
       ok(await window.api.hullSetQuotationHullConditions(quotation.id, updated.map(mapCondForSave)))
       const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
       setQConditions(Array.isArray(fresh) ? fresh : [])
-    } catch {}
+    } catch {
+      showError('Failed to update the condition scope')
+    }
   }
 
   // Additional conditions toggle
@@ -1244,7 +1305,7 @@ export default function HullConditionsTab({
 
   // Always carry the explicit order so deletes+reinserts never clobber the shared
   // additional+custom ordering namespace.
-  const mapAddForSave = (c: QuotationHullAdditionalCondition) => ({
+  const mapAddForSave = (c: QuotationHullAdditionalCondition): HullAddSaveItem => ({
     hullAdditionalConditionId: c.hullAdditionalConditionId,
     textOverride: c.textOverride,
     vesselScope: c.vesselScope,
@@ -1253,7 +1314,7 @@ export default function HullConditionsTab({
     order: c.order
   })
 
-  const toggleAdditional = async (addId: string) => {
+  const toggleAdditional = async (addId: string): Promise<void> => {
     let updated: QuotationHullAdditionalCondition[]
     if (selectedAddIds.has(addId)) {
       updated = qAdditional.filter((c) => c.hullAdditionalConditionId !== addId)
@@ -1282,12 +1343,12 @@ export default function HullConditionsTab({
       )
       const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
       setQAdditional(Array.isArray(fresh) ? fresh : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to update')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to update')
     }
   }
 
-  const updateAdditionalOverride = (addId: string, text: string) => {
+  const updateAdditionalOverride = (addId: string, text: string): void => {
     setQAdditional((prev) =>
       prev.map((c) =>
         c.hullAdditionalConditionId === addId ? { ...c, textOverride: text || undefined } : c
@@ -1295,7 +1356,7 @@ export default function HullConditionsTab({
     )
   }
 
-  const saveAdditionalOverrides = async () => {
+  const saveAdditionalOverrides = async (): Promise<void> => {
     try {
       ok(
         await window.api.hullSetQuotationHullAdditionalConditions(
@@ -1303,10 +1364,12 @@ export default function HullConditionsTab({
           qAdditional.map(mapAddForSave)
         )
       )
-    } catch {}
+    } catch {
+      showError('Failed to save the additional condition')
+    }
   }
 
-  const updateAdditionalAmount = async (addId: string, amount: number | null) => {
+  const updateAdditionalAmount = async (addId: string, amount: number | null): Promise<void> => {
     const updated = qAdditional.map((c) =>
       c.hullAdditionalConditionId === addId ? { ...c, amount } : c
     )
@@ -1318,10 +1381,12 @@ export default function HullConditionsTab({
           updated.map(mapAddForSave)
         )
       )
-    } catch {}
+    } catch {
+      showError('Failed to save the amount')
+    }
   }
 
-  const updateAdditionalScope = async (addId: string, scope: string[] | null) => {
+  const updateAdditionalScope = async (addId: string, scope: string[] | null): Promise<void> => {
     const updated = qAdditional.map((c) =>
       c.hullAdditionalConditionId === addId ? { ...c, vesselScope: scope } : c
     )
@@ -1334,12 +1399,14 @@ export default function HullConditionsTab({
       )
       const fresh = await window.api.hullGetQuotationHullAdditionalConditions(quotation.id)
       setQAdditional(Array.isArray(fresh) ? fresh : [])
-    } catch {}
+    } catch {
+      showError('Failed to update the condition scope')
+    }
   }
 
   // -- Custom conditions (now merged into the Additional Conditions tab) --
 
-  const addCustomCondition = async () => {
+  const addCustomCondition = async (): Promise<void> => {
     if (!newCustomText.trim()) return
     try {
       await window.api.hullAddQuotationCustomCondition({
@@ -1349,22 +1416,28 @@ export default function HullConditionsTab({
       setNewCustomText('')
       const fresh = await window.api.hullGetQuotationCustomConditions(quotation.id)
       setCustomConditions(Array.isArray(fresh) ? fresh : [])
-    } catch {}
+    } catch {
+      showError('Failed to add the custom condition')
+    }
   }
 
-  const deleteCustomCondition = async (id: string) => {
+  const deleteCustomCondition = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this custom condition?'))) return
     try {
       await window.api.hullDeleteQuotationCustomCondition(id)
       setCustomConditions((prev) => prev.filter((c) => c.id !== id))
-    } catch {}
+    } catch {
+      showError('Failed to delete the custom condition')
+    }
   }
 
-  const updateCustomConditionText = async (id: string, text: string) => {
+  const updateCustomConditionText = async (id: string, text: string): Promise<void> => {
     try {
       await window.api.hullUpdateQuotationCustomCondition(id, { text })
       setCustomConditions((prev) => prev.map((c) => (c.id === id ? { ...c, text } : c)))
-    } catch {}
+    } catch {
+      showError('Failed to save the custom condition')
+    }
   }
 
   // Build the combined additional + custom list in unified export order.
@@ -1404,7 +1477,7 @@ export default function HullConditionsTab({
     merged: MergedCondItem[],
     fromIdx: number,
     toIdx: number
-  ) => {
+  ): Promise<void> => {
     if (fromIdx === toIdx) return
     const next = [...merged]
     const [moved] = next.splice(fromIdx, 1)
@@ -1453,7 +1526,9 @@ export default function HullConditionsTab({
       )
       if (customOrder.length > 0)
         await window.api.hullReorderQuotationCustomConditions(quotation.id, customOrder)
-    } catch {}
+    } catch {
+      showError('Failed to save the new order')
+    }
   }
 
   // Derived data
@@ -1472,7 +1547,7 @@ export default function HullConditionsTab({
   const multiAlt = visibleAlternatives.length > 1
 
   // Build condition items with amount inputs
-  const buildCondItems = (conds: HullClauseCondition[]) =>
+  const buildCondItems = (conds: HullClauseCondition[]): HullPickerItem[] =>
     conds.map((c) => ({
       id: c.id,
       label: `Cl. ${c.conditionNumber}`,
@@ -1494,7 +1569,7 @@ export default function HullConditionsTab({
       ac.hullClauseIds.some((id) => allRelevantClauseIds.includes(id))
   )
 
-  const handleSyncFromSettings = async () => {
+  const handleSyncFromSettings = async (): Promise<void> => {
     // Add new default conditions/additional from settings that aren't already in this quotation
     const existingCondIds = new Set(qConditions.map((c) => c.hullConditionId))
     const existingAddIds = new Set(qAdditional.map((a) => a.hullAdditionalConditionId))
@@ -1516,7 +1591,7 @@ export default function HullConditionsTab({
             vesselScope: c.vesselScope,
             alternativeId: c.alternativeId
           })),
-          ...newConds.map((c: any) => ({
+          ...newConds.map((c) => ({
             hullConditionId: c.id,
             conditionSection: c.conditionSection || 'both',
             alternativeId: visibleAlternatives[0]?.id || null
@@ -1543,13 +1618,16 @@ export default function HullConditionsTab({
       showSuccess?.(
         `Added ${newConds.length} conditions and ${newAdds.length} additional conditions from settings`
       )
-    } catch (err: any) {
-      showError(err.message || 'Failed to sync from settings')
+    } catch (err) {
+      showError((err as { message?: string }).message || 'Failed to sync from settings')
     }
   }
 
   // Render a set of alternatives (used both in shared and per-vessel views)
-  const renderAlternatives = (alts: QuotationHullAlternative[], _vesselScopeId?: string | null) => {
+  const renderAlternatives = (
+    alts: QuotationHullAlternative[],
+    _vesselScopeId?: string | null
+  ): React.JSX.Element => {
     const isMulti = alts.length > 1
     // For vessel-scoped overrides, only show that vessel in per-vessel deductible inputs
     const scopedVessels = _vesselScopeId
@@ -2037,7 +2115,7 @@ export default function HullConditionsTab({
                   fontStyle: 'italic'
                 }}
               >
-                Or select "All Vessels" to modify shared conditions.
+                Or select &quot;All Vessels&quot; to modify shared conditions.
               </div>
             </div>
           )}
@@ -2047,7 +2125,7 @@ export default function HullConditionsTab({
             visibleAlternatives.length > 0 &&
             (() => {
               const includeInShared = visibleAlternatives[0]?.includeInShared !== false
-              const handleToggleIncludeInShared = async () => {
+              const handleToggleIncludeInShared = async (): Promise<void> => {
                 const newVal = !includeInShared
                 const vesselAlts = alternatives.filter(
                   (a) => a.vesselScopeId === selectedVesselScope
@@ -2057,7 +2135,9 @@ export default function HullConditionsTab({
                     await window.api.hullUpdateQuotationAlternative(alt.id, {
                       includeInShared: newVal
                     })
-                  } catch {}
+                  } catch {
+                    showError('Failed to update the alternative')
+                  }
                 }
                 setAlternatives((prev) =>
                   prev.map((a) =>
@@ -2174,11 +2254,13 @@ export default function HullConditionsTab({
                       quotation.id,
                       clauseId
                     )
-                    if (newAlt && !(newAlt as any).error) {
+                    if (newAlt && !(newAlt as { error?: unknown }).error) {
                       setAlternatives([newAlt])
                       try {
                         updateField('hullClauseId', clauseId)
-                      } catch {}
+                      } catch {
+                        /* best-effort sync of the quotation field; the tab state is already correct */
+                      }
                       // Auto-select default conditions for this clause, scoped to the new alternative
                       // Replace any existing null-scoped conditions (from prior auto-apply) with alt-scoped ones
                       const clauseConds = allConditions.filter(
@@ -2198,7 +2280,9 @@ export default function HullConditionsTab({
                       const fresh = await window.api.hullGetQuotationHullConditions(quotation.id)
                       setQConditions(Array.isArray(fresh) ? fresh : [])
                     }
-                  } catch {}
+                  } catch {
+                    showError('Failed to add the hull clause')
+                  }
                 }}
               />
             </div>

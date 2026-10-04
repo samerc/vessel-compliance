@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ScrollText,
   Search,
@@ -61,11 +61,11 @@ const MODULE_COLORS: Record<string, string> = {
   System: '#64748b'
 }
 
-function getActionStyle(action: string) {
+function getActionStyle(action: string): { bg: string; color: string } {
   return ACTION_COLORS[action?.toUpperCase()] || { bg: 'rgba(100,116,139,0.15)', color: '#64748b' }
 }
 
-function getModuleColor(module: string) {
+function getModuleColor(module: string): string {
   return MODULE_COLORS[module] || '#64748b'
 }
 
@@ -148,63 +148,75 @@ function ActivityLogView(): React.JSX.Element {
 
   const LIMIT = 25
 
-  const loadFilters = useCallback(async () => {
-    try {
-      const [mods, acts, usrs] = await Promise.all([
-        window.api.activityGetDistinctModules(),
-        window.api.activityGetDistinctActions(),
-        window.api.activityGetDistinctUsers()
-      ])
-      if (Array.isArray(mods)) setModules(mods)
-      if (Array.isArray(acts)) setActions(acts)
-      if (Array.isArray(usrs)) setUsers(usrs)
-    } catch {
-      // Filters are optional
-    }
-  }, [])
+  // Bumped by the Refresh button to reload both the filter options and the entries
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const filters: ActivityLogFilters = {
-        page,
-        limit: LIMIT
+  useEffect(() => {
+    let alive = true
+    const loadFilters = async (): Promise<void> => {
+      try {
+        const [mods, acts, usrs] = await Promise.all([
+          window.api.activityGetDistinctModules(),
+          window.api.activityGetDistinctActions(),
+          window.api.activityGetDistinctUsers()
+        ])
+        if (!alive) return
+        if (Array.isArray(mods)) setModules(mods)
+        if (Array.isArray(acts)) setActions(acts)
+        if (Array.isArray(usrs)) setUsers(usrs)
+      } catch {
+        // Filters are optional
       }
-      if (moduleFilter) filters.module = moduleFilter
-      if (actionFilter) filters.action = actionFilter
-      if (userFilter) filters.userId = userFilter
-      if (dateFrom) filters.dateFrom = dateFrom
-      if (dateTo) filters.dateTo = dateTo
-      if (search) filters.search = search
+    }
+    void loadFilters()
+    return () => {
+      alive = false
+    }
+  }, [reloadKey])
 
-      const result = await window.api.activityGetLog(filters)
-      if (result && Array.isArray(result.data)) {
-        setEntries(result.data)
-        setTotal(result.total)
-        setTotalPages(result.totalPages)
-      } else {
+  useEffect(() => {
+    let alive = true
+    const loadData = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const filters: ActivityLogFilters = {
+          page,
+          limit: LIMIT
+        }
+        if (moduleFilter) filters.module = moduleFilter
+        if (actionFilter) filters.action = actionFilter
+        if (userFilter) filters.userId = userFilter
+        if (dateFrom) filters.dateFrom = dateFrom
+        if (dateTo) filters.dateTo = dateTo
+        if (search) filters.search = search
+
+        const result = await window.api.activityGetLog(filters)
+        if (!alive) return
+        if (result && Array.isArray(result.data)) {
+          setEntries(result.data)
+          setTotal(result.total)
+          setTotalPages(result.totalPages)
+        } else {
+          setEntries([])
+          setTotal(0)
+          setTotalPages(0)
+        }
+      } catch {
+        if (!alive) return
         setEntries([])
         setTotal(0)
         setTotalPages(0)
+      } finally {
+        if (alive) setLoading(false)
       }
-    } catch {
-      setEntries([])
-      setTotal(0)
-      setTotalPages(0)
-    } finally {
-      setLoading(false)
     }
-  }, [page, moduleFilter, actionFilter, userFilter, dateFrom, dateTo, search])
+    void loadData()
+    return () => {
+      alive = false
+    }
+  }, [page, moduleFilter, actionFilter, userFilter, dateFrom, dateTo, search, reloadKey])
 
-  useEffect(() => {
-    loadFilters()
-  }, [loadFilters])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const handleReset = () => {
+  const handleReset = (): void => {
     setModuleFilter('')
     setActionFilter('')
     setUserFilter('')
@@ -214,7 +226,7 @@ function ActivityLogView(): React.JSX.Element {
     setPage(1)
   }
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = async (): Promise<void> => {
     try {
       // Fetch all entries matching current filters (up to 5000)
       const filters: ActivityLogFilters = { page: 1, limit: 5000 }
@@ -285,12 +297,12 @@ function ActivityLogView(): React.JSX.Element {
 
       doc.save('Activity_Audit_Report.pdf')
       showSuccess('Audit report exported')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export report')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to export report')
     }
   }
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (): Promise<void> => {
     try {
       const allEntries = await window.api.activityGetLog({
         page: 1,
@@ -324,8 +336,8 @@ function ActivityLogView(): React.JSX.Element {
       ws['!cols'] = colWidths
       XLSX.writeFile(wb, 'Activity_Log.xlsx')
       showSuccess('Activity log exported to Excel')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to export')
     }
   }
 
@@ -371,10 +383,7 @@ function ActivityLogView(): React.JSX.Element {
               <Table size={14} /> Export Excel
             </button>
             <button
-              onClick={() => {
-                loadData()
-                loadFilters()
-              }}
+              onClick={() => setReloadKey((k) => k + 1)}
               className="btn-secondary btn-sm"
               title="Refresh"
             >

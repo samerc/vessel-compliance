@@ -44,7 +44,7 @@ const wsData = [headers, sampleRow]
 const ws = XLSX.utils.aoa_to_sheet(wsData)
 
 // Set column widths for better readability
-const wscols = headers.map((h) => ({ wch: 20 }))
+const wscols = headers.map(() => ({ wch: 20 }))
 ws['!cols'] = wscols
 
 XLSX.utils.book_append_sheet(wb, ws, 'Compliance')

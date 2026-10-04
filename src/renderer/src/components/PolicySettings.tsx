@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import {
   Plus,
   Trash2,
@@ -33,8 +33,95 @@ import RichTextEditor from './RichTextEditor'
 import { SECTION_LABELS, getDefaultSectionOrder } from './quotationSettingsConstants'
 import { BC_DEFAULTS } from '../services/PolicyExportService'
 import { sanitizeHtml } from '../utils/sanitize'
-import { ok } from '../utils/ipc'
+import { ok, isIpcError } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
+import type {
+  TcTemplateMeta,
+  EndorsementTriggerField,
+  EndorsementTemplate
+} from '../../../shared/types'
+
+// ── Loaders shared by a tab's mount effect and its reload-after-save handlers ──
+
+type BankRow = { id: string; name: string; details: string; order: number }
+
+/** Banks list; null when the load failed (the caller keeps what it has) */
+async function fetchBanks(): Promise<BankRow[] | null> {
+  try {
+    const data = await window.api.bankGetAll()
+    return Array.isArray(data) ? data : null
+  } catch {
+    return null
+  }
+}
+
+/** T&C templates of one policy type; [] when the load failed */
+async function fetchTcTemplates(tc: string): Promise<TcTemplateMeta[]> {
+  try {
+    const r = await window.api.tcListByType(tc)
+    return Array.isArray(r) ? r : []
+  } catch {
+    return []
+  }
+}
+
+type SignatureRow = {
+  id: string
+  userId: string
+  fileName: string
+  uploadedAt: string
+  username: string
+}
+
+interface SignaturePageData {
+  signatures: SignatureRow[] | null
+  users: Array<{ id: string; username: string }> | null
+  previews: Record<string, string>
+}
+
+/** Signatures, users and a data-URL preview per signature. Throws when the lists fail to load. */
+async function fetchSignaturePageData(): Promise<SignaturePageData> {
+  const [sigs, allUsers] = await Promise.all([window.api.signatureGetAll(), window.api.getUsers()])
+  const out: SignaturePageData = {
+    signatures: Array.isArray(sigs) ? sigs : null,
+    users: Array.isArray(allUsers)
+      ? allUsers.map((u) => ({ id: u.id, username: u.username }))
+      : null,
+    previews: {}
+  }
+
+  // Load preview images for each signature
+  for (const sig of Array.isArray(sigs) ? sigs : []) {
+    try {
+      const full = await window.api.signatureGetForUser(sig.userId)
+      if (full?.imageData) {
+        // IPC may deliver the bytes as an array, a serialized Buffer ({ data }) or an index map
+        const imgData: unknown = full.imageData
+        const arr = Array.isArray(imgData)
+          ? imgData
+          : (imgData as { data?: number[] }).data ||
+            Object.values(imgData as Record<string, number>)
+        const bytes = new Uint8Array(arr)
+        let base64 = ''
+        const chunk = 8192
+        for (let i = 0; i < bytes.length; i += chunk) {
+          base64 += String.fromCharCode(...bytes.subarray(i, i + chunk))
+        }
+        const ext =
+          sig.fileName?.toLowerCase()?.endsWith('.jpg') ||
+          sig.fileName?.toLowerCase()?.endsWith('.jpeg')
+            ? 'image/jpeg'
+            : 'image/png'
+        out.previews[sig.userId] = `data:${ext};base64,${btoa(base64)}`
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return out
+}
+
+const policySectionOrderKey = (tc: string): string => `policy_section_order_defaults_${tc}`
 
 type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
 
@@ -77,7 +164,7 @@ const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[]
 
 const CATEGORY_TABS: Record<
   PolicySettingsCategory,
-  { id: PolicySettingsTab; label: string; icon: any }[]
+  { id: PolicySettingsTab; label: string; icon: React.ReactNode }[]
 > = {
   general: [
     { id: 'fontSize', label: 'Font Size', icon: <Type size={15} /> },
@@ -117,7 +204,7 @@ const CATEGORY_TABS: Record<
   ]
 }
 
-export default function PolicySettings() {
+export default function PolicySettings(): React.JSX.Element {
   const [activeCategory, setActiveCategory] = useState<PolicySettingsCategory>('general')
   const [activeTab, setActiveTab] = useState<PolicySettingsTab>('fontSize')
   const { showSuccess, showError } = useToast()
@@ -126,7 +213,7 @@ export default function PolicySettings() {
   const isLight = theme === 'light' || theme === 'aurora'
   const canSettings = hasPermission('admin:settings')
 
-  const handleCategoryChange = (cat: PolicySettingsCategory) => {
+  const handleCategoryChange = (cat: PolicySettingsCategory): void => {
     setActiveCategory(cat)
     setActiveTab(CATEGORY_TABS[cat][0].id)
   }
@@ -355,7 +442,7 @@ export default function PolicySettings() {
 }
 
 // ==================== Font Size Tab ====================
-function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }): React.JSX.Element {
   const [fontSize, setFontSize] = useState(10)
   const [loading, setLoading] = useState(true)
 
@@ -372,7 +459,7 @@ function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
     })()
   }, [])
 
-  const handleChange = async (pt: number) => {
+  const handleChange = async (pt: number): Promise<void> => {
     setFontSize(pt)
     ok(await window.api.setSetting('policy_font_size', String(pt)))
     showSuccess(`Font size set to ${pt}pt`)
@@ -414,46 +501,51 @@ function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
 }
 
 // ==================== Timezones Tab ====================
-function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }): React.JSX.Element {
   const [timezones, setTimezones] = useState<string[]>([])
   const [newTz, setNewTz] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadTimezones()
+    let alive = true
+    const loadTimezones = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const raw = await window.api.getSetting('policy_timezones')
+        if (!alive) return
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) setTimezones(parsed)
+        }
+        if (!raw)
+          setTimezones(['Lebanon Standard Time', 'Lebanon Local Standard Time', 'GMT', 'UTC'])
+      } catch {
+        if (alive) setTimezones(['Lebanon Standard Time', 'GMT', 'UTC'])
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void loadTimezones()
+    return () => {
+      alive = false
+    }
   }, [])
 
-  const loadTimezones = async () => {
-    setLoading(true)
-    try {
-      const raw = await window.api.getSetting('policy_timezones')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) setTimezones(parsed)
-      }
-      if (!raw) setTimezones(['Lebanon Standard Time', 'Lebanon Local Standard Time', 'GMT', 'UTC'])
-    } catch {
-      setTimezones(['Lebanon Standard Time', 'GMT', 'UTC'])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const save = async (updated: string[]) => {
+  const save = async (updated: string[]): Promise<void> => {
     setTimezones(updated)
     ok(await window.api.setSetting('policy_timezones', JSON.stringify(updated)))
     showSuccess('Timezones saved')
   }
 
-  const handleAdd = () => {
+  const handleAdd = (): void => {
     if (!newTz.trim() || timezones.includes(newTz.trim())) return
     save([...timezones, newTz.trim()])
     setNewTz('')
   }
 
-  const handleRemove = (tz: string) => save(timezones.filter((t) => t !== tz))
+  const handleRemove = (tz: string): Promise<void> => save(timezones.filter((t) => t !== tz))
 
-  const handleMove = (idx: number, dir: -1 | 1) => {
+  const handleMove = (idx: number, dir: -1 | 1): void => {
     const newIdx = idx + dir
     if (newIdx < 0 || newIdx >= timezones.length) return
     const updated = [...timezones]
@@ -583,7 +675,11 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
 }
 
 // ==================== Base Currency Tab ====================
-function BaseCurrencyTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function BaseCurrencyTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
   const [currency, setCurrency] = useState('USD')
   const [loading, setLoading] = useState(true)
 
@@ -600,7 +696,7 @@ function BaseCurrencyTab({ showSuccess }: { showSuccess: (msg: string) => void }
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     const val = currency.toUpperCase().trim()
     ok(await window.api.setSetting('base_currency', val))
     showSuccess(`Base currency set to ${val}`)
@@ -644,7 +740,7 @@ function BaseCurrencyTab({ showSuccess }: { showSuccess: (msg: string) => void }
 }
 
 // ==================== Footer Text Tab ====================
-function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }): React.JSX.Element {
   const [footerText, setFooterText] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -664,7 +760,7 @@ function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }) 
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
@@ -708,12 +804,18 @@ function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }) 
 }
 
 // ==================== Header Titles Tab ====================
-function HeaderTitlesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
-  const defaultTitles: Record<string, string> = {
-    P: 'Protection and Indemnity Certificate',
-    H: 'Hull & Machinery Certificate',
-    W: 'War Risk Certificate'
-  }
+const DEFAULT_HEADER_TITLES: Record<string, string> = {
+  P: 'Protection and Indemnity Certificate',
+  H: 'Hull & Machinery Certificate',
+  W: 'War Risk Certificate'
+}
+
+function HeaderTitlesTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
+  const defaultTitles = DEFAULT_HEADER_TITLES
   const typeLabels: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War' }
 
   const [headerTitles, setHeaderTitles] = useState(defaultTitles)
@@ -725,7 +827,8 @@ function HeaderTitlesTab({ showSuccess }: { showSuccess: (msg: string) => void }
         const raw = await window.api.getSetting('policyExportSettings')
         if (raw) {
           const parsed = JSON.parse(raw)
-          if (parsed.headerTitles) setHeaderTitles({ ...defaultTitles, ...parsed.headerTitles })
+          if (parsed.headerTitles)
+            setHeaderTitles({ ...DEFAULT_HEADER_TITLES, ...parsed.headerTitles })
         }
       } catch {
         /* default */
@@ -735,7 +838,7 @@ function HeaderTitlesTab({ showSuccess }: { showSuccess: (msg: string) => void }
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
@@ -791,7 +894,7 @@ function BanksTab({
 }: {
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [banks, setBanks] = useState<
     { id: string; name: string; details: string; order: number }[]
   >([])
@@ -802,23 +905,26 @@ function BanksTab({
   const [editBankDetails, setEditBankDetails] = useState('')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadBanks()
-  }, [])
-
-  const loadBanks = async () => {
+  const loadBanks = async (): Promise<void> => {
     setLoading(true)
-    try {
-      const data = await window.api.bankGetAll()
-      if (Array.isArray(data)) setBanks(data)
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false)
-    }
+    const data = await fetchBanks()
+    if (data) setBanks(data)
+    setLoading(false)
   }
 
-  const handleAdd = async (e: React.FormEvent) => {
+  useEffect(() => {
+    let alive = true
+    void fetchBanks().then((data) => {
+      if (!alive) return
+      if (data) setBanks(data)
+      setLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleAdd = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (!newBankName.trim()) return
     try {
@@ -827,12 +933,12 @@ function BanksTab({
       setNewBankDetails('')
       await loadBanks()
       showSuccess('Bank added')
-    } catch (err: any) {
-      showError(err.message || 'Failed to add bank')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to add bank')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     if (
       !(await confirmDialog(
         'Delete this bank? Policies that use it will no longer show its details.'
@@ -843,18 +949,18 @@ function BanksTab({
       await window.api.bankDelete(id)
       await loadBanks()
       showSuccess('Bank deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete bank')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete bank')
     }
   }
 
-  const startEditing = (bank: { id: string; name: string; details: string }) => {
+  const startEditing = (bank: { id: string; name: string; details: string }): void => {
     setEditingBankId(bank.id)
     setEditBankName(bank.name)
     setEditBankDetails(bank.details || '')
   }
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string): Promise<void> => {
     if (!editBankName.trim()) return
     try {
       await window.api.bankUpdate(id, {
@@ -864,12 +970,12 @@ function BanksTab({
       setEditingBankId(null)
       await loadBanks()
       showSuccess('Bank updated')
-    } catch (err: any) {
-      showError(err.message || 'Failed to update bank')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to update bank')
     }
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (index: number, direction: 'up' | 'down'): Promise<void> => {
     const newOrder = [...banks]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
     if (swapIndex < 0 || swapIndex >= newOrder.length) return
@@ -1094,7 +1200,11 @@ function BanksTab({
 }
 
 // ==================== Cancel & Replace Tab ====================
-function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function CancelReplaceTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
   const [templates, setTemplates] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
@@ -1116,7 +1226,7 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     ok(await window.api.setSetting('policy_cancel_replace_templates', JSON.stringify(templates)))
     showSuccess('Cancel & Replace templates saved')
   }
@@ -1158,7 +1268,11 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
 }
 
 // ==================== Premium Intro Tab ====================
-function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function PremiumIntroTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
   const [premiumIntroText, setPremiumIntroText] = useState(
     'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
   )
@@ -1211,7 +1325,7 @@ function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const existing = raw ? JSON.parse(raw) : {}
@@ -1505,7 +1619,11 @@ const BC_CONTACT_FIELDS: BcTextFieldDef[] = [
   { key: 'bc_mlc_phone', label: 'MLC Contact Phone (one per line for multiple)', rows: 2 }
 ]
 
-function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function BlueCardTextsTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [values, setValues] = useState<Record<string, string>>({})
@@ -1530,7 +1648,7 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     const keys = Object.keys(values)
     await Promise.all(
       keys.map(async (key) => {
@@ -1544,7 +1662,7 @@ function BlueCardTextsTab({ showSuccess }: { showSuccess: (msg: string) => void 
     showSuccess('Blue card texts saved')
   }
 
-  const handleReset = (key: string) => {
+  const handleReset = (key: string): void => {
     setValues((prev) => ({ ...prev, [key]: BC_DEFAULTS[key as keyof typeof BC_DEFAULTS] }))
   }
 
@@ -1699,10 +1817,10 @@ function TcTemplatesTab({
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const typeCodes = Object.keys(TC_TYPE_LABELS)
   const [typeCode, setTypeCode] = useState('P')
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<TcTemplateMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   // Rich-text editor modal state
@@ -1717,19 +1835,24 @@ function TcTemplatesTab({
     tcShowPageNumbers: true
   })
 
-  const load = async (tc: string) => {
+  const load = async (tc: string): Promise<void> => {
     setLoading(true)
-    try {
-      const r = await window.api.tcListByType(tc)
-      setTemplates(Array.isArray(r) ? r : [])
-    } catch {
-      setTemplates([])
-    } finally {
-      setLoading(false)
-    }
+    setTemplates(await fetchTcTemplates(tc))
+    setLoading(false)
   }
   useEffect(() => {
-    load(typeCode)
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      const list = await fetchTcTemplates(typeCode)
+      if (!alive) return
+      setTemplates(list)
+      setLoading(false)
+    }
+    void run()
+    return () => {
+      alive = false
+    }
   }, [typeCode])
   useEffect(() => {
     ;(async () => {
@@ -1749,18 +1872,18 @@ function TcTemplatesTab({
     })()
   }, [])
 
-  const saveFooter = async () => {
+  const saveFooter = async (): Promise<void> => {
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       const p = raw ? JSON.parse(raw) : {}
       await window.api.setSetting('policyExportSettings', JSON.stringify({ ...p, ...footer }))
       showSuccess('T&C footer saved')
-    } catch (err: any) {
-      showError(err.message || 'Failed to save footer')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save footer')
     }
   }
 
-  const uploadDocx = async () => {
+  const uploadDocx = async (): Promise<void> => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.docx'
@@ -1770,20 +1893,20 @@ function TcTemplatesTab({
       setBusy(true)
       try {
         const fileData = Array.from(new Uint8Array(await file.arrayBuffer()))
-        const r = (await window.api.tcCreate({
+        const r = await window.api.tcCreate({
           typeCode,
           name: file.name.replace(/\.docx$/i, ''),
           kind: 'docx',
           fileData,
           fileName: file.name
-        })) as any
-        if (r?.error) showError(r.message || 'Upload failed')
+        })
+        if (isIpcError(r)) showError(r.message || 'Upload failed')
         else {
           showSuccess('T&C document uploaded')
           await load(typeCode)
         }
-      } catch (err: any) {
-        showError(err.message || 'Upload failed')
+      } catch (err) {
+        showError((err instanceof Error ? err.message : '') || 'Upload failed')
       } finally {
         setBusy(false)
       }
@@ -1791,7 +1914,7 @@ function TcTemplatesTab({
     input.click()
   }
 
-  const saveHtml = async () => {
+  const saveHtml = async (): Promise<void> => {
     if (!editing) return
     setBusy(true)
     try {
@@ -1810,54 +1933,54 @@ function TcTemplatesTab({
       showSuccess('T&C template saved')
       setEditing(null)
       await load(typeCode)
-    } catch (err: any) {
-      showError(err.message || 'Save failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Save failed')
     } finally {
       setBusy(false)
     }
   }
 
-  const setDefault = async (id: string) => {
+  const setDefault = async (id: string): Promise<void> => {
     try {
       await window.api.tcSetDefault(id)
       await load(typeCode)
-    } catch (err: any) {
-      showError(err.message || 'Failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed')
     }
   }
-  const remove = async (id: string) => {
+  const remove = async (id: string): Promise<void> => {
     if (!(await confirmDialog('Delete this T&C template?'))) return
     try {
       await window.api.tcDeleteById(id)
       showSuccess('Template deleted')
       await load(typeCode)
-    } catch (err: any) {
-      showError(err.message || 'Delete failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Delete failed')
     }
   }
 
-  const openEdit = async (t: any) => {
+  const openEdit = async (t: TcTemplateMeta): Promise<void> => {
     if (t.kind !== 'html') return
     try {
-      const full = (await window.api.tcGetById(t.id)) as any
+      const full = await window.api.tcGetById(t.id)
       setEditing({ id: t.id, name: t.name || '', html: full?.contentHtml || '' })
     } catch {
       setEditing({ id: t.id, name: t.name || '', html: '' })
     }
   }
-  const openPreview = async (t: any) => {
+  const openPreview = async (t: TcTemplateMeta): Promise<void> => {
     if (t.kind !== 'html') {
       showError('Preview is available for rich-text templates. Download the DOCX to preview it.')
       return
     }
     try {
-      const full = (await window.api.tcGetById(t.id)) as any
+      const full = await window.api.tcGetById(t.id)
       setPreviewHtml({ name: t.name || 'T&C', html: full?.contentHtml || '' })
     } catch {
       /* ignore */
     }
   }
-  const downloadDocx = async (t: any) => {
+  const downloadDocx = async (t: TcTemplateMeta): Promise<void> => {
     try {
       const fileData = await window.api.tcGetFileById(t.id)
       if (!fileData) {
@@ -1874,12 +1997,12 @@ function TcTemplatesTab({
       a.download = t.fileName || `${t.name}.docx`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (err: any) {
-      showError(err.message || 'Download failed')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Download failed')
     }
   }
 
-  const typeColor = (tc: string) =>
+  const typeColor = (tc: string): string =>
     tc === 'P'
       ? '#6464ff'
       : tc === 'H'
@@ -2341,7 +2464,7 @@ function RichTextSettingTab({
   label: string
   description: string
   showSuccess: (msg: string) => void
-}) {
+}): React.JSX.Element {
   const [value, setValue] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -2358,7 +2481,7 @@ function RichTextSettingTab({
     })()
   }, [settingKey])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     ok(await window.api.setSetting(settingKey, value))
     showSuccess(`${label} saved`)
   }
@@ -2398,7 +2521,7 @@ function SignaturesTab({
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [signatures, setSignatures] = useState<
     Array<{ id: string; userId: string; fileName: string; uploadedAt: string; username: string }>
   >([])
@@ -2407,55 +2530,46 @@ function SignaturesTab({
   const [uploading, setUploading] = useState<string | null>(null)
   const [previewData, setPreviewData] = useState<Record<string, string>>({})
 
-  const loadData = async () => {
+  const applySignatureData = (d: SignaturePageData): void => {
+    if (d.signatures) setSignatures(d.signatures)
+    if (d.users) setUsers(d.users)
+    setPreviewData(d.previews)
+  }
+
+  const loadData = async (): Promise<void> => {
     setLoading(true)
     try {
-      const [sigs, allUsers] = await Promise.all([
-        window.api.signatureGetAll(),
-        window.api.getUsers()
-      ])
-      if (Array.isArray(sigs)) setSignatures(sigs)
-      if (Array.isArray(allUsers))
-        setUsers(allUsers.map((u: any) => ({ id: u.id, username: u.username })))
-
-      // Load preview images for each signature
-      const previews: Record<string, string> = {}
-      for (const sig of Array.isArray(sigs) ? sigs : []) {
-        try {
-          const full = await window.api.signatureGetForUser(sig.userId)
-          if (full?.imageData) {
-            const imgData = full.imageData as any
-            const arr = Array.isArray(imgData) ? imgData : imgData.data || Object.values(imgData)
-            const bytes = new Uint8Array(arr)
-            let base64 = ''
-            const chunk = 8192
-            for (let i = 0; i < bytes.length; i += chunk) {
-              base64 += String.fromCharCode(...bytes.subarray(i, i + chunk))
-            }
-            const ext =
-              sig.fileName?.toLowerCase()?.endsWith('.jpg') ||
-              sig.fileName?.toLowerCase()?.endsWith('.jpeg')
-                ? 'image/jpeg'
-                : 'image/png'
-            previews[sig.userId] = `data:${ext};base64,${btoa(base64)}`
-          }
-        } catch {
-          /* skip */
-        }
-      }
-      setPreviewData(previews)
-    } catch (err: any) {
-      showError(err.message || 'Failed to load signatures')
+      applySignatureData(await fetchSignaturePageData())
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to load signatures')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    let alive = true
+    const run = async (): Promise<void> => {
+      try {
+        const d = await fetchSignaturePageData()
+        if (!alive) return
+        if (d.signatures) setSignatures(d.signatures)
+        if (d.users) setUsers(d.users)
+        setPreviewData(d.previews)
+      } catch (err) {
+        if (alive)
+          showError((err instanceof Error ? err.message : '') || 'Failed to load signatures')
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [showError])
 
-  const handleUpload = async (userId: string) => {
+  const handleUpload = async (userId: string): Promise<void> => {
     setUploading(userId)
     try {
       const result = await window.api.dialogOpenImageFile()
@@ -2464,27 +2578,27 @@ function SignaturesTab({
         return
       }
       const uploadResult = await window.api.signatureUploadForUser(userId, result.filePath)
-      if (uploadResult && (uploadResult as any).error) {
-        showError((uploadResult as any).message || 'Failed to upload')
+      if (uploadResult && isIpcError(uploadResult)) {
+        showError(uploadResult.message || 'Failed to upload')
         return
       }
       showSuccess('Signature uploaded')
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to upload signature')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to upload signature')
     } finally {
       setUploading(null)
     }
   }
 
-  const handleDelete = async (userId: string) => {
+  const handleDelete = async (userId: string): Promise<void> => {
     if (!(await confirmDialog('Delete this signature?'))) return
     try {
       await window.api.signatureDeleteForUser(userId)
       showSuccess('Signature deleted')
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete signature')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete signature')
     }
   }
 
@@ -2643,7 +2757,11 @@ function SignaturesTab({
 }
 
 // ==================== QR Verification Tab ====================
-function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
+function QrVerificationTab({
+  showSuccess
+}: {
+  showSuccess: (msg: string) => void
+}): React.JSX.Element {
   const [url, setUrl] = useState('')
   const [defaultEnabled, setDefaultEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -2663,7 +2781,7 @@ function QrVerificationTab({ showSuccess }: { showSuccess: (msg: string) => void
     })()
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     ok(await window.api.setSetting('qr_verification_url', url))
     ok(await window.api.setSetting('qr_default_enabled', defaultEnabled ? 'true' : 'false'))
     showSuccess('QR verification settings saved')
@@ -2756,7 +2874,7 @@ function CommissionsTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string; code: string }[]>([])
   const [defaults, setDefaults] = useState<Record<string, number>>({})
   const [overrides, setOverrides] = useState<
@@ -2773,37 +2891,51 @@ function CommissionsTab({
   const [entitySearch, setEntitySearch] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const pt = await window.api.getQuotationTypes()
-      if (Array.isArray(pt))
-        setPolicyTypes(pt.map((t: any) => ({ id: t.id, name: t.name, code: t.code })))
-    } catch {}
-    try {
-      const cd = await window.api.commissionGetDefaults()
-      if (Array.isArray(cd)) {
-        const map: Record<string, number> = {}
-        for (const d of cd) map[d.policyTypeId] = d.commissionPercent
-        setDefaults(map)
-      }
-    } catch {}
-    try {
-      const co = await window.api.commissionGetOverrides()
-      if (Array.isArray(co)) setOverrides(co)
-    } catch {}
-    try {
-      const ents = await window.api.getEntities()
-      if (Array.isArray(ents)) setEntities(ents.map((e: any) => ({ id: e.id, name: e.name })))
-    } catch {}
-    setLoading(false)
-  }
-
+  // Bump reloadKey to reload everything (each source loads independently; a failure keeps the old value)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
   useEffect(() => {
-    loadData()
-  }, [])
+    let alive = true
+    const run = async (): Promise<void> => {
+      setLoading(true)
+      try {
+        const pt = await window.api.getQuotationTypes()
+        if (alive && Array.isArray(pt))
+          setPolicyTypes(pt.map((t) => ({ id: t.id, name: t.name, code: t.code })))
+      } catch {
+        /* keep the previous list */
+      }
+      try {
+        const cd = await window.api.commissionGetDefaults()
+        if (alive && Array.isArray(cd)) {
+          const map: Record<string, number> = {}
+          for (const d of cd) map[d.policyTypeId] = d.commissionPercent
+          setDefaults(map)
+        }
+      } catch {
+        /* keep the previous defaults */
+      }
+      try {
+        const co = await window.api.commissionGetOverrides()
+        if (alive && Array.isArray(co)) setOverrides(co)
+      } catch {
+        /* keep the previous overrides */
+      }
+      try {
+        const ents = await window.api.getEntities()
+        if (alive && Array.isArray(ents)) setEntities(ents.map((e) => ({ id: e.id, name: e.name })))
+      } catch {
+        /* keep the previous entities */
+      }
+      if (alive) setLoading(false)
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [reloadKey])
 
-  const handleDefaultChange = async (policyTypeId: string, value: string) => {
+  const handleDefaultChange = async (policyTypeId: string, value: string): Promise<void> => {
     const pct = parseFloat(value)
     if (isNaN(pct)) return
     setDefaults((prev) => ({ ...prev, [policyTypeId]: pct }))
@@ -2815,7 +2947,7 @@ function CommissionsTab({
     }
   }
 
-  const handleAddOverride = async () => {
+  const handleAddOverride = async (): Promise<void> => {
     if (!newEntityId) return
     try {
       for (const pt of policyTypes) {
@@ -2832,7 +2964,11 @@ function CommissionsTab({
     }
   }
 
-  const handleOverrideChange = async (entityId: string, policyTypeId: string, value: string) => {
+  const handleOverrideChange = async (
+    entityId: string,
+    policyTypeId: string,
+    value: string
+  ): Promise<void> => {
     const pct = parseFloat(value)
     if (isNaN(pct)) return
     setOverrides((prev) =>
@@ -2849,7 +2985,7 @@ function CommissionsTab({
     }
   }
 
-  const handleDeleteCustomer = async (entityId: string) => {
+  const handleDeleteCustomer = async (entityId: string): Promise<void> => {
     if (!(await confirmDialog('Remove all commission overrides for this customer?'))) return
     try {
       for (const pt of policyTypes) await window.api.commissionDeleteOverride(entityId, pt.id)
@@ -3111,7 +3247,11 @@ function CommissionsTab({
 
 // ==================== Declaration Settings Tab ====================
 
-function DeclarationSettingsTab({ showSuccess }: { showSuccess: (m: string) => void }) {
+function DeclarationSettingsTab({
+  showSuccess
+}: {
+  showSuccess: (m: string) => void
+}): React.JSX.Element {
   const [year, setYear] = useState(String(new Date().getFullYear()))
   const [umr, setUmr] = useState('')
   const [amlinRef, setAmlinRef] = useState('')
@@ -3120,26 +3260,31 @@ function DeclarationSettingsTab({ showSuccess }: { showSuccess: (m: string) => v
   )
   const [loading, setLoading] = useState(true)
 
-  const loadYear = async (y: string) => {
-    setLoading(true)
-    try {
-      const raw = await window.api.getSetting('declaration_settings')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        const ys = parsed[y] || {}
-        setUmr(ys.umr || '')
-        setAmlinRef(ys.amlinRef || '')
-        if (ys.riskCode) setRiskCode(ys.riskCode)
-      }
-    } catch {}
-    setLoading(false)
-  }
-
   useEffect(() => {
-    loadYear(year)
+    let alive = true
+    const loadYear = async (y: string): Promise<void> => {
+      setLoading(true)
+      try {
+        const raw = await window.api.getSetting('declaration_settings')
+        if (alive && raw) {
+          const parsed = JSON.parse(raw)
+          const ys = parsed[y] || {}
+          setUmr(ys.umr || '')
+          setAmlinRef(ys.amlinRef || '')
+          if (ys.riskCode) setRiskCode(ys.riskCode)
+        }
+      } catch {
+        /* no settings for this year yet: keep the current values */
+      }
+      if (alive) setLoading(false)
+    }
+    void loadYear(year)
+    return () => {
+      alive = false
+    }
   }, [year])
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     try {
       const raw = await window.api.getSetting('declaration_settings')
       const existing = raw ? JSON.parse(raw) : {}
@@ -3262,10 +3407,10 @@ function EndorsementSettingsTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [closingText, setClosingText] = useState('')
-  const [triggerFields, setTriggerFields] = useState<any[]>([])
-  const [templates, setTemplates] = useState<any[]>([])
+  const [triggerFields, setTriggerFields] = useState<EndorsementTriggerField[]>([])
+  const [templates, setTemplates] = useState<EndorsementTemplate[]>([])
   const [addingTemplate, setAddingTemplate] = useState(false)
   const [newTmplName, setNewTmplName] = useState('')
   const [newTmplSection, setNewTmplSection] = useState('general')
@@ -3284,11 +3429,7 @@ function EndorsementSettingsTab({
     { key: 'deductibles', label: 'Deductibles' }
   ]
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
+  async function loadData(): Promise<void> {
     try {
       const [ct, tf, tmpls] = await Promise.all([
         window.api.getSetting('endorsement_closing_text').catch(() => null),
@@ -3305,7 +3446,15 @@ function EndorsementSettingsTab({
     }
   }
 
-  async function saveClosingText() {
+  // Initial load, once on mount (state is only set after the awaits)
+  const loadOnMount = useEffectEvent(loadData)
+  useEffect(() => {
+    void (async () => {
+      await loadOnMount()
+    })()
+  }, [])
+
+  async function saveClosingText(): Promise<void> {
     try {
       ok(await window.api.setSetting('endorsement_closing_text', closingText))
       showSuccess('Closing text saved')
@@ -3314,7 +3463,7 @@ function EndorsementSettingsTab({
     }
   }
 
-  async function saveTriggerFields() {
+  async function saveTriggerFields(): Promise<void> {
     try {
       await window.api.endorsementSetTriggerFields(triggerFields)
       showSuccess('Trigger fields saved')
@@ -3323,7 +3472,7 @@ function EndorsementSettingsTab({
     }
   }
 
-  async function addTemplate() {
+  async function addTemplate(): Promise<void> {
     if (!newTmplName.trim()) return
     try {
       await window.api.endorsementAddTemplate({
@@ -3342,7 +3491,7 @@ function EndorsementSettingsTab({
     }
   }
 
-  async function updateTemplate(id: string) {
+  async function updateTemplate(id: string): Promise<void> {
     try {
       await window.api.endorsementUpdateTemplate(id, {
         name: editTmplName,
@@ -3357,7 +3506,7 @@ function EndorsementSettingsTab({
     }
   }
 
-  async function deleteTemplate(id: string) {
+  async function deleteTemplate(id: string): Promise<void> {
     if (!(await confirmDialog('Delete this endorsement template?'))) return
     try {
       await window.api.endorsementDeleteTemplate(id)
@@ -3671,7 +3820,7 @@ function PolicySectionOrderTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const TYPES: { code: string; label: string; color: string }[] = [
     { code: 'P', label: 'P&I', color: '#6464ff' },
     { code: 'H', label: 'Hull', color: '#ff64c8' },
@@ -3681,38 +3830,42 @@ function PolicySectionOrderTab({
   const [order, setOrder] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  const key = (tc: string) => `policy_section_order_defaults_${tc}`
-
-  const load = async (tc: string) => {
-    setLoading(true)
-    try {
-      const raw = await window.api.getSetting(key(tc))
-      let saved: string[] | null = null
-      if (raw) {
-        try {
-          saved = JSON.parse(raw)
-        } catch {
-          saved = null
-        }
-      }
-      const def = getDefaultSectionOrder(tc)
-      // Start from saved (filtered to valid keys), then append any missing default keys
-      const base =
-        Array.isArray(saved) && saved.length > 0 ? saved.filter((k) => def.includes(k)) : [...def]
-      for (const k of def) if (!base.includes(k)) base.push(k)
-      setOrder(base)
-    } catch {
-      setOrder(getDefaultSectionOrder(tc))
-    } finally {
-      setLoading(false)
-    }
-  }
+  const key = policySectionOrderKey
 
   useEffect(() => {
-    load(typeCode)
+    let alive = true
+    const load = async (tc: string): Promise<void> => {
+      setLoading(true)
+      try {
+        const raw = await window.api.getSetting(policySectionOrderKey(tc))
+        if (!alive) return
+        let saved: string[] | null = null
+        if (raw) {
+          try {
+            saved = JSON.parse(raw)
+          } catch {
+            saved = null
+          }
+        }
+        const def = getDefaultSectionOrder(tc)
+        // Start from saved (filtered to valid keys), then append any missing default keys
+        const base =
+          Array.isArray(saved) && saved.length > 0 ? saved.filter((k) => def.includes(k)) : [...def]
+        for (const k of def) if (!base.includes(k)) base.push(k)
+        setOrder(base)
+      } catch {
+        if (alive) setOrder(getDefaultSectionOrder(tc))
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void load(typeCode)
+    return () => {
+      alive = false
+    }
   }, [typeCode])
 
-  const move = (i: number, dir: 'up' | 'down') => {
+  const move = (i: number, dir: 'up' | 'down'): void => {
     const j = dir === 'up' ? i - 1 : i + 1
     if (j < 0 || j >= order.length) return
     const next = [...order]
@@ -3720,16 +3873,16 @@ function PolicySectionOrderTab({
     setOrder(next)
   }
 
-  const save = async () => {
+  const save = async (): Promise<void> => {
     try {
       await window.api.setSetting(key(typeCode), JSON.stringify(order))
       showSuccess('Section order saved')
-    } catch (err: any) {
-      showError(err.message || 'Failed to save')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save')
     }
   }
 
-  const reset = () => setOrder(getDefaultSectionOrder(typeCode))
+  const reset = (): void => setOrder(getDefaultSectionOrder(typeCode))
 
   return (
     <div>

@@ -33,14 +33,18 @@ import {
   Fleet,
   Entity,
   FlagState,
-  VesselType
+  VesselType,
+  AnalyticsVesselRow
 } from '../../../shared/types'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { getFlagClass } from '../utils/countryCodeMap'
+import { isIpcError } from '../utils/ipc'
 import 'flag-icons/css/flag-icons.min.css'
 
 const currentYear = new Date().getFullYear()
-const fmt = (n: number) => n.toLocaleString()
+type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
+
+const fmt = (n: number): string => n.toLocaleString()
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +107,7 @@ function Chip({
   label: string
   selected: boolean
   onClick: () => void
-}) {
+}): React.JSX.Element {
   return (
     <button
       onClick={onClick}
@@ -128,7 +132,13 @@ function Chip({
 
 // ── FilterSection ─────────────────────────────────────────────────────────────
 
-function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterSection({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
       <div
@@ -158,7 +168,7 @@ function CollapsibleFilter({
   label: string
   children: React.ReactNode
   defaultCollapsed?: boolean
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(!defaultCollapsed)
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
@@ -212,7 +222,7 @@ function MultiSelectDropdown({
   selectedIds: string[]
   onChange: (ids: string[]) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -224,7 +234,7 @@ function MultiSelectDropdown({
     return options.filter((o) => o.name.toLowerCase().includes(q))
   }, [options, search])
 
-  const toggle = (id: string) => {
+  const toggle = (id: string): void => {
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id])
   }
 
@@ -403,7 +413,7 @@ function KPI({
   label: string
   value: string | number
   sub?: string
-}) {
+}): React.JSX.Element {
   return (
     <div
       className="glass-card"
@@ -476,7 +486,7 @@ function ChartCard({
   accentColor: string
   count?: number
   children: React.ReactNode
-}) {
+}): React.JSX.Element {
   return (
     <div className="glass-card" style={{ padding: '20px 22px' }}>
       <div
@@ -528,7 +538,7 @@ function ChartCard({
 
 // ── ProgressBar (inline) ──────────────────────────────────────────────────────
 
-function ProgressBar({ pct }: { pct: number }) {
+function ProgressBar({ pct }: { pct: number }): React.JSX.Element {
   return (
     <div
       style={{
@@ -577,7 +587,7 @@ const tdStyle = (idx: number): React.CSSProperties => ({
 // ── Main component ───────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 
-export default function FleetAnalytics() {
+export default function FleetAnalytics(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
@@ -598,7 +608,7 @@ export default function FleetAnalytics() {
   const [presetNameInput, setPresetNameInput] = useState('')
 
   // ── Result state ────────────────────────────────────────────────────────────
-  const [vessels, setVessels] = useState<any[]>([])
+  const [vessels, setVessels] = useState<AnalyticsVesselRow[]>([])
   const [policyCoverage, setPolicyCoverage] = useState<{ name: string; vesselCount: number }[]>([])
   const [loading, setLoading] = useState(false)
   const [hasQueried, setHasQueried] = useState(false)
@@ -618,13 +628,13 @@ export default function FleetAnalytics() {
     rawVesselData: true
   })
 
-  const toggleExportSection = (key: keyof typeof exportSections) => {
+  const toggleExportSection = (key: keyof typeof exportSections): void => {
     setExportSections((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   // ── Load reference data on mount ────────────────────────────────────────────
   useEffect(() => {
-    const load = async () => {
+    const load = async (): Promise<void> => {
       try {
         const [pt, fl, en, fs, vt, pr] = await Promise.all([
           window.api.getPolicyTypes(),
@@ -657,8 +667,8 @@ export default function FleetAnalytics() {
     setLoading(true)
     setHasQueried(true)
     try {
-      const result = (await window.api.analyticsGetData(filters)) as any
-      if (result && !result.error) {
+      const result = await window.api.analyticsGetData(filters)
+      if (result && !isIpcError(result)) {
         setVessels(Array.isArray(result.vessels) ? result.vessels : [])
         setPolicyCoverage(Array.isArray(result.policyCoverage) ? result.policyCoverage : [])
       } else {
@@ -672,29 +682,189 @@ export default function FleetAnalytics() {
     }
   }, [filters, showError])
 
+  // ── Derived analytics ───────────────────────────────────────────────────────
+  const pool = vessels
+
+  const flagMap = useMemo(() => new Map(flagStates.map((f) => [f.id, f])), [flagStates])
+  const entityMap = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities])
+
+  const kpis = useMemo(() => {
+    const withAge = pool.filter((v) => v.builtYear)
+    const avgAge =
+      withAge.length > 0
+        ? withAge.reduce((s: number, v) => s + (currentYear - (v.builtYear as number)), 0) /
+          withAge.length
+        : null
+    const withTonnage = pool.filter((v) => v.grossTonnage)
+    const avgTonnage =
+      withTonnage.length > 0
+        ? Math.round(
+            withTonnage.reduce((s: number, v) => s + Number(v.grossTonnage), 0) / withTonnage.length
+          )
+        : null
+    const totalTonnage = withTonnage.reduce((s: number, v) => s + Number(v.grossTonnage), 0)
+    const flags = new Set(pool.filter((v) => v.flagStateId).map((v) => v.flagStateId)).size
+    const withPolicy =
+      policyCoverage.length > 0
+        ? new Set(policyCoverage.flatMap(() => pool.filter((v) => v.id).map((v) => v.id)))
+        : new Set<string>()
+    // Policy coverage % = vessels with at least 1 active policy / total
+    const coveredVesselIds = new Set<string>()
+    for (const pc of policyCoverage) {
+      // We know vesselCount but not which vessels; approximate with ratio
+      void pc
+    }
+    // Better: count vessels that appear in policyCoverage data
+    // Since we only have aggregated counts, use the total covered count
+    const totalCoveredVessels = policyCoverage.reduce(
+      (s, pc) => Math.max(s, Number(pc.vesselCount)),
+      0
+    )
+    const policyCoveragePct =
+      pool.length > 0 ? Math.round((totalCoveredVessels / pool.length) * 100) : 0
+
+    void withPolicy
+    void coveredVesselIds
+
+    return {
+      total: pool.length,
+      avgAge: avgAge != null ? +avgAge.toFixed(1) : null,
+      avgTonnage,
+      totalTonnage,
+      flags,
+      policyCoveragePct
+    }
+  }, [pool, policyCoverage])
+
+  // ── Vessel Type Breakdown ───────────────────────────────────────────────────
+  const vesselTypeBreakdown = useMemo(() => {
+    const grouped = groupBy(pool, (v) => v.vesselType || '(Unknown)')
+    return Array.from(grouped.entries())
+      .map(([name, items]) => {
+        const withAge = items.filter((v) => v.builtYear)
+        const avgAge =
+          withAge.length > 0
+            ? +(
+                withAge.reduce((s: number, v) => s + (currentYear - (v.builtYear as number)), 0) /
+                withAge.length
+              ).toFixed(1)
+            : null
+        const withTonnage = items.filter((v) => v.grossTonnage)
+        const avgTonnage =
+          withTonnage.length > 0
+            ? Math.round(
+                withTonnage.reduce((s: number, v) => s + Number(v.grossTonnage), 0) /
+                  withTonnage.length
+              )
+            : null
+        return {
+          name,
+          count: items.length,
+          pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0,
+          avgAge,
+          avgTonnage
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+  }, [pool])
+
+  // ── Flag State Distribution ─────────────────────────────────────────────────
+  const flagDistribution = useMemo(() => {
+    const grouped = groupBy(pool, (v) => v.flagStateId || '__none__')
+    const items = Array.from(grouped.entries())
+      .map(([flagId, vessels]) => {
+        const fs = flagMap.get(flagId)
+        return {
+          name: fs?.name ?? '(Unassigned)',
+          iso3: fs?.iso3Code ?? '',
+          count: vessels.length,
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+    if (items.length <= 15) return { rows: items, othersCount: 0 }
+    const top15 = items.slice(0, 15)
+    const othersCount = items.slice(15).reduce((s, i) => s + i.count, 0)
+    return { rows: top15, othersCount }
+  }, [pool, flagMap])
+
+  // ── Age Profile ─────────────────────────────────────────────────────────────
+  const ageProfile = useMemo(() => {
+    return AGE_BUCKETS.map((b) => {
+      const count = pool.filter((v) => {
+        if (!v.builtYear) return false
+        const age = currentYear - (v.builtYear as number)
+        return age >= b.min && age < b.max
+      }).length
+      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
+    })
+  }, [pool])
+
+  // ── Tonnage Profile ─────────────────────────────────────────────────────────
+  const tonnageProfile = useMemo(() => {
+    return TONNAGE_BUCKETS.map((b) => {
+      const count = pool.filter((v) => {
+        const gt = Number(v.grossTonnage)
+        if (!gt) return false
+        return gt >= b.min && gt < b.max
+      }).length
+      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
+    })
+  }, [pool])
+
+  // ── Customer Concentration ──────────────────────────────────────────────────
+  const customerConcentration = useMemo(() => {
+    const withCustomer = pool.filter((v) => v.customerId)
+    const grouped = groupBy(withCustomer, (v) => v.customerId as string)
+    return Array.from(grouped.entries())
+      .map(([customerId, vessels]) => {
+        const entity = entityMap.get(customerId)
+        const types = [...new Set(vessels.map((v) => v.vesselType).filter(Boolean))].join(', ')
+        return {
+          name: entity?.name ?? '(Unknown)',
+          count: vessels.length,
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
+          types
+        }
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [pool, entityMap])
+
+  // ── OFAC Status ─────────────────────────────────────────────────────────────
+  const ofacStatus = useMemo(() => {
+    const groups = groupBy(pool, (v) => v.ofacStatus || 'NOT_CHECKED')
+    const order = ['CLEARED', 'PENDING', 'POTENTIAL_MATCH', 'MATCH', 'NOT_CHECKED'] as const
+    return order.map((status) => ({
+      label: status.replace(/_/g, ' '),
+      key: status,
+      count: groups.get(status)?.length ?? 0
+    }))
+  }, [pool])
+
   // ── Preset management ───────────────────────────────────────────────────────
-  const handleSavePreset = async () => {
+  const handleSavePreset = async (): Promise<void> => {
     if (!presetNameInput.trim()) {
       setShowPresetInput(true)
       return
     }
     try {
-      const created = (await window.api.analyticsAddPreset(presetNameInput.trim(), filters)) as any
-      if (created && !created.error && created.id) {
+      const created = await window.api.analyticsAddPreset(presetNameInput.trim(), filters)
+      if (created && !isIpcError(created) && created.id) {
         setPresets((p) => [...p, created])
         setSelectedPresetId(created.id)
         showSuccess(`Preset "${presetNameInput.trim()}" saved`)
         setPresetNameInput('')
         setShowPresetInput(false)
       } else {
-        showError(created?.message || 'Failed to save preset')
+        showError((isIpcError(created) ? created.message : undefined) || 'Failed to save preset')
       }
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save preset')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save preset')
     }
   }
 
-  const handleLoadPreset = (id: string) => {
+  const handleLoadPreset = (id: string): void => {
     setSelectedPresetId(id)
     const preset = presets.find((p) => p.id === id)
     if (preset?.filters) {
@@ -705,7 +875,7 @@ export default function FleetAnalytics() {
     }
   }
 
-  const handleDeletePreset = async (id: string) => {
+  const handleDeletePreset = async (id: string): Promise<void> => {
     try {
       await window.api.analyticsDeletePreset(id)
       setPresets((p) => p.filter((x) => x.id !== id))
@@ -717,19 +887,22 @@ export default function FleetAnalytics() {
   }
 
   // ── Filter update helpers ───────────────────────────────────────────────────
-  const updateFilter = <K extends keyof AnalyticsFilters>(key: K, value: AnalyticsFilters[K]) => {
+  const updateFilter = <K extends keyof AnalyticsFilters>(
+    key: K,
+    value: AnalyticsFilters[K]
+  ): void => {
     setFilters((f) => ({ ...f, [key]: value }))
   }
 
   // ── Vessel status helper ────────────────────────────────────────────────────
   type VesselStatusFilter = 'active' | 'inactive' | 'all'
   const vesselStatus: VesselStatusFilter = filters.activeOnly ? 'active' : 'all'
-  const setVesselStatus = (s: VesselStatusFilter) => {
+  const setVesselStatus = (s: VesselStatusFilter): void => {
     updateFilter('activeOnly', s === 'active')
   }
 
   // ── Export functions ────────────────────────────────────────────────────────
-  const exportPDF = async (sections: typeof exportSections) => {
+  const exportPDF = async (sections: typeof exportSections): Promise<void> => {
     setExportModalOpen(false)
     try {
       const settings = await getReportSettings()
@@ -757,7 +930,7 @@ export default function FleetAnalytics() {
       let y = 30
       let needNewPage = false
 
-      const ensurePage = () => {
+      const ensurePage = (): void => {
         if (needNewPage) {
           doc.addPage()
           y = 15
@@ -819,7 +992,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: 10 }
         })
-        y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
       }
 
       // ── Flag States ──
@@ -852,7 +1025,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: 10 }
         })
-        y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
       }
 
       // ── Age Distribution ──
@@ -873,7 +1046,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: sections.tonnageDistribution ? pw / 2 + 5 : 10 }
         })
-        const ageTableBottom = (doc as any).lastAutoTable.finalY
+        const ageTableBottom = (doc as DocWithAutoTable).lastAutoTable.finalY
 
         // ── Tonnage Distribution (side by side if both selected) ──
         if (sections.tonnageDistribution) {
@@ -891,7 +1064,7 @@ export default function FleetAnalytics() {
             bodyStyles: { fontSize: 7.5 },
             margin: { left: pw / 2 + 5, right: 10 }
           })
-          y = Math.max(ageTableBottom, (doc as any).lastAutoTable.finalY) + 8
+          y = Math.max(ageTableBottom, (doc as DocWithAutoTable).lastAutoTable.finalY) + 8
         } else {
           y = ageTableBottom + 8
         }
@@ -911,7 +1084,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: 10 }
         })
-        y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
       }
 
       // ── Policy Coverage ──
@@ -937,7 +1110,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: 10 }
         })
-        y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
       }
 
       // ── Top Customers ──
@@ -962,7 +1135,7 @@ export default function FleetAnalytics() {
           bodyStyles: { fontSize: 7.5 },
           margin: { left: 10, right: 10 }
         })
-        y = (doc as any).lastAutoTable.finalY + 8
+        y = (doc as DocWithAutoTable).lastAutoTable.finalY + 8
       }
 
       // ── OFAC Status ──
@@ -1012,7 +1185,7 @@ export default function FleetAnalytics() {
     }
   }
 
-  const exportExcel = (sections: typeof exportSections) => {
+  const exportExcel = (sections: typeof exportSections): void => {
     setExportModalOpen(false)
     try {
       const dateStr = new Date().toISOString().slice(0, 10)
@@ -1058,9 +1231,7 @@ export default function FleetAnalytics() {
 
       // ── Sheet 3: Flag States (all, not just top 15) ──
       if (sections.flagStates) {
-        const allFlags = Array.from(
-          groupBy(pool, (v: any) => v.flagStateId || '__none__').entries()
-        )
+        const allFlags = Array.from(groupBy(pool, (v) => v.flagStateId || '__none__').entries())
           .map(([flagId, vs]) => {
             const fs = flagMap.get(flagId)
             return {
@@ -1159,8 +1330,8 @@ export default function FleetAnalytics() {
             'Customer Type',
             'OFAC Status'
           ],
-          ...pool.map((v: any) => {
-            const fs = flagMap.get(v.flagStateId)
+          ...pool.map((v) => {
+            const fs = v.flagStateId ? flagMap.get(v.flagStateId) : undefined
             const age = v.builtYear ? currentYear - v.builtYear : ''
             return [
               v.name || '',
@@ -1200,167 +1371,6 @@ export default function FleetAnalytics() {
       showError(msg)
     }
   }
-
-  // ── Derived analytics ───────────────────────────────────────────────────────
-  const pool = vessels
-
-  const flagMap = useMemo(() => new Map(flagStates.map((f) => [f.id, f])), [flagStates])
-  const entityMap = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities])
-
-  const kpis = useMemo(() => {
-    const withAge = pool.filter((v: any) => v.builtYear)
-    const avgAge =
-      withAge.length > 0
-        ? withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length
-        : null
-    const withTonnage = pool.filter((v: any) => v.grossTonnage)
-    const avgTonnage =
-      withTonnage.length > 0
-        ? Math.round(
-            withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) /
-              withTonnage.length
-          )
-        : null
-    const totalTonnage = withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0)
-    const flags = new Set(pool.filter((v: any) => v.flagStateId).map((v: any) => v.flagStateId))
-      .size
-    const withPolicy =
-      policyCoverage.length > 0
-        ? new Set(policyCoverage.flatMap(() => pool.filter((v: any) => v.id).map((v: any) => v.id)))
-        : new Set<string>()
-    // Policy coverage % = vessels with at least 1 active policy / total
-    const coveredVesselIds = new Set<string>()
-    for (const pc of policyCoverage) {
-      // We know vesselCount but not which vessels; approximate with ratio
-      void pc
-    }
-    // Better: count vessels that appear in policyCoverage data
-    // Since we only have aggregated counts, use the total covered count
-    const totalCoveredVessels = policyCoverage.reduce(
-      (s, pc) => Math.max(s, Number(pc.vesselCount)),
-      0
-    )
-    const policyCoveragePct =
-      pool.length > 0 ? Math.round((totalCoveredVessels / pool.length) * 100) : 0
-
-    void withPolicy
-    void coveredVesselIds
-
-    return {
-      total: pool.length,
-      avgAge: avgAge != null ? +avgAge.toFixed(1) : null,
-      avgTonnage,
-      totalTonnage,
-      flags,
-      policyCoveragePct
-    }
-  }, [pool, policyCoverage])
-
-  // ── Vessel Type Breakdown ───────────────────────────────────────────────────
-  const vesselTypeBreakdown = useMemo(() => {
-    const grouped = groupBy(pool, (v: any) => v.vesselType || '(Unknown)')
-    return Array.from(grouped.entries())
-      .map(([name, items]) => {
-        const withAge = items.filter((v: any) => v.builtYear)
-        const avgAge =
-          withAge.length > 0
-            ? +(
-                withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) /
-                withAge.length
-              ).toFixed(1)
-            : null
-        const withTonnage = items.filter((v: any) => v.grossTonnage)
-        const avgTonnage =
-          withTonnage.length > 0
-            ? Math.round(
-                withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) /
-                  withTonnage.length
-              )
-            : null
-        return {
-          name,
-          count: items.length,
-          pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0,
-          avgAge,
-          avgTonnage
-        }
-      })
-      .sort((a, b) => b.count - a.count)
-  }, [pool])
-
-  // ── Flag State Distribution ─────────────────────────────────────────────────
-  const flagDistribution = useMemo(() => {
-    const grouped = groupBy(pool, (v: any) => v.flagStateId || '__none__')
-    const items = Array.from(grouped.entries())
-      .map(([flagId, vessels]) => {
-        const fs = flagMap.get(flagId)
-        return {
-          name: fs?.name ?? '(Unassigned)',
-          iso3: fs?.iso3Code ?? '',
-          count: vessels.length,
-          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0
-        }
-      })
-      .sort((a, b) => b.count - a.count)
-    if (items.length <= 15) return { rows: items, othersCount: 0 }
-    const top15 = items.slice(0, 15)
-    const othersCount = items.slice(15).reduce((s, i) => s + i.count, 0)
-    return { rows: top15, othersCount }
-  }, [pool, flagMap])
-
-  // ── Age Profile ─────────────────────────────────────────────────────────────
-  const ageProfile = useMemo(() => {
-    return AGE_BUCKETS.map((b) => {
-      const count = pool.filter((v: any) => {
-        if (!v.builtYear) return false
-        const age = currentYear - v.builtYear
-        return age >= b.min && age < b.max
-      }).length
-      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
-    })
-  }, [pool])
-
-  // ── Tonnage Profile ─────────────────────────────────────────────────────────
-  const tonnageProfile = useMemo(() => {
-    return TONNAGE_BUCKETS.map((b) => {
-      const count = pool.filter((v: any) => {
-        const gt = Number(v.grossTonnage)
-        if (!gt) return false
-        return gt >= b.min && gt < b.max
-      }).length
-      return { ...b, count, pct: pool.length > 0 ? (count / pool.length) * 100 : 0 }
-    })
-  }, [pool])
-
-  // ── Customer Concentration ──────────────────────────────────────────────────
-  const customerConcentration = useMemo(() => {
-    const withCustomer = pool.filter((v: any) => v.customerId)
-    const grouped = groupBy(withCustomer, (v: any) => v.customerId)
-    return Array.from(grouped.entries())
-      .map(([customerId, vessels]) => {
-        const entity = entityMap.get(customerId)
-        const types = [...new Set(vessels.map((v: any) => v.vesselType).filter(Boolean))].join(', ')
-        return {
-          name: entity?.name ?? '(Unknown)',
-          count: vessels.length,
-          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
-          types
-        }
-      })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
-  }, [pool, entityMap])
-
-  // ── OFAC Status ─────────────────────────────────────────────────────────────
-  const ofacStatus = useMemo(() => {
-    const groups = groupBy(pool, (v: any) => v.ofacStatus || 'NOT_CHECKED')
-    const order = ['CLEARED', 'PENDING', 'POTENTIAL_MATCH', 'MATCH', 'NOT_CHECKED'] as const
-    return order.map((status) => ({
-      label: status.replace(/_/g, ' '),
-      key: status,
-      count: groups.get(status)?.length ?? 0
-    }))
-  }, [pool])
 
   // ══════════════════════════════════════════════════════════════════════════════
   // ── Render ─────────────────────────────────────────────────────────────────

@@ -3,6 +3,13 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Quotation } from '../../../../shared/types'
 import { asArray } from '../../utils/ipc'
 
+interface QuotationInfoItem {
+  id: string
+  quotationId: string
+  text: string
+  order: number
+}
+
 export default function InformationTab({
   quotation,
   updateField,
@@ -10,23 +17,30 @@ export default function InformationTab({
   showSuccess
 }: {
   quotation: Quotation
-  updateField: (f: string, v: any) => void
+  updateField: (f: string, v: unknown) => void
   setQ: (fn: (p: Quotation) => Quotation) => void
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
-  const [items, setItems] = useState<any[]>([])
+}): React.JSX.Element {
+  const [items, setItems] = useState<QuotationInfoItem[]>([])
   const [newText, setNewText] = useState('')
 
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
   useEffect(() => {
-    loadData()
-  }, [])
-  const loadData = async () => {
-    setItems(asArray(await window.api.getQuotationInformation(quotation.id)))
-  }
+    let alive = true
+    const run = async (): Promise<void> => {
+      const r = asArray<QuotationInfoItem>(await window.api.getQuotationInformation(quotation.id))
+      if (alive) setItems(r)
+    }
+    void run()
+    return () => {
+      alive = false
+    }
+  }, [quotation.id, reloadKey])
 
-  const handleAdd = async () => {
+  const handleAdd = async (): Promise<void> => {
     if (!newText.trim()) return
     await window.api.addQuotationInformation({
       quotationId: quotation.id,

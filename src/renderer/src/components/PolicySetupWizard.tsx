@@ -118,7 +118,7 @@ function seedPremiums(
   altId: string,
   lolId: string,
   instalmentCount: number
-) {
+): { vesselPremiums: Record<string, number>; totalPremium: number; instalmentAmounts: number[] } {
   const vesselPremiums: Record<string, number> = {}
   for (const vid of selectedIds) {
     const qv = ctx.vessels.find((v) => (v.vesselId || v.id) === vid)
@@ -138,9 +138,51 @@ function seedPremiums(
   }
 }
 
+/** safeHandle returns `{ error: true, message }` instead of throwing; null when the call succeeded. */
+function ipcFailure(result: unknown): { message?: string } | null {
+  if (result && typeof result === 'object' && 'error' in result && result.error) {
+    const message = 'message' in result ? result.message : undefined
+    return { message: typeof message === 'string' ? message : undefined }
+  }
+  return null
+}
+
 // Instalment due date: each 30 days = 1 calendar month from inception (month-end clamped)
 function instalmentDueDate(inception: string, daysFromInception: number): string {
   return addMonthsISO(inception, Math.round(daysFromInception / 30))
+}
+
+/** When the inception date/time changed between `prev` and `next`: expiry = 1 year later at the
+ *  same time (00:00 inception → 1 year minus 1 day at 23:59); a new inception date also
+ *  recalculates the instalment due dates. */
+function applyInceptionChange(
+  prev: WizardData,
+  next: WizardData,
+  instalments: QuotationInstalment[]
+): WizardData {
+  if (!next.inceptionDate) return next
+  let out = next
+  if (next.inceptionDate !== prev.inceptionDate || next.inceptionTime !== prev.inceptionTime) {
+    const oneYear = addMonthsISO(next.inceptionDate, 12)
+    if (next.inceptionTime === '00:00') {
+      const [y, m, d] = oneYear.split('-').map(Number)
+      const exp = new Date(y, m - 1, d - 1)
+      const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
+      out = { ...out, expiryDate, expiryTime: '23:59' }
+    } else {
+      out = { ...out, expiryDate: oneYear, expiryTime: next.inceptionTime }
+    }
+  }
+  if (next.inceptionDate !== prev.inceptionDate && instalments.length > 0) {
+    const inception = next.inceptionDate
+    out = {
+      ...out,
+      instalmentDates: instalments.map((inst) =>
+        instalmentDueDate(inception, inst.daysFromInception)
+      )
+    }
+  }
+  return out
 }
 
 // Fleet-level instalment amounts = per-vessel splits added together
@@ -167,7 +209,7 @@ export default function PolicySetupWizard({
   quotationId,
   onComplete,
   onCancel
-}: PolicySetupWizardProps) {
+}: PolicySetupWizardProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
@@ -266,8 +308,14 @@ export default function PolicySetupWizard({
   const isLastStep = currentStepIndex === steps.length - 1
   const isFirstStep = currentStepIndex === 0
 
-  const loadData = useCallback(async () => {
+  // A different quotation shows the loading state again (reset during render, not in the effect)
+  const [loadedFor, setLoadedFor] = useState(quotationId)
+  if (loadedFor !== quotationId) {
+    setLoadedFor(quotationId)
     setLoading(true)
+  }
+
+  const loadData = useCallback(async () => {
     try {
       const [
         q,
@@ -303,14 +351,14 @@ export default function PolicySetupWizard({
       setConvertedVesselIds(alreadyConverted)
 
       // Subjectivities: show the quotation's list, all kept by default
-      const safeSubj = (Array.isArray(subjRes) ? subjRes : []).map((s: any) => ({
+      const safeSubj = (Array.isArray(subjRes) ? subjRes : []).map((s) => ({
         id: s.id,
         text: s.text
       }))
       setSubjectivityItems(safeSubj)
       setData((d) => ({ ...d, selectedSubjectivityIds: safeSubj.map((s) => s.id) }))
 
-      if (!q || (q as any).error) {
+      if (!q || ('error' in q && q.error)) {
         showError('Failed to load quotation')
         return
       }
@@ -329,34 +377,32 @@ export default function PolicySetupWizard({
       setHullAlts(safeHullAlts)
 
       // Insured editor: entities, per-entity address map, per-vessel insured rows (from quotation assureds)
-      setAllEntities(
-        (Array.isArray(entRes) ? entRes : []).map((e: any) => ({ id: e.id, name: e.name }))
-      )
+      setAllEntities((Array.isArray(entRes) ? entRes : []).map((e) => ({ id: e.id, name: e.name })))
       const addrMap: Record<string, { id: string; addressLine1: string; label?: string }[]> = {}
-      for (const a of (Array.isArray(eaRes) ? eaRes : []) as any[]) {
+      for (const a of Array.isArray(eaRes) ? eaRes : []) {
         if (!addrMap[a.entityId]) addrMap[a.entityId] = []
         addrMap[a.entityId].push({ id: a.id, addressLine1: a.addressLine1 || '', label: a.label })
       }
       setEntityAddrs(addrMap)
-      const entName = (id: string) =>
-        (Array.isArray(entRes) ? entRes : []).find((e: any) => e.id === id)?.name || ''
+      const entName = (id: string): string =>
+        (Array.isArray(entRes) ? entRes : []).find((e) => e.id === id)?.name || ''
       const safeQA = Array.isArray(qaRes) ? qaRes : []
       const insuredByVessel: Record<string, InsuredRow[]> = {}
       for (const v of vessels) {
         const vid = (v.vesselId || v.id) as string
         insuredByVessel[vid] = safeQA
-          .filter((a: any) => !a.vesselLabel || a.vesselLabel === v.vesselLabel)
-          .map((a: any) => {
-            const firstAddr = (addrMap[a.entityId] || [])[0]
+          .filter((a) => !a.vesselLabel || a.vesselLabel === v.vesselLabel)
+          .map((a): InsuredRow => {
+            const firstAddr = ((a.entityId ? addrMap[a.entityId] : undefined) || [])[0]
             return {
               entityId: a.entityId || '',
-              entityName: a.name || entName(a.entityId) || '',
+              entityName: a.name || (a.entityId ? entName(a.entityId) : '') || '',
               role: a.role || '',
               addressText: firstAddr?.addressLine1 || '',
               addressLabel: '',
               addressId: firstAddr?.id || '',
               isNew: false
-            } as InsuredRow
+            }
           })
       }
       const allInsuredRows = Object.values(insuredByVessel).flat()
@@ -406,7 +452,7 @@ export default function PolicySetupWizard({
       // Extra discounts + hull alternative × vessel premiums (both feed the payable maths)
       const quot = q as Quotation
       let safeDiscounts: QuotationDiscount[] = []
-      let safeAltVesselPrems: Record<string, number> = {}
+      const safeAltVesselPrems: Record<string, number> = {}
       try {
         const [discRes, avpRes] = await Promise.all([
           window.api.quotationDiscountGetByQuotation(quotationId),
@@ -415,7 +461,7 @@ export default function PolicySetupWizard({
             : Promise.resolve([])
         ])
         if (Array.isArray(discRes)) safeDiscounts = discRes
-        for (const r of (Array.isArray(avpRes) ? avpRes : []) as any[]) {
+        for (const r of Array.isArray(avpRes) ? avpRes : []) {
           if (r.premiumAmount != null)
             safeAltVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(
               r.premiumAmount
@@ -506,72 +552,58 @@ export default function PolicySetupWizard({
         /* default off */
       }
 
-      setData((prev) => ({
-        ...prev,
-        // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
-        selectedVesselIds: initialSelection,
-        selectedAltId: firstAltId,
-        selectedLolOptionId: firstLolId,
-        inceptionDate: inception,
-        expiryDate: expiry,
-        totalPremium: payable,
-        vesselPremiums: seeded.vesselPremiums,
-        instalmentDates: initDates,
-        instalmentAmounts: initAmounts,
-        nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
-        nonRefundablePercent: quot.nonRefundablePercent || 0,
-        // No broker on the business = no commission by default (can still be ticked by hand)
-        commissionEnabled:
-          quoteHasBroker(quot, allInsuredRows) &&
-          resolvedCommission !== '' &&
-          Number(resolvedCommission) > 0,
-        commissionPercent: resolvedCommission,
-        insuredByVessel,
-        outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
-        outstandingPremiumText: quot.outstandingPremiumText || '',
-        blueCardInception: inception,
-        blueCardExpiry: expiry,
-        blueCardOwners: defaultBlueCardOwners,
-        qrEnabled: qrDefault
-      }))
-    } catch (err: any) {
-      showError(err.message || 'Failed to load data')
+      setData((prev) =>
+        applyInceptionChange(
+          prev,
+          {
+            ...prev,
+            // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
+            selectedVesselIds: initialSelection,
+            selectedAltId: firstAltId,
+            selectedLolOptionId: firstLolId,
+            inceptionDate: inception,
+            expiryDate: expiry,
+            totalPremium: payable,
+            vesselPremiums: seeded.vesselPremiums,
+            instalmentDates: initDates,
+            instalmentAmounts: initAmounts,
+            nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
+            nonRefundablePercent: quot.nonRefundablePercent || 0,
+            // No broker on the business = no commission by default (can still be ticked by hand)
+            commissionEnabled:
+              quoteHasBroker(quot, allInsuredRows) &&
+              resolvedCommission !== '' &&
+              Number(resolvedCommission) > 0,
+            commissionPercent: resolvedCommission,
+            insuredByVessel,
+            outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
+            outstandingPremiumText: quot.outstandingPremiumText || '',
+            blueCardInception: inception,
+            blueCardExpiry: expiry,
+            blueCardOwners: defaultBlueCardOwners,
+            qrEnabled: qrDefault
+          },
+          safeInstalments
+        )
+      )
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to load data')
     } finally {
       setLoading(false)
     }
-  }, [quotationId])
+  }, [quotationId, showError])
 
   useEffect(() => {
-    loadData()
+    const run = async (): Promise<void> => {
+      await loadData()
+    }
+    void run()
   }, [loadData])
 
-  // Auto-calculate expiry date/time when inception changes
-  useEffect(() => {
-    if (!data.inceptionDate) return
-    const oneYear = addMonthsISO(data.inceptionDate, 12)
-    if (data.inceptionTime === '00:00') {
-      // 00:00 inception → expiry = 1 year minus 1 day at 23:59
-      const [y, m, d] = oneYear.split('-').map(Number)
-      const exp = new Date(y, m - 1, d - 1)
-      const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
-      setData((prev) => ({ ...prev, expiryDate, expiryTime: '23:59' }))
-    } else {
-      // Other times → expiry = 1 year same time
-      setData((prev) => ({ ...prev, expiryDate: oneYear, expiryTime: data.inceptionTime }))
-    }
-  }, [data.inceptionDate, data.inceptionTime])
-
-  // Recalculate instalment dates when inception date changes
-  useEffect(() => {
-    if (!data.inceptionDate || instalments.length === 0) return
-    const dates = instalments.map((inst) =>
-      instalmentDueDate(data.inceptionDate, inst.daysFromInception)
-    )
-    setData((prev) => ({ ...prev, instalmentDates: dates }))
-  }, [data.inceptionDate, instalments])
-
-  const updateData = (partial: Partial<WizardData>) => {
-    setData((prev) => ({ ...prev, ...partial }))
+  // Inception changes re-derive the expiry date/time and the instalment dates
+  // (applied in the same update, see applyInceptionChange)
+  const updateData = (partial: Partial<WizardData>): void => {
+    setData((prev) => applyInceptionChange(prev, { ...prev, ...partial }, instalments))
   }
 
   // Default day-from-inception spacing per instalment count (mirrors PremiumTab)
@@ -587,7 +619,7 @@ export default function PolicySetupWizard({
   }
 
   // Change the number of instalments: rebuild dates (from inception) and split the premium evenly
-  const changeInstalmentCount = (rawCount: number) => {
+  const changeInstalmentCount = (rawCount: number): void => {
     const count = Math.max(1, Math.min(24, Math.floor(rawCount) || 1))
     const newInstalments: QuotationInstalment[] = Array.from({ length: count }, (_, i) => ({
       id: `wiz-inst-${i}`,
@@ -650,7 +682,7 @@ export default function PolicySetupWizard({
     return opts
   })()
 
-  const handleAltChange = (altId: string) => {
+  const handleAltChange = (altId: string): void => {
     if (!quotation) return
     updateData({
       selectedAltId: altId,
@@ -659,7 +691,7 @@ export default function PolicySetupWizard({
   }
 
   // Edit one vessel's payable premium (multi-vessel conversion) → re-split that vessel's instalments
-  const updateVesselPremium = (vid: string, amount: number) => {
+  const updateVesselPremium = (vid: string, amount: number): void => {
     const vesselPremiums = { ...data.vesselPremiums, [vid]: round2(amount) }
     updateData({
       vesselPremiums,
@@ -668,7 +700,7 @@ export default function PolicySetupWizard({
     })
   }
 
-  const recalcPremiumFromInstalments = (amounts: number[]) => {
+  const recalcPremiumFromInstalments = (amounts: number[]): void => {
     const sum = round2(amounts.reduce((s, a) => s + (a || 0), 0))
     const only = data.selectedVesselIds[0]
     updateData({
@@ -719,7 +751,7 @@ export default function PolicySetupWizard({
     }
   }
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     const error = validateStep(currentStep)
     if (error) {
       showError(error)
@@ -729,19 +761,19 @@ export default function PolicySetupWizard({
     if (nextIndex < steps.length) setCurrentStep(steps[nextIndex])
   }
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     const prevIndex = currentStepIndex - 1
     if (prevIndex >= 0) setCurrentStep(steps[prevIndex])
   }
 
-  const goToStep = (step: number) => {
+  const goToStep = (step: number): void => {
     const targetIndex = steps.indexOf(step)
     if (targetIndex < 0) return
     // Only allow going to completed steps
     if (targetIndex < currentStepIndex) setCurrentStep(step)
   }
 
-  const handleConvert = async () => {
+  const handleConvert = async (): Promise<void> => {
     if (!quotation) return
     // Validate all steps
     for (const step of steps.slice(0, -1)) {
@@ -828,8 +860,9 @@ export default function PolicySetupWizard({
         // otherwise null keeps legacy behavior (no subjectivities section).
         selectedSubjectivityIds: subjectivityItems.length > 0 ? data.selectedSubjectivityIds : null
       })
-      if ((result as any)?.error) {
-        showError((result as any).message || 'Conversion failed')
+      const failure = ipcFailure(result)
+      if (failure) {
+        showError(failure.message || 'Conversion failed')
         return
       }
       const policies = Array.isArray(result) ? result : []
@@ -837,8 +870,8 @@ export default function PolicySetupWizard({
         `${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`
       )
       if (policies[0]?.id) onComplete(policies[0].id)
-    } catch (err: any) {
-      showError(err.message || 'Failed to convert to policy')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to convert to policy')
     } finally {
       setConverting(false)
     }
@@ -1190,13 +1223,12 @@ export default function PolicySetupWizard({
 
       {showSectionOrder && quotation && (
         <SectionOrderModal
-          quotation={
-            {
-              id: quotationId,
-              quotationTypeCode: quotation.quotationTypeCode,
-              sectionOrder: data.sectionOrder
-            } as any
-          }
+          quotation={{
+            ...quotation,
+            id: quotationId,
+            quotationTypeCode: quotation.quotationTypeCode,
+            sectionOrder: data.sectionOrder ?? undefined
+          }}
           docLabel="policy"
           isLight={isLight}
           showSuccess={showSuccess}
@@ -1263,7 +1295,7 @@ function StepVesselAlternative({
   onSelectLolOption: (id: string) => void
   onSelectAgreedValueOption: (id: string) => void
   labelStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Vessel & Alternative Selection</h2>
@@ -1402,9 +1434,9 @@ function StepVesselAlternative({
                   transition: 'all 0.15s'
                 }}
               >
-                {(alt as any).label || `Alternative ${idx + 1}`}
-                {(alt as any).premiumAmount != null
-                  ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}`
+                {alt.label || `Alternative ${idx + 1}`}
+                {alt.premiumAmount != null
+                  ? ` — ${quotation.premiumCurrency || 'USD'} ${alt.premiumAmount.toLocaleString()}`
                   : ''}
                 {quotation.ivEnabled && quotation.ivPremiumAmount
                   ? ` + IV ${quotation.ivPremiumAmount.toLocaleString()}`
@@ -1539,7 +1571,7 @@ function StepPeriodPremium({
   onUpdate: (partial: Partial<WizardData>) => void
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Period</h2>
@@ -1651,7 +1683,7 @@ function StepInstalments({
   isMultiSelection: boolean
   onUpdateVesselPremium: (vesselId: string, amount: number) => void
   computePayable: (tech: number) => number
-}) {
+}): React.JSX.Element {
   const labelUpper: React.CSSProperties = {
     fontSize: '0.7rem',
     fontWeight: 700,
@@ -1736,7 +1768,7 @@ function StepInstalments({
               </div>
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-              One policy per vessel — each vessel's premium is split over the instalments below
+              One policy per vessel — each vessel&apos;s premium is split over the instalments below
             </p>
           </div>
         ) : (
@@ -1791,7 +1823,7 @@ function StepInstalments({
           const cp = computePayable
           const hasDiscount = cp(100) !== 100
           const cur = quotation.premiumCurrency || 'USD'
-          const fmt = (n: number) =>
+          const fmt = (n: number): string =>
             `${cur} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
           const rows = [
             { label: 'Hull', tech: hullTechnical, pay: cp(hullTechnical) },
@@ -2099,17 +2131,17 @@ function StepDetails({
   labelStyle: React.CSSProperties
   inputStyle: React.CSSProperties
   onEditSectionOrder: () => void
-}) {
+}): React.JSX.Element {
   const sameAsBase = premiumCurrency.toUpperCase() === baseCurrency.toUpperCase()
   const vesselIds = data.selectedVesselIds
   const [activeVid, setActiveVid] = useState(vesselIds[0] || '')
   const vid = vesselIds.includes(activeVid) ? activeVid : vesselIds[0] || ''
   const rows = data.insuredByVessel[vid] || []
-  const setRows = (newRows: InsuredRow[]) =>
+  const setRows = (newRows: InsuredRow[]): void =>
     onUpdate({ insuredByVessel: { ...data.insuredByVessel, [vid]: newRows } })
-  const updateRow = (idx: number, patch: Partial<InsuredRow>) =>
+  const updateRow = (idx: number, patch: Partial<InsuredRow>): void =>
     setRows(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
-  const addRow = () =>
+  const addRow = (): void =>
     setRows([
       ...rows,
       {
@@ -2122,9 +2154,9 @@ function StepDetails({
         isNew: false
       }
     ])
-  const removeRow = (idx: number) => setRows(rows.filter((_, i) => i !== idx))
+  const removeRow = (idx: number): void => setRows(rows.filter((_, i) => i !== idx))
   // Typed value matches an existing entity → link it (and default its address); otherwise keep as a custom name
-  const onEntityInput = (idx: number, text: string) => {
+  const onEntityInput = (idx: number, text: string): void => {
     const match = allEntities.find((e) => e.name.toLowerCase() === text.trim().toLowerCase())
     if (match) {
       const first = (entityAddrs[match.id] || [])[0]
@@ -2139,7 +2171,7 @@ function StepDetails({
       updateRow(idx, { entityId: '', entityName: text, addressId: '', isNew: false })
     }
   }
-  const onAddrChange = (idx: number, r: InsuredRow, val: string) => {
+  const onAddrChange = (idx: number, r: InsuredRow, val: string): void => {
     if (val === '__new__') {
       updateRow(idx, { addressId: '', isNew: true, addressText: '' })
       return
@@ -2147,7 +2179,7 @@ function StepDetails({
     const a = (entityAddrs[r.entityId] || []).find((x) => x.id === val)
     updateRow(idx, { addressId: val, isNew: false, addressText: a?.addressLine1 || '' })
   }
-  const vesselName = (id: string) => {
+  const vesselName = (id: string): string => {
     const v = qVessels.find((q) => (q.vesselId || q.id) === id)
     return v ? v.name || v.vesselLabel || id : id
   }
@@ -2502,7 +2534,7 @@ function StepBlueCards({
   onUpdate: (partial: Partial<WizardData>) => void
   ownerOptions: { id: string; name: string; role: string }[]
   labelStyle: React.CSSProperties
-}) {
+}): React.JSX.Element {
   // Find the vessel's flag state for ratification checks
   const vesselFlagStates = useMemo(() => {
     const result: { vesselName: string; flagState: FlagState | null }[] = []
@@ -2519,13 +2551,13 @@ function StepBlueCards({
 
   const primaryFlag = vesselFlagStates[0]?.flagState
 
-  const toggleCard = (card: string) => {
+  const toggleCard = (card: string): void => {
     const current = data.blueCards
     const updated = current.includes(card) ? current.filter((c) => c !== card) : [...current, card]
     onUpdate({ blueCards: updated, blueCardNone: false })
   }
 
-  const setNone = () => {
+  const setNone = (): void => {
     onUpdate({
       blueCardNone: !data.blueCardNone,
       blueCards: !data.blueCardNone ? [] : data.blueCards
@@ -2849,17 +2881,17 @@ function StepSubjectivities({
   selectedIds: string[]
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
-}) {
-  const stripHtml = (s: string) =>
+}): React.JSX.Element {
+  const stripHtml = (s: string): string =>
     (s || '')
       .replace(/<br\s*\/?>/gi, ' ')
       .replace(/<[^>]+>/g, '')
       .replace(/&amp;/g, '&')
       .replace(/&nbsp;/g, ' ')
       .trim()
-  const setSelected = (ids: string[]) =>
+  const setSelected = (ids: string[]): void =>
     onUpdate({ selectedSubjectivityIds: items.filter((i) => ids.includes(i.id)).map((i) => i.id) })
-  const toggle = (id: string) => {
+  const toggle = (id: string): void => {
     const set = new Set(selectedIds)
     set.has(id) ? set.delete(id) : set.add(id)
     setSelected([...set])
@@ -2967,7 +2999,7 @@ function StepReview({
   isPI: boolean
   isLight: boolean
   onGoToStep: (step: number) => void
-}) {
+}): React.JSX.Element {
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '0.65rem',
@@ -2986,7 +3018,7 @@ function StepReview({
     marginBottom: '12px'
   }
 
-  const editLink = (step: number) => (
+  const editLink = (step: number): React.JSX.Element => (
     <button
       onClick={() => onGoToStep(step)}
       style={{
@@ -3058,9 +3090,9 @@ function StepReview({
             {editLink(0)}
           </div>
           <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
-            {(selectedAlt as any).label || 'Alternative'}
-            {(selectedAlt as any).premiumAmount != null
-              ? ` — ${quotation.premiumCurrency || 'USD'} ${((selectedAlt as any).premiumAmount as number).toLocaleString()}`
+            {selectedAlt.label || 'Alternative'}
+            {selectedAlt.premiumAmount != null
+              ? ` — ${quotation.premiumCurrency || 'USD'} ${selectedAlt.premiumAmount.toLocaleString()}`
               : ''}
           </span>
         </div>

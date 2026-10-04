@@ -20,7 +20,7 @@ export default function Badge({
   title,
   style,
   children
-}: BadgeProps) {
+}: BadgeProps): React.JSX.Element {
   return (
     <span
       className={`badge badge-${tone}${dot ? ' badge-dot' : ''}`}

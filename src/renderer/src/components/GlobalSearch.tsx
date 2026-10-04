@@ -29,7 +29,7 @@ const SUGGESTED = [
 interface GlobalSearchProps {
   isOpen: boolean
   onClose: () => void
-  onNavigate: (type: string, id: string, extra?: any) => void
+  onNavigate: (type: string, id: string, extra?: unknown) => void
   /** Pages, views and actions the user may open (from the feature registry) */
   features?: Feature[]
   onFeature?: (target: NavTarget) => void
@@ -52,14 +52,18 @@ interface SearchResults {
     vesselName: string
     policyTypeName: string
     status: string
+    /** returned by the adapter but missing from the shared IPC type */
+    source?: 'policy_document' | 'vessel_policy'
   }>
 }
 
-interface FlatItem {
-  category: 'feature' | 'vessel' | 'entity' | 'quotation' | 'policy'
-  id: string
-  extra?: any
-}
+type FlatItem =
+  | { category: 'feature'; id: string; extra: Feature }
+  | {
+      category: 'vessel' | 'entity' | 'quotation' | 'policy'
+      id: string
+      extra?: SearchResults['policies'][number]
+    }
 
 export default function GlobalSearch({
   isOpen,
@@ -67,7 +71,7 @@ export default function GlobalSearch({
   onNavigate,
   features = [],
   onFeature
-}: GlobalSearchProps) {
+}: GlobalSearchProps): React.JSX.Element | null {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [query, setQuery] = useState('')
@@ -105,12 +109,20 @@ export default function GlobalSearch({
 
   const totalCount = flatItems.length
 
-  // Focus input on open
-  useEffect(() => {
+  // Reset on open (adjust state when the prop changes, during render)
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen)
     if (isOpen) {
       setQuery('')
       setResults(null)
       setHighlightIndex(0)
+    }
+  }
+
+  // Focus input on open
+  useEffect(() => {
+    if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
@@ -125,7 +137,7 @@ export default function GlobalSearch({
     setLoading(true)
     try {
       const res = await window.api.globalSearch(q.trim())
-      if (res && !(res as any).error) {
+      if (res && !('error' in res && res.error)) {
         setResults(res)
         setHighlightIndex(0)
       }
@@ -200,13 +212,13 @@ export default function GlobalSearch({
 
   let flatIdx = -1
 
-  const renderCategory = (
+  const renderCategory = <T,>(
     label: string,
     icon: React.ReactNode,
-    items: any[],
+    items: T[],
     category: string,
-    renderItem: (item: any, idx: number) => React.ReactNode
-  ) => {
+    renderItem: (item: T, idx: number) => React.ReactNode
+  ): React.ReactNode => {
     if (items.length === 0) return null
     return (
       <div key={category}>

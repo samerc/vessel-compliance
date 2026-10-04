@@ -50,7 +50,25 @@ import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
 import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
 import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
-import type { FlagState, FlagStatePort, VesselAssured } from '../../../shared/types'
+import type {
+  Entity,
+  FlagState,
+  FlagStatePort,
+  PIClause,
+  PIExclusion,
+  PISubjectivity,
+  PIWarranty,
+  PolicyBlueCard,
+  PolicyDocAddress,
+  PolicyDocInstalment,
+  PolicyDocument,
+  Quotation,
+  QuotationCustomSection,
+  QuotationCustomWarranty,
+  QuotationHullAdditionalCondition,
+  QuotationHullCondition,
+  VesselAssured
+} from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
 import { ok } from '../utils/ipc'
 import { MoneyInput } from './quotation-tabs/shared'
@@ -75,93 +93,54 @@ interface PolicyDetailProps {
   onNavigateToPolicy?: (policyId: string) => void
 }
 
-interface PolicyRecord {
-  id: string
-  quotationId: string
-  vesselId: string
-  policyNumber: string
-  status: string
-  revisionNumber: number
-  inceptionDate: string
-  inceptionTime: string
-  expiryDate: string
-  expiryTime: string
-  timezone: string
-  commissionPercent: number | null
-  showAddresses: boolean
-  bankId: string | null
-  bankName: string | null
-  bankDetails: string | null
-  proRata: boolean
-  perAnnumPremium: number | null
-  premiumAmount: number | null
-  selectedAlternativeId: string | null
-  cancelReplaceText: string | null
-  exportedAt: string | null
-  createdBy: string
-  createdAt: string
-  quotationReference: string | null
-  quotationTypeCode: string
-  quotationTypeName: string
-  vesselName: string
-  imoNumber: string
-  vesselType: string
-  flagStateId: string
-  builtYear: number | null
-  rebuiltYear: number | null
-  grossTonnage: number | null
-  flagStateName: string
-  flagIso3Code: string | null
-  customerName: string
-  customerType: string | null
-  callSign?: string
-  exchangeRate: number
-  fleetId: string | null
-  fleetName: string | null
-  classificationSociety: string | null
-  createdByName: string | null
-  signedBy: string | null
-  signedAt: string | null
-  signedByName: string | null
-  exportSnapshot: string | null
-  sectionOrder: string[] | null
-  selectedLolOptionId: string | null
-  selectedAgreedValueOptionId: string | null
+/** The loaded policy; `premiumCurrency` is read by the cancel modal but is not selected by policy:getById */
+type PolicyRecord = PolicyDocument & { premiumCurrency?: string }
+
+/** Instalments may carry a legacy `amount` field */
+type Instalment = PolicyDocInstalment & { amount?: number }
+
+type PolicyAddress = PolicyDocAddress
+
+type BlueCard = PolicyBlueCard
+
+/** A master P&I clause; `text` and `code` are read but are not part of PIClause */
+type PIClauseMaster = PIClause & { text?: string; code?: string }
+
+/** A read-only coverage line shown in the Coverage tab */
+interface CoverageItem {
+  id?: string
+  text: string
+  name?: string
+  code?: string
 }
 
-interface Instalment {
-  instalmentNumber: number
-  dueDate: string
-  premiumAmount: number
-  commissionAmount: number
-  isNonRefundable: boolean
+type LolOption = Awaited<ReturnType<typeof window.api.lolGetOptions>>[number]
+
+type PolicyRevision = Awaited<ReturnType<typeof window.api.policyGetRevisions>>[number]
+
+type PolicyBundle = [
+  PolicyDocument | null,
+  PolicyDocInstalment[],
+  PolicyDocAddress[],
+  PolicyBlueCard[]
+]
+
+function fetchPolicyBundle(id: string): Promise<PolicyBundle> {
+  return Promise.all([
+    window.api.policyGetById(id),
+    window.api.policyGetInstalments(id),
+    window.api.policyGetAddresses(id),
+    window.api.policyGetBlueCards(id)
+  ])
 }
 
-interface PolicyAddress {
-  entityId: string
-  entityName: string
-  role: string
-  addressText: string
-}
-
-interface BlueCard {
-  id: string
-  policyDocId: string
-  cardType: string
-  cardNumber: string
-  inceptionDate: string
-  expiryDate: string
-  revisionNumber: number
-  issuedDate: string
-  status: string
-  ownerEntityId?: string
-  ownerName?: string
-  ownerAddress?: string
-  portOfRegistry?: string
-  addressedToFlagId?: string
-  addressedToName?: string
-  addressedToAddress?: string
-  cancelReplaceText?: string
+/** The message of a thrown value, or the fallback (same as `err.message || fallback`) */
+function errMessage(err: unknown, fallback: string): string {
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const m = err.message
+    if (m) return String(m)
+  }
+  return fallback
 }
 
 const CARD_TYPES = ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'] as const
@@ -214,7 +193,7 @@ function formatAmount(amount?: number | null, currency?: string): string {
   return `${currency || 'USD'} ${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-function formatPeriod(date?: string, time?: string): string {
+function formatPeriod(date?: string | null, time?: string | null): string {
   if (!date) return '-'
   const formatted = formatDateShort(date)
   if (time) return `${formatted} ${time}`
@@ -227,7 +206,7 @@ export default function PolicyDetail({
   onNavigateToVessel,
   onNavigateToQuotation,
   onNavigateToPolicy
-}: PolicyDetailProps) {
+}: PolicyDetailProps): React.JSX.Element | null {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
   const [instalments, setInstalments] = useState<Instalment[]>([])
   const [addresses, setAddresses] = useState<PolicyAddress[]>([])
@@ -244,6 +223,8 @@ export default function PolicyDetail({
   const [declarationFields, setDeclarationFields] = useState<DeclarationFields | null>(null)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
+  // Where the Actions menu opens (measured from the button when it is clicked)
+  const [actionsMenuPos, setActionsMenuPos] = useState({ top: 0, right: 0 })
   const [confirmation, setConfirmation] = useState<{
     show: boolean
     title: string
@@ -295,15 +276,17 @@ export default function PolicyDetail({
   >([])
 
   // Coverage tab state
-  const [quotationData, setQuotationData] = useState<any>(null)
-  const [coverageWarranties, setCoverageWarranties] = useState<any[]>([])
-  const [coverageCustomWarranties, setCoverageCustomWarranties] = useState<any[]>([])
-  const [coverageDeductibles, setCoverageDeductibles] = useState<any[]>([])
-  const [coverageExclusions, setCoverageExclusions] = useState<any[]>([])
-  const [coverageClauses, setCoverageClauses] = useState<any[]>([])
-  const [coverageSubjectivities, setCoverageSubjectivities] = useState<any[]>([])
-  const [coverageCustomSections, setCoverageCustomSections] = useState<any[]>([])
-  const [coverageLolOptions, setCoverageLolOptions] = useState<any[]>([])
+  const [quotationData, setQuotationData] = useState<Quotation | null>(null)
+  const [coverageWarranties, setCoverageWarranties] = useState<CoverageItem[]>([])
+  const [coverageCustomWarranties, setCoverageCustomWarranties] = useState<
+    QuotationCustomWarranty[]
+  >([])
+  const [coverageDeductibles, setCoverageDeductibles] = useState<CoverageItem[]>([])
+  const [coverageExclusions, setCoverageExclusions] = useState<CoverageItem[]>([])
+  const [coverageClauses, setCoverageClauses] = useState<CoverageItem[]>([])
+  const [coverageSubjectivities, setCoverageSubjectivities] = useState<CoverageItem[]>([])
+  const [coverageCustomSections, setCoverageCustomSections] = useState<QuotationCustomSection[]>([])
+  const [coverageLolOptions, setCoverageLolOptions] = useState<LolOption[]>([])
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageExpanded, setCoverageExpanded] = useState<Record<string, boolean>>({})
 
@@ -350,52 +333,86 @@ export default function PolicyDetail({
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [found, inst, addr, bc] = await Promise.all([
-        window.api.policyGetById(policyId),
-        window.api.policyGetInstalments(policyId),
-        window.api.policyGetAddresses(policyId),
-        window.api.policyGetBlueCards(policyId)
-      ])
+  // Set when the policy cannot be loaded; the effect below then goes back to the list
+  // (the parent passes a new onBack each render, so the loaders do not call it directly)
+  const [policyNotFound, setPolicyNotFound] = useState(false)
+  useEffect(() => {
+    if (policyNotFound) onBack()
+  }, [policyNotFound, onBack])
 
-      if (!found || (found as any).error) {
+  const applyPolicyBundle = useCallback(
+    (bundle: PolicyBundle): void => {
+      const [found, inst, addr, bc] = bundle
+      if (!found || ('error' in found && found.error)) {
         showError('Policy not found')
-        onBack()
+        setPolicyNotFound(true)
         return
       }
 
-      setPolicy(found as PolicyRecord)
+      setPolicy(found)
       setInstalments(Array.isArray(inst) ? inst : [])
       setAddresses(Array.isArray(addr) ? addr : [])
       setBlueCards(Array.isArray(bc) ? bc : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to load policy')
+    },
+    [showError]
+  )
+
+  // Reload after a change (save, sign, export...)
+  const loadData = useCallback(async (): Promise<void> => {
+    setLoading(true)
+    try {
+      applyPolicyBundle(await fetchPolicyBundle(policyId))
+    } catch (err) {
+      showError(errMessage(err, 'Failed to load policy'))
     } finally {
       setLoading(false)
     }
-  }, [policyId])
+  }, [policyId, applyPolicyBundle, showError])
 
+  // Show the loading state again when another policy is opened in place (e.g. a new revision)
+  const [loadingPolicyId, setLoadingPolicyId] = useState(policyId)
+  if (loadingPolicyId !== policyId) {
+    setLoadingPolicyId(policyId)
+    setLoading(true)
+    setPolicyNotFound(false)
+  }
+
+  // Initial load, and again whenever the policy id changes
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    let alive = true
+    fetchPolicyBundle(policyId)
+      .then((bundle) => {
+        if (alive) applyPolicyBundle(bundle)
+      })
+      .catch((err) => {
+        if (alive) showError(errMessage(err, 'Failed to load policy'))
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [policyId, applyPolicyBundle, showError])
 
   // Track recent item view when policy loads
+  const recentPolicyId = policy?.id
+  const recentPolicyNumber = policy?.policyNumber
+  const recentVesselName = policy?.vesselName
   useEffect(() => {
-    if (!policy) return
+    if (!recentPolicyId) return
     window.api
       .recentItemsAdd(
         'policy',
-        policyId,
-        policy.policyNumber || 'Policy',
-        policy.vesselName || undefined
+        recentPolicyId,
+        recentPolicyNumber || 'Policy',
+        recentVesselName || undefined
       )
       .then(() => {
         window.dispatchEvent(new Event('recent-item-added'))
       })
       .catch(() => {})
-  }, [policy?.id])
+  }, [recentPolicyId, recentPolicyNumber, recentVesselName])
 
   // Load supplementary data for blue card management + editing
   useEffect(() => {
@@ -410,7 +427,11 @@ export default function PolicyDetail({
         setBanks(Array.isArray(bnks) ? bnks : [])
         // Build a simple entity lookup for assured entities
         const entMap = Array.isArray(entities)
-          ? entities.map((e: any) => ({ id: e.id, name: e.name, address: e.address }))
+          ? entities.map((e: Entity & { address?: string }) => ({
+              id: e.id,
+              name: e.name,
+              address: e.address
+            }))
           : []
         setAssuredEntities(entMap)
       } catch {
@@ -436,10 +457,11 @@ export default function PolicyDetail({
 
   // Load ports when flag state is known
   useEffect(() => {
-    if (!policy?.flagStateId) return
+    const flagStateId = policy?.flagStateId
+    if (!flagStateId) return
     const loadPorts = async (): Promise<void> => {
       try {
-        const ports = await window.api.flagStateGetPorts(policy.flagStateId)
+        const ports = await window.api.flagStateGetPorts(flagStateId)
         setFlagPorts(Array.isArray(ports) ? ports : [])
       } catch {
         // Non-critical
@@ -478,7 +500,7 @@ export default function PolicyDetail({
     )
     setEditCancelReplace(!!policy.cancelReplaceText)
     setEditCancelReplaceText(policy.cancelReplaceText || '')
-    setEditHideBroker(!!(policy as any).hideBroker)
+    setEditHideBroker(!!policy.hideBroker)
     setActiveTab('overview')
     setIsEditing(true)
   }, [policy, instalments, addresses])
@@ -522,7 +544,7 @@ export default function PolicyDetail({
             const existing = await window.api.getEntityAddresses(addr.entityId)
             const alreadyExists =
               Array.isArray(existing) &&
-              existing.some((ea: any) => ea.addressLine1?.trim() === addr.addressText?.trim())
+              existing.some((ea) => ea.addressLine1?.trim() === addr.addressText?.trim())
             if (!alreadyExists) {
               await window.api.addEntityAddress({
                 entityId: addr.entityId,
@@ -538,8 +560,8 @@ export default function PolicyDetail({
       showSuccess('Policy updated')
       setIsEditing(false)
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to save policy')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to save policy'))
     } finally {
       setSaving(false)
     }
@@ -564,15 +586,15 @@ export default function PolicyDetail({
               await loadData()
             }
           }
-        } catch (err: any) {
-          showError(err.message || 'Failed to create revision')
+        } catch (err) {
+          showError(errMessage(err, 'Failed to create revision'))
         }
       }
     })
   }
 
   // Load coverage data from linked quotation
-  const loadCoverageData = useCallback(async () => {
+  const loadCoverageData = useCallback(async (): Promise<void> => {
     if (!policy?.quotationId) return
     setCoverageLoading(true)
     try {
@@ -618,9 +640,11 @@ export default function PolicyDetail({
       setQuotationData(q)
       // Resolve warranty names from master list
       const masterWarrantyMap = new Map(
-        (Array.isArray(allWarranties) ? allWarranties : []).map((w: any) => [w.id, w])
+        (Array.isArray(allWarranties) ? allWarranties : []).map(
+          (w): [string, PIWarranty & { name?: string }] => [w.id, w]
+        )
       )
-      const resolvedWarranties = (Array.isArray(warranties) ? warranties : []).map((w: any) => {
+      const resolvedWarranties = (Array.isArray(warranties) ? warranties : []).map((w) => {
         const master = masterWarrantyMap.get(w.piWarrantyId)
         return { ...w, text: master?.text || master?.name || '', name: master?.name || '' }
       })
@@ -628,7 +652,7 @@ export default function PolicyDetail({
       setCoverageCustomWarranties(Array.isArray(customWarranties) ? customWarranties : [])
       // Resolve deductible text — deductibles have title+description directly
       setCoverageDeductibles(
-        (Array.isArray(deductibles) ? deductibles : []).map((d: any) => {
+        (Array.isArray(deductibles) ? deductibles : []).map((d) => {
           const parts = [d.title, d.description].filter(Boolean)
           let text = parts.join(' — ')
           if (d.amount) text += ` ${d.currency || 'USD'} ${Number(d.amount).toLocaleString()}`
@@ -637,27 +661,35 @@ export default function PolicyDetail({
       )
       // Resolve exclusion text — exclusions have customText or reference master
       const masterExclMap = new Map(
-        (Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map((e: any) => [e.id, e])
+        (Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map(
+          (e): [string, PIExclusion] => [e.id, e]
+        )
       )
       setCoverageExclusions(
-        (Array.isArray(exclusions) ? exclusions : []).map((e: any) => {
-          const master = masterExclMap.get(e.piExclusionId)
-          return { ...e, text: e.customText || master?.text || e.text || '' }
-        })
+        (Array.isArray(exclusions) ? exclusions : []).map(
+          (e: { piExclusionId?: string; customText?: string; text?: string }) => {
+            const master = e.piExclusionId ? masterExclMap.get(e.piExclusionId) : undefined
+            return { ...e, text: e.customText || master?.text || e.text || '' }
+          }
+        )
       )
       // Resolve clause names — clauses reference master pi_clauses with name+code
       const masterClauseMap = new Map(
-        (Array.isArray(allClausesMaster) ? allClausesMaster : []).map((c: any) => [c.id, c])
+        (Array.isArray(allClausesMaster) ? allClausesMaster : []).map(
+          (c): [string, PIClauseMaster] => [c.id, c]
+        )
       )
       // Deduplicate clauses by piClauseId
       const seenClauseIds = new Set<string>()
-      const dedupedClauses = (Array.isArray(clauses) ? clauses : []).filter((c: any) => {
-        if (seenClauseIds.has(c.piClauseId)) return false
-        seenClauseIds.add(c.piClauseId)
-        return true
-      })
+      const dedupedClauses = (Array.isArray(clauses) ? clauses : []).filter(
+        (c: { piClauseId: string; text?: string }) => {
+          if (seenClauseIds.has(c.piClauseId)) return false
+          seenClauseIds.add(c.piClauseId)
+          return true
+        }
+      )
       setCoverageClauses(
-        dedupedClauses.map((c: any) => {
+        dedupedClauses.map((c: { piClauseId: string; text?: string }) => {
           const master = masterClauseMap.get(c.piClauseId)
           return {
             ...c,
@@ -677,24 +709,24 @@ export default function PolicyDetail({
         const selectedAltId = policy.selectedAlternativeId
         // Get selected alt's clause
         const selectedAlt = selectedAltId
-          ? safeHullAlts.find((a: any) => a.id === selectedAltId)
+          ? safeHullAlts.find((a) => a.id === selectedAltId)
           : safeHullAlts[0]
         const selectedClause = selectedAlt
-          ? safeHullClauses.find((c: any) => c.id === selectedAlt.hullClauseId)
+          ? safeHullClauses.find((c) => c.id === selectedAlt.hullClauseId)
           : null
         // Filter conditions to selected alt
         const filteredConds = selectedAltId
-          ? safeHullConds.filter((c: any) => c.alternativeId === selectedAltId || !c.alternativeId)
+          ? safeHullConds.filter((c) => c.alternativeId === selectedAltId || !c.alternativeId)
           : safeHullConds
         // Dedup
-        const seenHull = new Map<string, any>()
-        for (const c of filteredConds.filter((x: any) => x.alternativeId))
+        const seenHull = new Map<string, QuotationHullCondition>()
+        for (const c of filteredConds.filter((x) => x.alternativeId))
           seenHull.set(c.hullConditionId, c)
-        for (const c of filteredConds.filter((x: any) => !x.alternativeId)) {
+        for (const c of filteredConds.filter((x) => !x.alternativeId)) {
           if (!seenHull.has(c.hullConditionId)) seenHull.set(c.hullConditionId, c)
         }
-        const hullClauseItems = Array.from(seenHull.values()).map((qc: any) => {
-          const def = safeAllHullConds.find((c: any) => c.id === qc.hullConditionId)
+        const hullClauseItems = Array.from(seenHull.values()).map((qc) => {
+          const def = safeAllHullConds.find((c) => c.id === qc.hullConditionId)
           return {
             text: `Cl. ${def?.conditionNumber || '?'} — ${qc.textOverride || def?.text || ''}`,
             code: `Cl. ${def?.conditionNumber || '?'}`
@@ -708,7 +740,10 @@ export default function PolicyDetail({
           })
         // Add additional conditions
         for (const qa of safeHullAddl) {
-          const text = qa.textOverride || (qa as any).text || ''
+          const text =
+            qa.textOverride ||
+            (qa as QuotationHullAdditionalCondition & { text?: string }).text ||
+            ''
           if (text) hullClauseItems.push({ text, code: '' })
         }
         setCoverageClauses(hullClauseItems)
@@ -718,19 +753,18 @@ export default function PolicyDetail({
       if (safeCustomExcl.length > 0) {
         setCoverageExclusions((prev) => [
           ...prev,
-          ...safeCustomExcl.map((e: any) => ({ text: e.text || '' }))
+          ...safeCustomExcl.map((e) => ({ text: e.text || '' }))
         ])
       }
       // Resolve subjectivity text
       const masterSubjMap = new Map(
-        (Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [
-          s.id,
-          s
-        ])
+        (Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map(
+          (s): [string, PISubjectivity] => [s.id, s]
+        )
       )
       setCoverageSubjectivities(
-        (Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
-          const master = masterSubjMap.get(s.piSubjectivityId)
+        (Array.isArray(subjectivities) ? subjectivities : []).map((s) => {
+          const master = s.piSubjectivityId ? masterSubjMap.get(s.piSubjectivityId) : undefined
           return { ...s, text: master?.text || s.text || '' }
         })
       )
@@ -752,14 +786,15 @@ export default function PolicyDetail({
     } finally {
       setCoverageLoading(false)
     }
-  }, [policy?.quotationId])
+  }, [policy])
 
-  // Load coverage when switching to that tab
-  useEffect(() => {
-    if (isEditing && activeTab === 'coverage' && !quotationData && !coverageLoading) {
+  // Switch edit tab; the coverage data loads when its tab is first opened
+  const selectEditTab = (tab: EditTab): void => {
+    setActiveTab(tab)
+    if (isEditing && tab === 'coverage' && !quotationData && !coverageLoading) {
       loadCoverageData()
     }
-  }, [isEditing, activeTab, quotationData, coverageLoading, loadCoverageData])
+  }
 
   // Recalculate instalment amounts when premium or commission change
   const recalcInstalments = (
@@ -824,10 +859,11 @@ export default function PolicyDetail({
   }, [blueCards])
 
   // Get vessel's flag state info
+  const vesselFlagStateId = policy?.flagStateId
   const vesselFlagState = useMemo(() => {
-    if (!policy?.flagStateId || flagStates.length === 0) return null
-    return flagStates.find((fs) => fs.id === policy.flagStateId) || null
-  }, [policy?.flagStateId, flagStates])
+    if (!vesselFlagStateId || flagStates.length === 0) return null
+    return flagStates.find((fs) => fs.id === vesselFlagStateId) || null
+  }, [vesselFlagStateId, flagStates])
 
   // Build owner options from vessel assureds
   const ownerOptions = useMemo(() => {
@@ -912,7 +948,7 @@ export default function PolicyDetail({
           ratifiedWreck: newFlagForm.ratWreck,
           authorityName: newFlagForm.authName.trim() || null,
           authorityAddress: newFlagForm.authAddr.trim() || null
-        } as any)
+        })
       )
       setFlagStates((prev) => [...prev, created])
       setBcForm((f) => ({
@@ -931,8 +967,8 @@ export default function PolicyDetail({
         authAddr: ''
       })
       showSuccess('Flag state added')
-    } catch (err: any) {
-      showError(err.message || 'Failed to add flag state')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to add flag state'))
     }
   }
 
@@ -1134,14 +1170,15 @@ export default function PolicyDetail({
           revisionNumber,
           issuedDate: todayISO,
           status: 'active',
-          ownerEntityId: bcForm.ownerEntityId || null,
-          ownerName: bcForm.ownerName || null,
-          ownerAddress: bcForm.ownerAddress || null,
-          portOfRegistry: bcForm.portOfRegistry || null,
-          addressedToFlagId: bcForm.addressedToFlagId || null,
-          addressedToName: bcForm.addressedToName || null,
-          addressedToAddress: bcForm.addressedToAddress || null,
-          cancelReplaceText: bcForm.cancelReplace ? bcForm.cancelReplaceText : null
+          // the adapter stores an empty/undefined value as NULL
+          ownerEntityId: bcForm.ownerEntityId || undefined,
+          ownerName: bcForm.ownerName || undefined,
+          ownerAddress: bcForm.ownerAddress || undefined,
+          portOfRegistry: bcForm.portOfRegistry || undefined,
+          addressedToFlagId: bcForm.addressedToFlagId || undefined,
+          addressedToName: bcForm.addressedToName || undefined,
+          addressedToAddress: bcForm.addressedToAddress || undefined,
+          cancelReplaceText: bcForm.cancelReplace ? bcForm.cancelReplaceText : undefined
         })
         showSuccess(bcModalMode === 'reissue' ? 'Blue card reissued' : 'Blue card issued')
       }
@@ -1155,8 +1192,8 @@ export default function PolicyDetail({
       // Reload blue cards
       const bc = await window.api.policyGetBlueCards(policyId)
       setBlueCards(Array.isArray(bc) ? bc : [])
-    } catch (err: any) {
-      showError(err.message || 'Failed to save blue card')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to save blue card'))
     } finally {
       setBcSaving(false)
     }
@@ -1193,8 +1230,8 @@ export default function PolicyDetail({
         policyId
       )
       showSuccess(`${card.cardType} blue card exported`)
-    } catch (err: any) {
-      showError(err.message || 'Failed to export blue card')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export blue card'))
     }
   }
 
@@ -1213,8 +1250,8 @@ export default function PolicyDetail({
         blueCards: bundleBlueCards
       })
       showSuccess('All documents exported as ZIP')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export documents')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export documents'))
     } finally {
       setExportingBundle(false)
     }
@@ -1317,7 +1354,7 @@ export default function PolicyDetail({
   if (!policy) return null
 
   const sc = statusColors[policy.status] || statusColors.inactive
-  const tc = typeColors[policy.quotationTypeCode] || typeColors.P
+  const tc = typeColors[policy.quotationTypeCode ?? ''] || typeColors.P
   const isPIType = policy.quotationTypeCode === 'P'
   const commissionAmount =
     policy.commissionPercent && policy.premiumAmount
@@ -1328,87 +1365,88 @@ export default function PolicyDetail({
       ? Math.round((policy.premiumAmount - commissionAmount) * 100) / 100
       : null
 
-  const handleSignPolicy = async () => {
+  const handleSignPolicy = async (): Promise<void> => {
     setSigning(true)
     try {
-      const result = (await window.api.policySign(policyId)) as any
+      const result: { success: boolean; error?: unknown; message?: string } =
+        await window.api.policySign(policyId)
       if (result?.error) {
         showError(result.message || 'Failed to sign policy')
       } else {
         // Capture export snapshot so future exports are frozen
         try {
           await capturePolicyExportSnapshot(policyId)
-        } catch (snapErr: any) {
+        } catch (snapErr) {
           console.error('Failed to capture export snapshot:', snapErr)
           // Non-blocking — signing still succeeds even if snapshot fails
         }
         showSuccess('Policy signed successfully')
         await loadData()
       }
-    } catch (err: any) {
-      showError(err.message || 'Failed to sign policy')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to sign policy'))
     } finally {
       setSigning(false)
     }
   }
 
-  const handleExportPolicy = async () => {
+  const handleExportPolicy = async (): Promise<void> => {
     setExportingPolicy(true)
     try {
       await exportPolicyDocx(policyId)
       showSuccess('Policy document exported')
       await loadData() // Reload to update exportedAt (hides Edit button)
-    } catch (err: any) {
-      showError(err.message || 'Failed to export policy')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export policy'))
     } finally {
       setExportingPolicy(false)
     }
   }
 
-  const handleExportPdfTC = async () => {
+  const handleExportPdfTC = async (): Promise<void> => {
     setExportingPdfTC(true)
     try {
       await exportPolicyPdfWithTC(policyId)
       showSuccess('Policy PDF with T&C exported')
       await loadData()
-    } catch (err: any) {
-      showError(err.message || 'Failed to export PDF with T&C')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export PDF with T&C'))
     } finally {
       setExportingPdfTC(false)
     }
   }
 
-  const handleExportDA = async () => {
+  const handleExportDA = async (): Promise<void> => {
     setExportingDA(true)
     try {
       await exportDebitAdviceDocx(policyId)
       showSuccess('Debit advice exported')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export debit advice')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export debit advice'))
     } finally {
       setExportingDA(false)
     }
   }
 
-  const handleExportCA = async () => {
+  const handleExportCA = async (): Promise<void> => {
     setExportingCA(true)
     try {
       await exportCreditAdviceDocx(policyId)
       showSuccess('Credit advice exported')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export credit advice')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export credit advice'))
     } finally {
       setExportingCA(false)
     }
   }
 
-  const handleExportQuickBooks = async () => {
+  const handleExportQuickBooks = async (): Promise<void> => {
     setExportingQB(true)
     try {
       await exportPolicyToQuickBooks(policyId)
       showSuccess('QuickBooks Excel exported')
-    } catch (err: any) {
-      showError(err.message || 'Failed to export QuickBooks Excel')
+    } catch (err) {
+      showError(errMessage(err, 'Failed to export QuickBooks Excel'))
     } finally {
       setExportingQB(false)
     }
@@ -1629,7 +1667,16 @@ export default function PolicyDetail({
             <button
               className="btn-secondary"
               style={{ ...headerBtnStyle }}
-              onClick={() => setShowActionsMenu(!showActionsMenu)}
+              onClick={() => {
+                if (!showActionsMenu) {
+                  const rect = actionsMenuRef.current?.getBoundingClientRect()
+                  setActionsMenuPos({
+                    top: (rect?.bottom || 0) + 4,
+                    right: window.innerWidth - (rect?.right || 0)
+                  })
+                }
+                setShowActionsMenu(!showActionsMenu)
+              }}
             >
               <MoreHorizontal size={16} /> Actions
             </button>
@@ -1643,10 +1690,8 @@ export default function PolicyDetail({
                   <div
                     style={{
                       position: 'fixed',
-                      top: (actionsMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
-                      right:
-                        window.innerWidth -
-                        (actionsMenuRef.current?.getBoundingClientRect().right || 0),
+                      top: actionsMenuPos.top,
+                      right: actionsMenuPos.right,
                       zIndex: 9999,
                       background: isLight ? '#ffffff' : '#1a1d28',
                       border: '1px solid var(--glass-border-color)',
@@ -1687,8 +1732,8 @@ export default function PolicyDetail({
                                   showSuccess('Renewal quotation created')
                                   onNavigateToQuotation?.(result.quotationId)
                                 } else showError('Failed to create renewal')
-                              } catch (err: any) {
-                                showError(err.message || 'Failed')
+                              } catch (err) {
+                                showError(errMessage(err, 'Failed'))
                               } finally {
                                 setRenewing(false)
                               }
@@ -1770,8 +1815,8 @@ export default function PolicyDetail({
                                 const fields = await loadDeclarationFields(policyId)
                                 setDeclarationFields(fields)
                                 setShowDeclarationModal(true)
-                              } catch (err: any) {
-                                showError(err.message || 'Failed to load declaration')
+                              } catch (err) {
+                                showError(errMessage(err, 'Failed to load declaration'))
                               }
                             }}
                             style={actionItemStyle}
@@ -1813,8 +1858,8 @@ export default function PolicyDetail({
                                       try {
                                         await handleExportSingleBC(bc)
                                         showSuccess(`${bc.cardType} exported`)
-                                      } catch (err: any) {
-                                        showError(err.message || 'Export failed')
+                                      } catch (err) {
+                                        showError(errMessage(err, 'Export failed'))
                                       } finally {
                                         setExportingBC(false)
                                       }
@@ -1868,8 +1913,8 @@ export default function PolicyDetail({
                       await window.api.policyDelete(policyId)
                       showSuccess('Policy deleted')
                       onBack()
-                    } catch (err: any) {
-                      showError(err.message || 'Failed to delete')
+                    } catch (err) {
+                      showError(errMessage(err, 'Failed to delete'))
                     }
                   }
                 })
@@ -1916,7 +1961,7 @@ export default function PolicyDetail({
             ).map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => selectEditTab(tab.key)}
                 style={{
                   padding: '10px 18px',
                   fontSize: '0.82rem',
@@ -2226,7 +2271,7 @@ export default function PolicyDetail({
                     fontSize: '0.85rem'
                   }}
                 >
-                  No addresses. Click "Add Address" to add one.
+                  No addresses. Click &quot;Add Address&quot; to add one.
                 </div>
               )}
 
@@ -2633,10 +2678,12 @@ export default function PolicyDetail({
                     onClick={async () => {
                       try {
                         // Auto-create quotation revision and navigate to it
-                        const newRevision = await window.api.createQuotationRevision(
-                          policy.quotationId
-                        )
-                        if (newRevision && !(newRevision as any).error) {
+                        const newRevision: (Quotation & { error?: unknown }) | string =
+                          await window.api.createQuotationRevision(policy.quotationId)
+                        if (
+                          newRevision &&
+                          !(typeof newRevision === 'object' && newRevision.error)
+                        ) {
                           const revId =
                             typeof newRevision === 'string'
                               ? newRevision
@@ -2649,14 +2696,14 @@ export default function PolicyDetail({
                               policy.quotationId
                             )
                             const selectedOldAlt = Array.isArray(oldAlts)
-                              ? oldAlts.find((a: any) => a.id === policy.selectedAlternativeId)
+                              ? oldAlts.find((a) => a.id === policy.selectedAlternativeId)
                               : null
                             if (selectedOldAlt) {
                               // Get new alternatives and match by hull_clause_id
                               const newAlts = await window.api.hullGetQuotationAlternatives(revId)
                               const matchingNewAlt = Array.isArray(newAlts)
                                 ? newAlts.find(
-                                    (a: any) => a.hullClauseId === selectedOldAlt.hullClauseId
+                                    (a) => a.hullClauseId === selectedOldAlt.hullClauseId
                                   )
                                 : null
                               if (matchingNewAlt) {
@@ -2670,7 +2717,7 @@ export default function PolicyDetail({
                             }
                           }
                           // Update the policy to reference the new quotation revision + new alt ID
-                          const updateFields: Record<string, any> = { quotationId: revId }
+                          const updateFields: Record<string, unknown> = { quotationId: revId }
                           if (newSelectedAltId)
                             updateFields.selectedAlternativeId = newSelectedAltId
                           ok(await window.api.policyUpdate(policy.id, updateFields))
@@ -2682,8 +2729,8 @@ export default function PolicyDetail({
                         } else {
                           showError('Failed to create quotation revision')
                         }
-                      } catch (err: any) {
-                        showError(err.message || 'Failed to create revision')
+                      } catch (err) {
+                        showError(errMessage(err, 'Failed to create revision'))
                       }
                     }}
                   >
@@ -2764,7 +2811,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageWarranties.map((w: any, i: number) => (
+                          {coverageWarranties.map((w, i) => (
                             <div
                               key={i}
                               style={{
@@ -2777,7 +2824,7 @@ export default function PolicyDetail({
                               {w.text || w.name || `Warranty ${i + 1}`}
                             </div>
                           ))}
-                          {coverageCustomWarranties.map((cw: any, i: number) => (
+                          {coverageCustomWarranties.map((cw, i) => (
                             <div
                               key={`cw-${i}`}
                               style={{
@@ -2851,7 +2898,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageDeductibles.map((d: any, i: number) => (
+                          {coverageDeductibles.map((d, i) => (
                             <div
                               key={i}
                               style={{
@@ -2921,7 +2968,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageExclusions.map((ex: any, i: number) => (
+                          {coverageExclusions.map((ex, i) => (
                             <div
                               key={i}
                               style={{
@@ -2993,7 +3040,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageClauses.map((c: any, i: number) => (
+                          {coverageClauses.map((c, i) => (
                             <div
                               key={i}
                               style={{
@@ -3066,7 +3113,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageSubjectivities.map((s: any, i: number) => (
+                          {coverageSubjectivities.map((s, i) => (
                             <div
                               key={i}
                               style={{
@@ -3138,7 +3185,7 @@ export default function PolicyDetail({
                             gap: '4px'
                           }}
                         >
-                          {coverageLolOptions.map((opt: any, i: number) => (
+                          {coverageLolOptions.map((opt, i) => (
                             <div
                               key={opt.id || i}
                               style={{
@@ -3242,7 +3289,7 @@ export default function PolicyDetail({
                             gap: '6px'
                           }}
                         >
-                          {coverageCustomSections.map((cs: any, i: number) => (
+                          {coverageCustomSections.map((cs, i) => (
                             <div
                               key={cs.id || i}
                               style={{
@@ -4864,9 +4911,13 @@ export default function PolicyDetail({
             </div>
             {(() => {
               const f = declarationFields
-              const update = (key: keyof DeclarationFields, val: string) =>
+              const update = (key: keyof DeclarationFields, val: string): void =>
                 setDeclarationFields((prev) => (prev ? { ...prev, [key]: val } : prev))
-              const fieldRow = (label: string, key: keyof DeclarationFields, rows?: number) => (
+              const fieldRow = (
+                label: string,
+                key: keyof DeclarationFields,
+                rows?: number
+              ): React.JSX.Element => (
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -4990,8 +5041,8 @@ export default function PolicyDetail({
                           await exportDeclarationDocx(policyId, f)
                           showSuccess('Declaration exported')
                           setShowDeclarationModal(false)
-                        } catch (err: any) {
-                          showError(err.message || 'Export failed')
+                        } catch (err) {
+                          showError(errMessage(err, 'Export failed'))
                         }
                       }}
                       className="btn-primary"
@@ -5016,7 +5067,7 @@ export default function PolicyDetail({
       {showCancelModal &&
         policy &&
         (() => {
-          const currency = (policy as any).premiumCurrency || 'USD'
+          const currency = policy.premiumCurrency || 'USD'
           const commPct = Number(policy.commissionPercent) || 0
           const isPnI = policy.quotationTypeCode === 'P'
 
@@ -5034,7 +5085,7 @@ export default function PolicyDetail({
             returnInstalments = instalments
               .filter((inst) => inst.instalmentNumber > cancelAfterInstalment)
               .map((inst) => {
-                const prem = Number((inst as any).premiumAmount || (inst as any).amount || 0)
+                const prem = Number(inst.premiumAmount || inst.amount || 0)
                 const comm = Number(inst.commissionAmount || 0)
                 return {
                   instalmentNumber: inst.instalmentNumber,
@@ -5048,8 +5099,8 @@ export default function PolicyDetail({
           } else if (cancelMode === 'date' && cancelDate && policy.premiumAmount) {
             // Pro-rata calculation using shared utility
             const totalPrem = Number(policy.premiumAmount) || 0
-            const totalPeriod = countDays(policy.inceptionDate, policy.expiryDate)
-            const remainPeriod = countDays(cancelDate, policy.expiryDate)
+            const totalPeriod = countDays(policy.inceptionDate ?? '', policy.expiryDate ?? '')
+            const remainPeriod = countDays(cancelDate, policy.expiryDate ?? '')
             if (totalPeriod.days > 0) {
               const calc = calcProRataPremium(
                 remainPeriod.days,
@@ -5153,10 +5204,10 @@ export default function PolicyDetail({
 
                 {/* Mode selector */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  {['instalment', 'date'].map((m) => (
+                  {(['instalment', 'date'] as const).map((m) => (
                     <button
                       key={m}
-                      onClick={() => setCancelMode(m as any)}
+                      onClick={() => setCancelMode(m)}
                       style={{
                         flex: 1,
                         padding: '8px',
@@ -5220,7 +5271,7 @@ export default function PolicyDetail({
                                 ? 'rd'
                                 : 'th'}{' '}
                           instalment
-                          {(inst as any).isNonRefundable ? ' (non-refundable)' : ''}
+                          {inst.isNonRefundable ? ' (non-refundable)' : ''}
                         </option>
                       ))}
                     </select>
@@ -5424,8 +5475,8 @@ export default function PolicyDetail({
                         setShowCancelModal(false)
                         // Reload to reflect cancelled status
                         loadData()
-                      } catch (err: any) {
-                        showError(err?.message || 'Failed to cancel policy')
+                      } catch (err) {
+                        showError(errMessage(err, 'Failed to cancel policy'))
                       }
                       setCancelling(false)
                     }}
@@ -5512,17 +5563,16 @@ function RevisionHistorySection({
   policyNumber: string
   currentPolicyId: string
   onViewRevision?: (policyId: string) => void
-}) {
-  const [revisions, setRevisions] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+}): React.JSX.Element {
+  const [revisions, setRevisions] = useState<PolicyRevision[]>([])
+  const [loadingRevisions, setLoading] = useState(true)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
+  // Nothing to load without a policy number
+  const loading = !!policyNumber && loadingRevisions
 
   useEffect(() => {
-    if (!policyNumber) {
-      setLoading(false)
-      return
-    }
+    if (!policyNumber) return
     ;(async () => {
       try {
         const revs = await window.api.policyGetRevisions(policyNumber)

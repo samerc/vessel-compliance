@@ -8,7 +8,7 @@ interface UserProfileModalProps {
   onClose: () => void
 }
 
-export default function UserProfileModal({ onClose }: UserProfileModalProps) {
+export default function UserProfileModal({ onClose }: UserProfileModalProps): React.JSX.Element {
   const { user, changePassword } = useAuth()
   const { showSuccess, showError } = useToast()
 
@@ -19,7 +19,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
 
   useEscapeKey(onClose)
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
       showError('New passwords do not match')
@@ -42,8 +42,8 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
       } else {
         showError(result.message || 'Failed to change password')
       }
-    } catch (error: any) {
-      showError(error.message || 'Failed to change password')
+    } catch (error) {
+      showError((error instanceof Error && error.message) || 'Failed to change password')
     } finally {
       setChangingPassword(false)
     }

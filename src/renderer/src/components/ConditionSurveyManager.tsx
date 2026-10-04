@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -33,7 +33,64 @@ interface ConditionSurveyManagerProps {
   vessel: Vessel
 }
 
-export default function ConditionSurveyManager({ vessel }: ConditionSurveyManagerProps) {
+type DefectCounts = Record<string, { open: number; closed: number; overdue: number }>
+
+/** Where loadSurveyData puts each part as soon as it arrives */
+interface SurveyDataSink {
+  setSurveys: (v: ConditionSurvey[]) => void
+  setSurveyors: (v: Surveyor[]) => void
+  setSurveyTypes: (v: ConditionSurveyType[]) => void
+  setAttachments: (v: SurveyAttachment[]) => void
+  setDefectCounts: (v: DefectCounts) => void
+}
+
+/** Load a vessel's surveys, surveyors, types, attachments and defect counts, in that order */
+async function loadSurveyData(
+  vesselId: string,
+  sink: SurveyDataSink,
+  alive: () => boolean
+): Promise<void> {
+  try {
+    const surveyData = await window.api.getConditionSurveys(vesselId)
+    const safeSurveys = Array.isArray(surveyData) ? surveyData : []
+    if (!alive()) return
+    sink.setSurveys(safeSurveys)
+
+    const surveyorData = await window.api.getSurveyors()
+    if (!alive()) return
+    sink.setSurveyors(Array.isArray(surveyorData) ? surveyorData : [])
+
+    const typeData = await window.api.getConditionSurveyTypes()
+    if (!alive()) return
+    sink.setSurveyTypes(Array.isArray(typeData) ? typeData : [])
+
+    const attachmentData = await window.api.getSurveyAttachments()
+    if (!alive()) return
+    sink.setAttachments(Array.isArray(attachmentData) ? attachmentData : [])
+
+    // Load defect counts (including overdue)
+    const counts: DefectCounts = {}
+    const today = new Date().toISOString().split('T')[0]
+    for (const survey of safeSurveys) {
+      const defects = await window.api.getSurveyDefects(survey.id)
+      const safeDefects = Array.isArray(defects) ? defects : []
+      counts[survey.id] = {
+        open: safeDefects.filter((d) => d.status === 'OPEN').length,
+        closed: safeDefects.filter((d) => d.status === 'CLOSED').length,
+        overdue: safeDefects.filter((d) => d.status === 'OPEN' && d.dueDate && d.dueDate < today)
+          .length
+      }
+    }
+    if (!alive()) return
+    sink.setDefectCounts(counts)
+  } catch (error) {
+    console.error('Failed to load survey data:', error)
+  }
+}
+
+export default function ConditionSurveyManager({
+  vessel
+}: ConditionSurveyManagerProps): React.JSX.Element {
   const { user, hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
   const { showError, showSuccess } = useToast()
@@ -88,47 +145,31 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const [editLocation, setEditLocation] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
+  const loadData = useCallback(
+    (): Promise<void> =>
+      loadSurveyData(
+        vessel.id,
+        { setSurveys, setSurveyors, setSurveyTypes, setAttachments, setDefectCounts },
+        () => true
+      ),
+    [vessel.id]
+  )
+
   useEffect(() => {
-    loadData()
+    let alive = true
+    void loadSurveyData(
+      vessel.id,
+      { setSurveys, setSurveyors, setSurveyTypes, setAttachments, setDefectCounts },
+      () => alive
+    )
+    return () => {
+      alive = false
+    }
   }, [vessel.id])
 
-  const loadData = async () => {
-    try {
-      const surveyData = await window.api.getConditionSurveys(vessel.id)
-      const safeSurveys = Array.isArray(surveyData) ? surveyData : []
-      setSurveys(safeSurveys)
-
-      const surveyorData = await window.api.getSurveyors()
-      setSurveyors(Array.isArray(surveyorData) ? surveyorData : [])
-
-      const typeData = await window.api.getConditionSurveyTypes()
-      setSurveyTypes(Array.isArray(typeData) ? typeData : [])
-
-      const attachmentData = await window.api.getSurveyAttachments()
-      setAttachments(Array.isArray(attachmentData) ? attachmentData : [])
-
-      // Load defect counts (including overdue)
-      const counts: Record<string, { open: number; closed: number; overdue: number }> = {}
-      const today = new Date().toISOString().split('T')[0]
-      for (const survey of safeSurveys) {
-        const defects = await window.api.getSurveyDefects(survey.id)
-        const safeDefects = Array.isArray(defects) ? defects : []
-        counts[survey.id] = {
-          open: safeDefects.filter((d) => d.status === 'OPEN').length,
-          closed: safeDefects.filter((d) => d.status === 'CLOSED').length,
-          overdue: safeDefects.filter((d) => d.status === 'OPEN' && d.dueDate && d.dueDate < today)
-            .length
-        }
-      }
-      setDefectCounts(counts)
-    } catch (error) {
-      console.error('Failed to load survey data:', error)
-    }
-  }
-
   // Lightweight refresh: only reload defect counts without reloading all surveys
-  const refreshDefectCounts = async () => {
-    const counts: Record<string, { open: number; closed: number; overdue: number }> = {}
+  const refreshDefectCounts = async (): Promise<void> => {
+    const counts: DefectCounts = {}
     const today = new Date().toISOString().split('T')[0]
     for (const survey of surveys) {
       const defects = await window.api.getSurveyDefects(survey.id)
@@ -144,22 +185,22 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   // One submit at a time: a double click must not create the survey (or surveyor) twice
   const addingSurveyRef = useRef(false)
   const [addingSurvey, setAddingSurvey] = useState(false)
-  const handleAddSurvey = async (e: React.FormEvent) => {
+  const handleAddSurvey = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (addingSurveyRef.current) return
     addingSurveyRef.current = true
     setAddingSurvey(true)
     try {
       await addSurveyNow()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to add survey')
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to add survey')
     } finally {
       addingSurveyRef.current = false
       setAddingSurvey(false)
     }
   }
 
-  const addSurveyNow = async () => {
+  const addSurveyNow = async (): Promise<void> => {
     if (!newDate || !newSurveyorId || !newType) return
 
     let surveyorId = newSurveyorId
@@ -204,7 +245,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     loadData()
   }
 
-  const handleEditSurvey = (survey: ConditionSurvey) => {
+  const handleEditSurvey = (survey: ConditionSurvey): void => {
     setEditingSurveyId(survey.id)
     setEditDate(survey.surveyDate)
     setEditSurveyorId(survey.surveyorId)
@@ -215,7 +256,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     setExpandedSurveyId(survey.id)
   }
 
-  const handleSaveEdit = async (surveyId: string) => {
+  const handleSaveEdit = async (surveyId: string): Promise<void> => {
     await window.api.updateConditionSurvey(surveyId, {
       surveyDate: editDate,
       surveyorId: editSurveyorId,
@@ -228,11 +269,11 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     loadData()
   }
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (): void => {
     setEditingSurveyId(null)
   }
 
-  const handleDeleteSurvey = async (survey: ConditionSurvey) => {
+  const handleDeleteSurvey = async (survey: ConditionSurvey): Promise<void> => {
     const defectsRaw = await window.api.getSurveyDefects(survey.id)
     const defects = Array.isArray(defectsRaw) ? defectsRaw : []
     const attachs = attachments.filter((a) => a.surveyId === survey.id)
@@ -254,14 +295,14 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     })
   }
 
-  const handleCloseSurvey = async (surveyId: string) => {
+  const handleCloseSurvey = async (surveyId: string): Promise<void> => {
     if (!user) return
     await window.api.closeSurvey(surveyId, user.id)
     setClosingSurveyId(null)
     await loadData()
   }
 
-  const handleEndorsementAnswer = async (surveyId: string, issued: boolean) => {
+  const handleEndorsementAnswer = async (surveyId: string, issued: boolean): Promise<void> => {
     ok(await window.api.updateConditionSurveyEndorsement(surveyId, issued))
     setEndorsementSurveyId(null)
     await loadData()
@@ -272,7 +313,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     return surveyor ? `${surveyor.companyName} (${surveyor.country})` : 'Unknown Surveyor'
   }
 
-  const handleDragOver = (e: React.DragEvent, surveyId: string) => {
+  const handleDragOver = (e: React.DragEvent, surveyId: string): void => {
     e.preventDefault()
     e.stopPropagation()
     if (e.dataTransfer) {
@@ -281,13 +322,13 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     setDragOverSurveyId(surveyId)
   }
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent): void => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverSurveyId(null)
   }
 
-  const handleDrop = async (e: React.DragEvent, surveyId: string) => {
+  const handleDrop = async (e: React.DragEvent, surveyId: string): Promise<void> => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverSurveyId(null)
@@ -323,7 +364,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     loadData()
   }
 
-  const handleDeleteAttachment = (attachmentId: string) => {
+  const handleDeleteAttachment = (attachmentId: string): void => {
     setConfirmation({
       show: true,
       title: 'Delete Attachment',
@@ -337,7 +378,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     })
   }
 
-  const handleOpenFile = async (filePath: string) => {
+  const handleOpenFile = async (filePath: string): Promise<void> => {
     const exists = await window.api.fsExists(filePath)
     if (!exists) {
       showError('File not found on disk')
@@ -346,7 +387,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     await window.api.fsOpen(filePath)
   }
 
-  const handleImportDefectsFromWord = async (surveyId: string) => {
+  const handleImportDefectsFromWord = async (surveyId: string): Promise<void> => {
     const filePath = await window.api.dialogOpenFileWord()
     if (!filePath) return
 
@@ -362,12 +403,12 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       } else {
         showError(`Import failed: ${result.message}`)
       }
-    } catch (error: any) {
-      showError(`Import error: ${error.message}`)
+    } catch (error) {
+      showError(`Import error: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const exportSurveyHistory = async () => {
+  const exportSurveyHistory = async (): Promise<void> => {
     const data = await window.api.getSurveyHistory(vessel.id)
     const rows = data.map((s) => ({
       'Survey Date': s.surveyDate,
@@ -386,7 +427,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     XLSX.writeFile(wb, `${vessel.name}_Survey_History.xlsx`)
   }
 
-  const getSurveyAttachments = (surveyId: string) => {
+  const getSurveyAttachments = (surveyId: string): SurveyAttachment[] => {
     return attachments.filter((a) => a.surveyId === surveyId)
   }
 
@@ -1398,7 +1439,7 @@ function SurveyAttachments({
   onOpenFile: (path: string) => void
   onImportWord: () => void
   canManage: boolean
-}) {
+}): React.JSX.Element {
   const [showUpload, setShowUpload] = useState(false)
 
   return (

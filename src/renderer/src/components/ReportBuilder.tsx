@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Play,
   Save,
@@ -22,7 +22,8 @@ import {
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
-import type { SavedReport, ReportConfig } from '../../../shared/types'
+import { isIpcError, type IpcErrorValue } from '../utils/ipc'
+import type { SavedReport, ReportConfig, ReportResultRow } from '../../../shared/types'
 
 // ── Data Source Definitions ─────────────────────────────────────────────────
 
@@ -420,50 +421,32 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
 
 async function loadFleetOptions(): Promise<{ value: string; label: string }[]> {
   const fleets = await window.api.getFleets()
-  return [
-    { value: 'all', label: 'All' },
-    ...fleets.map((f: any) => ({ value: f.id, label: f.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...fleets.map((f) => ({ value: f.id, label: f.name }))]
 }
 
 async function loadFlagStateOptions(): Promise<{ value: string; label: string }[]> {
   const flags = await window.api.getFlagStates()
-  return [
-    { value: 'all', label: 'All' },
-    ...flags.map((f: any) => ({ value: f.id, label: f.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...flags.map((f) => ({ value: f.id, label: f.name }))]
 }
 
 async function loadClassificationOptions(): Promise<{ value: string; label: string }[]> {
   const societies = await window.api.getClassificationSocieties()
-  return [
-    { value: 'all', label: 'All' },
-    ...societies.map((c: any) => ({ value: c.id, label: c.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...societies.map((c) => ({ value: c.id, label: c.name }))]
 }
 
 async function loadEntityOptions(): Promise<{ value: string; label: string }[]> {
   const entities = await window.api.getEntities()
-  return [
-    { value: 'all', label: 'All' },
-    ...entities.map((e: any) => ({ value: e.id, label: e.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...entities.map((e) => ({ value: e.id, label: e.name }))]
 }
 
 async function loadPolicyTypeOptions(): Promise<{ value: string; label: string }[]> {
   const types = await window.api.getPolicyTypes()
-  return [
-    { value: 'all', label: 'All' },
-    ...types.map((t: any) => ({ value: t.id, label: t.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...types.map((t) => ({ value: t.id, label: t.name }))]
 }
 
 async function loadQuotationTypeOptions(): Promise<{ value: string; label: string }[]> {
   const types = await window.api.getQuotationTypes()
-  return [
-    { value: 'all', label: 'All' },
-    ...types.map((t: any) => ({ value: t.id, label: t.name }))
-  ]
+  return [{ value: 'all', label: 'All' }, ...types.map((t) => ({ value: t.id, label: t.name }))]
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -490,7 +473,7 @@ const NUMBER_FIELDS = new Set([
   'revisionNumber'
 ])
 
-function formatCellValue(value: any, colKey: string): string {
+function formatCellValue(value: ReportResultRow[string] | undefined, colKey: string): string {
   if (value === null || value === undefined) return ''
   if (colKey === 'isActive') return value ? 'Active' : 'Inactive'
   if (DATE_FIELDS.has(colKey)) {
@@ -543,7 +526,7 @@ const CHART_METRICS: Record<string, { value: string; label: string; field?: stri
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export default function ReportBuilder() {
+export default function ReportBuilder(): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -551,11 +534,11 @@ export default function ReportBuilder() {
   // State
   const [dataSource, setDataSource] = useState<string>('vessels')
   const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set())
-  const [filters, setFilters] = useState<Record<string, any>>({})
+  const [filters, setFilters] = useState<Record<string, string>>({})
   const [groupBy, setGroupBy] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [results, setResults] = useState<any[]>([])
+  const [results, setResults] = useState<ReportResultRow[]>([])
   const [loading, setLoading] = useState(false)
   const [hasRun, setHasRun] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -586,20 +569,23 @@ export default function ReportBuilder() {
 
   const sourceDef = DATA_SOURCES[dataSource]
 
-  // Initialize columns when data source changes
-  useEffect(() => {
+  // Initialize columns when data source changes (adjusted during render, React docs pattern)
+  const [prevDataSource, setPrevDataSource] = useState<string | null>(null)
+  if (prevDataSource !== dataSource) {
+    setPrevDataSource(dataSource)
     const def = DATA_SOURCES[dataSource]
-    if (!def) return
-    const defaults = new Set(def.columns.filter((c) => c.defaultSelected).map((c) => c.key))
-    setSelectedColumns(defaults)
-    setFilters({})
-    setGroupBy(null)
-    setSortBy(def.defaultSort || null)
-    setSortDir('asc')
-    setResults([])
-    setHasRun(false)
-    setDynamicOptions({})
-  }, [dataSource])
+    if (def) {
+      const defaults = new Set(def.columns.filter((c) => c.defaultSelected).map((c) => c.key))
+      setSelectedColumns(defaults)
+      setFilters({})
+      setGroupBy(null)
+      setSortBy(def.defaultSort || null)
+      setSortDir('asc')
+      setResults([])
+      setHasRun(false)
+      setDynamicOptions({})
+    }
+  }
 
   // Load dynamic filter options
   useEffect(() => {
@@ -618,20 +604,21 @@ export default function ReportBuilder() {
   }, [dataSource])
 
   // Load saved reports
-  const loadSavedReports = useCallback(async () => {
-    try {
-      const reports = await window.api.reportBuilderGetSaved()
-      if (Array.isArray(reports)) setSavedReports(reports)
-    } catch {
-      // silently ignore
-    }
-  }, [])
-
+  const [savedReloadKey, setSavedReloadKey] = useState(0)
   useEffect(() => {
+    const loadSavedReports = async (): Promise<void> => {
+      try {
+        const reports = await window.api.reportBuilderGetSaved()
+        if (Array.isArray(reports)) setSavedReports(reports)
+      } catch {
+        // silently ignore
+      }
+    }
     loadSavedReports()
-  }, [loadSavedReports])
+  }, [savedReloadKey])
+  const loadSavedReports = (): void => setSavedReloadKey((k) => k + 1)
 
-  const toggleSection = (section: string) => {
+  const toggleSection = (section: string): void => {
     setCollapsedSections((prev) => {
       const next = new Set(prev)
       if (next.has(section)) next.delete(section)
@@ -640,7 +627,7 @@ export default function ReportBuilder() {
     })
   }
 
-  const toggleColumn = (key: string) => {
+  const toggleColumn = (key: string): void => {
     setSelectedColumns((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -649,20 +636,20 @@ export default function ReportBuilder() {
     })
   }
 
-  const selectAllColumns = () => {
+  const selectAllColumns = (): void => {
     setSelectedColumns(new Set(sourceDef.columns.map((c) => c.key)))
   }
 
-  const deselectAllColumns = () => {
+  const deselectAllColumns = (): void => {
     setSelectedColumns(new Set())
   }
 
-  const updateFilter = (key: string, value: any) => {
+  const updateFilter = (key: string, value: string): void => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   // Run report
-  const runReport = async () => {
+  const runReport = async (): Promise<void> => {
     if (selectedColumns.size === 0) {
       showError('Please select at least one column')
       return
@@ -676,18 +663,20 @@ export default function ReportBuilder() {
         sortBy,
         sortDir
       }
-      const data = await window.api.reportBuilderRun(dataSource, config)
+      // safeHandle may resolve with an error value instead of rows
+      const data = (await window.api.reportBuilderRun(dataSource, config)) as
+        ReportResultRow[] | IpcErrorValue
       if (Array.isArray(data)) {
         setResults(data)
-      } else if (data && (data as any).error) {
-        showError((data as any).message || 'Failed to run report')
+      } else if (isIpcError(data)) {
+        showError(data.message || 'Failed to run report')
         setResults([])
       } else {
         setResults([])
       }
       setHasRun(true)
-    } catch (err: any) {
-      showError(err?.message || 'Failed to run report')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to run report')
     } finally {
       setLoading(false)
     }
@@ -696,7 +685,7 @@ export default function ReportBuilder() {
   // Grouped results
   const groupedResults = useMemo(() => {
     if (!groupBy || !results.length) return null
-    const groups: Record<string, any[]> = {}
+    const groups: Record<string, ReportResultRow[]> = {}
     for (const row of results) {
       const key = row[groupBy] ?? '(None)'
       if (!groups[key]) groups[key] = []
@@ -708,7 +697,7 @@ export default function ReportBuilder() {
   // Chart data
   const chartData = useMemo(() => {
     if (!groupBy || !results.length) return []
-    const groups: Record<string, any[]> = {}
+    const groups: Record<string, ReportResultRow[]> = {}
     for (const row of results) {
       const key = String(row[groupBy] ?? '(None)')
       if (!groups[key]) groups[key] = []
@@ -741,13 +730,15 @@ export default function ReportBuilder() {
     return results.slice(start, start + ROWS_PER_PAGE)
   }, [results, currentPage, ROWS_PER_PAGE])
 
-  // Reset page when results change
-  useEffect(() => {
+  // Reset page when results change (adjusted during render, React docs pattern)
+  const [prevResults, setPrevResults] = useState(results)
+  if (prevResults !== results) {
+    setPrevResults(results)
     setCurrentPage(1)
-  }, [results])
+  }
 
   // Save report
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!saveName.trim()) {
       showError('Please enter a report name')
       return
@@ -775,13 +766,13 @@ export default function ReportBuilder() {
       setSaveShared(false)
       setEditingReportId(null)
       loadSavedReports()
-    } catch (err: any) {
-      showError(err?.message || 'Failed to save report')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to save report')
     }
   }
 
   // Load saved report
-  const loadReport = (report: SavedReport) => {
+  const loadReport = (report: SavedReport): void => {
     setDataSource(report.dataSource)
     // Need to defer setting columns/filters so the data source change effect runs first
     setTimeout(() => {
@@ -799,19 +790,19 @@ export default function ReportBuilder() {
   }
 
   // Delete saved report
-  const deleteReport = async (id: string) => {
+  const deleteReport = async (id: string): Promise<void> => {
     try {
       await window.api.reportBuilderDelete(id)
       showSuccess('Report deleted')
       loadSavedReports()
       if (editingReportId === id) setEditingReportId(null)
-    } catch (err: any) {
-      showError(err?.message || 'Failed to delete report')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to delete report')
     }
   }
 
   // Export Excel
-  const exportExcel = async () => {
+  const exportExcel = async (): Promise<void> => {
     if (!results.length) return
     try {
       const XLSX = await import('xlsx-js-style')
@@ -834,13 +825,13 @@ export default function ReportBuilder() {
       XLSX.utils.book_append_sheet(wb, ws, sourceDef.label)
       XLSX.writeFile(wb, `${sourceDef.label}_Report_${new Date().toISOString().split('T')[0]}.xlsx`)
       showSuccess('Excel exported')
-    } catch (err: any) {
-      showError(err?.message || 'Failed to export Excel')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to export Excel')
     }
   }
 
   // Export PDF
-  const exportPdf = async () => {
+  const exportPdf = async (): Promise<void> => {
     if (!results.length) return
     try {
       const { default: jsPDF } = await import('jspdf')
@@ -899,8 +890,8 @@ export default function ReportBuilder() {
 
       doc.save(`${sourceDef.label}_Report_${new Date().toISOString().split('T')[0]}.pdf`)
       showSuccess('PDF exported')
-    } catch (err: any) {
-      showError(err?.message || 'Failed to export PDF')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to export PDF')
     }
   }
 
@@ -1480,7 +1471,7 @@ export default function ReportBuilder() {
                 {viewMode === 'chart' && groupBy && (
                   <select
                     value={chartMetric}
-                    onChange={(e) => setChartMetric(e.target.value as any)}
+                    onChange={(e) => setChartMetric(e.target.value as typeof chartMetric)}
                     style={{
                       ...selectStyle,
                       width: 'auto',
@@ -1933,9 +1924,9 @@ function ResultsTable({
   isLight
 }: {
   columns: ColumnDef[]
-  rows: any[]
+  rows: ReportResultRow[]
   isLight: boolean
-}) {
+}): React.JSX.Element {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
       <thead>

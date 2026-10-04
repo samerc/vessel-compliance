@@ -7,7 +7,7 @@ export function formatNumberWithCommas(value: string): { display: string; raw: s
   if (!value) return { display: '', raw: '' }
 
   // Remove everything except digits, dots, and minus
-  const cleaned = value.replace(/[^0-9.\-]/g, '')
+  const cleaned = value.replace(/[^0-9.-]/g, '')
 
   // Handle negative
   const isNegative = cleaned.startsWith('-')

@@ -39,7 +39,7 @@ const SURVEY_COLUMNS: ColumnDef[] = [
   { id: 'actions', label: 'Actions', defaultVisible: true }
 ]
 
-export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
+export default function ConditionSurveyList({ onNavigateToVessel }: Props): React.JSX.Element {
   const [surveys, setSurveys] = useState<SurveyWithCounts[]>([])
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [surveyors, setSurveyors] = useState<Surveyor[]>([])
@@ -78,44 +78,46 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
     return map
   }, [surveyors])
 
-  const loadData = async () => {
-    setIsLoading(true)
-    try {
-      const [allSurveys, allVessels, allSurveyors, allDefects] = await Promise.all([
-        window.api.getConditionSurveys(),
-        window.api.getVessels(),
-        window.api.getSurveyors(),
-        // All defects in ONE call (was one IPC round-trip per survey)
-        window.api.getSurveyDefects().catch(() => [] as SurveyDefect[])
-      ])
-      setVessels(Array.isArray(allVessels) ? allVessels : [])
-      setSurveyors(Array.isArray(allSurveyors) ? allSurveyors : [])
-
-      const counts = new Map<string, { open: number; total: number }>()
-      for (const d of (Array.isArray(allDefects) ? allDefects : []) as SurveyDefect[]) {
-        const c = counts.get(d.surveyId) || { open: 0, total: 0 }
-        c.total++
-        if (d.status === 'OPEN') c.open++
-        counts.set(d.surveyId, c)
-      }
-      const surveysWithCounts: SurveyWithCounts[] = (
-        Array.isArray(allSurveys) ? allSurveys : []
-      ).map((survey) => {
-        const c = counts.get(survey.id)
-        return { ...survey, openDefects: c?.open ?? 0, totalDefects: c?.total ?? 0 }
-      })
-
-      setSurveys(surveysWithCounts)
-    } catch (err: any) {
-      showError('Failed to load surveys: ' + (err.message || err))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadData = (): void => setReloadKey((k) => k + 1)
 
   useEffect(() => {
-    loadData()
-  }, [])
+    const run = async (): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const [allSurveys, allVessels, allSurveyors, allDefects] = await Promise.all([
+          window.api.getConditionSurveys(),
+          window.api.getVessels(),
+          window.api.getSurveyors(),
+          // All defects in ONE call (was one IPC round-trip per survey)
+          window.api.getSurveyDefects().catch(() => [] as SurveyDefect[])
+        ])
+        setVessels(Array.isArray(allVessels) ? allVessels : [])
+        setSurveyors(Array.isArray(allSurveyors) ? allSurveyors : [])
+
+        const counts = new Map<string, { open: number; total: number }>()
+        for (const d of (Array.isArray(allDefects) ? allDefects : []) as SurveyDefect[]) {
+          const c = counts.get(d.surveyId) || { open: 0, total: 0 }
+          c.total++
+          if (d.status === 'OPEN') c.open++
+          counts.set(d.surveyId, c)
+        }
+        const surveysWithCounts: SurveyWithCounts[] = (
+          Array.isArray(allSurveys) ? allSurveys : []
+        ).map((survey) => {
+          const c = counts.get(survey.id)
+          return { ...survey, openDefects: c?.open ?? 0, totalDefects: c?.total ?? 0 }
+        })
+
+        setSurveys(surveysWithCounts)
+      } catch (err) {
+        showError('Failed to load surveys: ' + ((err as { message?: string })?.message || err))
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    void run()
+  }, [reloadKey, showError])
 
   const filtered = useMemo(() => {
     let result = surveys
@@ -155,10 +157,20 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
     openDefectsOnly
   ])
 
-  // Reset page when filters change
-  useEffect(() => {
+  // Reset page when filters change (adjust state during render, not in an effect)
+  const filterKey = JSON.stringify([
+    searchTerm,
+    dateFrom,
+    dateTo,
+    surveyorFilter,
+    typeFilter,
+    openDefectsOnly
+  ])
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
     setPage(0)
-  }, [searchTerm, dateFrom, dateTo, surveyorFilter, typeFilter, openDefectsOnly])
+  }
 
   // Unique survey types for filter dropdown
   const surveyTypes = useMemo(
@@ -175,7 +187,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [surveys, surveyorMap])
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: SortKey): void => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -218,7 +230,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
   const totalPages = Math.ceil(sorted.length / pageSize)
   const paginated = sorted.slice(page * pageSize, (page + 1) * pageSize)
 
-  const exportExcel = () => {
+  const exportExcel = (): void => {
     if (sorted.length === 0) return
     const data = sorted.map((s) => ({
       Vessel: vesselMap.get(s.vesselId)?.name || '',
@@ -249,7 +261,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
     showSuccess('Exported to Excel')
   }
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
+  const sortIcon = (col: SortKey): React.JSX.Element => {
     if (sortKey !== col) return <ChevronUp size={12} style={{ opacity: 0.25 }} />
     return sortDir === 'asc' ? (
       <ChevronUp size={12} style={{ color: 'var(--accent-primary)' }} />
@@ -655,49 +667,49 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                 {svVisSet.has('vessel') && (
                   <th style={thStyle} onClick={() => handleSort('vessel')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Vessel <SortIcon col="vessel" />
+                      Vessel {sortIcon('vessel')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('reference') && (
                   <th style={thStyle} onClick={() => handleSort('reference')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Reference <SortIcon col="reference" />
+                      Reference {sortIcon('reference')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('date') && (
                   <th style={thStyle} onClick={() => handleSort('date')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Survey Date <SortIcon col="date" />
+                      Survey Date {sortIcon('date')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('type') && (
                   <th style={thStyle} onClick={() => handleSort('type')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Type <SortIcon col="type" />
+                      Type {sortIcon('type')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('surveyor') && (
                   <th style={thStyle} onClick={() => handleSort('surveyor')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Surveyor <SortIcon col="surveyor" />
+                      Surveyor {sortIcon('surveyor')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('location') && (
                   <th style={thStyle} onClick={() => handleSort('location')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Location <SortIcon col="location" />
+                      Location {sortIcon('location')}
                     </span>
                   </th>
                 )}
                 {svVisSet.has('defects') && (
                   <th style={thStyle} onClick={() => handleSort('defects')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Defects <SortIcon col="defects" />
+                      Defects {sortIcon('defects')}
                     </span>
                   </th>
                 )}

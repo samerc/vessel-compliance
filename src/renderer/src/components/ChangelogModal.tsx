@@ -21,7 +21,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
   useEscapeKey(onClose)
 
   useEffect(() => {
-    const fetchChangelogs = async () => {
+    const fetchChangelogs = async (): Promise<void> => {
       try {
         setLoading(true)
         const data = await changelogService.getChangelogs()
@@ -29,8 +29,8 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
         if (data.length > 0) {
           setExpandedVersion(data[0].version)
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load changelogs')
+      } catch (err) {
+        setError((err instanceof Error ? err.message : '') || 'Failed to load changelogs')
       } finally {
         setLoading(false)
       }
@@ -40,7 +40,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
   }, [reloadKey])
 
   // Simple formatter to handle basic markdown-like syntax in GitHub notes
-  const formatNotes = (notes: string) => {
+  const formatNotes = (notes: string): React.ReactNode => {
     if (!notes)
       return <p style={{ opacity: 0.5, fontStyle: 'italic' }}>No release notes available.</p>
 
@@ -96,7 +96,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
     })
   }
 
-  const formatChangelogDate = (dateStr: string) => {
+  const formatChangelogDate = (dateStr: string): string => {
     return formatDateLong(dateStr)
   }
 
@@ -157,7 +157,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
             <div>
               <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Release History</h2>
               <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.7 }}>
-                What's new in Vessel Compliance
+                What&apos;s new in Vessel Compliance
               </p>
             </div>
           </div>

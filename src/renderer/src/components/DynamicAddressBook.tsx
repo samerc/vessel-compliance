@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Loader2
 } from 'lucide-react'
-import { PolicyType, FlagState, DABQueryCriteria } from '../../../shared/types'
+import { PolicyType, FlagState, DABQueryCriteria, DABResult } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 
 type PolicyFilter = 'all' | 'undefined' | string[]
@@ -26,7 +26,7 @@ function Chip({
   label: string
   selected: boolean
   onClick: () => void
-}) {
+}): React.JSX.Element {
   return (
     <button
       onClick={onClick}
@@ -50,7 +50,13 @@ function Chip({
 }
 
 // Filter section with a label
-function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterSection({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
       <div
@@ -79,7 +85,7 @@ function CollapsibleFilter({
   label: string
   children: React.ReactNode
   defaultCollapsed?: boolean
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = useState(!defaultCollapsed)
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
@@ -119,12 +125,12 @@ function CollapsibleFilter({
   )
 }
 
-export default function DynamicAddressBook() {
+export default function DynamicAddressBook(): React.JSX.Element {
   const { showSuccess, showError } = useToast()
 
   const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
-  const [results, setResults] = useState<any[]>([])
+  const [results, setResults] = useState<DABResult[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
@@ -141,14 +147,13 @@ export default function DynamicAddressBook() {
   const [contactMode, setContactMode] = useState<'all' | 'customers'>('all')
 
   useEffect(() => {
+    const loadFilterData = async (): Promise<void> => {
+      const [pt, fs] = await Promise.all([window.api.getPolicyTypes(), window.api.getFlagStates()])
+      setPolicyTypes(Array.isArray(pt) ? pt : [])
+      setFlagStates(Array.isArray(fs) ? fs : [])
+    }
     loadFilterData()
   }, [])
-
-  const loadFilterData = async () => {
-    const [pt, fs] = await Promise.all([window.api.getPolicyTypes(), window.api.getFlagStates()])
-    setPolicyTypes(Array.isArray(pt) ? pt : [])
-    setFlagStates(Array.isArray(fs) ? fs : [])
-  }
 
   const selectedPolicyTypeIds = useMemo(() => {
     if (policyFilter === 'all') return policyTypes.map((p) => p.id)
@@ -164,7 +169,7 @@ export default function DynamicAddressBook() {
     flagUnassigned ||
     customerType !== 'both'
 
-  const handleSearch = async () => {
+  const handleSearch = async (): Promise<void> => {
     if (!hasAnyCriteria) {
       showError('Please select at least one filter criteria')
       return
@@ -192,10 +197,12 @@ export default function DynamicAddressBook() {
       }
       const data = await window.api.queryDAB(criteria)
       if (!Array.isArray(data))
-        throw new Error((data as any)?.message || 'Failed to query address book')
+        throw new Error(
+          (data as { message?: string } | null)?.message || 'Failed to query address book'
+        )
       setResults(data)
-    } catch (err: any) {
-      showError(err.message || 'Failed to query address book')
+    } catch (err) {
+      showError((err instanceof Error ? err.message : '') || 'Failed to query address book')
     } finally {
       setLoading(false)
     }
@@ -211,7 +218,7 @@ export default function DynamicAddressBook() {
     })
   }, [results, exportType, contactMode])
 
-  const handleCopyToClipboard = () => {
+  const handleCopyToClipboard = (): void => {
     const lines = filteredResults
       .map((r) => {
         if (exportType === 'email') return r.email
@@ -227,7 +234,7 @@ export default function DynamicAddressBook() {
     showSuccess(`Copied ${lines.length} contacts to clipboard`)
   }
 
-  const handleCopyForOutlook = () => {
+  const handleCopyForOutlook = (): void => {
     const emails = filteredResults.map((r) => r.email).filter(Boolean)
     if (emails.length === 0) {
       showError('No emails to copy')
@@ -237,7 +244,7 @@ export default function DynamicAddressBook() {
     showSuccess(`Copied ${emails.length} emails for Outlook`)
   }
 
-  const togglePolicyType = (id: string) => {
+  const togglePolicyType = (id: string): void => {
     if (policyFilter === 'all' || policyFilter === 'undefined') {
       setPolicyFilter([id])
     } else {
@@ -246,13 +253,13 @@ export default function DynamicAddressBook() {
     }
   }
 
-  const isPolicySelected = (id: string) => {
+  const isPolicySelected = (id: string): boolean => {
     if (policyFilter === 'all') return true
     if (policyFilter === 'undefined') return false
     return (policyFilter as string[]).includes(id)
   }
 
-  const toggleFlag = (id: string) =>
+  const toggleFlag = (id: string): void =>
     setSelectedFlagStates((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )

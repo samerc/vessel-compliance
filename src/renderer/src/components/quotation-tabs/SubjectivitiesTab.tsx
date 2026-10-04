@@ -16,11 +16,326 @@ import {
   QuotationSubjectivity,
   QuotationVessel,
   DocumentType,
-  Entity
+  Entity,
+  EntityDocumentType,
+  EntityDocument,
+  VesselDocument,
+  VesselAssured
 } from '../../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok } from '../../utils/ipc'
+
+/** Where the subjectivity loaders put what they load */
+interface SubjectivitySink {
+  setItems: (v: QuotationSubjectivity[]) => void
+  setMasterList: (v: PISubjectivity[]) => void
+  setDocTypes: (v: DocumentType[]) => void
+  setQVessels: (v: QuotationVessel[]) => void
+  setScopeAutoDetected: (v: boolean) => void
+}
+
+/** Rows from older adapters may still carry the snake_case column */
+type VesselDocumentRow = VesselDocument & { document_type_id?: string }
+
+async function loadSubjectivities(
+  quotationId: string,
+  quotationTypeCode: string | undefined,
+  sink: SubjectivitySink,
+  autoPopulateRan: { current: boolean }
+): Promise<void> {
+  const [subjs, masters, dts, qv] = await Promise.all([
+    window.api.getQuotationSubjectivities(quotationId),
+    window.api.getPISubjectivities(),
+    window.api.getDocumentTypes(),
+    window.api.getQuotationVessels(quotationId)
+  ])
+  const safeSubjs = Array.isArray(subjs) ? subjs : []
+  const safeMasters = Array.isArray(masters) ? masters : []
+  const safeDts = Array.isArray(dts) ? dts : []
+  // Filter masters by quotation type scope
+  const typeCode =
+    quotationTypeCode?.toLowerCase() === 'h'
+      ? 'hull'
+      : quotationTypeCode?.toLowerCase() === 'w'
+        ? 'war'
+        : quotationTypeCode?.toLowerCase() === 'c'
+          ? 'cargo'
+          : 'pi'
+  const filteredMasters = safeMasters.filter(
+    (m) => !m.typeScope || m.typeScope === 'all' || m.typeScope.split(',').includes(typeCode)
+  )
+  sink.setItems(safeSubjs)
+  sink.setMasterList(filteredMasters)
+  sink.setDocTypes(safeDts)
+  sink.setQVessels(Array.isArray(qv) ? qv : [])
+
+  // Auto-populate on first load if no subjectivities yet (skip for War and Cargo — subjectivities not included by default)
+  if (
+    !autoPopulateRan.current &&
+    safeSubjs.length === 0 &&
+    filteredMasters.length > 0 &&
+    quotationTypeCode !== 'W' &&
+    quotationTypeCode !== 'C'
+  ) {
+    autoPopulateRan.current = true
+    await autoPopulate(quotationId, filteredMasters, safeDts, sink)
+  }
+}
+
+async function autoPopulate(
+  quotationId: string,
+  masters: PISubjectivity[],
+  dts: DocumentType[],
+  sink: SubjectivitySink
+): Promise<void> {
+  if (masters.length === 0) return
+  try {
+    const qVessels: QuotationVessel[] = await window.api.getQuotationVessels(quotationId)
+    const linkedVessels = qVessels.filter((qv) => qv.vesselId)
+    const hasRealVessel = linkedVessels.length > 0
+
+    const toAdd: PISubjectivity[] = []
+
+    if (!hasRealVessel) {
+      // No vessel in DB — add all master subjectivities
+      toAdd.push(...masters)
+    } else {
+      // Check each vessel's doc status
+      const missingDocTypeIds = new Set<string>()
+
+      for (const qv of linkedVessels) {
+        const vesselDocs = await window.api.getVesselDocuments(qv.vesselId!)
+        const vesselDocMap = new Map(
+          vesselDocs.map((d: VesselDocumentRow) => [d.documentTypeId || d.document_type_id, d])
+        )
+
+        // Check required doc types only — optional docs are excluded from auto-populate
+        for (const dt of dts) {
+          if (!dt.required) continue
+          const doc = vesselDocMap.get(dt.id)
+          if (!doc || !doc.filePath) {
+            missingDocTypeIds.add(dt.id)
+            continue
+          }
+          // For annual types — check if expiring soon (P&I policy logic)
+          if (dt.annualRenewal) {
+            try {
+              const policies = await window.api.getVesselDynamicPolicies(qv.vesselId!)
+              const effectiveExpiry = resolveEffectivePolicyExpiry(policies) || doc.expiryDate
+              if (effectiveExpiry) {
+                const daysLeft = Math.ceil(
+                  (new Date(effectiveExpiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                )
+                if (daysLeft <= 60) missingDocTypeIds.add(dt.id)
+              }
+            } catch {
+              /* skip policy check errors */
+            }
+          }
+        }
+      }
+
+      // Also check assured entity documents
+      try {
+        const qAssureds = await window.api.getQuotationAssureds(quotationId)
+        const allEntities = await window.api.getEntities()
+        const edTypesRaw = await window.api.getEntityDocumentTypes()
+        const edDocsRaw = await window.api.getEntityDocuments()
+        const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter(
+          (t) => t.isActive && t.isRequired
+        )
+        const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
+        for (const qa of Array.isArray(qAssureds) ? qAssureds : []) {
+          if (!qa.entityId) continue
+          const entity = allEntities.find((e) => e.id === qa.entityId)
+          if (!entity) continue
+          for (const edt of activeEdTypes.filter(
+            (t) => t.entityScope === 'both' || t.entityScope === entity.type
+          )) {
+            if (
+              !allEdDocs.some(
+                (d) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath
+              )
+            ) {
+              missingDocTypeIds.add(`entity:${edt.id}`)
+            }
+          }
+        }
+      } catch {
+        /* ignore entity doc check errors */
+      }
+
+      // Add master subjectivities whose linked doc types overlap with missing/expiring
+      for (const m of masters) {
+        const shouldAdd =
+          !m.docTypeIds ||
+          m.docTypeIds.length === 0 ||
+          m.docTypeIds.some((dtId) => missingDocTypeIds.has(dtId))
+        if (shouldAdd) toAdd.push(m)
+      }
+    }
+
+    // Insert the items
+    let order = 0
+    for (const m of toAdd) {
+      await window.api.addQuotationSubjectivity({
+        quotationId: quotationId,
+        piSubjectivityId: m.id,
+        text: m.text,
+        isAutoPopulated: true,
+        order: order++
+      })
+    }
+
+    // Reload after auto-populate
+    const refreshed = await window.api.getQuotationSubjectivities(quotationId)
+    const safeRefreshed = Array.isArray(refreshed) ? refreshed : []
+    sink.setItems(safeRefreshed)
+
+    // Auto-detect vessel scopes when 2+ vessels
+    if (qVessels.length >= 2 && safeRefreshed.length > 0) {
+      try {
+        const scopes = await autoSetSubjectivityScopes(safeRefreshed, qVessels, masters)
+        const withScopes = safeRefreshed.map((s) => ({
+          ...s,
+          vesselScope: scopes[s.id] !== undefined ? scopes[s.id] : s.vesselScope
+        }))
+        sink.setItems(withScopes)
+        for (const s of withScopes) {
+          if (scopes[s.id] !== undefined) {
+            ok(await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] }))
+          }
+        }
+        sink.setScopeAutoDetected(true)
+      } catch {
+        /* scope detection is best-effort */
+      }
+    }
+  } catch (err) {
+    console.error('Auto-populate subjectivities error:', err)
+  }
+}
+
+async function autoSetSubjectivityScopes(
+  subjs: QuotationSubjectivity[],
+  vessels: QuotationVessel[],
+  allSubjDefs: PISubjectivity[]
+): Promise<Record<string, string[] | null>> {
+  const scopes: Record<string, string[] | null> = {}
+
+  // Pre-fetch all entities once for entity doc checks
+  let allEntities: Entity[] = []
+  try {
+    const ents = await window.api.getEntities()
+    allEntities = Array.isArray(ents) ? ents : []
+  } catch {
+    /* ignore */
+  }
+
+  // Load entity document data
+  let scopeEdTypes: EntityDocumentType[] = []
+  let scopeEdDocs: EntityDocument[] = []
+  try {
+    const [edtRaw, eddRaw] = await Promise.all([
+      window.api.getEntityDocumentTypes(),
+      window.api.getEntityDocuments()
+    ])
+    scopeEdTypes = (Array.isArray(edtRaw) ? edtRaw : []).filter((t) => t.isActive && t.isRequired)
+    scopeEdDocs = Array.isArray(eddRaw) ? eddRaw : []
+  } catch {
+    /* ignore */
+  }
+
+  // Pre-fetch vessel docs and assureds per vessel
+  const vesselDocsMap = new Map<string, VesselDocumentRow[]>()
+  const vesselAssuredsMap = new Map<string, VesselAssured[]>()
+  for (const qv of vessels) {
+    if (!qv.vesselId) continue
+    try {
+      const [docs, assureds] = await Promise.all([
+        window.api.getVesselDocuments(qv.vesselId),
+        window.api.getVesselAssureds(qv.vesselId)
+      ])
+      vesselDocsMap.set(qv.vesselId, Array.isArray(docs) ? docs : [])
+      vesselAssuredsMap.set(qv.vesselId, Array.isArray(assureds) ? assureds : [])
+    } catch {
+      /* ignore */
+    }
+  }
+
+  for (const subj of subjs) {
+    const def = allSubjDefs.find((s) => s.id === subj.piSubjectivityId)
+    if (!def || !def.docTypeIds || def.docTypeIds.length === 0) {
+      scopes[subj.id] = null // no doc mapping — applies to all
+      continue
+    }
+
+    const entityDocTypeIds = def.docTypeIds.filter((id) => id.startsWith('entity:'))
+    const vesselDocTypeIds = def.docTypeIds.filter((id) => !id.startsWith('entity:'))
+    const needsVessels: string[] = []
+
+    for (const qv of vessels) {
+      if (!qv.vesselId) {
+        // Manual vessel — always needs the subjectivity
+        needsVessels.push(qv.id)
+        continue
+      }
+
+      const vesselDocs = vesselDocsMap.get(qv.vesselId) || []
+      let vesselHasAll = true
+
+      // Check vessel document types
+      for (const dtId of vesselDocTypeIds) {
+        const hasDoc = vesselDocs.some(
+          (d) => (d.documentTypeId || d.document_type_id) === dtId && d.filePath
+        )
+        if (!hasDoc) {
+          vesselHasAll = false
+          break
+        }
+      }
+
+      // Check entity documents dynamically
+      if (vesselHasAll && entityDocTypeIds.length > 0) {
+        const assureds = vesselAssuredsMap.get(qv.vesselId) || []
+        for (const assured of assureds) {
+          if (!assured.entityId) continue
+          const entity = allEntities.find((e) => e.id === assured.entityId)
+          if (!entity) continue
+          for (const eid of entityDocTypeIds) {
+            const edtId = eid.startsWith('entity:') ? eid.slice(7) : null
+            if (edtId) {
+              const edt = scopeEdTypes.find((t) => t.id === edtId)
+              if (edt && (edt.entityScope === 'both' || edt.entityScope === entity.type)) {
+                if (
+                  !scopeEdDocs.some(
+                    (d) => d.entityId === entity.id && d.documentTypeId === edtId && d.filePath
+                  )
+                ) {
+                  vesselHasAll = false
+                  break
+                }
+              }
+            }
+          }
+          if (!vesselHasAll) break
+        }
+      }
+
+      if (!vesselHasAll) needsVessels.push(qv.id)
+    }
+
+    // If all vessels need it → null (all). If none need it → null (keep for all, user can remove).
+    if (needsVessels.length === vessels.length || needsVessels.length === 0) {
+      scopes[subj.id] = null
+    } else {
+      scopes[subj.id] = needsVessels
+    }
+  }
+
+  return scopes
+}
 
 export default function SubjectivitiesTab({
   quotation,
@@ -31,7 +346,7 @@ export default function SubjectivitiesTab({
   showSuccess: (m: string) => void
   showError: (m: string) => void
   isLight: boolean
-}) {
+}): React.JSX.Element {
   const [items, setItems] = useState<QuotationSubjectivity[]>([])
   const [masterList, setMasterList] = useState<PISubjectivity[]>([])
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -44,180 +359,26 @@ export default function SubjectivitiesTab({
   const [scopeAutoDetected, setScopeAutoDetected] = useState(false)
   const autoPopulateRan = useRef(false)
 
+  const sink: SubjectivitySink = {
+    setItems,
+    setMasterList,
+    setDocTypes,
+    setQVessels,
+    setScopeAutoDetected
+  }
+  const loadData = (): Promise<void> =>
+    loadSubjectivities(quotation.id, quotation.quotationTypeCode, sink, autoPopulateRan)
+
   useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    const [subjs, masters, dts, qv] = await Promise.all([
-      window.api.getQuotationSubjectivities(quotation.id),
-      window.api.getPISubjectivities(),
-      window.api.getDocumentTypes(),
-      window.api.getQuotationVessels(quotation.id)
-    ])
-    const safeSubjs = Array.isArray(subjs) ? subjs : []
-    const safeMasters = Array.isArray(masters) ? masters : []
-    const safeDts = Array.isArray(dts) ? dts : []
-    // Filter masters by quotation type scope
-    const typeCode =
-      quotation.quotationTypeCode?.toLowerCase() === 'h'
-        ? 'hull'
-        : quotation.quotationTypeCode?.toLowerCase() === 'w'
-          ? 'war'
-          : quotation.quotationTypeCode?.toLowerCase() === 'c'
-            ? 'cargo'
-            : 'pi'
-    const filteredMasters = safeMasters.filter(
-      (m) => !m.typeScope || m.typeScope === 'all' || m.typeScope.split(',').includes(typeCode)
+    void loadSubjectivities(
+      quotation.id,
+      quotation.quotationTypeCode,
+      { setItems, setMasterList, setDocTypes, setQVessels, setScopeAutoDetected },
+      autoPopulateRan
     )
-    setItems(safeSubjs)
-    setMasterList(filteredMasters)
-    setDocTypes(safeDts)
-    setQVessels(Array.isArray(qv) ? qv : [])
+  }, [quotation.id, quotation.quotationTypeCode])
 
-    // Auto-populate on first load if no subjectivities yet (skip for War and Cargo — subjectivities not included by default)
-    if (
-      !autoPopulateRan.current &&
-      safeSubjs.length === 0 &&
-      filteredMasters.length > 0 &&
-      quotation.quotationTypeCode !== 'W' &&
-      quotation.quotationTypeCode !== 'C'
-    ) {
-      autoPopulateRan.current = true
-      await autoPopulate(filteredMasters, safeDts)
-    }
-  }
-
-  const autoPopulate = async (masters: PISubjectivity[], dts: DocumentType[]) => {
-    if (masters.length === 0) return
-    try {
-      const qVessels: QuotationVessel[] = await window.api.getQuotationVessels(quotation.id)
-      const linkedVessels = qVessels.filter((qv) => qv.vesselId)
-      const hasRealVessel = linkedVessels.length > 0
-
-      const toAdd: PISubjectivity[] = []
-
-      if (!hasRealVessel) {
-        // No vessel in DB — add all master subjectivities
-        toAdd.push(...masters)
-      } else {
-        // Check each vessel's doc status
-        const missingDocTypeIds = new Set<string>()
-
-        for (const qv of linkedVessels) {
-          const vesselDocs = await window.api.getVesselDocuments(qv.vesselId!)
-          const vesselDocMap = new Map(
-            vesselDocs.map((d: any) => [d.documentTypeId || d.document_type_id, d])
-          )
-
-          // Check required doc types only — optional docs are excluded from auto-populate
-          for (const dt of dts) {
-            if (!dt.required) continue
-            const doc = vesselDocMap.get(dt.id)
-            if (!doc || !doc.filePath) {
-              missingDocTypeIds.add(dt.id)
-              continue
-            }
-            // For annual types — check if expiring soon (P&I policy logic)
-            if (dt.annualRenewal) {
-              try {
-                const policies = await window.api.getVesselDynamicPolicies(qv.vesselId!)
-                const effectiveExpiry = resolveEffectivePolicyExpiry(policies) || doc.expiryDate
-                if (effectiveExpiry) {
-                  const daysLeft = Math.ceil(
-                    (new Date(effectiveExpiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                  )
-                  if (daysLeft <= 60) missingDocTypeIds.add(dt.id)
-                }
-              } catch {
-                /* skip policy check errors */
-              }
-            }
-          }
-        }
-
-        // Also check assured entity documents
-        try {
-          const qAssureds = await window.api.getQuotationAssureds(quotation.id)
-          const allEntities = await window.api.getEntities()
-          const edTypesRaw = await window.api.getEntityDocumentTypes()
-          const edDocsRaw = await window.api.getEntityDocuments()
-          const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter(
-            (t: any) => t.isActive && t.isRequired
-          )
-          const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
-          for (const qa of Array.isArray(qAssureds) ? qAssureds : []) {
-            if (!qa.entityId) continue
-            const entity = allEntities.find((e: any) => e.id === qa.entityId)
-            if (!entity) continue
-            for (const edt of activeEdTypes.filter(
-              (t: any) => t.entityScope === 'both' || t.entityScope === entity.type
-            )) {
-              if (
-                !allEdDocs.some(
-                  (d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath
-                )
-              ) {
-                missingDocTypeIds.add(`entity:${edt.id}`)
-              }
-            }
-          }
-        } catch {
-          /* ignore entity doc check errors */
-        }
-
-        // Add master subjectivities whose linked doc types overlap with missing/expiring
-        for (const m of masters) {
-          const shouldAdd =
-            !m.docTypeIds ||
-            m.docTypeIds.length === 0 ||
-            m.docTypeIds.some((dtId) => missingDocTypeIds.has(dtId))
-          if (shouldAdd) toAdd.push(m)
-        }
-      }
-
-      // Insert the items
-      let order = 0
-      for (const m of toAdd) {
-        await window.api.addQuotationSubjectivity({
-          quotationId: quotation.id,
-          piSubjectivityId: m.id,
-          text: m.text,
-          isAutoPopulated: true,
-          order: order++
-        })
-      }
-
-      // Reload after auto-populate
-      const refreshed = await window.api.getQuotationSubjectivities(quotation.id)
-      const safeRefreshed = Array.isArray(refreshed) ? refreshed : []
-      setItems(safeRefreshed)
-
-      // Auto-detect vessel scopes when 2+ vessels
-      if (qVessels.length >= 2 && safeRefreshed.length > 0) {
-        try {
-          const scopes = await autoSetSubjectivityScopes(safeRefreshed, qVessels, masters)
-          const withScopes = safeRefreshed.map((s) => ({
-            ...s,
-            vesselScope: scopes[s.id] !== undefined ? scopes[s.id] : s.vesselScope
-          }))
-          setItems(withScopes)
-          for (const s of withScopes) {
-            if (scopes[s.id] !== undefined) {
-              ok(await window.api.updateQuotationSubjectivity(s.id, { vesselScope: scopes[s.id] }))
-            }
-          }
-          setScopeAutoDetected(true)
-        } catch {
-          /* scope detection is best-effort */
-        }
-      }
-    } catch (err) {
-      console.error('Auto-populate subjectivities error:', err)
-    }
-  }
-
-  const handleAddCustom = async () => {
+  const handleAddCustom = async (): Promise<void> => {
     if (!newText.trim()) return
     await window.api.addQuotationSubjectivity({
       quotationId: quotation.id,
@@ -230,7 +391,7 @@ export default function SubjectivitiesTab({
     loadData()
   }
 
-  const handleAddFromMaster = async (m: PISubjectivity) => {
+  const handleAddFromMaster = async (m: PISubjectivity): Promise<void> => {
     if (items.some((i) => i.piSubjectivityId === m.id)) return
     await window.api.addQuotationSubjectivity({
       quotationId: quotation.id,
@@ -243,7 +404,7 @@ export default function SubjectivitiesTab({
     await resortByMasterOrder()
   }
 
-  const resortByMasterOrder = async () => {
+  const resortByMasterOrder = async (): Promise<void> => {
     const refreshed = await window.api.getQuotationSubjectivities(quotation.id)
     const safeItems = Array.isArray(refreshed) ? refreshed : []
     // Build order map from master list
@@ -263,19 +424,19 @@ export default function SubjectivitiesTab({
     setItems(safeItems.map((s, i) => ({ ...s, order: i })))
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<void> => {
     if (!editingId || !editText.trim()) return
     ok(await window.api.updateQuotationSubjectivity(editingId, { text: editText.trim() }))
     setEditingId(null)
     loadData()
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<void> => {
     await window.api.deleteQuotationSubjectivity(id)
     loadData()
   }
 
-  const handleMove = async (idx: number, dir: -1 | 1) => {
+  const handleMove = async (idx: number, dir: -1 | 1): Promise<void> => {
     const arr = [...items]
     const targetIdx = idx + dir
     if (targetIdx < 0 || targetIdx >= arr.length) return
@@ -286,135 +447,12 @@ export default function SubjectivitiesTab({
     }
   }
 
-  const updateSubjectivityScope = async (id: string, scope: string[] | null) => {
+  const updateSubjectivityScope = async (id: string, scope: string[] | null): Promise<void> => {
     setItems((prev) => prev.map((s) => (s.id === id ? { ...s, vesselScope: scope } : s)))
     ok(await window.api.updateQuotationSubjectivity(id, { vesselScope: scope }))
   }
 
-  const autoSetSubjectivityScopes = async (
-    subjs: QuotationSubjectivity[],
-    vessels: QuotationVessel[],
-    allSubjDefs: PISubjectivity[]
-  ): Promise<Record<string, string[] | null>> => {
-    const scopes: Record<string, string[] | null> = {}
-
-    // Pre-fetch all entities once for entity doc checks
-    let allEntities: Entity[] = []
-    try {
-      const ents = await window.api.getEntities()
-      allEntities = Array.isArray(ents) ? ents : []
-    } catch {
-      /* ignore */
-    }
-
-    // Load entity document data
-    let scopeEdTypes: any[] = []
-    let scopeEdDocs: any[] = []
-    try {
-      const [edtRaw, eddRaw] = await Promise.all([
-        window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments()
-      ])
-      scopeEdTypes = (Array.isArray(edtRaw) ? edtRaw : []).filter(
-        (t: any) => t.isActive && t.isRequired
-      )
-      scopeEdDocs = Array.isArray(eddRaw) ? eddRaw : []
-    } catch {
-      /* ignore */
-    }
-
-    // Pre-fetch vessel docs and assureds per vessel
-    const vesselDocsMap = new Map<string, any[]>()
-    const vesselAssuredsMap = new Map<string, any[]>()
-    for (const qv of vessels) {
-      if (!qv.vesselId) continue
-      try {
-        const [docs, assureds] = await Promise.all([
-          window.api.getVesselDocuments(qv.vesselId),
-          window.api.getVesselAssureds(qv.vesselId)
-        ])
-        vesselDocsMap.set(qv.vesselId, Array.isArray(docs) ? docs : [])
-        vesselAssuredsMap.set(qv.vesselId, Array.isArray(assureds) ? assureds : [])
-      } catch {
-        /* ignore */
-      }
-    }
-
-    for (const subj of subjs) {
-      const def = allSubjDefs.find((s) => s.id === subj.piSubjectivityId)
-      if (!def || !def.docTypeIds || def.docTypeIds.length === 0) {
-        scopes[subj.id] = null // no doc mapping — applies to all
-        continue
-      }
-
-      const entityDocTypeIds = def.docTypeIds.filter((id) => id.startsWith('entity:'))
-      const vesselDocTypeIds = def.docTypeIds.filter((id) => !id.startsWith('entity:'))
-      const needsVessels: string[] = []
-
-      for (const qv of vessels) {
-        if (!qv.vesselId) {
-          // Manual vessel — always needs the subjectivity
-          needsVessels.push(qv.id)
-          continue
-        }
-
-        const vesselDocs = vesselDocsMap.get(qv.vesselId) || []
-        let vesselHasAll = true
-
-        // Check vessel document types
-        for (const dtId of vesselDocTypeIds) {
-          const hasDoc = vesselDocs.some(
-            (d: any) => (d.documentTypeId || d.document_type_id) === dtId && d.filePath
-          )
-          if (!hasDoc) {
-            vesselHasAll = false
-            break
-          }
-        }
-
-        // Check entity documents dynamically
-        if (vesselHasAll && entityDocTypeIds.length > 0) {
-          const assureds = vesselAssuredsMap.get(qv.vesselId) || []
-          for (const assured of assureds) {
-            if (!assured.entityId) continue
-            const entity = allEntities.find((e) => e.id === assured.entityId)
-            if (!entity) continue
-            for (const eid of entityDocTypeIds) {
-              const edtId = eid.startsWith('entity:') ? eid.slice(7) : null
-              if (edtId) {
-                const edt = scopeEdTypes.find((t: any) => t.id === edtId)
-                if (edt && (edt.entityScope === 'both' || edt.entityScope === entity.type)) {
-                  if (
-                    !scopeEdDocs.some(
-                      (d: any) =>
-                        d.entityId === entity.id && d.documentTypeId === edtId && d.filePath
-                    )
-                  ) {
-                    vesselHasAll = false
-                    break
-                  }
-                }
-              }
-            }
-            if (!vesselHasAll) break
-          }
-        }
-
-        if (!vesselHasAll) needsVessels.push(qv.id)
-      }
-
-      // If all vessels need it → null (all). If none need it → null (keep for all, user can remove).
-      if (needsVessels.length === vessels.length || needsVessels.length === 0) {
-        scopes[subj.id] = null
-      } else {
-        scopes[subj.id] = needsVessels
-      }
-    }
-
-    return scopes
-  }
-
-  const handleAutoDetectScopes = async () => {
+  const handleAutoDetectScopes = async (): Promise<void> => {
     if (qVessels.length < 2) {
       showSuccess('Auto-detect requires 2 or more vessels')
       return
@@ -438,7 +476,7 @@ export default function SubjectivitiesTab({
     }
   }
 
-  const handleRePopulate = async () => {
+  const handleRePopulate = async (): Promise<void> => {
     if (masterList.length === 0) {
       showSuccess('No master subjectivities configured — add them in Quotation Settings first')
       return
@@ -448,7 +486,7 @@ export default function SubjectivitiesTab({
     for (const item of nonCustomItems) {
       await window.api.deleteQuotationSubjectivity(item.id)
     }
-    await autoPopulate(masterList, docTypes)
+    await autoPopulate(quotation.id, masterList, docTypes, sink)
     showSuccess('Re-populated from vessel documents')
   }
 
@@ -533,7 +571,7 @@ export default function SubjectivitiesTab({
             const v = Math.max(0, parseInt(e.target.value) || 0)
             setSubjectivityDays(v)
             window.api
-              .updateQuotation(quotation.id, { subjectivityDays: v } as any)
+              .updateQuotation(quotation.id, { subjectivityDays: v })
               .then(ok)
               .catch(() => {})
           }}
