@@ -540,7 +540,6 @@ const api = {
 
   // Vessel Insurance Policies (imported)
   getVesselInsurancePolicies: (vesselId: string) => ipcRenderer.invoke('vessels:getInsurancePolicies', vesselId),
-  importInsurancePoliciesFromExcel: (filePath: string) => ipcRenderer.invoke('vessels:importInsurancePoliciesFromExcel', filePath),
 
   // Classification Societies
   getClassificationSocieties: () => ipcRenderer.invoke('db:getClassificationSocieties'),
@@ -559,7 +558,6 @@ const api = {
   reorderVesselTypes: (ids: string[]) => ipcRenderer.invoke('db:reorderVesselTypes', ids),
 
   // Re-import vessel details (type, flag, class) from Excel
-  reimportVesselDetails: (filePath: string) => ipcRenderer.invoke('vessels:reimportVesselDetails', filePath),
 
   // Vessel Audit Log
   getVesselAuditLog: (vesselId: string) => ipcRenderer.invoke('vessels:getAuditLog', vesselId),

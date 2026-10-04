@@ -526,7 +526,6 @@ export interface Api {
 
   // Vessel Insurance Policies (imported)
   getVesselInsurancePolicies: (vesselId: string) => Promise<VesselInsurancePolicy[]>
-  importInsurancePoliciesFromExcel: (filePath: string) => Promise<{ imported: number; skippedCancelled: number; totalRows: number; unmatched: { ship: string; imo: string; broker: string; fleet: string }[] }>
 
   // Classification Societies
   getClassificationSocieties: () => Promise<ClassificationSociety[]>
@@ -545,7 +544,6 @@ export interface Api {
   reorderVesselTypes: (ids: string[]) => Promise<void>
 
   // Re-import vessel details
-  reimportVesselDetails: (filePath: string) => Promise<{ updated: number; totalRows: number; createdFlags: number; createdClasses: number; createdTypes: number }>
 
   // Vessel Audit Log
   getVesselAuditLog: (vesselId: string) => Promise<VesselAuditEntry[]>

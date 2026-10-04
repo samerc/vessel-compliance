@@ -430,13 +430,9 @@ Query builder for finding entity contacts across the fleet (`src/renderer/src/co
 - **Empty states**: "No query run yet" (before first search), "No contacts found" (after search with 0 results)
 - **Chip component**: Selected = accent border + tinted bg; unselected = subtle border + transparent
 
-### Vessel Excel Import
+### Vessel Excel Import (REMOVED)
 
-Bulk vessel import from Excel files (`src/main/vesselExcelImport.ts`):
-
-- **Date Handling**: Excel serial dates converted to ISO `YYYY-MM-DD` via `excelDateToISO()` with Lotus 123 leap year bug correction
-- **Fallback Parsing**: Text dates parsed via `new Date()` constructor
-- **Migration**: Startup migration in `initSchema()` normalizes existing non-ISO dates in `vessel_policy_values`
+The one-time legacy Excel importer (`vesselExcelImport.ts`, IPCs `vessels:importInsurancePoliciesFromExcel` / `vessels:reimportVesselDetails`) was removed; its UI had already been dropped. Data it imported stays (`vessels:getInsurancePolicies` still reads it). The startup migration in `initSchema()` that normalizes non-ISO dates in `vessel_policy_values` is kept.
 
 ### Vessel Filter
 
@@ -1040,7 +1036,6 @@ Vessel type stored as FK reference, not text. Renaming a type in settings auto-r
 - **Migration**: Auto-matches existing text values to `vessel_types` by name (case-insensitive), creates missing types
 - **VesselDetail**: Dropdown uses `vt.id` as value, not name
 - **Audit log**: Resolves vessel type IDs to names for readable history
-- **Excel import**: Resolves type names to IDs, auto-creates missing types
 
 ### Quotation List View
 
