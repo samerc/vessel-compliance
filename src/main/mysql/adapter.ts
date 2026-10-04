@@ -16774,7 +16774,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       `
             SELECT pd.*, qt.code as quotationTypeCode, qt.name as quotationTypeName,
-                   q.reference_number as quotationReference,
+                   q.reference_number as quotationReference, q.premium_currency as premiumCurrency,
                    v.name as vesselName, v.imo_number as imoNumber, v.vessel_type as vesselType,
                    v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage,
                    v.classification_society as classificationSociety, v.fleet_id as fleetId, v.call_sign as callSign,
@@ -16820,6 +16820,7 @@ export class MySQLAdapter {
       revisionNumber: Number(r.revision_number || 0),
       quotationId: r.quotation_id,
       quotationReference: r.quotationReference || null,
+      premiumCurrency: r.premiumCurrency || 'USD',
       vesselId: r.vessel_id,
       policyNumber: r.policy_number,
       inceptionDate: r.inception_date,

@@ -96,7 +96,7 @@ interface PolicyDetailProps {
   onNavigateToPolicy?: (policyId: string) => void
 }
 
-/** The loaded policy; `premiumCurrency` is read by the cancel modal but is not selected by policy:getById */
+/** The loaded policy (premiumCurrency comes from its quotation) */
 type PolicyRecord = PolicyDocument & { premiumCurrency?: string }
 
 /** Instalments may carry a legacy `amount` field */
@@ -3748,14 +3748,14 @@ export default function PolicyDetail({
                 <div>
                   <div style={labelStyle}>Premium</div>
                   <div style={{ ...valueStyle, fontWeight: 600 }}>
-                    {formatAmount(policy.premiumAmount)}
+                    {formatAmount(policy.premiumAmount, policy.premiumCurrency)}
                   </div>
                 </div>
                 {policy.perAnnumPremium != null && (
                   <div>
                     <div style={labelStyle}>Per Annum Premium</div>
                     <div style={{ ...valueStyle, fontWeight: 600 }}>
-                      {formatAmount(policy.perAnnumPremium)}
+                      {formatAmount(policy.perAnnumPremium, policy.premiumCurrency)}
                     </div>
                   </div>
                 )}
@@ -3766,7 +3766,7 @@ export default function PolicyDetail({
                       {policy.commissionPercent}%
                       {commissionAmount != null && (
                         <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
-                          ({formatAmount(commissionAmount)})
+                          ({formatAmount(commissionAmount, policy.premiumCurrency)})
                         </span>
                       )}
                     </div>
@@ -3782,7 +3782,7 @@ export default function PolicyDetail({
                         color: isLight ? '#047857' : '#34d399'
                       }}
                     >
-                      {formatAmount(netPremium)}
+                      {formatAmount(netPremium, policy.premiumCurrency)}
                     </div>
                   </div>
                 )}
@@ -3810,72 +3810,103 @@ export default function PolicyDetail({
               {instalments.length > 0 && (
                 <div style={{ marginTop: '8px' }}>
                   <div style={{ ...labelStyle, marginBottom: '8px' }}>Instalments</div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                        <th style={thStyle}>#</th>
-                        <th style={thStyle}>Due Date</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Net</th>
-                        <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {instalments.map((inst, idx) => (
-                        <tr
-                          key={inst.instalmentNumber}
-                          style={{
-                            borderBottom: '1px solid var(--table-border)',
-                            background:
-                              idx % 2 === 0
-                                ? 'transparent'
-                                : isLight
-                                  ? 'rgba(0,0,0,0.02)'
-                                  : 'rgba(255,255,255,0.02)'
-                          }}
-                        >
-                          <td style={tdStyle}>{inst.instalmentNumber}</td>
-                          <td style={tdStyle}>
-                            {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 500 }}>
-                            {formatAmount(inst.premiumAmount)}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            {formatAmount(inst.commissionAmount)}
-                          </td>
-                          <td
-                            style={{
-                              ...tdStyle,
-                              textAlign: 'right',
-                              color: isLight ? '#047857' : '#34d399'
-                            }}
-                          >
-                            {formatAmount((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            {inst.isNonRefundable ? (
-                              <span
-                                style={{
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 600,
-                                  background: 'rgba(255, 176, 32, 0.15)',
-                                  color: '#ffb020'
-                                }}
-                              >
-                                NR
-                              </span>
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    // Compact: currency once in the headings, one line per cell, and the
+                    // commission / net columns only when there is a commission
+                    const cur = policy.premiumCurrency || 'USD'
+                    const num = (n?: number | null): string =>
+                      n == null
+                        ? '-'
+                        : Number(n).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })
+                    const hasComm = instalments.some((i) => (i.commissionAmount || 0) !== 0)
+                    const th: React.CSSProperties = {
+                      ...thStyle,
+                      padding: '8px 10px',
+                      whiteSpace: 'nowrap'
+                    }
+                    const td: React.CSSProperties = {
+                      ...tdStyle,
+                      padding: '8px 10px',
+                      whiteSpace: 'nowrap',
+                      fontVariantNumeric: 'tabular-nums'
+                    }
+                    return (
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                            <th style={{ ...th, width: '1%' }}>#</th>
+                            <th style={th}>Due Date</th>
+                            <th style={{ ...th, textAlign: 'right' }}>Premium ({cur})</th>
+                            {hasComm && <th style={{ ...th, textAlign: 'right' }}>Commission</th>}
+                            {hasComm && <th style={{ ...th, textAlign: 'right' }}>Net</th>}
+                            <th style={{ ...th, textAlign: 'center', width: '1%' }}>NR</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {instalments.map((inst, idx) => (
+                            <tr
+                              key={inst.instalmentNumber}
+                              style={{
+                                borderBottom: '1px solid var(--table-border)',
+                                background:
+                                  idx % 2 === 0
+                                    ? 'transparent'
+                                    : isLight
+                                      ? 'rgba(0,0,0,0.02)'
+                                      : 'rgba(255,255,255,0.02)'
+                              }}
+                            >
+                              <td style={td}>{inst.instalmentNumber}</td>
+                              <td style={td}>
+                                {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
+                              </td>
+                              <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+                                {num(inst.premiumAmount)}
+                              </td>
+                              {hasComm && (
+                                <td style={{ ...td, textAlign: 'right' }}>
+                                  {num(inst.commissionAmount)}
+                                </td>
+                              )}
+                              {hasComm && (
+                                <td
+                                  style={{
+                                    ...td,
+                                    textAlign: 'right',
+                                    color: isLight ? '#047857' : '#34d399'
+                                  }}
+                                >
+                                  {num((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
+                                </td>
+                              )}
+                              <td style={{ ...td, textAlign: 'center' }}>
+                                {inst.isNonRefundable ? (
+                                  <span
+                                    style={{
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 600,
+                                      background: 'rgba(255, 176, 32, 0.15)',
+                                      color: '#ffb020'
+                                    }}
+                                    title="Non-refundable"
+                                  >
+                                    NR
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  })()}
                 </div>
               )}
 
@@ -4972,7 +5003,7 @@ export default function PolicyDetail({
             <EndorsementManager
               policyDocId={policyId}
               policyNumber={policy.policyNumber}
-              premiumCurrency="USD"
+              premiumCurrency={policy.premiumCurrency || 'USD'}
             />
           </div>
 

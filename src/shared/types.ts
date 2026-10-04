@@ -2307,6 +2307,8 @@ export interface PolicyDocument {
   selectedAgreedValueOptionId: string | null
   ourShare: number | null
   subjectivityDays: number
+  /** The quotation's premium currency (policy amounts are in it) */
+  premiumCurrency?: string
   /** UPCC section name on this policy (null = the quotation's) */
   upccTitle?: string | null
   /** Survey warranty wording edited in the converter (null = built from the quotation) */
