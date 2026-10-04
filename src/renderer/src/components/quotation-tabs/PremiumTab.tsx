@@ -21,6 +21,9 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
 
+/** Sections an additional discount's wording can be placed in (besides its own section) */
+const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
+
 /** Parse periodText to extract number of months. Returns null if unparseable. */
 function parsePeriodMonths(text: string | undefined): number | null {
   if (!text) return null
@@ -2769,16 +2772,20 @@ export default function PremiumTab({
                     }}
                   >
                     <option value="">Own section</option>
-                    {getDefaultSectionOrder(quotation.quotationTypeCode).map((k) => (
-                      <option key={k} value={k}>
-                        {SECTION_LABELS[k] || k}
-                      </option>
-                    ))}
+                    {getDefaultSectionOrder(quotation.quotationTypeCode)
+                      .filter((k) => DISCOUNT_PLACEMENTS.includes(k) || k === d.targetSection)
+                      .map((k) => (
+                        <option key={k} value={k}>
+                          {SECTION_LABELS[k] || k}
+                        </option>
+                      ))}
                   </select>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    {d.targetSection
-                      ? 'Wording appended to this section'
-                      : 'Renders as its own section'}
+                    {d.targetSection === 'premium'
+                      ? 'Wording placed right below the premium, before the payment texts'
+                      : d.targetSection
+                        ? 'Wording appended to this section'
+                        : 'Renders as its own section'}
                   </span>
                 </div>
                 <RichTextEditor

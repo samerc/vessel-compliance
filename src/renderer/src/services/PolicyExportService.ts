@@ -3752,7 +3752,10 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
 }
 
 async function polBuildPremiumPaymentSection(
-  data: PolicyExportData
+  data: PolicyExportData,
+  /** Discount wording placed in the Premium section: goes below the premium and instalments,
+   *  before the outstanding / loss / condition texts */
+  discountContent: (Paragraph | Table)[] = []
 ): Promise<(Paragraph | Table)[]> {
   const content: (Paragraph | Table)[] = []
   const { instalments } = data
@@ -3873,6 +3876,9 @@ async function polBuildPremiumPaymentSection(
       }
     }
   }
+
+  // 2a. Discounts placed in the Premium section
+  for (const dc of discountContent) content.push(dc)
 
   // 2b. Outstanding premium notice — policy override (set in the conversion wizard) wins over the quotation
   const outstandingEnabled =
@@ -4316,6 +4322,8 @@ export async function exportPolicyDocx(
   // EXTRA DISCOUNTS (beyond NCB/UPCC) — wording with {amount}/{percentage} resolved against
   // this vessel's premium. A targeted discount is placed right under its target section.
   const targetedDiscountRows: { target: string; row: TableRow }[] = []
+  // Discounts placed in the Premium section are merged into it, right below the premium
+  const premiumDiscountContent: (Paragraph | Table)[] = []
   if ((data.discounts || []).length > 0) {
     const q = data.quotation
     const cur = q.premiumCurrency || 'USD'
@@ -4337,14 +4345,15 @@ export async function exportPolicyDocx(
         .filter((l) => l.trim())
         .map((l) => polNp(l))
       if (dContent.length === 0) continue
-      if (d.targetSection)
+      if (d.targetSection === 'premium') premiumDiscountContent.push(...dContent, polSpacerPts(6))
+      else if (d.targetSection)
         targetedDiscountRows.push({ target: d.targetSection, row: makeRow('', dContent) })
       else addRow(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
     }
   }
 
   // PREMIUM PAYMENT
-  const premiumContent = await polBuildPremiumPaymentSection(data)
+  const premiumContent = await polBuildPremiumPaymentSection(data, premiumDiscountContent)
   if (premiumContent.length > 0)
     addRow('premium', makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
 

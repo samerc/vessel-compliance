@@ -34,7 +34,12 @@ const TITLE_W = Math.round(CONTENT_W * 0.2)
 const BODY_W = CONTENT_W - TITLE_W
 
 // A section row that remembers its title/content so a targeted discount can rebuild it
-type RowWithSource = TableRow & { __title?: string; __content?: (Paragraph | Table)[] }
+type RowWithSource = TableRow & {
+  __title?: string
+  __content?: (Paragraph | Table)[]
+  /** Where merged discount wording goes in __content (default: the end) */
+  __insertAt?: number
+}
 
 // Additional hull condition, or a custom one merged in as a synthetic row
 type HullAddlRow = QuotationHullAdditionalCondition & {
@@ -4742,6 +4747,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         }
       }
     }
+    // Discounts placed in the Premium section go here: below the premium, before the payment texts
+    const wPremTextsAt = premContent.length
     const wNumInst = wq.numInstalments || 1
     const wFirstInstDays = data.instalments.length > 0 ? data.instalments[0].daysFromInception : 0
     const wSingleTiming =
@@ -4843,13 +4850,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       premContent.push(...mp(st(data, 'premiumEarned')))
       premContent.push(emptyP())
     }
-    rowMap.set(
-      'premium',
-      makeRow(
-        'Premium Payment Condition Precedent',
-        premContent.length > 0 ? premContent : [emptyP()]
-      )
+    const premRow: RowWithSource = makeRow(
+      'Premium Payment Condition Precedent',
+      premContent.length > 0 ? premContent : [emptyP()]
     )
+    if (premContent.length > 0) premRow.__insertAt = wPremTextsAt
+    rowMap.set('premium', premRow)
 
     // NCB as separate section
     if (wq.ncbEnabled) {
@@ -5083,14 +5089,28 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     rowMap.set(`custom:${cs.id}`, makeRow(cs.title, csContent))
   }
 
-  // Merge discounts that target an existing section: append their wording to that section's row.
+  // Merge discounts that target an existing section into that section's row: right below the
+  // premium in the Premium section, at the end of any other section (NCB, UPCC).
   // Falls back to a standalone discount row if the target section isn't present for this quotation.
   for (const td of targetedDiscounts) {
-    const existing = rowMap.get(td.targetSection)
+    const existing = rowMap.get(td.targetSection) as RowWithSource | undefined
     if (existing) {
-      const base = (existing as RowWithSource).__content || []
-      const title = (existing as RowWithSource).__title || ''
-      rowMap.set(td.targetSection, makeRow(title, [...base, emptyP(), ...td.content]))
+      const base = existing.__content || []
+      const title = existing.__title || ''
+      const at = existing.__insertAt
+      if (at != null) {
+        const merged: RowWithSource = makeRow(title, [
+          ...base.slice(0, at),
+          ...td.content,
+          emptyP(),
+          ...base.slice(at)
+        ])
+        // The next discount for this section goes after this one, keeping their order
+        merged.__insertAt = at + td.content.length + 1
+        rowMap.set(td.targetSection, merged)
+      } else {
+        rowMap.set(td.targetSection, makeRow(title, [...base, emptyP(), ...td.content]))
+      }
     } else {
       rowMap.set(`discount:${td.id}`, makeRow(td.label, td.content))
     }
