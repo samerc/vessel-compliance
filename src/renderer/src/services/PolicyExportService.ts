@@ -1413,7 +1413,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   }
 
   const safeClauseRows = filterByAlt(Array.isArray(clauseRows) ? clauseRows : [])
-  const selectedClauseIds = safeClauseRows.map((r) => r.piClauseId)
+  const selectedClauseIds = [...new Set(safeClauseRows.map((r) => r.piClauseId))]
   const clauseOverrides: Record<string, string> =
     clauseOverridesArr &&
     typeof clauseOverridesArr === 'object' &&
@@ -1422,7 +1422,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       : {}
 
   const safeWarrantyRows = filterByAlt(Array.isArray(warrantyRows) ? warrantyRows : [])
-  const selectedWarrantyIds = safeWarrantyRows.map((r) => r.piWarrantyId)
+  const selectedWarrantyIds = [...new Set(safeWarrantyRows.map((r) => r.piWarrantyId))]
 
   const piAlternativesRaw =
     quotation.quotationTypeCode === 'P'
@@ -1620,7 +1620,16 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     subLimits: Array.isArray(subLimits) ? subLimits : [],
     selectedClauseIds,
     allClauses: Array.isArray(allClauses) ? allClauses : [],
-    additionalClauses: filterByAlt(Array.isArray(additionalClauses) ? additionalClauses : []),
+    // An additional clause stored both shared and for the chosen alternative prints once
+    additionalClauses: (() => {
+      const seen = new Set<string>()
+      return filterByAlt(Array.isArray(additionalClauses) ? additionalClauses : []).filter((ac) => {
+        const key = ac.piAdditionalClauseId || ac.id
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    })(),
     allAdditionalClauses: Array.isArray(allAdditionalClauses) ? allAdditionalClauses : [],
     selectedWarrantyIds,
     allWarranties: Array.isArray(allWarranties) ? allWarranties : [],
@@ -2800,7 +2809,12 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
           layout: TableLayoutType.FIXED,
           columnWidths: [clauseRefW, clauseDescW],
           rows: selectedClauses.map((c) => {
-            const desc = data.clauseOverrides[c.id] || c.description
+            const desc =
+              (data.policy.selectedAlternativeId
+                ? data.clauseOverrides[`${c.id}::${data.policy.selectedAlternativeId}`]
+                : undefined) ||
+              data.clauseOverrides[c.id] ||
+              c.description
             const clauseDesc = desc ? ` \u2013 ${desc}` : ''
             const displayName = (c.name || '')
               .replace(/^Section\s*B\s*Cl\.?\s*\d+\s*[-\u2013\u2014]?\s*/i, '')
@@ -3275,12 +3289,14 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         resolvedLolAmount = selLol.amount
         resolvedLolCurrency = selLol.currency || resolvedLolCurrency
       }
-    } else if (data.piAlternatives.length > 0 && data.policy.selectedAlternativeId) {
-      const selAlt = data.piAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)
-      if (selAlt && selAlt.lolAmount != null) {
-        resolvedLolAmount = selAlt.lolAmount
-        if (selAlt.lolCurrency) resolvedLolCurrency = selAlt.lolCurrency
-      }
+    } else if (
+      data.piAlternatives.length > 0 &&
+      data.policy.selectedAlternativeId &&
+      data.piAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)?.lolAmount != null
+    ) {
+      const selAlt = data.piAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)!
+      resolvedLolAmount = selAlt.lolAmount!
+      if (selAlt.lolCurrency) resolvedLolCurrency = selAlt.lolCurrency
     } else if (
       data.vessel &&
       data.quotation.limitOfLiabilityVesselAmounts?.[data.vessel.id] != null
@@ -3718,6 +3734,8 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
 
 function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
+  // As in the quotation: no deductibles = no section (the additional text alone doesn't make one)
+  if (data.deductibles.length === 0 && data.textDeductibles.length === 0) return content
   const dedAmtW = Math.round(POL_BODY_INNER_W * 0.2)
   const dedDescW = POL_BODY_INNER_W - dedAmtW
 
@@ -3843,14 +3861,15 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
     ? data.quotation.deductibleAggregateText ||
       (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : '')
     : ''
-  if (dedAggText) {
+  // Only with table deductibles (as in the quotation)
+  if (dedAggText && data.deductibles.length > 0) {
     content.push(polEmptyP())
     content.push(...polMp(dedAggText))
   }
 
   if (data.textDeductibles.length > 0) {
     // One blank line after the table / aggregate clause (as in the quotation)
-    content.push(polEmptyP())
+    if (content.length > 0) content.push(polEmptyP())
     data.textDeductibles.forEach((td, i) => {
       content.push(
         ...(i === data.textDeductibles.length - 1 ? polMpTight(td.text) : polMp(td.text))
@@ -4340,8 +4359,13 @@ export async function exportPolicyDocx(
   const hasAltExclusions = data.piAlternatives.length > 0
   const exclAltId =
     data.policy.selectedAlternativeId || (hasAltExclusions ? data.piAlternatives[0].id : null)
+  const seenExcl = new Set<string>()
   for (const se of data.selectedExclusions) {
     if (hasAltExclusions && se.alternativeId && se.alternativeId !== exclAltId) continue
+    // An exclusion stored both shared and for the chosen alternative prints once
+    const exKey = se.piExclusionId || `custom:${se.customText || ''}`
+    if (seenExcl.has(exKey)) continue
+    seenExcl.add(exKey)
     if (se.customText) exclusionsContent.push(polBulletP(decodeHtmlEntities(se.customText)))
     else if (se.piExclusionId) {
       const found = data.allExclusions.find((e) => e.id === se.piExclusionId)
