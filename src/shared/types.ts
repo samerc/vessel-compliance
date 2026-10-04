@@ -866,6 +866,9 @@ export interface QuotationDiscount {
   /** When set, the discount wording is appended to that existing export section (e.g. 'premium')
    *  instead of rendering as its own standalone section. Null/empty = own section. */
   targetSection?: string | null
+  /** True = the wording is printed but the discount is NOT deducted from the payable premium
+   *  (a conditional discount granted later, e.g. if the assured does something) */
+  excludeFromPremium?: boolean
   order: number
 }
 

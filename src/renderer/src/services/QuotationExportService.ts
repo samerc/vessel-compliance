@@ -4001,7 +4001,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
   {
     const premContent: (Paragraph | Table)[] = []
     const wq = data.quotation
-    const wHasDiscount = wq.ncbEnabled || wq.upccEnabled || data.discounts.length > 0
+    // Conditional discounts (granted later) print their wording but never reduce the premium
+    const wDeducted = data.discounts.filter((d) => !d.excludeFromPremium)
+    const wHasDiscount = wq.ncbEnabled || wq.upccEnabled || wDeducted.length > 0
     // Only apply a discount when its feature is enabled — a disabled NCB/UPCC can still carry a
     // leftover percent/amount in the DB, which must NOT reduce the payable premium.
     const wNcbType = wq.ncbDiscountType || 'percentage'
@@ -4013,7 +4015,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
     // Apply the generic per-quotation discounts sequentially (after NCB/UPCC)
     const wApplyExtra = (amt: number): number => {
       let r = amt
-      for (const d of data.discounts) {
+      for (const d of wDeducted) {
         if (d.discountType === 'amount') r -= d.amount || 0
         else r -= (r * (d.percent || 0)) / 100
       }
@@ -4926,7 +4928,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       for (const d of data.discounts) {
         const ded =
           d.discountType === 'amount' ? d.amount || 0 : (wDiscBase * (d.percent || 0)) / 100
-        wDiscBase -= ded
+        if (!d.excludeFromPremium) wDiscBase -= ded
         const pctStr = `${d.percent || 0}%`
         const amtStr = formatCurrency(ded, wq.premiumCurrency)
         const dContent: (Paragraph | Table)[] = []
@@ -4935,6 +4937,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
             .replace(/\{amount\}/g, amtStr)
             .replace(/\{percentage\}/g, pctStr)
             .replace(/\{percent\}/g, pctStr)
+            .replace(/\{currency\}/g, wq.premiumCurrency || 'USD')
           dContent.push(...mp(resolved))
         }
         if (dContent.length === 0) dContent.push(emptyP())

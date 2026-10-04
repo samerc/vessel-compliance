@@ -26,6 +26,13 @@ export interface ExtraDiscount {
   discountType: 'percentage' | 'amount'
   percent?: number | null
   amount?: number | null
+  /** Conditional discount: wording only, never deducted from the payable premium */
+  excludeFromPremium?: boolean | null
+}
+
+/** The extra discounts that actually reduce the payable premium (skips conditional ones). */
+export function deductedDiscounts<T extends ExtraDiscount>(extra: T[] = []): T[] {
+  return extra.filter((d) => !d.excludeFromPremium)
 }
 
 export interface VesselDiscountFlags {
@@ -37,7 +44,7 @@ export const round2 = (n: number): number => Math.round((n || 0) * 100) / 100
 
 /** True when any discount (NCB, UPCC or an extra discount) changes the payable premium. */
 export function hasPremiumDiscount(q: PremiumDiscountSource, extra: ExtraDiscount[] = []): boolean {
-  return !!q.ncbEnabled || !!q.upccEnabled || extra.length > 0
+  return !!q.ncbEnabled || !!q.upccEnabled || deductedDiscounts(extra).length > 0
 }
 
 /** Technical premium → payable premium (rounded to cents). */
@@ -62,7 +69,7 @@ export function computePayablePremium(
       ? Number(q.upccDiscountAmount) || 0
       : (afterNcb * (Number(q.upccDiscountPercent) || 0)) / 100
   let r = afterNcb - upccDed
-  for (const d of extra) {
+  for (const d of deductedDiscounts(extra)) {
     if (d.discountType === 'amount') r -= Number(d.amount) || 0
     else r -= (r * (Number(d.percent) || 0)) / 100
   }

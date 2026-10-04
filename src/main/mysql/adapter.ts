@@ -2276,6 +2276,7 @@ export class MySQLAdapter {
                             amount DECIMAL(15,2) NULL,
                             text MEDIUMTEXT NULL,
                             target_section VARCHAR(50) NULL,
+                            exclude_from_premium TINYINT(1) NOT NULL DEFAULT 0,
                             order_index INT DEFAULT 0,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             INDEX idx_qd_quotation (quotation_id),
@@ -2292,6 +2293,15 @@ export class MySQLAdapter {
           if ((qdCols as RowDataPacket[]).length === 0) {
             await this.pool.query(
               'ALTER TABLE quotation_discounts ADD COLUMN target_section VARCHAR(50) NULL'
+            )
+          }
+          // Migration: conditional discount - wording only, not deducted from the premium
+          const [qdExCols] = await this.pool.query(
+            "SHOW COLUMNS FROM quotation_discounts LIKE 'exclude_from_premium'"
+          )
+          if ((qdExCols as RowDataPacket[]).length === 0) {
+            await this.pool.query(
+              'ALTER TABLE quotation_discounts ADD COLUMN exclude_from_premium TINYINT(1) NOT NULL DEFAULT 0'
             )
           }
         }
@@ -13157,7 +13167,7 @@ export class MySQLAdapter {
       )
       for (const d of srcDiscounts as RowDataPacket[]) {
         await this.pool.execute(
-          'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, exclude_from_premium, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             uuidv4(),
             newId,
@@ -13167,6 +13177,7 @@ export class MySQLAdapter {
             d.amount,
             d.text,
             d.target_section ?? null,
+            d.exclude_from_premium ? 1 : 0,
             d.order_index
           ]
         )
@@ -19383,14 +19394,16 @@ export class MySQLAdapter {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id AS quotationId, label, discount_type AS discountType,
-                    percent, amount, text, target_section AS targetSection, order_index AS 'order'
+                    percent, amount, text, target_section AS targetSection,
+                    exclude_from_premium AS excludeFromPremium, order_index AS 'order'
              FROM quotation_discounts WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
     return (rows as Row<QuotationDiscount>[]).map((r) => ({
       ...r,
       percent: r.percent != null ? Number(r.percent) : null,
-      amount: r.amount != null ? Number(r.amount) : null
+      amount: r.amount != null ? Number(r.amount) : null,
+      excludeFromPremium: !!r.excludeFromPremium
     }))
   }
 
@@ -19403,6 +19416,7 @@ export class MySQLAdapter {
       amount?: number | null
       text?: string | null
       targetSection?: string | null
+      excludeFromPremium?: boolean
     }
   ): Promise<QuotationDiscount> {
     if (!this.pool) throw new Error('DB not connected')
@@ -19413,8 +19427,8 @@ export class MySQLAdapter {
     )
     const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
-      `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, exclude_from_premium, order_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         quotationId,
@@ -19424,6 +19438,7 @@ export class MySQLAdapter {
         data.amount ?? null,
         data.text ?? null,
         data.targetSection ?? null,
+        data.excludeFromPremium ? 1 : 0,
         order
       ]
     )
@@ -19436,6 +19451,7 @@ export class MySQLAdapter {
       amount: data.amount ?? null,
       text: data.text ?? null,
       targetSection: data.targetSection ?? null,
+      excludeFromPremium: !!data.excludeFromPremium,
       order
     }
   }
@@ -19449,6 +19465,7 @@ export class MySQLAdapter {
       amount?: number | null
       text?: string | null
       targetSection?: string | null
+      excludeFromPremium?: boolean
     }
   ): Promise<void> {
     if (!this.pool) return
@@ -19477,6 +19494,10 @@ export class MySQLAdapter {
     if (updates.targetSection !== undefined) {
       fields.push('target_section = ?')
       values.push(updates.targetSection || null)
+    }
+    if (updates.excludeFromPremium !== undefined) {
+      fields.push('exclude_from_premium = ?')
+      values.push(updates.excludeFromPremium ? 1 : 0)
     }
     if (fields.length === 0) return
     values.push(id)

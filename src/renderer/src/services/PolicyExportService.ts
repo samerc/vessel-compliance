@@ -4332,7 +4332,8 @@ export async function exportPolicyDocx(
     let base = computePayablePremium(tech, q, [], data.vessel)
     for (const d of data.discounts || []) {
       const ded = d.discountType === 'amount' ? d.amount || 0 : (base * (d.percent || 0)) / 100
-      base -= ded
+      // A conditional discount (granted later) is worded but never deducted
+      if (!d.excludeFromPremium) base -= ded
       if (!d.text) continue
       const pctStr = `${d.percent || 0}%`
       const resolved = decodeHtmlEntities(polHtmlToLines(d.text))

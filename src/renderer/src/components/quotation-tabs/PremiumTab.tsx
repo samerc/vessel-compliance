@@ -13,7 +13,7 @@ import {
   WarSettings,
   QuotationDiscount
 } from '../../../../shared/types'
-import RichTextEditor from '../RichTextEditor'
+import RichTextEditor, { type PlaceholderItem } from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { ALT_COLORS } from './sharedUtils'
 import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsConstants'
@@ -23,6 +23,13 @@ import { MoneyInput } from './shared'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
 const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
+
+/** Placeholders a discount's wording can use (resolved in the quotation and policy exports) */
+const DISCOUNT_FIELDS: PlaceholderItem[] = [
+  { key: '{amount}', label: 'Discount amount (with currency)', category: 'Discount' },
+  { key: '{percentage}', label: 'Discount percentage', category: 'Discount' },
+  { key: '{currency}', label: 'Premium currency', category: 'Discount' }
+]
 
 /** Parse periodText to extract number of months. Returns null if unparseable. */
 function parsePeriodMonths(text: string | undefined): number | null {
@@ -315,11 +322,13 @@ export default function PremiumTab({
   const computeProRata = (annual: number): number =>
     proRataMonths > 0 ? Math.round((annual / 12) * proRataMonths * 100) / 100 : 0
 
-  const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled || discounts.length > 0
+  // Conditional discounts (granted later) are worded only, never deducted from the premium
+  const deducted = discounts.filter((d) => !d.excludeFromPremium)
+  const hasDiscount = quotation.ncbEnabled || quotation.upccEnabled || deducted.length > 0
   // Apply the generic per-quotation discounts sequentially (after NCB/UPCC) to an amount
   const applyExtraDiscounts = (amt: number): number => {
     let r = amt
-    for (const d of discounts) {
+    for (const d of deducted) {
       if (d.discountType === 'amount') r -= d.amount || 0
       else r -= (r * (d.percent || 0)) / 100
     }
@@ -2017,7 +2026,7 @@ export default function PremiumTab({
                 ? `UPCC ${currency} ${upccFixedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                 : `UPCC ${upccPct}%`
               : '',
-            ...discounts.map((d) =>
+            ...deducted.map((d) =>
               d.discountType === 'amount'
                 ? `${d.label || 'Discount'} ${currency} ${(d.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                 : `${d.label || 'Discount'} ${d.percent || 0}%`
@@ -2547,8 +2556,9 @@ export default function PremiumTab({
         {discounts.length === 0 ? (
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
             No extra discounts. Use these for discounts other than NCB/UPCC — each is applied to the
-            payable premium in order. Wording supports <code>{'{percentage}'}</code> and{' '}
-            <code>{'{amount}'}</code>.
+            payable premium in order, unless it is marked as not deducted (a discount granted
+            later). Wording supports <code>{'{amount}'}</code>, <code>{'{percentage}'}</code> and{' '}
+            <code>{'{currency}'}</code>.
           </p>
         ) : (
           discounts.map((d, idx) => {
@@ -2788,16 +2798,81 @@ export default function PremiumTab({
                         : 'Renders as its own section'}
                   </span>
                 </div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginBottom: '8px',
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    width: 'fit-content'
+                  }}
+                  title="For a discount given later (e.g. if the assured does something): the wording is printed, the premium is not reduced"
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!d.excludeFromPremium}
+                    onChange={(e) => {
+                      patch({ excludeFromPremium: e.target.checked })
+                      save({ excludeFromPremium: e.target.checked })
+                    }}
+                    style={{ accentColor: 'var(--accent-primary)' }}
+                  />
+                  Not deducted from the premium (discount granted later)
+                </label>
+                {d.excludeFromPremium && (
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      margin: '-4px 0 8px 22px'
+                    }}
+                  >
+                    Only the wording is printed. The payable premium and instalments stay as they
+                    are.
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    flexWrap: 'wrap',
+                    marginBottom: '6px',
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <span>Placeholders:</span>
+                  {DISCOUNT_FIELDS.map((f) => (
+                    <code
+                      key={f.key}
+                      title={f.label}
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--table-border)',
+                        color: 'var(--text-primary)'
+                      }}
+                    >
+                      {f.key}
+                    </code>
+                  ))}
+                  <span>(use Insert Field in the toolbar)</span>
+                </div>
                 <RichTextEditor
                   value={d.text || ''}
                   onChange={(val) => {
                     patch({ text: val })
                     save({ text: val })
                   }}
-                  placeholder="Wording — use {percentage} and {amount} placeholders…"
+                  placeholder="Wording — use {amount}, {percentage} and {currency} placeholders…"
                   minHeight={80}
                   showFontSize
                   showAlignment
+                  showPlaceholders
+                  placeholderItems={DISCOUNT_FIELDS}
                 />
               </div>
             )
