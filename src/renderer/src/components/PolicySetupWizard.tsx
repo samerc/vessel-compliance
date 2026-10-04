@@ -112,6 +112,16 @@ function sumVesselInstalments(vesselPremiums: Record<string, number>, count: num
   return totals.map(round2)
 }
 
+
+/** A broker is on the business when the quotation's customer is a broker, a c/o name is set, or
+ *  an insured carries a Broker role. Commission (and so a Credit Advice) only applies then. */
+function quoteHasBroker(q: Quotation | null, rows: InsuredRow[]): boolean {
+  if (!q) return false
+  if (q.customerType === 'broker' && q.customerEntityId) return true
+  if (q.coName && q.coName.trim()) return true
+  return rows.some(r => /broker/i.test(r.role || ''))
+}
+
 export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
@@ -188,7 +198,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const isMultiVessel = qVessels.length > 1
   // More than one vessel being converted now → one policy per vessel, each with its own premium
   const isMultiSelection = data.selectedVesselIds.length > 1
-  const hasBroker = !!quotation?.coName
+  const hasBroker = useMemo(
+    () => quoteHasBroker(quotation, Object.values(data.insuredByVessel || {}).flat()),
+    [quotation, data.insuredByVessel]
+  )
 
   // Determine which steps to show
   const steps = useMemo(() => {
@@ -396,7 +409,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         instalmentAmounts: initAmounts,
         nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
         nonRefundablePercent: quot.nonRefundablePercent || 0,
-        commissionEnabled: resolvedCommission !== '' && Number(resolvedCommission) > 0,
+        // No broker on the business = no commission by default (can still be ticked by hand)
+        commissionEnabled: quoteHasBroker(quot, allInsuredRows) && resolvedCommission !== '' && Number(resolvedCommission) > 0,
         commissionPercent: resolvedCommission,
         insuredByVessel,
         outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
@@ -1469,6 +1483,11 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
           <input type="checkbox" checked={data.commissionEnabled} onChange={e => onUpdate({ commissionEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
           Include commission{hasBroker ? ' (broker — generates Credit Advice)' : ''}
         </label>
+        {!hasBroker && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '-2px 0 8px 26px' }}>
+            No broker on this business, so commission is off by default.
+          </div>
+        )}
         {data.commissionEnabled && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
