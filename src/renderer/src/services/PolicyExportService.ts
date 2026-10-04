@@ -335,27 +335,34 @@ function buildBbcWrcPage(
     })
   )
 
-  // 8. Period of Insurance
-  children.push(bcParagraph('Period of Insurance:', { bold: false, spacingAfter: 80 }))
+  // 8. Period of Insurance — one block: the label sits on the From line, then
+  // From:/To: (plain) | date (bold) | time + timezone (bold), rows tight together
+  const pHeadW = 2500
+  const pLabelW = 800
+  const pDateW = 3000
+  const pTimeTzW = 10000 - pHeadW - pLabelW - pDateW
 
-  // Period table: 3 columns — From/To | Date | Time + Timezone
-  const pLabelW = 900
-  const pDateW = 2800
-  const pTimeTzW = 6300
-
-  const bcPeriodCell = (text: string, w: number) => new TableCell({
+  const bcPeriodCell = (text: string, w: number, bold: boolean) => new TableCell({
     width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
-    children: [new Paragraph({ spacing: { before: 20, after: 20 }, children: [bcText(text, { bold: true })] })]
+    children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(text, { bold })] })]
+  })
+  const bcPeriodRow = (head: string, label: string, date: string, time: string | null | undefined) => new TableRow({
+    children: [
+      bcPeriodCell(head, pHeadW, false),
+      bcPeriodCell(label, pLabelW, false),
+      bcPeriodCell(date, pDateW, true),
+      bcPeriodCell(`${polFormatTime(time)} ${data.timezone || ''}`.trim(), pTimeTzW, true)
+    ]
   })
 
   children.push(new Table({
     width: { size: 10000, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     margins: BC_TABLE_MARGINS,
-    columnWidths: [pLabelW, pDateW, pTimeTzW],
+    columnWidths: [pHeadW, pLabelW, pDateW, pTimeTzW],
     rows: [
-      new TableRow({ children: [bcPeriodCell('From', pLabelW), bcPeriodCell(inceptionFmt, pDateW), bcPeriodCell(`${polFormatTime(data.inceptionTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] }),
-      new TableRow({ children: [bcPeriodCell('To', pLabelW), bcPeriodCell(expiryFmt, pDateW), bcPeriodCell(`${polFormatTime(data.expiryTime)} ${data.timezone || ''}`.trim(), pTimeTzW)] })
+      bcPeriodRow('Period of the Insurance:', 'From:', inceptionFmt, data.inceptionTime),
+      bcPeriodRow('', 'To:', expiryFmt, data.expiryTime)
     ],
   }) as unknown as Paragraph)
 
