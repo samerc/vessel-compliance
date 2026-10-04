@@ -564,7 +564,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
 
 
   const thStyle = (field: SortField, align: 'left' | 'right' = 'left'): React.CSSProperties => ({
-    padding: '12px 14px',
+    padding: '10px 12px',
     textAlign: align,
     fontSize: '0.75rem',
     color: sortField === field ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -577,8 +577,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   })
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field)
-      return <ChevronDown size={12} style={{ opacity: 0.3, marginLeft: '2px' }} />
+    // Only the active sort shows an arrow (an arrow on every header widened the table past the screen)
+    if (sortField !== field) return null
     return sortDir === 'asc' ? (
       <ChevronUp size={12} style={{ marginLeft: '2px' }} />
     ) : (
@@ -708,7 +708,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         }}
       >
         {selectMode && (
-          <td style={{ padding: '12px 6px 12px 14px', width: '30px' }}>
+          <td style={{ padding: '10px 4px 10px 12px', width: '30px' }}>
             <button
               onClick={(e) => { e.stopPropagation(); toggleSelectId(q.id) }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: selectedIds.has(q.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
@@ -718,7 +718,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </td>
         )}
         {showFavStar && !selectMode && (
-          <td style={{ padding: '12px 6px 12px 14px', width: '30px' }}>
+          <td style={{ padding: '10px 4px 10px 12px', width: '30px' }}>
             <button
               onClick={(e) => toggleFavorite(q.id, e)}
               style={{
@@ -739,16 +739,17 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('referenceNumber') && (
           <td
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               fontWeight: 600,
               fontSize: '0.88rem',
+              whiteSpace: 'nowrap',
               color: (q.referenceNumber || '').startsWith('DRAFT-')
                 ? 'var(--text-secondary)'
                 : 'var(--accent-primary)'
             }}
           >
-            {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginRight: '6px', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(180,120,0,0.1)' : 'rgba(255,176,32,0.1)', border: isLight ? '1px solid rgba(180,120,0,0.3)' : '1px solid rgba(255,176,32,0.25)', fontSize: '0.68rem', color: isLight ? '#8a6500' : '#ffb020', fontWeight: 600 }} title={`Locked by ${q.lockedByName || 'user'}`}>
-              <Lock size={11} /> {q.lockedByName || 'user'}
+            {q.lockedBy && <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: '6px', color: 'var(--warning)' }} title={`Being edited by ${q.lockedByName || 'another user'}`}>
+              <Lock size={13} />
             </span>}
             {q.referenceNumber || (
               <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
@@ -786,7 +787,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </td>
         )}
         {qVisibleSet.has('quotationTypeName') && (
-          <td style={{ padding: '12px 14px' }}>
+          <td style={{ padding: '10px 12px' }}>
             {q.quotationTypeCode ? (
               <span
                 style={{
@@ -812,7 +813,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('quotationDate') && (
           <td
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               color: 'var(--text-secondary)',
               fontSize: '0.82rem',
               whiteSpace: 'nowrap'
@@ -824,9 +825,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('vesselName') && (
           <td
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               fontSize: '0.85rem',
-              maxWidth: '180px',
+              maxWidth: '160px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -855,10 +856,10 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('coName') && (
           <td
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               fontSize: '0.82rem',
               color: 'var(--text-secondary)',
-              maxWidth: '150px',
+              maxWidth: '140px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -869,11 +870,12 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         )}
         {qVisibleSet.has('conditions') && (
           <td
+            className="hide-narrow"
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               fontSize: '0.78rem',
               color: 'var(--text-secondary)',
-              maxWidth: '160px',
+              maxWidth: '130px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -886,7 +888,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('premiumAmount') && (
           <td
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               textAlign: 'right',
               fontSize: '0.82rem',
               fontWeight: q.premiumAmount ? 600 : 400,
@@ -897,7 +899,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </td>
         )}
         {qVisibleSet.has('status') && (
-          <td style={{ padding: '12px 14px' }}>
+          <td style={{ padding: '10px 12px' }}>
             {q.workflowStepName ? (
               <Badge color={q.workflowStepColor || '#6b7280'} dot>{q.workflowStepName}</Badge>
             ) : (
@@ -907,8 +909,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         )}
         {qVisibleSet.has('updatedAt') && (
           <td
+            className="hide-narrow"
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               color: 'var(--text-secondary)',
               fontSize: '0.78rem',
               whiteSpace: 'nowrap'
@@ -917,39 +920,40 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             {formatDateOrDash(q.updatedAt)}
           </td>
         )}
-        <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          {q.lockedBy && hasPermission('admin:settings') && (
-            <button
-              onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }}
-              className="btn-secondary"
-              style={{ padding: '3px 8px', marginRight: '4px', fontSize: '0.72rem', color: isLight ? '#8a6500' : '#ffb020', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-              title={`Force unlock (locked by ${q.lockedByName || 'user'})`}
-            >
-              <Unlock size={13} /> Unlock
-            </button>
-          )}
-          {hasPermission('quotations:create') && (
-            <button
-              onClick={(e) => handleDuplicate(q, e)}
-              className="btn-secondary"
-              style={{ padding: '5px', marginRight: '4px' }}
-              title="Duplicate"
-            >
-              <Copy size={14} />
-            </button>
-          )}
-          {hasPermission('quotations:delete') && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                openDeleteModal(q)
-              }}
-              className="btn-secondary"
-              style={{ padding: '5px', color: 'var(--danger)' }}
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
+        <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {qVisibleSet.has('actions') && (
+            <div style={{ display: 'inline-flex', gap: '2px' }}>
+              {q.lockedBy && hasPermission('admin:settings') && (
+                <button
+                  onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }}
+                  className="btn-ghost btn-icon"
+                  style={{ color: 'var(--warning)' }}
+                  title={`Force unlock (being edited by ${q.lockedByName || 'another user'})`}
+                  aria-label="Force unlock"
+                >
+                  <Unlock size={15} />
+                </button>
+              )}
+              {hasPermission('quotations:create') && (
+                <button onClick={(e) => handleDuplicate(q, e)} className="btn-ghost btn-icon" title="Duplicate" aria-label="Duplicate">
+                  <Copy size={15} />
+                </button>
+              )}
+              {hasPermission('quotations:delete') && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openDeleteModal(q)
+                  }}
+                  className="btn-ghost btn-icon"
+                  style={{ color: 'var(--danger)' }}
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
           )}
         </td>
       </tr>
@@ -960,7 +964,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     <thead>
       <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
         {selectMode && (
-          <th style={{ padding: '12px 6px 12px 14px', width: '30px' }}>
+          <th style={{ padding: '10px 4px 10px 12px', width: '30px' }}>
             <button
               onClick={toggleSelectAll}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: selectedIds.size === data.rows.length && data.rows.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
@@ -969,7 +973,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             </button>
           </th>
         )}
-        {showFavCol && !selectMode && <th style={{ padding: '12px 6px 12px 14px', width: '30px' }} />}
+        {showFavCol && !selectMode && <th style={{ padding: '10px 4px 10px 12px', width: '30px' }} />}
         {qVisibleSet.has('referenceNumber') && (
           <th style={thStyle('referenceNumber')} onClick={() => toggleSort('referenceNumber')}>
             Ref <SortIcon field="referenceNumber" />
@@ -996,7 +1000,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </th>
         )}
         {qVisibleSet.has('conditions') && (
-          <th style={thStyle('conditions')} onClick={() => toggleSort('conditions')}>
+          <th className="hide-narrow" style={thStyle('conditions')} onClick={() => toggleSort('conditions')}>
             Conditions <SortIcon field="conditions" />
           </th>
         )}
@@ -1011,13 +1015,13 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </th>
         )}
         {qVisibleSet.has('updatedAt') && (
-          <th style={thStyle('updatedAt')} onClick={() => toggleSort('updatedAt')}>
+          <th className="hide-narrow" style={thStyle('updatedAt')} onClick={() => toggleSort('updatedAt')}>
             Updated <SortIcon field="updatedAt" />
           </th>
         )}
         <th
           style={{
-            padding: '12px 14px',
+            padding: '10px 12px',
             textAlign: 'right',
             fontSize: '0.75rem',
             color: 'var(--text-secondary)',
@@ -1034,7 +1038,6 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
               gap: '8px'
             }}
           >
-            {qVisibleSet.has('actions') && 'Actions'}
             <ColumnSelector
               pageKey="quotations"
               allColumns={QUOTATION_COLUMNS}
@@ -1823,7 +1826,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px',
-                    padding: '12px 14px',
+                    padding: '10px 12px',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     marginBottom: '8px',
@@ -1871,7 +1874,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '10px',
-                    padding: '12px 14px',
+                    padding: '10px 12px',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     border:

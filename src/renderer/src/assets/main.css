@@ -626,6 +626,13 @@ button[class*="btn-"]:active {
   color: var(--text-secondary);
 }
 
+/* Secondary table columns dropped on narrow windows so the table fits */
+@media (max-width: 1440px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
