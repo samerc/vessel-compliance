@@ -87,11 +87,13 @@ import {
 } from '../../../shared/types'
 import {
   DEFAULT_SECTION_TEXTS,
-  getDefaultSectionOrder
+  getDefaultSectionOrder,
+  addMissingSections
 } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
+import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
 
 // ==================== Export Snapshot ====================
@@ -970,10 +972,8 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
     else order.push(...fresh)
   }
 
-  // Ensure all type-relevant default keys are present
-  for (const dk of typeDefaultOrder) {
-    if (!order.includes(dk)) order.push(dk)
-  }
+  // Ensure all type-relevant default keys are present (each after its default predecessor)
+  order.splice(0, order.length, ...addMissingSections(order, typeDefaultOrder))
 
   // Remove stale custom keys and sections not relevant to this type
   const validCustomIds = new Set(data.customSections.map((s) => s.id))
@@ -3057,12 +3057,12 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       const dIsS2Only = Boolean(data.quotation.warSection2Only)
 
       // Interest section
-      const dS1Text =
-        data.quotation.warSection1Text ||
-        'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
-      const dS2Text =
-        data.quotation.warSection2Text ||
-        'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
+      // Same wording chain as the editor and the policy: field -> War Settings -> default
+      const {
+        section1: dS1Text,
+        section2: dS2Text,
+        combinedLimit: dCombinedTpl
+      } = warSectionTexts(data.quotation, data.warSettings)
       if (dIsS2Only) {
         rowMap.set('interest', makeRow('Interest', [np(dS2Text)]))
       } else {
@@ -3079,6 +3079,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       }
 
       const dExcessAmt = data.quotation.warExcessAmount || 0
+      // Section 2 amount of one vessel (its own figure, else the quotation's)
+      const dS2Of = (qv: QuotationVessel | undefined): number =>
+        qv?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
       if (dIsS2Only) {
         // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
         const limContent: (Paragraph | Table)[] = []
@@ -3088,7 +3091,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           if (data.quotationVessels.length > 1) limContent.push(bp(vi.name))
           limContent.push(
             np(
-              `${formatCurrency(dExcessAmt, dWCur)} in excess of ${formatCurrency(primaryAmt, dWCur)} primary war P&I risks.`
+              `${formatCurrency(dS2Of(qv), dWCur)} in excess of ${formatCurrency(primaryAmt, dWCur)} primary war P&I risks.`
             )
           )
         }
@@ -3133,13 +3136,29 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           limContent.push(np(formatCurrency(s1Amt, dWCur)))
         }
         limContent.push(emptyP(), bup('Section 2'))
-        limContent.push(np(formatCurrency(dExcessAmt, dWCur)))
-        limContent.push(emptyP())
-        const dCombinedText = (
-          data.quotation.warCombinedLimitText ||
-          'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.'
-        ).replace('{amount}', formatCurrency(dExcessAmt, dWCur))
-        limContent.push(np(dCombinedText))
+        // Each vessel's own Section 2 amount; a per-vessel list when they differ
+        const dS2Amounts = data.quotationVessels.map((qv) => dS2Of(qv))
+        const dS2Same = dS2Amounts.length <= 1 || dS2Amounts.every((a) => a === dS2Amounts[0])
+        const dS2Common = dS2Amounts.length > 0 ? dS2Amounts[0] : dExcessAmt
+        if (dS2Same) {
+          limContent.push(np(formatCurrency(dS2Common, dWCur)))
+          limContent.push(emptyP())
+          limContent.push(np(dCombinedTpl.replace(/\{amount\}/g, formatCurrency(dS2Common, dWCur))))
+        } else {
+          for (const qv of data.quotationVessels) {
+            const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+            limContent.push(np(`${vi.name}: ${formatCurrency(dS2Of(qv), dWCur)}`))
+          }
+          limContent.push(emptyP())
+          for (const qv of data.quotationVessels) {
+            const vi = getVesselInfo(qv, data.allVessels, data.flagStates)
+            limContent.push(
+              np(
+                `${vi.name}: ${dCombinedTpl.replace(/\{amount\}/g, formatCurrency(dS2Of(qv), dWCur))}`
+              )
+            )
+          }
+        }
         rowMap.set('sumInsured', makeRow('Sum Insured / Limits', limContent))
       }
     } else if (data.quotationVessels.length > 1) {
@@ -4537,6 +4556,21 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                 })
               )
             premContent.push(new Paragraph({ children: s2Runs }))
+            // With NCB / UPCC / discounts: the payable premium of both sections
+            if (wHasDiscount) {
+              premContent.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: `Payable: ${formatCurrency(wComputePayable(s1Prem + s2Prem, v), wq.premiumCurrency)} per annum`,
+                      size: 22,
+                      font: 'Arial',
+                      bold: true
+                    })
+                  ]
+                })
+              )
+            }
             premContent.push(emptyP())
           }
         }
@@ -4590,7 +4624,8 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         lines.push({ label: '', tech: wq.premiumAmount || 0 })
       }
 
-      const useTable = lines.length > 1 || wHasDiscount
+      // Section 1/2 war premiums are written above (no lines): no empty Technical/Payable table
+      const useTable = lines.length > 1 || (wHasDiscount && lines.length > 0)
       if (useTable) {
         if (wHasDiscount) {
           // Two-section table: Technical then Payable

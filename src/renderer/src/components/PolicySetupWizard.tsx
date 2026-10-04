@@ -36,6 +36,7 @@ import {
   PremiumContext,
   PremiumLolOption
 } from '../../../shared/premium'
+import { isIpcError } from '../utils/ipc'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { resolvePolicySurveyWarranty } from '../utils/surveyWarrantyText'
@@ -300,6 +301,8 @@ export default function PolicySetupWizard({
   // Extra quotation discounts (beyond NCB/UPCC) + hull alternative × vessel premium matrix
   const [discounts, setDiscounts] = useState<QuotationDiscount[]>([])
   const [altVesselPrems, setAltVesselPrems] = useState<Record<string, number>>({})
+  // War Settings default rates (premium maths when the quotation stored no rate)
+  const [warDefaults, setWarDefaults] = useState<PremiumContext['warDefaults']>(undefined)
   const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
   // Insured editor data
   const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([])
@@ -494,14 +497,18 @@ export default function PolicySetupWizard({
       const quot = q as Quotation
       let safeDiscounts: QuotationDiscount[] = []
       const safeAltVesselPrems: Record<string, number> = {}
+      let safeWarDefaults: PremiumContext['warDefaults'] = undefined
       try {
-        const [discRes, avpRes] = await Promise.all([
+        const [discRes, avpRes, warRes] = await Promise.all([
           window.api.quotationDiscountGetByQuotation(quotationId),
           quot.quotationTypeCode === 'H'
             ? window.api.hullGetAltVesselPremiums(quotationId)
-            : Promise.resolve([])
+            : Promise.resolve([]),
+          quot.quotationTypeCode === 'W' ? window.api.warGetSettings() : Promise.resolve(null)
         ])
         if (Array.isArray(discRes)) safeDiscounts = discRes
+        if (warRes && !isIpcError(warRes))
+          safeWarDefaults = { rate: warRes.defaultRate, excessRate: warRes.defaultExcessRate }
         for (const r of Array.isArray(avpRes) ? avpRes : []) {
           if (r.premiumAmount != null)
             safeAltVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(
@@ -513,6 +520,7 @@ export default function PolicySetupWizard({
       }
       setDiscounts(safeDiscounts)
       setAltVesselPrems(safeAltVesselPrems)
+      setWarDefaults(safeWarDefaults)
 
       // Default alternative / LOL option = the first one (only when there is a real choice)
       const allAltsLocal = [...safePiAlts, ...safeHullAlts]
@@ -535,7 +543,8 @@ export default function PolicySetupWizard({
           hullAlts: safeHullAlts,
           lolOptions: safeLolOptions,
           altVesselPrems: safeAltVesselPrems,
-          discounts: safeDiscounts
+          discounts: safeDiscounts,
+          warDefaults: safeWarDefaults
         },
         initialSelection,
         firstAltId,
@@ -686,7 +695,16 @@ export default function PolicySetupWizard({
   ): Partial<WizardData> => {
     if (!quotation) return {}
     return seedPremiums(
-      { quotation, vessels: qVessels, piAlts, hullAlts, lolOptions, altVesselPrems, discounts },
+      {
+        quotation,
+        vessels: qVessels,
+        piAlts,
+        hullAlts,
+        lolOptions,
+        altVesselPrems,
+        discounts,
+        warDefaults
+      },
       selection,
       altId,
       lolId,

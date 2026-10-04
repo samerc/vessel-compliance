@@ -65,10 +65,12 @@ import {
 } from '../../../shared/types'
 import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
 import { resolvePolicySurveyWarranty, DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
+import { warSectionTexts } from '../utils/warTexts'
 import JSZip from 'jszip'
 import {
   DEFAULT_SECTION_TEXTS,
-  getDefaultSectionOrder
+  getDefaultSectionOrder,
+  addMissingSections
 } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { numberToWords } from '../utils/numberToWords'
@@ -1576,7 +1578,14 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
           hullAlts: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
           lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
           altVesselPrems,
-          discounts
+          discounts,
+          warDefaults:
+            warSettingsRaw && !isIpcError(warSettingsRaw)
+              ? {
+                  rate: warSettingsRaw.defaultRate,
+                  excessRate: warSettingsRaw.defaultExcessRate
+                }
+              : undefined
         },
         vessel,
         policy.selectedAlternativeId || '',
@@ -3456,11 +3465,12 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
           )
         )
       }
-      if (data.quotation.warCombinedLimitText) {
+      // Combined limit: Sections 1 + 2 only (not Section-2-only cover); default text when blank
+      if (!vIsS2Only) {
         content.push(polEmptyP())
         content.push(
           polNp(
-            data.quotation.warCombinedLimitText.replace(
+            warSectionTexts(data.quotation, data.warSettings).combinedLimit.replace(
               /\{amount\}/g,
               polFormatCurrency(sec2Amt, wCurrency)
             )
@@ -3528,8 +3538,11 @@ function resolvePolicySectionOrder(data: PolicyExportData, settingsDefault?: str
   const hardcoded = getDefaultSectionOrder(typeCode)
   const def = settingsDefault && settingsDefault.length > 0 ? settingsDefault : hardcoded
   const saved = data.policy.sectionOrder
-  const order = Array.isArray(saved) && saved.length > 0 ? [...saved] : [...def]
-  for (const k of hardcoded) if (!order.includes(k)) order.push(k)
+  // Sections missing from a saved order go after their default predecessor, not at the end
+  const order = addMissingSections(
+    Array.isArray(saved) && saved.length > 0 ? [...saved] : [...def],
+    hardcoded
+  )
   for (const cs of data.customSections) {
     const key = `custom:${cs.id}`
     if (!order.includes(key)) order.push(key)
@@ -4276,14 +4289,11 @@ export async function exportPolicyDocx(
 
       // War P&I Excess: Interest section
       const intContent: (Paragraph | Table)[] = []
-      const sec1Text =
-        data.quotation.warSection1Text ||
-        data.warSettings?.section1Text ||
-        'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
-      const sec2Text =
-        data.quotation.warSection2Text ||
-        data.warSettings?.section2Text ||
-        'War P&I in excess of Hull value'
+      // Same wording chain as the editor and the quotation: field -> War Settings -> default
+      const { section1: sec1Text, section2: sec2Text } = warSectionTexts(
+        data.quotation,
+        data.warSettings
+      )
       if (polIsS2Only) {
         intContent.push(polNp(sec2Text))
       } else {
@@ -5676,8 +5686,37 @@ async function buildDebitAdviceBlobFresh(
   // IV payable = ivPremium after NCB/UPCC discounts (mirrors the wizard); H&M = Total − IV.
   const ivPremRaw = data.quotation.ivPremiumAmount || 0
   const showIvSplit = data.quotation.ivEnabled === true && ivPremRaw > 0
+  // War P&I excess with both sections: the payable premium split into Section 1 / Section 2,
+  // in proportion to the two sections' technical premiums (the policy itself shows the total)
+  const wq = data.quotation
+  const warSplit = (() => {
+    if (wq.quotationTypeCode !== 'W' || !wq.warExcessEnabled || wq.warSection2Only) return null
+    const v = data.vessel
+    const s1Amt = v?.agreedValue ?? wq.agreedValue ?? 0
+    const s2Amt = v?.warExcessAmount ?? wq.warExcessAmount ?? 0
+    const s1Rate = wq.premiumRate ?? data.warSettings?.defaultRate ?? 0
+    const s2Rate = wq.warExcessRate ?? data.warSettings?.defaultExcessRate ?? 0
+    const s1Tech = v?.warSection1Premium ?? (s1Amt * s1Rate) / 100
+    const s2Tech = v?.warSection2Premium ?? ((s2Amt - s1Amt) * s2Rate) / 100
+    const techSum = s1Tech + s2Tech
+    if (!(techSum > 0)) return null
+    const s1Pay = Math.round(((totalPremium * s1Tech) / techSum) * 100) / 100
+    return { s1Pay, s2Pay: Math.round((totalPremium - s1Pay) * 100) / 100 }
+  })()
   const premiumContent: (Paragraph | Table)[] = []
-  if (showIvSplit) {
+  if (warSplit) {
+    premiumContent.push(
+      ...polBuildAmountBreakdown(
+        [
+          { label: 'Section 1', amount: warSplit.s1Pay },
+          { label: 'Section 2', amount: warSplit.s2Pay }
+        ],
+        'Total',
+        totalPremium,
+        currency
+      )
+    )
+  } else if (showIvSplit) {
     // Fleet quotes: IV is a fleet-level amount, so this vessel carries its share
     // (in proportion to the vessels' own premiums, evenly if none are set)
     const qvs = data.quotationVessels
@@ -6489,9 +6528,59 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   }
   for (const cw of data.customWarranties) warrantyLines.push(resolveWarPh(cw.text))
 
-  // Trading
+  // Trading: this vessel's own intro first (as the policy), then the quotation's
   let tradingText = ''
-  if (q.tradingWarrantyIntro) tradingText = resolveWarPh(stripHtml(q.tradingWarrantyIntro))
+  const declIntro =
+    (data.vessel
+      ? (data.tradingIntros || []).find(
+          (ti) => ti.vesselScope && ti.vesselScope.includes(data.vessel!.id)
+        )?.text
+      : undefined) || q.tradingWarrantyIntro
+  if (declIntro) tradingText = resolveWarPh(stripHtml(declIntro))
+
+  // War P&I excess: Section 1 / Section 2 values and rates (War Settings defaults when unset)
+  const s1Rate = q.premiumRate ?? data.warSettings?.defaultRate ?? null
+  const s2Rate = q.warExcessRate ?? data.warSettings?.defaultExcessRate ?? null
+  const warExcess = q.warExcessEnabled
+    ? {
+        s2Only: Boolean(q.warSection2Only),
+        s2Amt: data.vessel?.warExcessAmount ?? q.warExcessAmount ?? 0
+      }
+    : null
+  const fmtAmt = (n: number): string => `${curSymbol} ${n.toLocaleString()}`
+  const sumInsured = warExcess
+    ? warExcess.s2Only
+      ? {
+          main: `${fmtAmt(warExcess.s2Amt)} in excess of ${fmtAmt(vesselAV)} primary war P&I risks`,
+          second: '',
+          total: ''
+        }
+      : {
+          main: `Section 1\t\t${fmtAmt(vesselAV)}`,
+          second: `Section 2\t\t${fmtAmt(warExcess.s2Amt)}`,
+          total: ''
+        }
+    : hasIV
+      ? {
+          main: `A)\tAgreed Insured Value\t\t${fmtAmt(vesselAV)}`,
+          second: `B)\tAgreed Increased Value\t\t${fmtAmt(vesselIV!)}`,
+          total: fmtAmt(totalValue)
+        }
+      : { main: fmtAmt(vesselAV), second: '', total: '' }
+  const annualRate = warExcess
+    ? warExcess.s2Only
+      ? s2Rate != null
+        ? `${s2Rate} %`
+        : ''
+      : [
+          s1Rate != null ? `Section 1: ${s1Rate} %` : '',
+          s2Rate != null ? `Section 2: ${s2Rate} %` : ''
+        ]
+          .filter(Boolean)
+          .join('\n')
+    : s1Rate != null
+      ? `${s1Rate} %`
+      : ''
 
   return {
     yearOfAccount: year,
@@ -6500,13 +6589,9 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
     assuredText: assuredLines.join('\n'),
     vesselName: vi.name,
     vesselImo: vi.imo || '',
-    vesselSumInsured: hasIV
-      ? `A)\tAgreed Insured Value\t\t${curSymbol} ${vesselAV.toLocaleString()}`
-      : `${curSymbol} ${vesselAV.toLocaleString()}`,
-    vesselSumInsuredIV: hasIV
-      ? `B)\tAgreed Increased Value\t\t${curSymbol} ${vesselIV!.toLocaleString()}`
-      : '',
-    vesselTotalValue: hasIV ? `${curSymbol} ${totalValue.toLocaleString()}` : '',
+    vesselSumInsured: sumInsured.main,
+    vesselSumInsuredIV: sumInsured.second,
+    vesselTotalValue: sumInsured.total,
     vesselBuilt: vi.built ? String(vi.built) : '',
     vesselGT: vi.gt ? vi.gt.toLocaleString() : '',
     vesselType: vi.type || '',
@@ -6515,7 +6600,7 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
     periodTo,
     wording: wordingLines.join('\n\n'),
     warranties: warrantyLines.join('\n\n'),
-    annualRate: q.premiumRate != null ? `${q.premiumRate} %` : '',
+    annualRate,
     ourShare: data.policy.ourShare != null ? `${data.policy.ourShare} %` : '',
     trading: tradingText,
     riskCode,
@@ -6630,8 +6715,11 @@ export async function exportDeclarationDocx(
   if (fields.vesselSumInsuredIV) {
     vesselLines.push(`SUM INSURED:  ${fields.vesselSumInsured}`)
     vesselLines.push(`\t\t${fields.vesselSumInsuredIV}`)
-    vesselLines.push('')
-    vesselLines.push(`\t\tTotal Value:\t\t${fields.vesselTotalValue}`)
+    // War Section 1 / Section 2 has no total line (Section 2 is in excess of Section 1)
+    if (fields.vesselTotalValue) {
+      vesselLines.push('')
+      vesselLines.push(`\t\tTotal Value:\t\t${fields.vesselTotalValue}`)
+    }
   } else {
     vesselLines.push(`INSURED VALUE: ${fields.vesselSumInsured}`)
   }
@@ -6661,7 +6749,7 @@ export async function exportDeclarationDocx(
   )
 
   // Annual Rate
-  rows.push(makeRow('ANNUAL\nRATE:', [fields.annualRate]))
+  rows.push(makeRow('ANNUAL\nRATE:', fields.annualRate.split('\n')))
 
   // Our Share
   rows.push(makeRow('OUR\nSHARE:', [fields.ourShare]))

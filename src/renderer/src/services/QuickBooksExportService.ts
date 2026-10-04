@@ -1,5 +1,6 @@
 import XLSX from 'xlsx-js-style'
 import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
+import { isIpcError } from '../utils/ipc'
 import type {
   HullAltVesselPremium,
   PIClause,
@@ -260,7 +261,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
       deductibleDefs = Array.isArray(dedDefs) ? dedDefs : []
       if (q && !(q as { error?: unknown }).error) {
         const isHull = q.quotationTypeCode === 'H'
-        const [qvs, piAlts, hullAlts, lols, avp, disc] = await Promise.all([
+        const [qvs, piAlts, hullAlts, lols, avp, disc, warSet] = await Promise.all([
           window.api.getQuotationVessels(policy.quotationId),
           q.quotationTypeCode === 'P'
             ? window.api.piGetQuotationAlternatives(policy.quotationId)
@@ -272,7 +273,8 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
             ? window.api.lolGetOptions(policy.quotationId)
             : Promise.resolve([]),
           isHull ? window.api.hullGetAltVesselPremiums(policy.quotationId) : Promise.resolve([]),
-          window.api.quotationDiscountGetByQuotation(policy.quotationId)
+          window.api.quotationDiscountGetByQuotation(policy.quotationId),
+          q.quotationTypeCode === 'W' ? window.api.warGetSettings() : Promise.resolve(null)
         ])
         const vessels = Array.isArray(qvs) ? qvs : []
         qDiscounts = Array.isArray(disc) ? disc : []
@@ -293,7 +295,11 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
               hullAlts: Array.isArray(hullAlts) ? hullAlts : [],
               lolOptions: Array.isArray(lols) ? lols : [],
               altVesselPrems,
-              discounts: qDiscounts
+              discounts: qDiscounts,
+              warDefaults:
+                warSet && !isIpcError(warSet)
+                  ? { rate: warSet.defaultRate, excessRate: warSet.defaultExcessRate }
+                  : undefined
             },
             qVessel,
             policy.selectedAlternativeId || '',

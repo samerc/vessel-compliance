@@ -113,6 +113,8 @@ export interface PremiumContext {
   lolOptions: PremiumLolOption[]
   altVesselPrems: Record<string, number> // `${altId}:${quotationVesselId}` → premium
   discounts: QuotationDiscount[]
+  /** War Settings default rates, used when the quotation stored none (as the quotation does) */
+  warDefaults?: { rate?: number | null; excessRate?: number | null }
 }
 
 // Technical premium of ONE quotation vessel for the chosen alternative / LOL option.
@@ -137,9 +139,12 @@ export function vesselTechnical(
   if (q.quotationTypeCode === 'W' && q.warExcessEnabled) {
     const s1Amt = qv.agreedValue ?? q.agreedValue ?? 0
     const s2Amt = qv.warExcessAmount ?? q.warExcessAmount ?? 0
-    const s1Prem = qv.warSection1Premium ?? round2((s1Amt * (q.premiumRate || 0)) / 100)
-    const s2Prem = qv.warSection2Premium ?? round2(((s2Amt - s1Amt) * (q.warExcessRate || 0)) / 100)
-    return round2(s1Prem + s2Prem)
+    const s1Rate = q.premiumRate ?? ctx.warDefaults?.rate ?? 0
+    const s2Rate = q.warExcessRate ?? ctx.warDefaults?.excessRate ?? 0
+    const s1Prem = qv.warSection1Premium ?? round2((s1Amt * s1Rate) / 100)
+    const s2Prem = qv.warSection2Premium ?? round2(((s2Amt - s1Amt) * s2Rate) / 100)
+    // Section-2-only cover charges the excess layer only (as the quotation premium)
+    return round2(q.warSection2Only ? s2Prem : s1Prem + s2Prem)
   }
 
   const plain =

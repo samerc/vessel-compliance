@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Quotation, QuotationVessel, WarSettings } from '../../../../shared/types'
+import { warSectionTexts } from '../../utils/warTexts'
 
 /** Format a number with thousand separators for display in text inputs */
 function fmtNum(val: number | undefined | null): string {
@@ -597,11 +598,7 @@ export default function SumInsuredTab({
               </label>
               <input
                 type="text"
-                value={
-                  quotation.warSection1Text ||
-                  warSettings?.section1Text ||
-                  'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
-                }
+                value={warSectionTexts(quotation, warSettings).section1}
                 onChange={(e) => {
                   setQ((q) => ({ ...q, warSection1Text: e.target.value }))
                 }}
@@ -622,11 +619,7 @@ export default function SumInsuredTab({
               </label>
               <input
                 type="text"
-                value={
-                  quotation.warSection2Text ||
-                  warSettings?.section2Text ||
-                  'War Protection and Indemnity in excess of the Hull, Material, Machinery and Outfit'
-                }
+                value={warSectionTexts(quotation, warSettings).section2}
                 onChange={(e) => {
                   setQ((q) => ({ ...q, warSection2Text: e.target.value }))
                 }}
@@ -647,11 +640,7 @@ export default function SumInsuredTab({
               </label>
               <input
                 type="text"
-                value={
-                  quotation.warCombinedLimitText ||
-                  warSettings?.combinedLimitText ||
-                  'Combined sections 1 & 2 War Protection and Indemnity limit not to exceed {amount}.'
-                }
+                value={warSectionTexts(quotation, warSettings).combinedLimit}
                 onChange={(e) => {
                   setQ((q) => ({ ...q, warCombinedLimitText: e.target.value }))
                 }}

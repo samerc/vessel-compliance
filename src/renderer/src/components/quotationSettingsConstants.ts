@@ -65,6 +65,8 @@ export const WAR_SECTION_ORDER: string[] = [
   'warConditions',
   'warTrading',
   'warranties',
+  'sanctions',
+  'subjectivities',
   'ncb',
   'upcc',
   'premium',
@@ -84,6 +86,25 @@ export const CARGO_SECTION_ORDER: string[] = [
   'subjectivities',
   'information'
 ]
+
+/** Adds the default sections a saved order lacks (e.g. one added to the defaults later), each
+ *  right after the section it follows in the default order, instead of at the very end. */
+export function addMissingSections(order: string[], defaults: string[]): string[] {
+  const out = [...order]
+  defaults.forEach((key, i) => {
+    if (out.includes(key)) return
+    let at = 0
+    for (let j = i - 1; j >= 0; j--) {
+      const idx = out.indexOf(defaults[j])
+      if (idx >= 0) {
+        at = idx + 1
+        break
+      }
+    }
+    out.splice(at, 0, key)
+  })
+  return out
+}
 
 export function getDefaultSectionOrder(typeCode?: string): string[] {
   if (typeCode === 'H') return [...HULL_SECTION_ORDER]
