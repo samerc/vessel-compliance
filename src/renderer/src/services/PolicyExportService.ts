@@ -2692,7 +2692,7 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
 
   if (numInst === 1 && instalments.length === 1) {
     // Single instalment: "Premium of {currency} {amount} shall be payable on {date}..."
-    const singleTemplate = premIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
+    const singleTemplate = premIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
     const singleIntro = polApplyPremiumTime(singleTemplate
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
@@ -3890,7 +3890,7 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
 
   const ppTime = polPremiumPaymentTime(data)
   if (numInst === 1 && data.instalments.length === 1) {
-    const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.'
+    const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
     ppcpContent.push(polNpTight(polApplyPremiumTime(singleTpl
       .replace(/\{currency\}/g, currency)
       .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))

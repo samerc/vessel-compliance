@@ -3288,6 +3288,15 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('export_snapshot migration:', e) }
 
+            // Migration: the document is a Debit ADVICE - saved premium intro texts that still say
+            // "debit note" (the old default, saved along with any Policy Settings change) are reworded
+            try {
+                await this.pool.query(
+                    `UPDATE app_settings SET setting_value = REPLACE(REPLACE(setting_value, 'debit note', 'debit advice'), 'Debit Note', 'Debit Advice')
+                     WHERE setting_key = 'policyExportSettings' AND (setting_value LIKE BINARY '%ebit note%' OR setting_value LIKE BINARY '%ebit Note%')`
+                )
+            } catch (e) { console.error('debit note wording migration:', e) }
+
             // Migration: exact exported files of SIGNED policies (policy, DA, CA, blue cards).
             // Re-exporting a signed policy returns these bytes, so a later change to the export
             // code never changes a signed document. Cleared whenever export_snapshot is reset.

@@ -738,9 +738,9 @@ function CancelReplaceTab({ showSuccess }: { showSuccess: (msg: string) => void 
 // ==================== Premium Intro Tab ====================
 function PremiumIntroTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
   const [premiumIntroText, setPremiumIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
-  const [premiumIntroSingleText, setPremiumIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
+  const [premiumIntroSingleText, setPremiumIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.')
   const [daIntroText, setDaIntroText] = useState('Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:')
-  const [daIntroSingleText, setDaIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit note, at {time} {timezone}, time being of the essence.')
+  const [daIntroSingleText, setDaIntroSingleText] = useState('Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.')
   const [caCommText, setCaCommText] = useState('Commission payable in {instalments} instalments:')
   const [caCommSingleText, setCaCommSingleText] = useState('Commission payable on {date}.')
   const [outstandingText, setOutstandingText] = useState('All outstanding premium to be settled prior inception')
