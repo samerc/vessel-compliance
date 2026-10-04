@@ -9,6 +9,7 @@
   ],
   "compilerOptions": {
     "composite": true,
+    "outDir": "node_modules/.tsbuild/web",
     "jsx": "react-jsx"
   }
 }

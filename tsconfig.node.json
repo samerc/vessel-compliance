@@ -9,6 +9,7 @@
   ],
   "compilerOptions": {
     "composite": true,
+    "outDir": "node_modules/.tsbuild/node",
     "types": ["electron-vite/node"]
   }
 }
