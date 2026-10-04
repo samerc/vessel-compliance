@@ -838,7 +838,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                 <caption className="sr-only">Filtered vessel results</caption>
                                 <thead>
                                     <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        <th scope="col" style={{ ...th, width: '36px', padding: '11px 8px' }}></th>
+                                        <th scope="col" style={{ ...th, width: '36px', padding: '11px 8px' }} title="Tick two vessels to compare them side by side">Compare</th>
                                         <th scope="col" style={th}>Vessel</th>
                                         <th scope="col" style={th}>IMO</th>
                                         <th scope="col" style={th}>Type</th>

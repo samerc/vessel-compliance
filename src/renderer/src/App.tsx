@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download, Receipt, FileBarChart2 } from 'lucide-react'
+import { LayoutDashboard, Ship, Settings, ShieldAlert, LogOut, UserCog, Sun, Moon, Search, Bell, Calculator, BookOpen, ChevronDown, ChevronRight, ChevronLeft, KeyRound, ClipboardList, FileText, SlidersHorizontal, Calendar, RefreshCw, Layers, FileWarning, BarChart2, Crown, ScrollText, Mail, FileCheck, List, Anchor, Building2, Sparkles, Eye, EyeOff, Download, Receipt, FileBarChart2, Compass, X } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
 import VesselManager from './components/VesselManager'
@@ -13,6 +13,8 @@ import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
 import GlobalSearch from './components/GlobalSearch'
 import { PageHeader, SegmentedControl } from './components/ui'
+import { useToast } from './contexts/ToastContext'
+import { AppTab, AppAction, NavTarget, visibleFeatures, FEATURES } from './features'
 import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
@@ -38,6 +40,7 @@ const PolicyDetail = lazy(() => import('./components/PolicyDetail'))
 const PolicySettings = lazy(() => import('./components/PolicySettings'))
 const PolicySetupWizard = lazy(() => import('./components/PolicySetupWizard'))
 const NotificationsPage = lazy(() => import('./components/NotificationsPage'))
+const FeaturesPage = lazy(() => import('./components/FeaturesPage'))
 
 const LoadingFallback = () => (
   <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -46,7 +49,7 @@ const LoadingFallback = () => (
 )
 
 function App(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vessels' | 'fleets' | 'admin' | 'directory' | 'compliance' | 'users' | 'sanctions-search' | 'surveys' | 'survey-followup' | 'calculators' | 'quotations' | 'vessel-filter' | 'renewals' | 'reports' | 'analytics' | 'activity-log' | 'templates' | 'policies-list' | 'policy-detail' | 'policy-setup' | 'notifications' | 'receipts'>('dashboard')
+  const [activeTab, setActiveTab] = useState<AppTab>('dashboard')
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState<string>('')
   const [showProfile, setShowProfile] = useState(false)
@@ -67,6 +70,9 @@ function App(): React.JSX.Element {
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
   const [policySetupQuotationId, setPolicySetupQuotationId] = useState<string | null>(null)
+  // Sub-tab asked for by the palette / Features page; `n` makes a repeat request re-apply
+  const [pageRequest, setPageRequest] = useState<{ tab: AppTab; sub: string; n: number } | null>(null)
+  const { showSuccess, showError } = useToast()
   const [breadcrumbVesselName, setBreadcrumbVesselName] = useState<string | null>(null)
   const [breadcrumbQuotationRef, setBreadcrumbQuotationRef] = useState<string | null>(null)
   const [breadcrumbPolicyRef, setBreadcrumbPolicyRef] = useState<string | null>(null)
@@ -77,6 +83,7 @@ function App(): React.JSX.Element {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
+  const [discoverTipSeen, setDiscoverTipSeen] = useState(true)
   const [density, setDensity] = useState<'compact' | 'normal' | 'spacious'>(() => {
     return (localStorage.getItem('tableDensity') as 'compact' | 'normal' | 'spacious') || 'normal'
   })
@@ -179,6 +186,55 @@ function App(): React.JSX.Element {
     }
   }, [])
 
+  const checkForUpdates = useCallback(async (announce = false) => {
+    setCheckingUpdate(true)
+    try {
+      const result = await window.api.hotUpdateCheck()
+      if (result.updated) setHotUpdateAvailable(true)
+      else if (announce) showSuccess('You are on the latest version')
+    } catch {
+      if (announce) showError('Could not check for updates')
+    }
+    setCheckingUpdate(false)
+  }, [showSuccess, showError])
+
+  const startCreate = useCallback((kind: 'vessel' | 'quotation' | 'entity') => {
+    setCreateIntent(kind)
+    if (kind === 'vessel') { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }
+    setPageRequest(null)
+    setActiveTab(kind === 'vessel' ? 'vessels' : kind === 'quotation' ? 'quotations' : 'directory')
+  }, [])
+
+  const runAction = useCallback((action: AppAction) => {
+    switch (action) {
+      case 'new-vessel': return startCreate('vessel')
+      case 'new-quotation': return startCreate('quotation')
+      case 'new-entity': return startCreate('entity')
+      case 'whats-new': return setShowWhatsNew(true)
+      case 'release-history': return setShowChangelog(true)
+      case 'profile': return setShowProfile(true)
+      case 'check-updates': return void checkForUpdates(true)
+      case 'theme-dark': return setThemeTo('dark')
+      case 'theme-light': return setThemeTo('light')
+      case 'theme-premium': return setThemeTo('premium')
+      case 'theme-aurora': return setThemeTo('aurora')
+      case 'density-compact': return setDensity('compact')
+      case 'density-normal': return setDensity('normal')
+      case 'density-spacious': return setDensity('spacious')
+    }
+  }, [startCreate, checkForUpdates, setThemeTo])
+
+  /** One way to go anywhere: a page, a sub-tab inside it, or an action */
+  const navigateTo = useCallback((t: NavTarget) => {
+    if (t.action) { runAction(t.action); return }
+    if (!t.tab) return
+    if (t.tab === 'policies-list') setPolicyView(t.sub === 'settings' ? 'settings' : 'list')
+    if (t.tab === 'compliance' && t.sub) setComplianceSubTab(t.sub as typeof complianceSubTab)
+    if (t.tab === 'vessels') { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }
+    setPageRequest(t.sub ? { tab: t.tab, sub: t.sub, n: Date.now() } : null)
+    setActiveTab(t.tab)
+  }, [runAction])
+
   // Restore sidebar state from DB when user session loads
   useEffect(() => {
     if (user) {
@@ -245,6 +301,16 @@ function App(): React.JSX.Element {
     }
     return undefined
   }, [isAuthenticated, appVersion, user?.id])
+
+  // One-time tip about Ctrl+K and the Features page (per user, per machine)
+  useEffect(() => {
+    if (!user) return
+    try { setDiscoverTipSeen(!!localStorage.getItem(`tip_discover_u${user.id}`)) } catch { setDiscoverTipSeen(true) }
+  }, [user?.id])
+  const dismissDiscoverTip = () => {
+    setDiscoverTipSeen(true)
+    try { if (user) localStorage.setItem(`tip_discover_u${user.id}`, '1') } catch { /* private storage */ }
+  }
 
   // Poll for unread notification count every 30 seconds
   useEffect(() => {
@@ -318,15 +384,17 @@ function App(): React.JSX.Element {
       icon={icon}
       label={label}
       active={activeTab === tab}
-      onClick={() => setActiveTab(tab)}
+      onClick={() => { setPageRequest(null); setActiveTab(tab) }}
       sidebarCollapsed={sc}
     />
   )
 
+  const sub = (tab: AppTab) => (pageRequest?.tab === tab ? { subTab: pageRequest.sub, subTabNonce: pageRequest.n } : {})
+
   // Derive breadcrumbs from current state
   const breadcrumbs: { label: string; onClick?: () => void }[] = []
   const TAB_LABELS: Record<string, string> = {
-    dashboard: 'Dashboard', vessels: 'Vessels', fleets: 'Fleets', admin: 'Settings',
+    dashboard: 'Dashboard', features: 'Features', vessels: 'Vessels', fleets: 'Fleets', admin: 'Settings',
     directory: 'Directory', compliance: 'Compliance', users: 'Users',
     'sanctions-search': 'Sanctions Search', surveys: 'Surveys',
     'survey-followup': 'Survey Follow-Up', calculators: 'Calculators',
@@ -397,58 +465,62 @@ function App(): React.JSX.Element {
             </div>
 
             {/* Search + Notification Bell */}
-            <div style={{ display: 'flex', justifyContent: sc ? 'center' : 'flex-end', marginTop: '6px', gap: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: sc ? 'column' : 'row', alignItems: 'center', marginTop: '8px', gap: '6px' }}>
               <button
                 onClick={(e) => { e.stopPropagation(); setSearchOpen(true) }}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
+                  flex: sc ? undefined : 1,
+                  minWidth: 0,
+                  background: sc ? 'transparent' : 'var(--input-bg)',
+                  border: sc ? 'none' : '1px solid var(--input-border)',
                   cursor: 'pointer',
                   color: 'var(--text-secondary)',
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: sc ? '6px' : '6px 8px',
+                  borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
+                  fontWeight: 400,
                 }}
                 className="hover-effect"
-                title="Search (Ctrl+K)"
+                title="Search records, pages and actions (Ctrl+K)"
               >
-                <Search size={16} />
-                {!sc && <span style={{ fontSize: '0.78rem' }}>Search</span>}
+                <Search size={15} style={{ flexShrink: 0 }} />
+                {!sc && <span style={{ fontSize: '0.78rem', flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search or jump to...</span>}
+                {!sc && <kbd className="kbd" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Ctrl K</kbd>}
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); setActiveTab('notifications') }}
+                onClick={(e) => { e.stopPropagation(); setPageRequest(null); setActiveTab('notifications') }}
                 style={{
                   position: 'relative',
                   background: activeTab === 'notifications' ? (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)') : 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   color: activeTab === 'notifications' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '7px',
+                  borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  flexShrink: 0,
                 }}
                 className="hover-effect"
-                title="Notifications"
+                title={unreadNotifCount > 0 ? `Notifications (${unreadNotifCount} unread)` : 'Notifications'}
+                aria-label="Notifications"
               >
                 <Bell size={16} />
-                {!sc && <span style={{ fontSize: '0.78rem' }}>Notifications</span>}
                 {unreadNotifCount > 0 && (
                   <span style={{
-                    position: sc ? 'absolute' : 'static',
-                    top: sc ? '-2px' : undefined,
-                    right: sc ? '-2px' : undefined,
+                    position: 'absolute',
+                    top: '-3px',
+                    right: '-3px',
                     background: 'var(--danger)',
                     color: '#fff',
                     borderRadius: '10px',
-                    padding: '0 5px',
-                    fontSize: '0.65rem',
+                    padding: '0 4px',
+                    fontSize: '0.6rem',
                     fontWeight: 700,
-                    minWidth: '16px',
-                    height: '16px',
+                    minWidth: '15px',
+                    height: '15px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -535,6 +607,18 @@ function App(): React.JSX.Element {
                     )})}
                   </div>
                 </div>
+                <div style={{ borderBottom: '1px solid var(--glass-border-color)', padding: '4px 0' }}>
+                  {([
+                    { icon: <Compass size={14} />, label: 'Features & shortcuts', run: () => navigateTo({ tab: 'features' }) },
+                    { icon: <Sparkles size={14} />, label: "What's new", run: () => setShowWhatsNew(true) },
+                    { icon: <ScrollText size={14} />, label: 'Release history', run: () => setShowChangelog(true) },
+                    { icon: <Download size={14} />, label: checkingUpdate ? 'Checking...' : 'Check for updates', run: () => checkForUpdates(true) }
+                  ] as const).map(m => (
+                    <button key={m.label} onClick={() => { m.run(); setShowUserMenu(false) }} disabled={m.label === 'Checking...'} style={{ width: '100%', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left', fontWeight: 400 }} className="hover-effect">
+                      {m.icon} {m.label}
+                    </button>
+                  ))}
+                </div>
                 <button onClick={() => { logout(); setShowUserMenu(false) }} style={{ width: '100%', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.83rem', textAlign: 'left' }} className="hover-effect">
                   <LogOut size={14} /> Logout
                 </button>
@@ -545,6 +629,7 @@ function App(): React.JSX.Element {
           {/* Navigation */}
           <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, overflowY: 'auto' }}>
             {navItem('dashboard', <LayoutDashboard size={18} />, 'Dashboard')}
+            {navItem('features', <Compass size={18} />, 'Features')}
 
             {recentItems.length > 0 && (
               <NavGroup id="recent" label="Recent" icon={<RefreshCw size={14} />}
@@ -673,16 +758,7 @@ function App(): React.JSX.Element {
                 <button onClick={() => setShowChangelog(true)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.63rem', padding: '1px 3px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '2px' }} className="hover-effect" title="View Changelog">
                   <RefreshCw size={9} />
                 </button>
-                <button onClick={async () => {
-                  setCheckingUpdate(true)
-                  try {
-                    const result = await window.api.hotUpdateCheck()
-                    if (result.updated) {
-                      setHotUpdateAvailable(true)
-                    }
-                  } catch { /* silent */ }
-                  setCheckingUpdate(false)
-                }} disabled={checkingUpdate} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: checkingUpdate ? 'wait' : 'pointer', fontSize: '0.63rem', padding: '1px 3px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '2px', opacity: checkingUpdate ? 0.5 : 1 }} className="hover-effect" title="Check for updates">
+                <button onClick={() => checkForUpdates(true)} disabled={checkingUpdate} style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: checkingUpdate ? 'wait' : 'pointer', fontSize: '0.63rem', padding: '1px 3px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '2px', opacity: checkingUpdate ? 0.5 : 1 }} className="hover-effect" title="Check for updates">
                   <Download size={9} />
                 </button>
               </div>
@@ -753,17 +829,24 @@ function App(): React.JSX.Element {
             </nav>
           )}
           {/* Per-page boundary: a crash on one page stays on that page; switching tab resets it */}
+          {activeTab === 'dashboard' && !discoverTipSeen && (
+            <div className="page" style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '12px', background: 'var(--accent-tint)', border: '1px solid var(--accent-border)' }}>
+                <Compass size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: '0.88rem' }}>
+                  <strong>Find anything fast.</strong> Press <kbd className="kbd">Ctrl</kbd> <kbd className="kbd">K</kbd> and type a vessel, a quotation number, a page or an action like "new quotation". The <strong>Features</strong> page lists everything the app can do.
+                </div>
+                <button className="btn-secondary btn-sm" onClick={() => { dismissDiscoverTip(); navigateTo({ tab: 'features' }) }}>Show features</button>
+                <button className="btn-ghost btn-icon" title="Dismiss" aria-label="Dismiss tip" onClick={dismissDiscoverTip}><X size={16} /></button>
+              </div>
+            </div>
+          )}
           <ErrorBoundary key={activeTab} variant="page">
           {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => {
             if (tab === 'search') { setSearchOpen(true); return }
-            const intentTab = { 'new-vessel': 'vessels', 'new-quotation': 'quotations', 'new-entity': 'directory' } as const
-            if (tab in intentTab) {
-              setCreateIntent(tab.slice(4) as 'vessel' | 'quotation' | 'entity')
-              if (tab === 'new-vessel') { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }
-              setActiveTab(intentTab[tab as keyof typeof intentTab])
-              return
-            }
-            setActiveTab(tab as any)
+            if (tab === 'new-vessel' || tab === 'new-quotation' || tab === 'new-entity') { startCreate(tab.slice(4) as 'vessel' | 'quotation' | 'entity'); return }
+            setPageRequest(null)
+            setActiveTab(tab as AppTab)
           }} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
@@ -787,18 +870,18 @@ function App(): React.JSX.Element {
           />}
           <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
-          {activeTab === 'fleets' && <FleetManager />}
-          {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
+          {activeTab === 'fleets' && <FleetManager {...sub('fleets')} />}
+          {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} {...sub('admin')} onNavigate={navigateTo} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
           {activeTab === 'users' && hasPermission('admin:users') && <UserManager />}
-          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} openCreate={createIntent === 'entity'} onCreateConsumed={() => setCreateIntent(null)} />}
-          {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter initialTab={complianceSubTab} onTabChange={setComplianceSubTab} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
+          {activeTab === 'directory' && <Directory {...sub('directory')} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} openCreate={createIntent === 'entity'} onCreateConsumed={() => setCreateIntent(null)} />}
+          {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter {...sub('compliance')} initialTab={complianceSubTab} onTabChange={setComplianceSubTab} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           </Suspense>
-          {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
+          {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch {...sub('sanctions-search')} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           {activeTab === 'surveys' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><ConditionSurveyList onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('surveys'); setNavigateBackTab('surveys'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
-          {activeTab === 'survey-followup' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><SurveyFollowUp onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
-          {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators /></Suspense>}
+          {activeTab === 'survey-followup' && (hasPermission('surveys:view') ? <Suspense fallback={<LoadingFallback />}><SurveyFollowUp {...sub('survey-followup')} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('survey-followup'); setActiveTab('vessels') }} /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
+          {activeTab === 'calculators' && <Suspense fallback={<LoadingFallback />}><Calculators {...sub('calculators')} /></Suspense>}
           {activeTab === 'receipts' && (hasPermission('policies:view') ? <Suspense fallback={<LoadingFallback />}><ReceiptManager /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
-          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager
+          {activeTab === 'quotations' && <Suspense fallback={<LoadingFallback />}><QuotationManager {...sub('quotations')}
             onNavigateToPolicy={(policyId) => { setSelectedPolicyId(policyId); setActiveTab('policy-detail') }}
             onNavigateToPolicySetup={(quotationId) => { setPolicySetupQuotationId(quotationId); setActiveTab('policy-setup') }}
             initialQuotationId={initialQuotationId}
@@ -810,9 +893,10 @@ function App(): React.JSX.Element {
             onCreateConsumed={() => setCreateIntent(null)}
           /></Suspense>}
           {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} onCreateRenewalQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }} /></Suspense>}
-          {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
+          {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports {...sub('reports')} /></Suspense>}
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
           {activeTab === 'templates' && <Suspense fallback={<LoadingFallback />}><TemplatesPage /></Suspense>}
+          {activeTab === 'features' && <Suspense fallback={<LoadingFallback />}><FeaturesPage onNavigate={navigateTo} /></Suspense>}
           {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
             <div className="page">
               <PageHeader
@@ -866,11 +950,12 @@ function App(): React.JSX.Element {
           </ErrorBoundary>
         </main>
         <UpdateNotification />
-        <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={handleSearchNavigate} />
+        <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={handleSearchNavigate} features={visibleFeatures(hasPermission, !!isAdmin)} onFeature={navigateTo} />
         {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
         {showWhatsNew && (
           <WhatsNewModal
+            onTry={(featureId) => { const f = FEATURES.find(x => x.id === featureId); if (f) navigateTo(f.target) }}
             onClose={() => {
               if (user && appVersion) localStorage.setItem(`whatsNew_seen_v${appVersion}_u${user.id}`, '1')
               setShowWhatsNew(false)

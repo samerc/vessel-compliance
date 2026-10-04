@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, Ship, Building2, FileText, FileCheck, X, Loader2 } from 'lucide-react'
+import { Search, Ship, Building2, FileText, FileCheck, X, Loader2, ArrowRight, Zap, Compass } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { Feature, NavTarget, searchFeatures } from '../features'
+
+// Shown when the box is empty (those the user can use)
+const SUGGESTED = ['new-quotation', 'new-vessel', 'new-entity', 'compliance-docs', 'renewals', 'sanctions-search', 'report-builder', 'features']
 
 interface GlobalSearchProps {
   isOpen: boolean
   onClose: () => void
   onNavigate: (type: string, id: string, extra?: any) => void
+  /** Pages, views and actions the user may open (from the feature registry) */
+  features?: Feature[]
+  onFeature?: (target: NavTarget) => void
 }
 
 interface SearchResults {
@@ -29,12 +36,12 @@ interface SearchResults {
 }
 
 interface FlatItem {
-  category: 'vessel' | 'entity' | 'quotation' | 'policy'
+  category: 'feature' | 'vessel' | 'entity' | 'quotation' | 'policy'
   id: string
   extra?: any
 }
 
-export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSearchProps) {
+export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [], onFeature }: GlobalSearchProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [query, setQuery] = useState('')
@@ -45,16 +52,23 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const listRef = useRef<HTMLDivElement>(null)
 
+  // Matching pages / actions: suggestions when empty, ranked matches while typing
+  const featureMatches = useMemo<Feature[]>(() => {
+    if (!onFeature) return []
+    if (!query.trim()) return SUGGESTED.map(id => features.find(f => f.id === id)).filter((f): f is Feature => !!f)
+    return searchFeatures(features, query).slice(0, 6)
+  }, [features, query, onFeature])
+
   // Flatten results into ordered list for keyboard navigation
   const flatItems = useMemo<FlatItem[]>(() => {
-    if (!results) return []
-    const items: FlatItem[] = []
+    const items: FlatItem[] = featureMatches.map(f => ({ category: 'feature' as const, id: f.id, extra: f }))
+    if (!results) return items
     for (const v of results.vessels) items.push({ category: 'vessel', id: v.id })
     for (const e of results.entities) items.push({ category: 'entity', id: e.id })
     for (const q of results.quotations) items.push({ category: 'quotation', id: q.id })
     for (const p of results.policies) items.push({ category: 'policy', id: p.id, extra: p })
     return items
-  }, [results])
+  }, [results, featureMatches])
 
   const totalCount = flatItems.length
 
@@ -93,6 +107,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value
       setQuery(val)
+      setHighlightIndex(0)
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => doSearch(val), 300)
     },
@@ -116,12 +131,13 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
         e.preventDefault()
         const item = flatItems[highlightIndex]
         if (item) {
-          onNavigate(item.category, item.id, item.extra)
+          if (item.category === 'feature') onFeature?.(item.extra.target)
+          else onNavigate(item.category, item.id, item.extra)
           onClose()
         }
       }
     },
-    [flatItems, highlightIndex, totalCount, onClose, onNavigate]
+    [flatItems, highlightIndex, totalCount, onClose, onNavigate, onFeature]
   )
 
   // Scroll highlighted item into view
@@ -258,7 +274,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder="Search everything..."
+            placeholder="Search records, pages and actions..."
             style={{
               flex: 1,
               background: 'transparent',
@@ -305,20 +321,50 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
 
         {/* Results */}
         <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+          {featureMatches.length > 0 && renderCategory(
+            query.trim() ? 'Pages & actions' : 'Suggested',
+            <Compass size={12} />,
+            featureMatches,
+            'features',
+            (f: Feature, idx) => (
+              <div
+                key={f.id}
+                data-idx={idx}
+                style={itemStyle(idx)}
+                onMouseEnter={() => setHighlightIndex(idx)}
+                onClick={() => {
+                  onFeature?.(f.target)
+                  onClose()
+                }}
+              >
+                {f.kind === 'action'
+                  ? <Zap size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                  : <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{f.title}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {f.description}
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{f.area}</span>
+              </div>
+            )
+          )}
+
           {!results && query.trim().length < 2 && (
             <div
               style={{
-                padding: '32px 16px',
+                padding: featureMatches.length ? '10px 16px 6px' : '32px 16px',
                 textAlign: 'center',
                 color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
+                fontSize: '0.78rem',
               }}
             >
-              Type to search across vessels, entities, quotations, and policies
+              Type at least 2 letters to also search vessels, entities, quotations and policies
             </div>
           )}
 
-          {noResults && (
+          {noResults && featureMatches.length === 0 && (
             <div
               style={{
                 padding: '32px 16px',
@@ -513,7 +559,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
         </div>
 
         {/* Footer hint */}
-        {hasResults && (
+        {(hasResults || featureMatches.length > 0) && (
           <div
             style={{
               padding: '8px 16px',

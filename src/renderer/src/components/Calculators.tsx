@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { Calculator } from 'lucide-react'
 import { PageHeader, Tabs } from './ui'
 import PremiumCalculator from './PremiumCalculator'
@@ -13,8 +14,9 @@ const calculators: { id: CalculatorType; label: string; description: string }[] 
   { id: 'warbreach', label: 'War Breach', description: 'Compute war/breach premiums with Lebanese government taxes' }
 ]
 
-export default function Calculators() {
+export default function Calculators({ subTab, subTabNonce }: SubTabProps = {}) {
   const [activeCalc, setActiveCalc] = useState<CalculatorType>('premium')
+  useRequestedSubTab(subTab, subTabNonce, ['premium', 'tlo', 'warbreach'] as const, setActiveCalc)
 
   return (
     <div className="fade-in page">

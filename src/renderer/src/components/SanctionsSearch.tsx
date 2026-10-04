@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { Search, Shield, AlertTriangle, Info, Ship, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Upload, X, Users, Settings, FileText, RefreshCw, Loader2 } from 'lucide-react'
 import { SanctionsMatch } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -41,7 +42,7 @@ interface RemarkTemplate {
     text: string
 }
 
-export default function SanctionsSearch() {
+export default function SanctionsSearch({ subTab, subTabNonce }: SubTabProps = {}) {
     const { user, hasPermission } = useAuth()
     // Editing the local SIC list (same gate as the server)
     const canEditSic = hasPermission('compliance:review') || hasPermission('admin:settings')
@@ -50,6 +51,7 @@ export default function SanctionsSearch() {
     const isLight = theme === 'light' || theme === 'aurora'
 
     const [activeTab, setActiveTab] = useState<'search' | 'sic' | 'report'>('search')
+    useRequestedSubTab(subTab, subTabNonce, ['search', 'sic', 'report'] as const, setActiveTab)
     const [updatingLists, setUpdatingLists] = useState(false)
     const [updateProgress, setUpdateProgress] = useState('')
 

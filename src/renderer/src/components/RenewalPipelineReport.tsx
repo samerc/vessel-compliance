@@ -606,7 +606,7 @@ export default function RenewalPipelineReport() {
                             borderRadius: '6px',
                             fontSize: '0.78rem',
                             fontWeight: 500,
-                            color: '#000',
+                            color: 'var(--text-primary)',
                             background: (r.renewalStatusColor || '#888') + '22',
                             border: `2px solid ${r.renewalStatusColor || '#888'}`,
                           }}>

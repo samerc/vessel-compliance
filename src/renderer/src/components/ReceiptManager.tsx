@@ -3,7 +3,7 @@ import { Receipt, Vessel, VesselAssured } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
-import { PageHeader } from './ui'
+import { PageHeader, EmptyState } from './ui'
 import {
   exportReceiptDocx, ordinal, formatReceiptAmount
 } from '../services/ReceiptExportService'
@@ -182,7 +182,15 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
                 <tr><td style={td} colSpan={vesselId ? 6 : 7}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td style={{ ...td, textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }} colSpan={vesselId ? 6 : 7}>
-                  No receipts yet. Click “New Receipt” to create one.
+                  <EmptyState
+                    compact
+                    icon={<ReceiptIcon size={34} />}
+                    title={search ? 'No receipts match your search' : 'No receipts yet'}
+                    text={search ? undefined : 'Issue a receipt when a premium payment comes in; it can be exported to Word.'}
+                    action={search
+                      ? <button className="btn-secondary btn-sm" onClick={() => setSearch('')}>Clear search</button>
+                      : <button className="btn-primary btn-sm" onClick={openCreate}><Plus size={14} /> New Receipt</button>}
+                  />
                 </td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
-import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle } from 'lucide-react'
+import { Plus, Trash2, FileText, UserCheck, ChevronDown, ChevronRight, ChevronUp, Shield, X, Database, Clock, Play, Loader2, Bell, ClipboardCheck, ArrowLeft, Ship, GripVertical, Tag, Edit3, Lock, Users, Download, Upload, AlertTriangle, Landmark, FolderOpen, Save, RefreshCw, CheckCircle, ExternalLink } from 'lucide-react'
 import { DocumentType, AssuredRole, FileTypeSettings, ComplianceScheduleSettings, ConditionSurveyType, PolicyType, ClassificationSociety, VesselType, PolicyTypeCharacteristic, PolicyTypeCondition, ReportSettings, UserGroup, PERMISSION_CATEGORIES, NotificationGroup, NOTIFICATION_EVENT_TYPES, EntityDocumentType } from '../../../shared/types'
 import { REPORT_SETTINGS_DEFAULTS, rgbToHex, hexToRgb, CUSTOMIZABLE_REPORTS, getReportText } from '../services/ReportSettingsService'
 import { useToast } from '../contexts/ToastContext'
@@ -9,6 +9,8 @@ import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import { confirmDialog, alertDialog } from './DialogHost'
 import { PageHeader } from './ui'
+import type { SubTabProps } from '../utils/useRequestedSubTab'
+import type { NavTarget } from '../features'
 import { ok } from '../utils/ipc'
 
 // ── Section definitions ────────────────────────────────────────────────────────
@@ -25,7 +27,7 @@ const GRANTABLE_SECTIONS = [
     { id: 'reportSettings',label: 'Report Settings' },
 ]
 
-export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: boolean; onNavigateToVessel?: (vesselId: string) => void }) {
+export default function AdminPanel({ isAdmin, onNavigateToVessel, subTab, subTabNonce, onNavigate }: { isAdmin?: boolean; onNavigateToVessel?: (vesselId: string) => void; onNavigate?: (target: NavTarget) => void } & SubTabProps) {
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
     const [newName, setNewName] = useState('')
     const [newDescription, setNewDescription] = useState('')
@@ -76,6 +78,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
 
     // Sidebar navigation
     const [activeSection, setActiveSection] = useState<string>('docTypes')
+    useEffect(() => { if (subTab) setActiveSection(subTab) }, [subTab, subTabNonce])
     const [userSectionAccess, setUserSectionAccess] = useState<string[]>([])
 
     const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
@@ -142,14 +145,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
     const [lastBackupDate, setLastBackupDate] = useState<string | null>(null)
     const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
 
-    // Banks state
-    const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
-    const [newBankName, setNewBankName] = useState('')
-    const [newBankDetails, setNewBankDetails] = useState('')
-    const [editingBankId, setEditingBankId] = useState<string | null>(null)
-    const [editBankName, setEditBankName] = useState('')
-    const [editBankDetails, setEditBankDetails] = useState('')
-
     // Notification Groups state
     const [notifGroups, setNotifGroups] = useState<NotificationGroup[]>([])
     const [newNotifGroupName, setNewNotifGroupName] = useState('')
@@ -194,7 +189,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         loadUserGroups()
         loadLastBackupDate()
         loadLogRetention()
-        loadBanks()
         loadNotifGroups()
         loadDailyAlerts()
         window.api.getUserSectionAccess().then(setUserSectionAccess).catch(() => {})
@@ -392,66 +386,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         } finally {
             setCleaningLog(false)
         }
-    }
-
-    // ── Banks ──────────────────────────────────────────────────────────────
-    const loadBanks = async () => {
-        try {
-            const data = await window.api.bankGetAll()
-            if (Array.isArray(data)) setBanks(data)
-        } catch { /* ignore */ }
-    }
-
-    const handleAddBank = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!newBankName.trim()) return
-        try {
-            await window.api.bankAdd(newBankName.trim(), newBankDetails.trim())
-            setNewBankName('')
-            setNewBankDetails('')
-            await loadBanks()
-            showSuccess('Bank added')
-        } catch (err: any) {
-            showError(err.message || 'Failed to add bank')
-        }
-    }
-
-    const handleDeleteBank = async (id: string) => {
-        if (!(await confirmDialog('Delete this bank?'))) return
-        try {
-            await window.api.bankDelete(id)
-            await loadBanks()
-            showSuccess('Bank deleted')
-        } catch (err: any) {
-            showError(err.message || 'Failed to delete bank')
-        }
-    }
-
-    const startEditingBank = (bank: { id: string; name: string; details: string }) => {
-        setEditingBankId(bank.id)
-        setEditBankName(bank.name)
-        setEditBankDetails(bank.details || '')
-    }
-
-    const saveBankEdit = async (id: string) => {
-        if (!editBankName.trim()) return
-        try {
-            await window.api.bankUpdate(id, { name: editBankName.trim(), details: editBankDetails.trim() })
-            setEditingBankId(null)
-            await loadBanks()
-            showSuccess('Bank updated')
-        } catch (err: any) {
-            showError(err.message || 'Failed to update bank')
-        }
-    }
-
-    const handleMoveBank = async (index: number, direction: 'up' | 'down') => {
-        const newOrder = [...banks]
-        const swapIndex = direction === 'up' ? index - 1 : index + 1
-        if (swapIndex < 0 || swapIndex >= newOrder.length) return
-            ;[newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]]
-        setBanks(newOrder)
-        await window.api.bankReorder(newOrder.map(b => b.id))
     }
 
     const handleBackup = async () => {
@@ -1326,7 +1260,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
         ...(isAdmin || userSectionAccess.includes('reportSettings') ? [{ id: 'reportSettings', label: 'Report Settings', icon: <FileText size={16} /> }] : []),
         ...(hasPermission('fileManager:view') ? [{ id: 'fileManager', label: 'File Manager', icon: <FolderOpen size={16} /> }] : []),
         ...(isAdmin ? [
-            { id: 'banks', label: 'Banks', icon: <Landmark size={16} />, adminOnly: true },
             { id: 'userGroups', label: 'User Groups', icon: <Users size={16} />, adminOnly: true },
             { id: 'notifGroups', label: 'Notification Groups', icon: <Bell size={16} />, adminOnly: true },
             { id: 'dailyAlerts', label: 'Daily Alerts', icon: <Clock size={16} />, adminOnly: true },
@@ -1352,6 +1285,39 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{isAdmin ? 'Administrator' : 'User'}</div>
                 </div>
                 <nav style={{ flex: 1, padding: '8px 0' }}>
+                    {onNavigate && (() => {
+                        const allLinks: { label: string; icon: React.ReactNode; target: NavTarget; show: boolean }[] = [
+                            { label: 'Quotation Settings', icon: <FileText size={16} />, target: { tab: 'quotations', sub: 'settings' }, show: hasPermission('quotations:settings') },
+                            { label: 'Policy Settings & Banks', icon: <Landmark size={16} />, target: { tab: 'policies-list', sub: 'settings' }, show: hasPermission('admin:settings') },
+                            { label: 'User Management', icon: <Users size={16} />, target: { tab: 'users' }, show: hasPermission('admin:users') },
+                            { label: 'My Preferences', icon: <UserCheck size={16} />, target: { action: 'profile' }, show: true }
+                        ]
+                        const links = allLinks.filter(l => l.show)
+                        return (
+                            <>
+                                <div style={{ padding: '8px 16px 2px', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.9px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                    Other settings
+                                </div>
+                                {links.map(l => (
+                                    <button
+                                        key={l.label}
+                                        onClick={() => onNavigate(l.target)}
+                                        className="hover-effect"
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 16px', width: '100%', textAlign: 'left',
+                                            background: 'transparent', border: 'none', borderLeft: '3px solid transparent',
+                                            color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 400, cursor: 'pointer'
+                                        }}
+                                    >
+                                        {l.icon}
+                                        <span style={{ flex: 1 }}>{l.label}</span>
+                                        <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                                    </button>
+                                ))}
+                                <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '8px 16px' }} />
+                            </>
+                        )
+                    })()}
                     {(() => {
                         const grantable = sidebarSections.filter(s => !s.adminOnly)
                         const adminSystemSections = sidebarSections.filter(s => s.adminOnly)
@@ -1391,7 +1357,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             </div>
                         )
                         const divider = (key: string) => (
-                            <div key={key} style={{ height: '1px', background: 'var(--glass-border)', margin: '8px 16px', opacity: 0.5 }} />
+                            <div key={key} style={{ height: '1px', background: 'var(--glass-border-color)', margin: '8px 16px' }} />
                         )
 
                         if (isAdmin) {
@@ -2273,105 +2239,6 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             Save Settings
                         </button>
                     </div>
-            </section>
-            )}
-
-            {/* Banks */}
-            {effectiveSection === 'banks' && isAdmin && (
-            <section className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-                <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Landmark size={20} color="var(--accent-primary)" /> Banks
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                    Manage bank accounts used for policy documents and quotation exports.
-                </p>
-
-                <form onSubmit={handleAddBank} style={{ marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                        <input
-                            type="text"
-                            value={newBankName}
-                            onChange={e => setNewBankName(e.target.value)}
-                            placeholder="Bank name"
-                            style={{ flex: 1 }}
-                            aria-label="Bank name"
-                        />
-                        <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Plus size={18} /> Add Bank
-                        </button>
-                    </div>
-                    <textarea
-                        value={newBankDetails}
-                        onChange={e => setNewBankDetails(e.target.value)}
-                        placeholder="Bank details (IBAN, SWIFT, address, etc.)"
-                        rows={3}
-                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', resize: 'vertical', boxSizing: 'border-box' }}
-                    />
-                </form>
-
-                {banks.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {banks.map((bank, index) => (
-                            <div
-                                key={bank.id}
-                                style={{
-                                    padding: '14px 16px', borderRadius: '10px',
-                                    border: '1px solid var(--table-border)',
-                                    background: editingBankId === bank.id ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent'
-                                }}
-                            >
-                                {editingBankId === bank.id ? (
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={editBankName}
-                                            onChange={e => setEditBankName(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && saveBankEdit(bank.id)}
-                                            autoFocus
-                                            style={{ width: '100%', marginBottom: '8px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
-                                            aria-label="Edit bank name"
-                                        />
-                                        <textarea
-                                            value={editBankDetails}
-                                            onChange={e => setEditBankDetails(e.target.value)}
-                                            rows={3}
-                                            style={{ width: '100%', marginBottom: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.9rem', resize: 'vertical', boxSizing: 'border-box' }}
-                                        />
-                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                            <button onClick={() => saveBankEdit(bank.id)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Save</button>
-                                            <button onClick={() => setEditingBankId(null)} className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                                            <button onClick={() => handleMoveBank(index, 'up')} disabled={index === 0} style={{ background: 'transparent', border: 'none', cursor: index === 0 ? 'default' : 'pointer', padding: '0', opacity: index === 0 ? 0.3 : 1 }} aria-label="Move up"><ChevronUp size={14} color="var(--text-secondary)" /></button>
-                                            <button onClick={() => handleMoveBank(index, 'down')} disabled={index === banks.length - 1} style={{ background: 'transparent', border: 'none', cursor: index === banks.length - 1 ? 'default' : 'pointer', padding: '0', opacity: index === banks.length - 1 ? 0.3 : 1 }} aria-label="Move down"><ChevronDown size={14} color="var(--text-secondary)" /></button>
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '4px' }}>{bank.name}</div>
-                                            {bank.details && (
-                                                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.4, maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {bank.details}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                            <button onClick={() => startEditingBank(bank)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} aria-label="Edit bank"><Edit3 size={16} /></button>
-                                            <button onClick={() => handleDeleteBank(bank.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} aria-label="Delete bank"><Trash2 size={16} /></button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {banks.length === 0 && (
-                    <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        No banks configured yet. Add one above.
-                    </div>
-                )}
             </section>
             )}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { Users, ClipboardList, Flag, BookOpen } from 'lucide-react'
 import EntityDirectory from './EntityDirectory'
 import SurveyorDirectory from './SurveyorDirectory'
@@ -6,7 +7,7 @@ import FlagStateDirectory from './FlagStateDirectory'
 import DynamicAddressBook from './DynamicAddressBook'
 import { PageHeader, Tabs } from './ui'
 
-interface DirectoryProps {
+interface DirectoryProps extends SubTabProps {
     onNavigateToVessel?: (vesselId: string) => void
     initialEntityId?: string | null
     onInitialEntityConsumed?: () => void
@@ -14,8 +15,9 @@ interface DirectoryProps {
     onCreateConsumed?: () => void
 }
 
-export default function Directory({ onNavigateToVessel, initialEntityId, onInitialEntityConsumed, openCreate, onCreateConsumed }: DirectoryProps) {
+export default function Directory({ onNavigateToVessel, initialEntityId, onInitialEntityConsumed, openCreate, onCreateConsumed, subTab, subTabNonce }: DirectoryProps) {
     const [activeView, setActiveView] = useState<'entities' | 'surveyors' | 'flag-states' | 'address-book'>('entities')
+    useRequestedSubTab(subTab, subTabNonce, ['entities', 'surveyors', 'flag-states', 'address-book'] as const, setActiveView)
 
     return (
         <div className="fade-in page">

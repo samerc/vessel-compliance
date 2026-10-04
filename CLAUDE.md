@@ -908,11 +908,21 @@ Customizable reports with 9 data sources:
 - **Export**: Excel + PDF with company header
 - **Pagination**: 50 rows per page
 
-### Global Search
+### Global Search / Command Palette
 
-- **Shortcut**: Ctrl+K / Cmd+K opens search modal
-- **Sources**: Vessels (name/IMO), Entities (name), Quotations (reference), Policies (number)
-- **UI**: Grouped results, keyboard navigation (arrows/Enter/Esc), debounced input
+- **Shortcut**: Ctrl+K / Cmd+K, or the "Search or jump to..." box at the top of the sidebar
+- **Pages & actions**: matches from the feature registry (below) appear first, instantly; with an empty box it shows suggestions
+- **Records**: Vessels (name/IMO), Entities (name), Quotations (reference), Policies (number), from 2 letters (debounced IPC)
+- **UI**: Grouped results, keyboard navigation (arrows/Enter/Esc)
+
+### Feature Registry & Navigation
+
+- **Registry**: `src/renderer/src/features.ts` (`FEATURES`) lists every page, sub-tab and notable action with title, description, area, keywords, permission and a `NavTarget` (`{ tab, sub?, action? }`). It feeds the command palette, the **Features** page (`FeaturesPage.tsx`, sidebar under Dashboard) and What's New "Try it" links. **Add an entry when you add a page, a sub-tab or a notable action.**
+- **`navigateTo(target)`** in App.tsx is the one way to go anywhere: sets the tab, a requested sub-tab (`pageRequest`), or runs an `AppAction` (new vessel/quotation/entity, what's new, release history, profile, check updates, theme, density)
+- **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
+- **What's New "Try it"**: `featureId` on a `WHATS_NEW` item, or `[try:feature-id]` at the end of a release-note line
+- **Settings hub**: the Settings page's "Other settings" links go to Quotation Settings, Policy Settings & Banks, User Management and the profile. Banks are managed only in Policy Settings (the duplicate in Settings was removed)
+- **First-run tip**: one-time Dashboard banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
 
 ### Customizable Dashboard
 

@@ -3,6 +3,8 @@ export type WhatsNewTag = 'New' | 'Improved' | 'Fixed'
 export interface WhatsNewItem {
   tag: WhatsNewTag
   text: string
+  /** Feature registry id (src/features.ts): shows a "Try it" button that opens it */
+  featureId?: string
 }
 
 export interface WhatsNewEntry {

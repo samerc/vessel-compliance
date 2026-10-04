@@ -963,12 +963,27 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     </div>
                     {/* Spacer */}
                     <div style={{ flex: 1 }} />
+                    {/* Main actions, visible; the rest stay in the Actions menu */}
+                    {(() => {
+                        const canConvert = !policyContext && isApproved && q.workflowStepName?.toLowerCase() !== 'converted' && hasPermission('quotations:edit')
+                        return <>
+                            {!policyContext && canExport && (
+                                <button onClick={() => handleExportWithDraftCheck('word')} className={`${canConvert ? 'btn-secondary' : 'btn-primary'} btn-sm`} title="Export the quotation to Word">
+                                    <Download size={15} /> Export
+                                </button>
+                            )}
+                            {canConvert && (
+                                <button onClick={() => { if (onNavigateToPolicySetup) onNavigateToPolicySetup(q.id) }} className="btn-primary btn-sm" title="Create the policy from this approved quotation">
+                                    <FileText size={15} /> Convert to Policy
+                                </button>
+                            )}
+                        </>
+                    })()}
                     {/* Actions dropdown */}
                     <div style={{ position: 'relative' }} ref={actionsRef}>
                         <button
                             onClick={() => setShowActionsMenu(!showActionsMenu)}
-                            className="btn-secondary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                            className="btn-secondary btn-sm"
                         >
                             <MoreHorizontal size={16} /> Actions
                         </button>
@@ -983,13 +998,11 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                     background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
                                     borderRadius: '10px', padding: '6px', minWidth: '200px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
                                 }}>
-                                    {!policyContext && canExport && <button onClick={() => { setShowActionsMenu(false); handleExportWithDraftCheck('word') }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Download size={15} /> Export</button>}
                                     <button onClick={() => { setShowActionsMenu(false); setShowSectionOrder(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><LayoutList size={15} /> Section Order</button>
                                     {!isLocked && canEdit && <button onClick={() => { setShowActionsMenu(false); setShowCopyFromQuotation(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Copy size={15} /> Copy from Quotation</button>}
                                     {!isLocked && canEdit && <button onClick={async () => { setShowActionsMenu(false); await handleReloadFromSettings() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><RefreshCw size={15} /> Reload from Settings</button>}
-                                    {!policyContext && !isLocked && hasPermission('quotations:edit') && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
-                                    {!policyContext && isApproved && q.workflowStepName?.toLowerCase() !== 'converted' && hasPermission('quotations:edit') && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); if (onNavigateToPolicySetup) onNavigateToPolicySetup(q.id) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#008c46' : '#00c864', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><FileText size={15} /> Convert to Policy</button></>}
-                                    {!policyContext && hasPermission('quotations:delete') && <><div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); openDeleteModal() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Trash2 size={15} /> Delete Quotation</button></>}
+                                    {!policyContext && !isLocked && hasPermission('quotations:edit') && <><div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: isLight ? '#7a3db8' : '#b464ff', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><GitBranch size={15} /> Create Revision</button></>}
+                                    {!policyContext && hasPermission('quotations:delete') && <><div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} /><button onClick={() => { setShowActionsMenu(false); openDeleteModal() }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect"><Trash2 size={15} /> Delete Quotation</button></>}
                                 </div>
                             </>,
                             document.body

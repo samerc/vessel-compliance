@@ -3,17 +3,20 @@ import { X, Sparkles, Loader2 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { WHATS_NEW, WhatsNewTag } from '../whatsNew'
 import { changelogService } from '../services/ChangelogService'
+import { FEATURES } from '../features'
 
 interface WhatsNewModalProps {
   onClose: () => void
   onViewChangelog: () => void
   /** Installed version (package.json); the notes shown must be for this version */
   appVersion?: string
+  /** Opens a feature from a "Try it" link */
+  onTry?: (featureId: string) => void
 }
 
 type ParsedItem =
-  | { kind: 'tagged'; tag: WhatsNewTag; text: string }
-  | { kind: 'bullet'; text: string }
+  | { kind: 'tagged'; tag: WhatsNewTag; text: string; featureId?: string }
+  | { kind: 'bullet'; text: string; featureId?: string }
   | { kind: 'heading'; text: string }
 
 const TAG_STYLES: Record<WhatsNewTag, { bg: string; color: string; lightBg: string; lightColor: string }> = {
@@ -40,12 +43,20 @@ const TAG_STYLES: Record<WhatsNewTag, { bg: string; color: string; lightBg: stri
  *   - New: War Breach Calculator saves history
  *   - Improved: Fleet view sortable columns
  *   - Fixed: Entity panel scroll bug
+ * End a line with `[try:feature-id]` (an id from src/features.ts) to add a "Try it" button.
  */
 function parseNotes(notes: string): ParsedItem[] {
   const items: ParsedItem[] = []
   for (const raw of notes.split('\n')) {
-    const line = raw.trim()
+    let line = raw.trim()
     if (!line) continue
+    // Optional trailing [try:feature-id]
+    let featureId: string | undefined
+    const tryMatch = line.match(/\s*\[try:([a-z0-9-]+)\]\s*$/i)
+    if (tryMatch) {
+      featureId = tryMatch[1]
+      line = line.slice(0, tryMatch.index).trim()
+    }
     // Section headings
     if (line.startsWith('## ') || line.startsWith('### ')) {
       items.push({ kind: 'heading', text: line.replace(/^#+\s+/, '') })
@@ -56,14 +67,14 @@ function parseNotes(notes: string): ParsedItem[] {
     if (tagged) {
       const tag = (tagged[1].charAt(0).toUpperCase() + tagged[1].slice(1).toLowerCase()) as WhatsNewTag
       if (tag === 'New' || tag === 'Improved' || tag === 'Fixed') {
-        items.push({ kind: 'tagged', tag, text: tagged[2].trim() })
+        items.push({ kind: 'tagged', tag, text: tagged[2].trim(), featureId })
         continue
       }
     }
     // Plain bullet
     const bullet = line.match(/^[*-]\s+(.+)/)
     if (bullet) {
-      items.push({ kind: 'bullet', text: bullet[1].trim() })
+      items.push({ kind: 'bullet', text: bullet[1].trim(), featureId })
     }
   }
   return items
@@ -75,7 +86,7 @@ function headingVersion(notes: string): string | null {
   return m ? m[1] : null
 }
 
-export default function WhatsNewModal({ onClose, onViewChangelog, appVersion }: WhatsNewModalProps) {
+export default function WhatsNewModal({ onClose, onViewChangelog, appVersion, onTry }: WhatsNewModalProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -122,8 +133,20 @@ export default function WhatsNewModal({ onClose, onViewChangelog, appVersion }: 
     }
     setVersion(entry.version)
     setDate(entry.date)
-    setItems(entry.items.map(i => ({ kind: 'tagged' as const, tag: i.tag, text: i.text })))
+    setItems(entry.items.map(i => ({ kind: 'tagged' as const, tag: i.tag, text: i.text, featureId: i.featureId })))
   }
+
+  // Only for features that exist (an old note may name a removed one)
+  const tryButton = (featureId?: string) =>
+    featureId && onTry && FEATURES.some(f => f.id === featureId) ? (
+      <button
+        className="btn-ghost btn-sm"
+        style={{ color: 'var(--accent-primary)', flexShrink: 0, padding: '2px 8px' }}
+        onClick={() => { onClose(); onTry(featureId) }}
+      >
+        Try it
+      </button>
+    ) : null
 
   return (
     <div
@@ -212,7 +235,8 @@ export default function WhatsNewModal({ onClose, onViewChangelog, appVersion }: 
                       }}>
                         {item.tag}
                       </span>
-                      <span style={{ fontSize: '0.88rem', lineHeight: '1.5' }}>{item.text}</span>
+                      <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>{item.text}</span>
+                      {tryButton(item.featureId)}
                     </div>
                   )
                 }
@@ -220,7 +244,8 @@ export default function WhatsNewModal({ onClose, onViewChangelog, appVersion }: 
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingLeft: '4px' }}>
                     <span style={{ color: 'var(--accent-primary)', marginTop: '5px', flexShrink: 0, fontSize: '0.6rem' }}>●</span>
-                    <span style={{ fontSize: '0.88rem', lineHeight: '1.5' }}>{item.text}</span>
+                    <span style={{ fontSize: '0.88rem', lineHeight: '1.5', flex: 1 }}>{item.text}</span>
+                    {tryButton(item.featureId)}
                   </div>
                 )
               })}

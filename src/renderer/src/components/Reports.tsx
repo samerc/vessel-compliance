@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { FileBarChart2, Database, Users, ClipboardCheck, CalendarClock } from 'lucide-react'
 import { PageHeader, Tabs } from './ui'
 import LossRecordReport from './LossRecordReport'
@@ -20,8 +21,9 @@ const TABS: { id: ReportTab; label: string; icon: any }[] = [
   { id: 'renewal-pipeline', label: 'Renewal Pipeline', icon: CalendarClock }
 ]
 
-export default function Reports() {
+export default function Reports({ subTab, subTabNonce }: SubTabProps = {}) {
   const [activeTab, setActiveTab] = useState<ReportTab>('report-builder')
+  useRequestedSubTab(subTab, subTabNonce, TABS.map(t => t.id), setActiveTab)
 
   return (
     <div className="fade-in page">

@@ -1454,6 +1454,30 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             </span>
           )}
 
+          {/* Main exports, visible; the rest stay in the Actions menu */}
+          {!isEditing && hasPermission('reports:export') && (
+            <>
+              <button
+                className={policy.exportedAt ? 'btn-primary' : 'btn-secondary'}
+                style={{ ...headerBtnStyle }}
+                onClick={handleExportBundle}
+                disabled={exportingBundle}
+                title="Policy, debit and credit advice and every active blue card in one ZIP"
+              >
+                <FileArchive size={16} /> {exportingBundle ? 'Zipping...' : 'Export All'}
+              </button>
+              <button
+                className="btn-secondary"
+                style={{ ...headerBtnStyle }}
+                onClick={handleExportPolicy}
+                disabled={exportingPolicy}
+                title="Export the policy document (Word)"
+              >
+                <Download size={16} /> Export Policy
+              </button>
+            </>
+          )}
+
           {/* Actions dropdown */}
           <div style={{ position: 'relative' }} ref={actionsMenuRef}>
             <button
@@ -1511,15 +1535,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {hasPermission('reports:export') && (
                     <>
-                      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                      <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
 
-                      {/* Exports */}
-                      <button onClick={handleExportBundle} disabled={exportingBundle} style={{ ...actionItemStyle, fontWeight: 600, color: 'var(--accent-primary)' }} className="hover-effect">
-                        <FileArchive size={15} /> {exportingBundle ? 'Zipping...' : 'Export All Documents (ZIP)'}
-                      </button>
-                      <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
-                        <Download size={15} /> Export Policy (DOCX)
-                      </button>
+                      {/* Other exports (Export All / Export Policy are header buttons) */}
                       <button onClick={() => { setShowActionsMenu(false); handleExportPdfTC() }} disabled={exportingPdfTC} style={actionItemStyle} className="hover-effect">
                         <FileCheck size={15} /> {exportingPdfTC ? 'Converting...' : 'Export Policy (PDF + T&C)'}
                       </button>
@@ -1545,7 +1563,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       )}
                       {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
                         <>
-                          <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                          <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
                           <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Cards</div>
                           {blueCards.filter(bc => bc.status === 'active').map(bc => (
                             <button key={bc.id} onClick={async () => {
@@ -1560,7 +1578,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         </>
                       )}
 
-                      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
+                      <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
 
                       <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: 'var(--accent-primary)' }} className="hover-effect">
                         <FileSpreadsheet size={15} /> Export to QuickBooks

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Search, RefreshCw, Eye, ChevronUp, ChevronDown, Download, ClipboardList } from 'lucide-react'
-import { PageHeader } from './ui'
+import { PageHeader, EmptyState } from './ui'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -469,7 +469,13 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                       color: 'var(--text-secondary)'
                     }}
                   >
-                    {searchTerm ? 'No surveys match your search.' : 'No condition surveys found.'}
+                    <EmptyState
+                      compact
+                      icon={<ClipboardList size={34} />}
+                      title={searchTerm ? 'No surveys match your search' : 'No condition surveys found'}
+                      text={searchTerm ? 'The date, type and open-defects filters also apply.' : "Surveys are added from a vessel's Surveys tab, where you can import the defects from the report."}
+                      action={searchTerm ? <button className="btn-secondary btn-sm" onClick={() => setSearchTerm('')}>Clear search</button> : undefined}
+                    />
                   </td>
                 </tr>
               ) : (

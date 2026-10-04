@@ -626,6 +626,30 @@ button[class*="btn-"]:active {
   color: var(--text-secondary);
 }
 
+/* Keyboard key hint */
+.kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--glass-border-color);
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Features page cards */
+.feature-card {
+  cursor: pointer;
+}
+
+.feature-card:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+}
+
 /* Secondary table columns dropped on narrow windows so the table fits */
 @media (max-width: 1440px) {
   .hide-narrow {

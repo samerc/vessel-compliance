@@ -36,7 +36,7 @@ import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
-import { Badge } from './ui'
+import { Badge, EmptyState } from './ui'
 import type { BadgeTone } from './ui'
 
 const STATUS_TONES: Record<string, BadgeTone> = {
@@ -1269,10 +1269,10 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         <button
           onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()) }}
           className={`${selectMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-          title="Select quotations for bulk actions"
+          title={selectMode ? 'Hide the checkboxes' : 'Tick several quotations to delete them or add them to a group'}
         >
           <CheckSquare size={13} />
-          Select
+          {selectMode ? 'Done' : 'Bulk select'}
         </button>
 
         {/* Bulk actions (visible when items are selected) */}
@@ -1602,14 +1602,18 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                     color: 'var(--text-secondary)'
                   }}
                 >
-                  <FileText size={36} style={{ opacity: 0.3, marginBottom: '10px' }} />
-                  <div style={{ fontSize: '0.9rem' }}>
-                    {loading
-                      ? 'Loading quotations...'
-                      : hasActiveFilters
-                        ? 'No quotations match your filters'
-                        : 'No quotations yet'}
-                  </div>
+                  {loading ? 'Loading quotations...' : (
+                    <EmptyState
+                      compact
+                      icon={<FileText size={36} />}
+                      title={hasActiveFilters ? 'No quotations match your filters' : isSearchActive ? 'Nothing found' : `No quotations in ${navLabel}`}
+                      text={hasActiveFilters ? undefined : isSearchActive ? 'Search looks across all months and views.' : 'Use the arrows to look at other months, or search to look across all of them.'}
+                      action={<div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {hasActiveFilters && <button className="btn-secondary btn-sm" onClick={clearAllFilters}>Clear filters</button>}
+                        {!hasActiveFilters && hasPermission('quotations:create') && <button className="btn-primary btn-sm" onClick={() => setShowNewMenu(true)}><Plus size={14} /> New Quotation</button>}
+                      </div>}
+                    />
+                  )}
                 </td>
               </tr>
             ) : groupedRows ? (

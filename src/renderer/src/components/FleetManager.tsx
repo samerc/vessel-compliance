@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import {
   FolderPlus,
   Trash2,
@@ -37,7 +38,7 @@ interface CustomerGroup {
   vessels: Vessel[]
 }
 
-export default function FleetManager() {
+export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess } = useToast()
@@ -65,6 +66,7 @@ export default function FleetManager() {
 
   // --- ui state ---
   const [viewMode, setViewMode] = useState<'fleets' | 'customers'>('fleets')
+  useRequestedSubTab(subTab, subTabNonce, ['fleets', 'customers'] as const, setViewMode)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newFleetName, setNewFleetName] = useState('')
   const [fleetSearch, setFleetSearch] = useState('')

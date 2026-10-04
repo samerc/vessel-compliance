@@ -56,7 +56,7 @@ import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
 import { exportCustomerCompliancePDF } from './CustomerComplianceReport'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
-import { SanctionsBadge } from './ui'
+import { SanctionsBadge, EmptyState } from './ui'
 
 function jaroWinkler(s1: string, s2: string): number {
   s1 = s1.toLowerCase().trim()
@@ -1035,10 +1035,10 @@ export default function EntityDirectory({
             gap: '6px',
             fontSize: '0.82rem'
           }}
-          title={selectMode ? 'Exit select mode' : 'Enter select mode'}
+          title={selectMode ? 'Hide the checkboxes' : 'Tick several entities to export or delete them together'}
         >
           <CheckSquare size={15} />
-          Select
+          {selectMode ? 'Done' : 'Bulk select'}
         </button>
       </div>
 
@@ -1246,16 +1246,15 @@ export default function EntityDirectory({
                         color: 'var(--text-secondary)'
                       }}
                     >
-                      <Shield
-                        size={30}
-                        style={{
-                          marginBottom: '10px',
-                          opacity: 0.25,
-                          display: 'block',
-                          margin: '0 auto 10px'
-                        }}
+                      <EmptyState
+                        compact
+                        icon={<Shield size={34} />}
+                        title={searchTerm ? 'No entities match your search' : 'No entities found'}
+                        text={searchTerm ? 'Type and status filters also apply.' : 'Entities are the owners, managers, brokers and UBOs linked to vessels.'}
+                        action={searchTerm
+                          ? <button className="btn-secondary btn-sm" onClick={() => setSearchTerm('')}>Clear search</button>
+                          : hasPermission('entities:create') && <button className="btn-primary btn-sm" onClick={() => setShowCreateModal(true)}><Plus size={14} /> Create Entity</button>}
                       />
-                      No entities found
                     </td>
                   </tr>
                 ) : (

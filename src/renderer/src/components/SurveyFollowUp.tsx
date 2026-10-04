@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { Bell, Check, AlertTriangle, RefreshCw, X, FileWarning, Ship, ChevronRight, Search, ChevronUp, ChevronDown as ChevronDownIcon, Download, CheckSquare } from 'lucide-react'
 import { PageHeader, Badge } from './ui'
 import XLSX from 'xlsx-js-style'
@@ -9,7 +10,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateOrDash } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 
-interface SurveyFollowUpProps {
+interface SurveyFollowUpProps extends SubTabProps {
   onNavigateToVessel?: (vesselId: string) => void
 }
 
@@ -54,7 +55,7 @@ function getUrgency(w: SurveyWarranty): UrgencyLevel {
 
 const URGENCY_ORDER: Record<UrgencyLevel, number> = { overdue: 0, urgent: 1, normal: 2, done: 3 }
 
-export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpProps) {
+export default function SurveyFollowUp({ onNavigateToVessel, subTab, subTabNonce }: SurveyFollowUpProps) {
   const { user } = useAuth()
   const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
@@ -65,6 +66,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
   const [isLoading, setIsLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
   const [activeTab, setActiveTab] = useState<'warranties' | 'endorsements'>('warranties')
+  useRequestedSubTab(subTab, subTabNonce, ['warranties', 'endorsements'] as const, setActiveTab)
   const [warrantySearch, setWarrantySearch] = useState('')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -433,7 +435,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
               <input type="text" value={warrantySearch} onChange={e => { setWarrantySearch(e.target.value); setWarrantyPage(1) }} placeholder="Search vessels or warranties..." style={{ padding: '6px 10px 6px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '220px' }} />
             </div>
             <button onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()) }} className={selectMode ? 'btn-primary' : 'btn-secondary'} style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <CheckSquare size={14} /> {selectMode ? 'Cancel' : 'Select'}
+              <CheckSquare size={14} /> {selectMode ? 'Done' : 'Bulk select'}
             </button>
             <button onClick={exportExcel} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Download size={14} /> Excel

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { FileText, Settings, List } from 'lucide-react'
 import { Quotation } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +10,7 @@ import { PageHeader, SegmentedControl } from './ui'
 
 type QuotationView = 'list' | 'settings' | 'editor'
 
-interface QuotationManagerProps {
+interface QuotationManagerProps extends SubTabProps {
     onNavigateToPolicy?: (policyId: string) => void
     onNavigateToPolicySetup?: (quotationId: string) => void
     initialQuotationId?: string | null
@@ -21,10 +22,11 @@ interface QuotationManagerProps {
     onCreateConsumed?: () => void
 }
 
-export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy, openCreate, onCreateConsumed }: QuotationManagerProps) {
+export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy, openCreate, onCreateConsumed, subTab, subTabNonce }: QuotationManagerProps) {
     const { hasPermission } = useAuth()
     const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
+    useRequestedSubTab(subTab, subTabNonce, (canSettings ? ['list', 'settings'] : ['list']) as QuotationView[], v => { setEditingQuotation(null); setView(v) })
     const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
     const [activePolicyContext, setActivePolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
     const [listKey, setListKey] = useState(0)

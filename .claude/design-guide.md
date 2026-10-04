@@ -23,6 +23,8 @@ React components in `src/renderer/src/components/ui/` (import from `./ui`) and m
 | Buttons | `.btn-primary` / `.btn-secondary` / `.btn-danger` / `.btn-ghost` + size `.btn-sm`, icon-only `.btn-icon` (all inline-flex with 8px gap) |
 | Table | `.table-wrap` > `table.data-table` (sticky header, `.num` right-aligned, `tr.clickable`, `tr.selected`) |
 
+**Discoverability**: a new page, sub-tab or notable action gets an entry in `src/renderer/src/features.ts` (it then shows in Ctrl+K and on the Features page). Keep the one or two main actions of a screen as visible buttons; only secondary ones go in an Actions menu. Bulk-select toggles read "Bulk select" / "Done" with a tooltip saying what the selection is for. Empty lists use `EmptyState` with the next step as its action.
+
 **Accent tokens** (theme-aware - never hardcode `#00aac8` / `rgba(0,170,200,x)`): `var(--accent-primary)` for accent text/icons, `rgba(var(--accent-primary-rgb), x)` for a custom tint, or `--accent-tint` (0.1) / `--accent-tint-strong` (0.18) / `--accent-border` (0.35) / `--row-hover` / `--row-selected`. Semantic text colors: `--success`, `--danger`, `--warning`, `--info`, `--violet` (all have readable light-theme values). Sticky table headers: `var(--bg-sticky-header)`.
 
 Fixed hex is still right for **identity colors** that must not follow the theme: alternative colors (`ALT_COLORS`), sanctions source colors, user-chosen group/workflow/renewal-status colors.

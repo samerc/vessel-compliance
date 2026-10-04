@@ -10,7 +10,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
-import { PageHeader, SanctionsBadge } from './ui'
+import { PageHeader, SanctionsBadge, EmptyState } from './ui'
 
 
 import { ok } from '../utils/ipc'
@@ -592,10 +592,10 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     }}
                     className={selectMode ? 'btn-primary' : 'btn-secondary'}
                     style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                    title={selectMode ? 'Exit select mode' : 'Enter select mode'}
+                    title={selectMode ? 'Hide the checkboxes' : 'Tick several vessels to assign a fleet, change status or export them together'}
                 >
                     <CheckSquare size={16} />
-                    Select
+                    {selectMode ? 'Done' : 'Bulk select'}
                 </button>
             </div>
 
@@ -724,15 +724,14 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                 )}
 
                 {!isLoading && vessels.length === 0 && (
-                    <div style={{ padding: '64px 40px', textAlign: 'center' }}>
-                        <Ship size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.3 }} />
-                        <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                            No vessels found
-                        </div>
-                        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-                            {searchTerm ? 'No vessels match your search criteria.' : 'No vessels registered yet. Click "Add Vessel" to get started.'}
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon={<Ship size={44} />}
+                        title={searchTerm ? 'No vessels match your search' : 'No vessels found'}
+                        text={searchTerm ? 'Check the spelling or search by IMO number. The status and fleet filters also apply.' : 'Register the first vessel to start tracking its documents and policies.'}
+                        action={searchTerm
+                            ? <button className="btn-secondary btn-sm" onClick={() => setSearchTerm('')}>Clear search</button>
+                            : hasPermission('vessels:create') && <button className="btn-primary btn-sm" onClick={() => setShowQuickAdd(true)}><Plus size={14} /> Add Vessel</button>}
+                    />
                 )}
 
                 {!isLoading && vessels.length > 0 && (

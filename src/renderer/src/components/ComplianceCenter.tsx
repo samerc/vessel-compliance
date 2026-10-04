@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
 import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers, Search, FileText } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -85,13 +86,13 @@ const EMPTY_RULE_FORM = {
     severity: 'warning',
 }
 
-interface ComplianceCenterProps {
+interface ComplianceCenterProps extends SubTabProps {
     onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
     initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
     onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
 }
 
-export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTabChange }: ComplianceCenterProps) {
+export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTabChange, subTab, subTabNonce }: ComplianceCenterProps) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [docs, setDocs] = useState<VesselDocument[]>([])
     const [docTypes, setDocTypes] = useState<DocumentType[]>([])
@@ -108,6 +109,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
         setActiveTabRaw(tab)
         onTabChange?.(tab)
     }
+    useRequestedSubTab(subTab, subTabNonce, ['documents', 'policies', 'sanctions', 'dataQuality'] as const, k => { setActiveTab(k); if (k === 'dataQuality') loadDataValidation() })
     const { showSuccess, showError } = useToast()
     const { theme } = useTheme()
     const { hasPermission } = useAuth()
