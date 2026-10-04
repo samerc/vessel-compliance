@@ -113,7 +113,7 @@ export const SECTION_LABELS: Record<string, string> = {
   subjectivities: 'Subjectivities',
   premium: 'Premium',
   ncb: 'No Claims Bonus (NCB)',
-  upcc: 'Upfront Continuity (UPCC)',
+  upcc: 'Upfront Profit Continuity Credit (UPCC)',
   information: 'Information',
   insuredValue: 'Insured Value',
   voyage: 'Voyage / Period',

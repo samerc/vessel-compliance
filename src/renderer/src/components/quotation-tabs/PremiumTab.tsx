@@ -20,6 +20,7 @@ import { SECTION_LABELS, getDefaultSectionOrder } from '../quotationSettingsCons
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
+import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
 const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
@@ -2376,12 +2377,24 @@ export default function PremiumTab({
               }}
               style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
             />
-            <span style={{ fontWeight: 600 }}>Upfront Continuity (UPCC)</span>
+            <span style={{ fontWeight: 600 }}>{quotation.upccTitle || DEFAULT_UPCC_TITLE}</span>
           </label>
           {quotation.upccEnabled && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '24px' }}
             >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Section name
+                </span>
+                <input
+                  value={quotation.upccTitle || ''}
+                  placeholder={DEFAULT_UPCC_TITLE}
+                  onChange={(e) => setQ((p) => ({ ...p, upccTitle: e.target.value }))}
+                  onBlur={(e) => updateField('upccTitle', e.target.value.trim() || null)}
+                  style={{ flex: 1, padding: '6px 8px', fontSize: '0.82rem' }}
+                />
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <label
                   style={{

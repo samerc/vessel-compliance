@@ -250,6 +250,7 @@ const QUOTATION_CONTENT_COLS = [
   'cpc_discount_percent',
   'cpc_discount_amount',
   'cpc_text',
+  'upcc_title',
   'non_refundable_type',
   'non_refundable_percent',
   'agreed_value',
@@ -5223,6 +5224,23 @@ export class MySQLAdapter {
         }
       } catch {
         /* idempotent migration: already applied or not applicable */
+      }
+      // Migration: editable UPCC section name (quotation + policy override) and the survey
+      // warranty wording edited in the converter (JSON [{id, text}], NULL = from the quotation)
+      for (const [table, col, ddl] of [
+        ['quotations', 'upcc_title', 'VARCHAR(255) NULL'],
+        ['policy_documents', 'upcc_title', 'VARCHAR(255) NULL'],
+        ['policy_documents', 'survey_warranty_texts', 'MEDIUMTEXT NULL']
+      ] as const) {
+        try {
+          const [c] = (await this.pool.query(
+            `SHOW COLUMNS FROM ${table} LIKE '${col}'`
+          )) as QueryRows
+          if ((c as RowDataPacket[]).length === 0)
+            await this.pool.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`)
+        } catch {
+          /* idempotent migration: already applied */
+        }
       }
       // Outstanding-premium override (NULL = inherit from quotation)
       try {
@@ -12160,7 +12178,7 @@ export class MySQLAdapter {
                 q.validity_days as validityDays,
                 q.premium_additional_text as premiumAdditionalText,
                 q.ncb_enabled as ncbEnabled, q.ncb_discount_type as ncbDiscountType, q.ncb_discount_percent as ncbDiscountPercent, q.ncb_discount_amount as ncbDiscountAmount, q.ncb_text as ncbText,
-                q.cpc_enabled as upccEnabled, q.cpc_discount_type as upccDiscountType, q.cpc_discount_percent as upccDiscountPercent, q.cpc_discount_amount as upccDiscountAmount, q.cpc_text as upccText,
+                q.cpc_enabled as upccEnabled, q.cpc_discount_type as upccDiscountType, q.cpc_discount_percent as upccDiscountPercent, q.cpc_discount_amount as upccDiscountAmount, q.cpc_text as upccText, q.upcc_title as upccTitle,
                 q.non_refundable_type as nonRefundableType, q.non_refundable_percent as nonRefundablePercent,
                 q.agreed_value as agreedValue, q.agreed_value_currency as agreedValueCurrency,
                 q.iv_enabled as ivEnabled, q.iv_value as ivValue, q.iv_currency as ivCurrency, q.iv_premium_amount as ivPremiumAmount,
@@ -12431,6 +12449,7 @@ export class MySQLAdapter {
       upccDiscountPercent: 'cpc_discount_percent',
       upccDiscountAmount: 'cpc_discount_amount',
       upccText: 'cpc_text',
+      upccTitle: 'upcc_title',
       nonRefundableType: 'non_refundable_type',
       nonRefundablePercent: 'non_refundable_percent',
       agreedValue: 'agreed_value',
@@ -16849,7 +16868,18 @@ export class MySQLAdapter {
       selectedLolOptionId: r.selected_lol_option_id || null,
       selectedAgreedValueOptionId: r.selected_agreed_value_option_id || null,
       ourShare: r.our_share != null ? Number(r.our_share) : null,
-      subjectivityDays: r.subjectivity_days != null ? Number(r.subjectivity_days) : 7
+      subjectivityDays: r.subjectivity_days != null ? Number(r.subjectivity_days) : 7,
+      upccTitle: r.upcc_title || null,
+      surveyWarrantyTexts: r.survey_warranty_texts
+        ? (() => {
+            try {
+              const v = JSON.parse(r.survey_warranty_texts)
+              return Array.isArray(v) ? v : null
+            } catch {
+              return null
+            }
+          })()
+        : null
     }
   }
 
@@ -17076,7 +17106,10 @@ export class MySQLAdapter {
       ourShare: 'our_share',
       qrEnabled: 'qr_enabled',
       hideBroker: 'hide_broker',
-      selectedSubjectivityIds: 'selected_subjectivity_ids'
+      selectedSubjectivityIds: 'selected_subjectivity_ids',
+      subjectivityDays: 'subjectivity_days',
+      upccTitle: 'upcc_title',
+      surveyWarrantyTexts: 'survey_warranty_texts'
     }
     const sets: string[] = []
     const vals: SqlValue[] = []
@@ -17084,7 +17117,8 @@ export class MySQLAdapter {
       if (key in fields) {
         let val: SqlValue = fields[key] ?? null
         if (key === 'sectionOrder') val = val ? JSON.stringify(val) : null
-        if (key === 'selectedSubjectivityIds') val = val != null ? JSON.stringify(val) : null
+        if (key === 'selectedSubjectivityIds' || key === 'surveyWarrantyTexts')
+          val = val != null ? JSON.stringify(val) : null
         sets.push(`${col} = ?`)
         vals.push(val)
       }
@@ -17302,6 +17336,28 @@ export class MySQLAdapter {
         today,
         createdBy
       ]
+    )
+    // Carry over every per-policy choice made in the converter or the editor, so the revision
+    // exports the same limit, subjectivities, order, wording and toggles
+    await this.pool.execute(
+      `UPDATE policy_documents n JOIN policy_documents o ON o.id = ?
+          SET n.section_order = o.section_order,
+              n.selected_lol_option_id = o.selected_lol_option_id,
+              n.selected_agreed_value_option_id = o.selected_agreed_value_option_id,
+              n.selected_subjectivity_ids = o.selected_subjectivity_ids,
+              n.subjectivity_days = o.subjectivity_days,
+              n.outstanding_premium_enabled = o.outstanding_premium_enabled,
+              n.outstanding_premium_text = o.outstanding_premium_text,
+              n.non_refundable_type = o.non_refundable_type,
+              n.non_refundable_percent = o.non_refundable_percent,
+              n.hide_broker = o.hide_broker,
+              n.qr_enabled = o.qr_enabled,
+              n.our_share = o.our_share,
+              n.exchange_rate = o.exchange_rate,
+              n.upcc_title = o.upcc_title,
+              n.survey_warranty_texts = o.survey_warranty_texts
+        WHERE n.id = ?`,
+      [policyId, newId]
     )
 
     // Copy instalments
@@ -17525,6 +17581,10 @@ export class MySQLAdapter {
       // Per-policy subjectivity selection (quotation_subjectivity IDs to keep).
       // undefined/null = keep all (legacy); [] = none → renders "NIL"; [ids] = only those.
       selectedSubjectivityIds?: string[] | null
+      // Subjectivity compliance days printed on the policy (default 7)
+      subjectivityDays?: number | null
+      // Survey warranty wording edited in the converter, per vessel id (NULL = from the quotation)
+      surveyWarrantyTexts?: Record<string, { id: string; text: string }[]> | null
       // Per-vessel payable premium + instalment amounts (same dates as `instalments`).
       // Each vessel becomes its own policy, so each needs its own figures.
       perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
@@ -17603,8 +17663,8 @@ export class MySQLAdapter {
                     section_order, selected_lol_option_id, selected_agreed_value_option_id,
                     outstanding_premium_enabled, outstanding_premium_text,
                     non_refundable_type, non_refundable_percent, qr_enabled, opening_clause,
-                    selected_subjectivity_ids)
-                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    selected_subjectivity_ids, subjectivity_days, survey_warranty_texts)
+                VALUES (?, ?, ?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
         [
           policyId,
@@ -17640,6 +17700,11 @@ export class MySQLAdapter {
           openingClauseSetting,
           options.selectedSubjectivityIds != null
             ? JSON.stringify(options.selectedSubjectivityIds)
+            : null,
+          options.subjectivityDays ?? 7,
+          // keyed by the converter's vessel id (same key as vesselIds)
+          options.surveyWarrantyTexts?.[vid]
+            ? JSON.stringify(options.surveyWarrantyTexts[vid])
             : null
         ]
       )

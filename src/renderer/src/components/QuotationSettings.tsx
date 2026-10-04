@@ -7885,7 +7885,7 @@ const SECTION_TEXT_FIELDS: {
   },
   {
     key: 'continuationPiClubText',
-    label: 'Upfront Continuity Credit (UPCC) Additional Text',
+    label: 'Upfront Profit Continuity Credit (UPCC) Additional Text',
     section: 'UPCC',
     rows: 3
   },

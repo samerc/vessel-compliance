@@ -38,6 +38,7 @@ import {
 } from '../../../shared/premium'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
+import { resolvePolicySurveyWarranty } from '../utils/surveyWarrantyText'
 import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
 
@@ -49,8 +50,18 @@ interface PolicySetupWizardProps {
 
 const DEFAULT_TIMEZONE_OPTIONS = ['Lebanon Standard Time', 'GMT', 'UTC', 'CET', 'EST', 'PST']
 
-// Step id 6 (Subjectivities) is inserted between Details and Cards when the quotation has any.
-const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review', 'Subjectivities']
+// Step id 6 (Subjectivities) is inserted between Details and Cards when the quotation has any;
+// step id 7 (Survey Warranties) after it when the selected vessels have survey warranties.
+const STEP_LABELS = [
+  'Vessel',
+  'Period',
+  'Premium',
+  'Details',
+  'Cards',
+  'Review',
+  'Subjectivities',
+  'Survey Warranties'
+]
 const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, ListChecks]
 
 interface InsuredRow {
@@ -107,6 +118,18 @@ interface WizardData {
   qrEnabled: boolean
   // Subjectivities kept for the resulting policy (quotation_subjectivity IDs). Empty = "NIL".
   selectedSubjectivityIds: string[]
+  // Subjectivity compliance days printed on the policy (0 = prior inception)
+  subjectivityDays: number
+  // Survey warranty wording per vessel (converter vessel id -> warranty id -> text);
+  // a missing entry uses the quotation's wording, '' removes the warranty
+  surveyWarrantyEdits: Record<string, Record<string, string>>
+}
+
+interface SurveyWarrantyItem {
+  id: string
+  text: string
+  vesselScope: string[] | null
+  alternativeId: string | null
 }
 
 type LolOptionLite = PremiumLolOption
@@ -263,8 +286,12 @@ export default function PolicySetupWizard({
     selectedAgreedValueOptionId: '',
     sectionOrder: null,
     qrEnabled: false,
-    selectedSubjectivityIds: []
+    selectedSubjectivityIds: [],
+    subjectivityDays: 7,
+    surveyWarrantyEdits: {}
   })
+  // The quotation's survey warranties (placeholders filled, policy wording)
+  const [surveyItems, setSurveyItems] = useState<SurveyWarrantyItem[]>([])
 
   // Quotation subjectivities available to keep/uncheck in the wizard
   const [subjectivityItems, setSubjectivityItems] = useState<{ id: string; text: string }[]>([])
@@ -298,11 +325,12 @@ export default function PolicySetupWizard({
   const steps = useMemo(() => {
     const s = [0, 1, 2, 3] // Vessel, Period, Instalments, Details
     if (subjectivityItems.length > 0) s.push(6) // Subjectivities (any type) when the quotation has any
+    if (surveyItems.length > 0) s.push(7) // Survey warranties: wording can be edited per policy
     // Step 4 (Blue Cards) only for P&I
     if (isPI) s.push(4)
     s.push(5) // Review is always last
     return s
-  }, [isPI, subjectivityItems.length])
+  }, [isPI, subjectivityItems.length, surveyItems.length])
 
   const currentStepIndex = steps.indexOf(currentStep)
   const isLastStep = currentStepIndex === steps.length - 1
@@ -329,7 +357,8 @@ export default function PolicySetupWizard({
         qaRes,
         eaRes,
         convRes,
-        subjRes
+        subjRes,
+        swRes
       ] = await Promise.all([
         window.api.getQuotation(quotationId),
         window.api.getQuotationVessels(quotationId),
@@ -345,7 +374,8 @@ export default function PolicySetupWizard({
         typeof window.api.policyGetConvertedVesselIds === 'function'
           ? window.api.policyGetConvertedVesselIds(quotationId)
           : Promise.resolve([]),
-        window.api.getQuotationSubjectivities(quotationId)
+        window.api.getQuotationSubjectivities(quotationId),
+        window.api.quotationSurveyWarrantyGetAll(quotationId)
       ])
       const alreadyConverted = Array.isArray(convRes) ? convRes : []
       setConvertedVesselIds(alreadyConverted)
@@ -356,6 +386,17 @@ export default function PolicySetupWizard({
         text: s.text
       }))
       setSubjectivityItems(safeSubj)
+      setSurveyItems(
+        (Array.isArray(swRes) ? swRes : [])
+          .slice()
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map((sw) => ({
+            id: sw.id,
+            text: resolvePolicySurveyWarranty(sw),
+            vesselScope: Array.isArray(sw.vesselScope) ? sw.vesselScope : null,
+            alternativeId: sw.alternativeId || null
+          }))
+      )
       setData((d) => ({ ...d, selectedSubjectivityIds: safeSubj.map((s) => s.id) }))
 
       if (!q || ('error' in q && q.error)) {
@@ -858,7 +899,23 @@ export default function PolicySetupWizard({
         blueCardOwners: data.blueCardOwners,
         // Only send a selection when the quotation had subjectivities (step was shown);
         // otherwise null keeps legacy behavior (no subjectivities section).
-        selectedSubjectivityIds: subjectivityItems.length > 0 ? data.selectedSubjectivityIds : null
+        selectedSubjectivityIds: subjectivityItems.length > 0 ? data.selectedSubjectivityIds : null,
+        subjectivityDays: data.subjectivityDays,
+        // Final survey warranty wording per vessel (only when the quotation has any)
+        surveyWarrantyTexts:
+          surveyItems.length > 0
+            ? Object.fromEntries(
+                data.selectedVesselIds.map((vid) => [
+                  vid,
+                  surveyItemsForVessel(surveyItems, qVessels, vid, data.selectedAltId)
+                    .map((sw) => ({
+                      id: sw.id,
+                      text: data.surveyWarrantyEdits[vid]?.[sw.id] ?? sw.text
+                    }))
+                    .filter((w) => w.text.trim())
+                ])
+              )
+            : null
       })
       const failure = ipcFailure(result)
       if (failure) {
@@ -1158,7 +1215,19 @@ export default function PolicySetupWizard({
           <StepSubjectivities
             items={subjectivityItems}
             selectedIds={data.selectedSubjectivityIds}
+            subjectivityDays={data.subjectivityDays}
             isLight={isLight}
+            onUpdate={updateData}
+          />
+        )}
+
+        {currentStep === 7 && (
+          <StepSurveyWarranties
+            items={surveyItems}
+            qVessels={qVessels}
+            selectedVesselIds={data.selectedVesselIds}
+            altId={data.selectedAltId}
+            edits={data.surveyWarrantyEdits}
             onUpdate={updateData}
           />
         )}
@@ -2871,14 +2940,129 @@ function StepBlueCards({
   )
 }
 
+/** Survey warranties that apply to one converter vessel id (vessel scope = quotation vessel ids) */
+function surveyItemsForVessel(
+  items: SurveyWarrantyItem[],
+  qVessels: QuotationVessel[],
+  vid: string,
+  altId: string
+): SurveyWarrantyItem[] {
+  const qv = qVessels.find((v) => (v.vesselId || v.id) === vid)
+  return items.filter(
+    (sw) =>
+      (!sw.alternativeId || !altId || sw.alternativeId === altId) &&
+      (!sw.vesselScope ||
+        sw.vesselScope.length === 0 ||
+        qVessels.length <= 1 ||
+        (qv ? sw.vesselScope.includes(qv.id) : true))
+  )
+}
+
+function StepSurveyWarranties({
+  items,
+  qVessels,
+  selectedVesselIds,
+  altId,
+  edits,
+  onUpdate
+}: {
+  items: SurveyWarrantyItem[]
+  qVessels: QuotationVessel[]
+  selectedVesselIds: string[]
+  altId: string
+  edits: Record<string, Record<string, string>>
+  onUpdate: (partial: Partial<WizardData>) => void
+}): React.JSX.Element {
+  const setText = (vid: string, id: string, text: string): void =>
+    onUpdate({ surveyWarrantyEdits: { ...edits, [vid]: { ...(edits[vid] || {}), [id]: text } } })
+  const resetText = (vid: string, id: string): void => {
+    const forVessel = { ...(edits[vid] || {}) }
+    delete forVessel[id]
+    onUpdate({ surveyWarrantyEdits: { ...edits, [vid]: forVessel } })
+  }
+  const nameOf = (vid: string): string => {
+    const qv = qVessels.find((v) => (v.vesselId || v.id) === vid)
+    return (qv?.name || qv?.vesselLabel || 'Vessel').toUpperCase()
+  }
+  return (
+    <div>
+      <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem' }}>Survey Warranties</h3>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+        The wording printed on the policy. Edit it as needed; clearing a box removes that warranty
+        from this policy. The quotation is not changed.
+      </p>
+      {selectedVesselIds.map((vid) => {
+        const list = surveyItemsForVessel(items, qVessels, vid, altId)
+        return (
+          <div key={vid} style={{ marginBottom: '18px' }}>
+            {selectedVesselIds.length > 1 && (
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', margin: '0 0 8px' }}>
+                M/V {nameOf(vid)}
+              </div>
+            )}
+            {list.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                No survey warranties for this vessel.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {list.map((sw) => {
+                  const edited = edits[vid]?.[sw.id]
+                  const value = edited ?? sw.text
+                  return (
+                    <div key={sw.id}>
+                      <textarea
+                        value={value}
+                        rows={Math.min(6, Math.max(2, Math.ceil(value.length / 90)))}
+                        onChange={(e) => setText(vid, sw.id, e.target.value)}
+                        style={{
+                          width: '100%',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                          fontSize: '0.85rem',
+                          opacity: value.trim() ? 1 : 0.6
+                        }}
+                        placeholder="Removed from this policy"
+                      />
+                      {edited != null && (
+                        <button
+                          type="button"
+                          onClick={() => resetText(vid, sw.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.75rem',
+                            textDecoration: 'underline',
+                            padding: 0
+                          }}
+                        >
+                          Restore the quotation wording
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function StepSubjectivities({
   items,
   selectedIds,
+  subjectivityDays,
   isLight,
   onUpdate
 }: {
   items: { id: string; text: string }[]
   selectedIds: string[]
+  subjectivityDays: number
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
 }): React.JSX.Element {
@@ -2905,6 +3089,28 @@ function StepSubjectivities({
         Uncheck any subjectivity you don&apos;t want on this policy. Kept items render exactly as in
         the quotation. If none are kept, the policy shows <strong>NIL</strong> in this section.
       </p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+        <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          Subjectivities to be complied with within
+        </label>
+        <input
+          type="number"
+          min={0}
+          value={subjectivityDays}
+          onChange={(e) =>
+            onUpdate({ subjectivityDays: Math.max(0, parseInt(e.target.value, 10) || 0) })
+          }
+          style={{ width: '80px' }}
+        />
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          days (
+          {subjectivityDays === 0
+            ? 'prints "prior inception"'
+            : `prints "within ${subjectivityDays} days"`}
+          )
+        </span>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
         <button

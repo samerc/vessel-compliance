@@ -91,6 +91,7 @@ import {
 } from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { stripHtml } from '../utils/htmlToPdfText'
+import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { formatDateLong } from '../utils/dateUtils'
 
 // ==================== Export Snapshot ====================
@@ -4912,7 +4913,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           upccContent.push(np(`Applicable to ${names}`))
         }
       }
-      rowMap.set('upcc', makeRow('Upfront Continuity (UPCC)', upccContent))
+      rowMap.set('upcc', makeRow(wq.upccTitle || DEFAULT_UPCC_TITLE, upccContent))
     }
 
     // Generic discounts — one section each, placed after NCB/UPCC via section order

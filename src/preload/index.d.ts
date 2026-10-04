@@ -2035,6 +2035,8 @@ export interface Api {
       blueCardExpiry?: string | null
       blueCardOwners?: Record<string, string>
       selectedSubjectivityIds?: string[] | null
+      subjectivityDays?: number | null
+      surveyWarrantyTexts?: Record<string, { id: string; text: string }[]> | null
       perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
     }
   ) => Promise<ConvertedPolicy[]>

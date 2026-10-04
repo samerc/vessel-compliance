@@ -1082,6 +1082,8 @@ export interface Quotation {
   upccDiscountPercent?: number
   upccDiscountAmount?: number
   upccText?: string
+  /** UPCC section name (null = default "Upfront Profit Continuity Credit (UPCC)") */
+  upccTitle?: string | null
   nonRefundableType?: 'first_instalment' | 'percentage' | null
   nonRefundablePercent?: number
   agreedValue?: number
@@ -2305,6 +2307,10 @@ export interface PolicyDocument {
   selectedAgreedValueOptionId: string | null
   ourShare: number | null
   subjectivityDays: number
+  /** UPCC section name on this policy (null = the quotation's) */
+  upccTitle?: string | null
+  /** Survey warranty wording edited in the converter (null = built from the quotation) */
+  surveyWarrantyTexts?: { id: string; text: string }[] | null
   quotationTypeCode: string | null
   quotationTypeName: string | null
   quotationReference: string | null

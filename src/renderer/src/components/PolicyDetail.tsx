@@ -25,7 +25,8 @@ import {
   FileSpreadsheet,
   FileArchive,
   MoreHorizontal,
-  PenTool
+  PenTool,
+  LayoutList
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -72,6 +73,8 @@ import type {
 import { splitInstalments } from '../../../shared/premium'
 import { ok } from '../utils/ipc'
 import { MoneyInput } from './quotation-tabs/shared'
+import SectionOrderModal from './quotation-tabs/SectionOrderModal'
+import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -269,6 +272,10 @@ export default function PolicyDetail({
   const [editCancelReplace, setEditCancelReplace] = useState(false)
   const [editCancelReplaceText, setEditCancelReplaceText] = useState('')
   const [editHideBroker, setEditHideBroker] = useState(false)
+  const [editSubjectivityDays, setEditSubjectivityDays] = useState(7)
+  const [editUpccTitle, setEditUpccTitle] = useState('')
+  const [editSectionOrder, setEditSectionOrder] = useState<string[] | null>(null)
+  const [showSectionOrder, setShowSectionOrder] = useState(false)
 
   // Supplementary data for editing
   const [banks, setBanks] = useState<
@@ -501,6 +508,9 @@ export default function PolicyDetail({
     setEditCancelReplace(!!policy.cancelReplaceText)
     setEditCancelReplaceText(policy.cancelReplaceText || '')
     setEditHideBroker(!!policy.hideBroker)
+    setEditSubjectivityDays(policy.subjectivityDays ?? 7)
+    setEditUpccTitle(policy.upccTitle || '')
+    setEditSectionOrder(policy.sectionOrder || null)
     setActiveTab('overview')
     setIsEditing(true)
   }, [policy, instalments, addresses])
@@ -522,6 +532,9 @@ export default function PolicyDetail({
           bankId: editBankId || null,
           cancelReplaceText: editCancelReplace ? editCancelReplaceText : null,
           hideBroker: editHideBroker,
+          subjectivityDays: editSubjectivityDays,
+          upccTitle: editUpccTitle.trim() || null,
+          sectionOrder: editSectionOrder,
           // Editing invalidates the frozen export snapshot so the next export re-freezes
           // with the change (exports are otherwise identical on re-export).
           exportSnapshot: null
@@ -2236,6 +2249,137 @@ export default function PolicyDetail({
                   advice always shows the broker (it is the broker’s document).
                 </div>
               </div>
+
+              {/* Document options: subjectivity days, UPCC name, section order */}
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid transparent',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  alignItems: 'end'
+                }}
+              >
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '4px' }}>
+                    Subjectivities to be complied with within (days)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editSubjectivityDays}
+                    onChange={(e) =>
+                      setEditSubjectivityDays(Math.max(0, parseInt(e.target.value, 10) || 0))
+                    }
+                    style={{ width: '100%' }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '4px'
+                    }}
+                  >
+                    0 prints &quot;prior inception&quot;
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '4px' }}>
+                    UPCC section name
+                  </label>
+                  <input
+                    value={editUpccTitle}
+                    onChange={(e) => setEditUpccTitle(e.target.value)}
+                    placeholder={quotationData?.upccTitle || DEFAULT_UPCC_TITLE}
+                    style={{ width: '100%' }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '4px'
+                    }}
+                  >
+                    Empty = the quotation&apos;s name
+                  </div>
+                </div>
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowSectionOrder(true)}
+                    disabled={!policy.quotationId}
+                  >
+                    <LayoutList size={14} />{' '}
+                    {editSectionOrder ? 'Edit Section Order' : 'Reorder Sections'}
+                  </button>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: editSectionOrder ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                    }}
+                  >
+                    {editSectionOrder
+                      ? 'Custom order for this policy'
+                      : 'Using the default order for this type'}
+                  </span>
+                  {editSectionOrder && (
+                    <button
+                      type="button"
+                      onClick={() => setEditSectionOrder(null)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.75rem',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Use default
+                    </button>
+                  )}
+                </div>
+              </div>
+              {showSectionOrder && policy.quotationId && (
+                <SectionOrderModal
+                  quotation={
+                    {
+                      id: policy.quotationId,
+                      quotationTypeCode: policy.quotationTypeCode || 'P',
+                      sectionOrder: editSectionOrder ?? undefined
+                    } as Quotation
+                  }
+                  docLabel="policy"
+                  isLight={isLight}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  // Defaults come from the policy settings (not the quotation defaults)
+                  defaultsLoader={async (tc) => {
+                    try {
+                      const raw = await window.api.getSetting(`policy_section_order_defaults_${tc}`)
+                      return raw ? JSON.parse(raw) : []
+                    } catch {
+                      return []
+                    }
+                  }}
+                  // Saved with the rest of the policy edit
+                  persist={async (order) => {
+                    setEditSectionOrder(order)
+                  }}
+                  onClose={() => setShowSectionOrder(false)}
+                  onSave={() => setShowSectionOrder(false)}
+                />
+              )}
             </div>
           )}
 

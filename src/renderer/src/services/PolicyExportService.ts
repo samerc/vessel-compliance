@@ -63,7 +63,8 @@ import {
   EndorsementSection,
   EndorsementInstalment
 } from '../../../shared/types'
-import { computePayablePremium } from '../../../shared/premium'
+import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
+import { resolvePolicySurveyWarranty, DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import JSZip from 'jszip'
 import {
   DEFAULT_SECTION_TEXTS,
@@ -1088,6 +1089,11 @@ interface PolicyExportData {
     order: number
   }[]
   agreedValueOptions: QuotationAgreedValueOption[]
+  /** This policy's vessel is IACS classed ("vessel classed" warranties read "vessel IACS classed") */
+  vesselIacs?: boolean
+  /** Technical premium of this policy's vessel for its chosen alternative / LOL option
+   *  (before NCB/UPCC/discounts); base for the {amount} placeholders */
+  technicalPremium?: number | null
   fleets: { id: string; name: string }[]
   vesselClassificationNames: Record<string, string>
   // Extra quotation discounts (beyond NCB/UPCC). Optional: absent on older frozen snapshots.
@@ -1428,6 +1434,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   // Resolve IACS classification from junction table
   const vesselClassificationNames: Record<string, string> = {}
+  const vesselIacsById: Record<string, boolean> = {}
   try {
     const [classSocieties] = await Promise.all([window.api.getClassificationSocieties()])
     const safeQV = Array.isArray(quotationVessels) ? quotationVessels : []
@@ -1438,6 +1445,10 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
         if (Array.isArray(classIds) && classIds.length > 0) {
           // Sort IACS first
           const iacsIds = new Set(classSocieties.filter((s) => s.isIacs).map((s) => s.id))
+          if (
+            classIds.some((c) => iacsIds.has(typeof c === 'string' ? c : c.classificationSocietyId))
+          )
+            vesselIacsById[qv.id] = true
           const sorted = [...classIds].sort((a, b) => {
             const aId = typeof a === 'string' ? a : a.classificationSocietyId
             const bId = typeof b === 'string' ? b : b.classificationSocietyId
@@ -1466,10 +1477,12 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
           const cs = classSocieties.find(
             (s) => s.id === classId || s.name === classId || s.abbreviation === classId
           )
-          if (cs)
+          if (cs) {
             vesselClassificationNames[qv.id] = cs.abbreviation
               ? `${cs.name} (${cs.abbreviation})`
               : cs.name
+            if (cs.isIacs) vesselIacsById[qv.id] = true
+          }
         }
       }
     }
@@ -1542,11 +1555,45 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     /* no extra discounts */
   }
 
+  // Technical premium of this vessel for the chosen alternative / LOL option (same maths as
+  // the converter), the base of the NCB / UPCC / discount {amount} placeholders
+  let technicalPremium: number | null = null
+  if (vessel) {
+    try {
+      const altVesselPrems: Record<string, number> = {}
+      if (quotation.quotationTypeCode === 'H') {
+        const avp = await window.api.hullGetAltVesselPremiums(policy.quotationId)
+        for (const r of Array.isArray(avp) ? avp : []) {
+          if (r.premiumAmount != null)
+            altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+        }
+      }
+      technicalPremium = vesselTechnical(
+        {
+          quotation,
+          vessels: safeQVessels,
+          piAlts: Array.isArray(piAlternativesRaw) ? piAlternativesRaw : [],
+          hullAlts: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
+          lolOptions: Array.isArray(lolOptionsRaw) ? lolOptionsRaw : [],
+          altVesselPrems,
+          discounts
+        },
+        vessel,
+        policy.selectedAlternativeId || '',
+        policy.selectedLolOptionId || ''
+      )
+    } catch {
+      technicalPremium = null
+    }
+  }
+
   return {
     policy,
     quotation,
     frozen,
     discounts,
+    technicalPremium,
+    vesselIacs: vessel ? !!vesselIacsById[vessel.id] : false,
     instalments: Array.isArray(instalments) ? instalments : [],
     addresses: Array.isArray(addresses) ? addresses : [],
     blueCards: Array.isArray(blueCards) ? blueCards : [],
@@ -1591,13 +1638,15 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     sanctionsVersions: Array.isArray(sanctionsVersions) ? sanctionsVersions : [],
     clauseOverrides,
     piAlternatives: Array.isArray(piAlternativesRaw) ? piAlternativesRaw : [],
-    hullAgreedValueItems: Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : [],
+    hullAgreedValueItems: filterByAlt(
+      Array.isArray(hullAgreedValueItems) ? hullAgreedValueItems : []
+    ),
     hullClauses: Array.isArray(hullClausesRaw) ? hullClausesRaw : [],
-    hullConditions: Array.isArray(hullConditionsRaw) ? hullConditionsRaw : [],
+    hullConditions: filterByAlt(Array.isArray(hullConditionsRaw) ? hullConditionsRaw : []),
     allHullConditions: Array.isArray(allHullConditionsRaw) ? allHullConditionsRaw : [],
-    hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw)
-      ? hullAdditionalConditionsRaw
-      : [],
+    hullAdditionalConditions: filterByAlt(
+      Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : []
+    ),
     allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw)
       ? allHullAdditionalConditionsRaw
       : [],
@@ -1605,7 +1654,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullCustomConditions: filterByAlt(
       Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : []
     ),
-    warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
+    warConditions: filterByAlt(Array.isArray(warConditionsRaw) ? warConditionsRaw : []),
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
     warSettings:
       warSettingsRaw && !('error' in warSettingsRaw && warSettingsRaw.error)
@@ -1620,15 +1669,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
           return vessel ? sw.vesselScope.includes(vessel.id) : true
         })
         .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((sw) => ({
-          ...sw,
-          text: (sw.text || '')
-            .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
-            .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
-            .replace(/\{event\}/g, sw.eventValue || '{event}')
-            .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
-            .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
-        }))
+        .map((sw) => ({ ...sw, text: resolvePolicySurveyWarranty(sw) }))
     ),
     tradingIntros: Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : [],
     companyName: reportSettings.companyName || 'Insurance Company',
@@ -3565,17 +3606,27 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
+  // Same rule as the quotation: an IACS-classed vessel's "vessel classed" warranty reads
+  // "vessel IACS classed"
+  const iacs = (t: string): string =>
+    data.vesselIacs ? t.replace(/vessel\s+classed/i, 'vessel IACS classed') : t
 
   for (const wid of data.selectedWarrantyIds) {
     const w = data.allWarranties.find((ww) => ww.id === wid)
-    if (w) content.push(polBulletP(decodeHtmlEntities(w.text)))
+    if (w) content.push(polBulletP(iacs(decodeHtmlEntities(w.text))))
   }
   for (const cw of [...data.customWarranties].sort((a, b) => a.order - b.order)) {
-    content.push(polBulletP(decodeHtmlEntities(cw.text)))
+    content.push(polBulletP(iacs(decodeHtmlEntities(cw.text))))
   }
   if (data.quotation.quotationTypeCode !== 'W') {
-    for (const sw of data.surveyWarranties) content.push(polBulletP(decodeHtmlEntities(sw.text)))
+    // Wording edited in the converter wins over the quotation's survey warranties
+    const swTexts = data.policy.surveyWarrantyTexts
+      ? data.policy.surveyWarrantyTexts.map((w) => w.text).filter((t) => t.trim())
+      : data.surveyWarranties.map((sw) => sw.text)
+    for (const t of swTexts) content.push(polBulletP(iacs(decodeHtmlEntities(t))))
   }
+  // Like the quotation, the section only exists when it has warranty items
+  if (content.length === 0) return content
   if (polSt(data, 'warrantiesAdditionalText')) {
     content.push(polEmptyP())
     content.push(...polMpUniform(polSt(data, 'warrantiesAdditionalText')))
@@ -3585,15 +3636,19 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
     content.push(...polMpUniform(polSt(data, 'warrantiesBreach')))
   }
 
-  // H&M warranty NOTE — from warrantiesNote section text or hardcoded default
-  if (data.quotation.quotationTypeCode === 'H') {
+  // Warranty NOTE — the warrantiesNote text for every type (as in the quotation); Hull keeps
+  // its hardcoded default when no text is set
+  {
     const noteText = polSt(data, 'warrantiesNote')
     const defaultNote =
-      "NOTE: The Insured's attention is drawn to the provisions of the H&M Terms and Conditions, which also include Warranties."
-    content.push(polEmptyP())
+      data.quotation.quotationTypeCode === 'H'
+        ? "NOTE: The Insured's attention is drawn to the provisions of the H&M Terms and Conditions, which also include Warranties."
+        : ''
     if (noteText) {
+      content.push(polEmptyP())
       content.push(...polMp(noteText))
-    } else {
+    } else if (defaultNote) {
+      content.push(polEmptyP())
       content.push(polNp(defaultNote))
     }
   }
@@ -4272,9 +4327,11 @@ export async function exportPolicyDocx(
   }
 
   // NCB (No Claims Bonus) — skip if this vessel is excluded from NCB
+  const polCur = data.quotation.premiumCurrency || 'USD'
   if (data.quotation.ncbEnabled && data.quotation.ncbText && !data.vessel?.ncbExcluded) {
     const ncbContent: (Paragraph | Table)[] = []
-    let ncbText = decodeHtmlEntities(polHtmlToLines(data.quotation.ncbText))
+    // Placeholders resolved in the HTML so the wording keeps its formatting (as the quotation)
+    let ncbText = data.quotation.ncbText
     // {ncb_amount} follows the discount TYPE (mirrors the quotation export): a fixed amount
     // for amount-type, "X%" for percentage-type — a stale value of the other type is ignored.
     const ncbPct = data.quotation.ncbDiscountPercent
@@ -4282,52 +4339,48 @@ export async function exportPolicyDocx(
     const ncbIsAmount = data.quotation.ncbDiscountType === 'amount'
     if (ncbPct != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(ncbPct))
     if (ncbIsAmount && ncbAmt != null)
-      ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
+      ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatCurrency(ncbAmt, polCur))
     else if (!ncbIsAmount && ncbPct != null)
       ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
-    ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
-    ncbContent.push(
-      ...ncbText
-        .split('\n')
-        .filter((l) => l.trim())
-        .map((l) => polNp(l))
-    )
+    ncbText = ncbText.replace(/\{currency\}/g, polCur)
+    ncbContent.push(...polMp(ncbText))
     addRow('ncb', makeRow('No Claims\nBonus (NCB)', ncbContent))
   }
 
-  // UPCC (Upfront Continuity Credit) — skip if this vessel is excluded from UPCC
+  // UPCC (Upfront Profit Continuity Credit) — skip if this vessel is excluded from UPCC
   if (data.quotation.upccEnabled && data.quotation.upccText && !data.vessel?.upccExcluded) {
     const upccContent: (Paragraph | Table)[] = []
-    let upccText = decodeHtmlEntities(polHtmlToLines(data.quotation.upccText))
+    let upccText = data.quotation.upccText
     const upccIsAmount = data.quotation.upccDiscountType === 'amount'
     if (data.quotation.upccDiscountPercent != null)
       upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
     if (upccIsAmount && data.quotation.upccDiscountAmount != null)
       upccText = upccText.replace(
         /\{upcc_amount\}/g,
-        polFormatAmountOnly(data.quotation.upccDiscountAmount)
+        polFormatCurrency(data.quotation.upccDiscountAmount, polCur)
       )
     else if (!upccIsAmount && data.quotation.upccDiscountPercent != null)
       upccText = upccText.replace(/\{upcc_amount\}/g, `${data.quotation.upccDiscountPercent}%`)
-    upccText = upccText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
-    upccContent.push(
-      ...upccText
-        .split('\n')
-        .filter((l) => l.trim())
-        .map((l) => polNp(l))
+    upccText = upccText.replace(/\{currency\}/g, polCur)
+    upccContent.push(...polMp(upccText))
+    addRow(
+      'upcc',
+      makeRow(data.policy.upccTitle || data.quotation.upccTitle || DEFAULT_UPCC_TITLE, upccContent)
     )
-    addRow('upcc', makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
   }
 
   // EXTRA DISCOUNTS (beyond NCB/UPCC) — wording with {amount}/{percentage} resolved against
   // this vessel's premium. A targeted discount is placed right under its target section.
-  const targetedDiscountRows: { target: string; row: TableRow }[] = []
+  const targetedDiscountRows: { target: string; label: string; content: (Paragraph | Table)[] }[] =
+    []
+  // Discounts in their own section print after the Premium section (as in the quotation)
+  const standaloneDiscountRows: { key: string; row: TableRow }[] = []
   // Discounts placed in the Premium section are merged into it, right below the premium
   const premiumDiscountContent: (Paragraph | Table)[] = []
   if ((data.discounts || []).length > 0) {
     const q = data.quotation
     const cur = q.premiumCurrency || 'USD'
-    const tech = data.vessel?.premiumAmount || q.premiumAmount || 0
+    const tech = data.technicalPremium ?? (data.vessel?.premiumAmount || q.premiumAmount || 0)
     // Base after NCB/UPCC (no extra discounts), then each discount reduces it in order
     let base = computePayablePremium(tech, q, [], data.vessel)
     for (const d of data.discounts || []) {
@@ -4336,20 +4389,26 @@ export async function exportPolicyDocx(
       if (!d.excludeFromPremium) base -= ded
       if (!d.text) continue
       const pctStr = `${d.percent || 0}%`
-      const resolved = decodeHtmlEntities(polHtmlToLines(d.text))
+      // Placeholders resolved in the HTML so the wording keeps its formatting
+      const resolved = d.text
         .replace(/\{amount\}/g, polFormatCurrency(Math.round(ded * 100) / 100, cur))
         .replace(/\{percentage\}/g, pctStr)
         .replace(/\{percent\}/g, pctStr)
         .replace(/\{currency\}/g, cur)
-      const dContent = resolved
-        .split('\n')
-        .filter((l) => l.trim())
-        .map((l) => polNp(l))
+      const dContent: (Paragraph | Table)[] = polMp(resolved)
       if (dContent.length === 0) continue
       if (d.targetSection === 'premium') premiumDiscountContent.push(...dContent, polSpacerPts(6))
       else if (d.targetSection)
-        targetedDiscountRows.push({ target: d.targetSection, row: makeRow('', dContent) })
-      else addRow(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
+        targetedDiscountRows.push({
+          target: d.targetSection,
+          label: d.label || 'Discount',
+          content: dContent
+        })
+      else
+        standaloneDiscountRows.push({
+          key: `discount:${d.id}`,
+          row: makeRow(d.label || 'Discount', dContent)
+        })
     }
   }
 
@@ -4357,17 +4416,23 @@ export async function exportPolicyDocx(
   const premiumContent = await polBuildPremiumPaymentSection(data, premiumDiscountContent)
   if (premiumContent.length > 0)
     addRow('premium', makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
+  for (const sd of standaloneDiscountRows) addRow(sd.key, sd.row)
 
   // Emit sections in the configured order. Any section whose key isn't in the configured
   // order (e.g. a War policy's sanctions section) is anchored right after its original
   // preceding section, so it keeps its natural position instead of jumping to the end.
   // Targeted discounts: insert directly after their target section (untitled, so they read as
   // the end of that section); unknown target → appended at the end
+  // A discount whose target section is not on this policy (e.g. NCB for an NCB-excluded vessel)
+  // gets its own titled section instead, like the quotation
   for (const td of targetedDiscountRows) {
     const at = secList.findIndex((s) => s.key === td.target)
-    const entry = { key: `discount-in:${td.target}:${at}`, row: td.row }
-    if (at >= 0) secList.splice(at + 1, 0, entry)
-    else secList.push(entry)
+    if (at >= 0)
+      secList.splice(at + 1, 0, {
+        key: `discount-in:${td.target}:${at}`,
+        row: makeRow('', td.content)
+      })
+    else secList.push({ key: `discount-own:${td.target}`, row: makeRow(td.label, td.content) })
   }
   const policySecDefault: string[] = data.frozen?.sectionOrderDefault || []
   const secOrder = resolvePolicySectionOrder(data, policySecDefault)
