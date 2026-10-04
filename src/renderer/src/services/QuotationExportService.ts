@@ -2627,8 +2627,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const matchedAlts = dEffectiveAlts.filter((a) => ids.includes(a.hullClauseId))
         const matchesIv = dIvClauseId && ids.includes(dIvClauseId)
         if (matchedAlts.length === dEffectiveAlts.length && matchesIv) return { type: 'both' }
-        if (matchedAlts.length === dEffectiveAlts.length && !matchesIv)
-          return dMultiAlt ? { type: 'allAlts' } : { type: 'both' }
+        if (matchedAlts.length === dEffectiveAlts.length && !matchesIv) {
+          if (dMultiAlt) return { type: 'allAlts' }
+          // One alternative with an IV section: linked to the H&M clause only = under Hull and
+          // Machinery, not "Applicable to both sections"
+          if (data.quotation.ivEnabled && dIvClauseId && dEffectiveAlts.length === 1)
+            return { type: 'alt', altId: dEffectiveAlts[0].id }
+          return { type: 'both' }
+        }
         if (matchedAlts.length === 0 && matchesIv) return { type: 'iv' }
         if (matchedAlts.length === 0 && !matchesIv) return { type: 'none' }
         if (matchedAlts.length === 1) return { type: 'alt', altId: matchedAlts[0].id }

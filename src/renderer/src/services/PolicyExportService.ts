@@ -3017,87 +3017,9 @@ function polBuildHullConditionsContent(
   }
 
   const selectedAlt = altId ? dAlts.find((a) => a.id === altId) : null
-  if (selectedAlt) {
-    // === Selected alternative: separate main clause from IV ===
-    const mainClauseId = selectedAlt.hullClauseId
-    const clause = data.hullClauses.find((c) => c.id === mainClauseId)
+  const ivOn = !!(data.quotation.ivEnabled && ivClauseId)
 
-    // Main clause conditions (not IV)
-    const mainConds = hc
-      .filter((qc) => {
-        const clauseId = getCondClauseId(qc)
-        return clauseId === mainClauseId || (!clauseId && !ivClauseId)
-      })
-      .filter((qc) => qc.alternativeId === selectedAlt.id || !qc.alternativeId)
-    const dedupedMain = dedupConds(mainConds)
-
-    // "Hull and Machinery" sub-heading when IV exists
-    if (data.quotation.ivEnabled && ivClauseId) {
-      content.push(polBupTight('Hull and Machinery'))
-      content.push(polEmptyP())
-    }
-    if (clause) {
-      content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
-      content.push(polEmptyP())
-    }
-    if (dedupedMain.length > 0) content.push(makeCondTable(dedupedMain))
-
-    // IV conditions (separate section)
-    if (data.quotation.ivEnabled && ivClauseId) {
-      const ivConds = hc.filter((qc) => getCondClauseId(qc) === ivClauseId)
-      const dedupedIV = dedupConds(ivConds)
-      const ivClause = data.hullClauses.find((c) => c.id === ivClauseId)
-      content.push(polEmptyP())
-      content.push(polBupTight('Increased Value'))
-      content.push(polEmptyP())
-      if (ivClause) {
-        content.push(polNpTight(decodeHtmlEntities(ivClause.description || ivClause.name)))
-        content.push(polEmptyP())
-      }
-      if (dedupedIV.length > 0) content.push(makeCondTable(dedupedIV))
-    }
-  } else if (dAlts.length > 1) {
-    for (let i = 0; i < dAlts.length; i++) {
-      const alt = dAlts[i]
-      const clause = data.hullClauses.find((c) => c.id === alt.hullClauseId)
-      // Dedup conditions per alternative
-      const ownConds = hc.filter((qc) => qc.alternativeId === alt.id)
-      const nullConds = hc.filter((qc) => !qc.alternativeId)
-      const altMerged = [...ownConds]
-      for (const nc of nullConds) {
-        if (!altMerged.some((c) => c.hullConditionId === nc.hullConditionId)) altMerged.push(nc)
-      }
-      altMerged.sort((a, b) => {
-        const da = data.allHullConditions.find((c) => c.id === a.hullConditionId)
-        const db = data.allHullConditions.find((c) => c.id === b.hullConditionId)
-        return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
-      })
-      content.push(polBupTight(`Alternative ${i + 1}`))
-      content.push(polEmptyP())
-      if (clause) {
-        content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
-        content.push(polEmptyP())
-      }
-      if (altMerged.length > 0) content.push(makeCondTable(altMerged))
-      content.push(polEmptyP())
-    }
-  } else {
-    const singleAlt = dAlts[0]
-    const selectedClause = singleAlt
-      ? data.hullClauses.find((c) => c.id === singleAlt.hullClauseId)
-      : data.quotation.hullClauseId
-        ? data.hullClauses.find((c) => c.id === data.quotation.hullClauseId)
-        : null
-    if (selectedClause) {
-      content.push(
-        polNpTight(decodeHtmlEntities(selectedClause.description || selectedClause.name))
-      )
-      content.push(polEmptyP())
-    }
-    if (hc.length > 0) content.push(makeCondTable(hc))
-  }
-
-  // Shared additional conditions ("Applicable to all sections")
+  // ---- Additional + custom conditions (one shared order) ----
   const filteredHa = altId
     ? (() => {
         const ownAddls = ha.filter((qa) => qa.alternativeId === altId)
@@ -3120,7 +3042,7 @@ function polBuildHullConditionsContent(
     const sc = dAlts[0]?.hullClauseId || data.quotation.hullClauseId
     if (sc) activeClauseIds.push(sc)
   }
-  if (data.quotation.ivEnabled && ivClauseId) activeClauseIds.push(ivClauseId)
+  if (ivOn && ivClauseId) activeClauseIds.push(ivClauseId)
 
   const visibleHa = filteredHa.filter((qa) => {
     const def = data.allHullAdditionalConditions.find((c) => c.id === qa.hullAdditionalConditionId)
@@ -3144,13 +3066,25 @@ function polBuildHullConditionsContent(
     }))
   ].sort((a, b) => a.order - b.order)
 
-  if (mergedAddl.length > 0) {
-    if (selectedAlt && data.quotation.ivEnabled && ivClauseId) {
-      content.push(polEmptyP())
-      content.push(polBupTight('Applicable to all sections'))
-    }
-    content.push(polEmptyP())
-    for (const it of mergedAddl) {
+  // With an IV section, an additional condition linked only to the H&M clause belongs under
+  // Hull and Machinery, one linked only to the IV clause under Increased Value; unlinked,
+  // both-linked and custom conditions go under "Applicable to both sections" (as the quotation)
+  const mainClauseForAddl = selectedAlt?.hullClauseId || dAlts[0]?.hullClauseId || null
+  const addlSection = (it: MergedAddl): 'hm' | 'iv' | 'both' => {
+    if (!ivOn || it.kind === 'custom') return 'both'
+    const def = data.allHullAdditionalConditions.find(
+      (c) => c.id === it.qa.hullAdditionalConditionId
+    )
+    const ids = def?.hullClauseIds || []
+    const onMain = !!mainClauseForAddl && ids.includes(mainClauseForAddl)
+    const onIv = !!ivClauseId && ids.includes(ivClauseId)
+    if (onMain && !onIv) return 'hm'
+    if (onIv && !onMain) return 'iv'
+    return 'both'
+  }
+  const renderAddl = (items: MergedAddl[]): Paragraph[] => {
+    const paras: Paragraph[] = []
+    for (const it of items) {
       if (it.kind === 'addl') {
         const qa = it.qa
         const def = data.allHullAdditionalConditions.find(
@@ -3168,13 +3102,118 @@ function polBuildHullConditionsContent(
         condText = condText
           .replace(/\{currency\}/g, currency)
           .replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
-        content.push(...polMpBullet(condText))
+        paras.push(...polMpBullet(condText))
       } else {
         const cc = it.cc
-        content.push(...polMpBullet(cc.title ? `${cc.title} — ${cc.text}` : cc.text))
+        paras.push(...polMpBullet(cc.title ? `${cc.title} — ${cc.text}` : cc.text))
       }
     }
+    return paras
   }
+  const pushAddl = (items: MergedAddl[]): void => {
+    const paras = renderAddl(items)
+    if (paras.length === 0) return
+    content.push(polEmptyP())
+    content.push(...paras)
+  }
+
+  // Conditions of one clause, alt-specific rows winning over shared ones
+  const clauseConds = (
+    clauseId: string | null | undefined,
+    alt?: { id: string } | null
+  ): QuotationHullCondition[] =>
+    dedupConds(
+      hc
+        .filter((qc) => (clauseId ? getCondClauseId(qc) === clauseId : true))
+        .filter((qc) => !qc.alternativeId || !alt || qc.alternativeId === alt.id)
+    )
+
+  if (selectedAlt || (dAlts.length <= 1 && ivOn)) {
+    // === One alternative: main clause, then IV as its own section ===
+    const mainClauseId = selectedAlt?.hullClauseId || dAlts[0]?.hullClauseId || null
+    const clause = mainClauseId
+      ? data.hullClauses.find((c) => c.id === mainClauseId)
+      : data.quotation.hullClauseId
+        ? data.hullClauses.find((c) => c.id === data.quotation.hullClauseId)
+        : null
+    const effMainId = mainClauseId || data.quotation.hullClauseId || null
+
+    // Main clause conditions (not IV)
+    const dedupedMain = dedupConds(
+      hc
+        .filter((qc) => {
+          const clauseId = getCondClauseId(qc)
+          return clauseId === effMainId || (!clauseId && !ivClauseId)
+        })
+        .filter((qc) => !qc.alternativeId || !selectedAlt || qc.alternativeId === selectedAlt.id)
+    )
+
+    // "Hull and Machinery" sub-heading when IV exists
+    if (ivOn) {
+      content.push(polBupTight('Hull and Machinery'))
+      content.push(polEmptyP())
+    }
+    if (clause) {
+      content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
+      content.push(polEmptyP())
+    }
+    if (dedupedMain.length > 0) content.push(makeCondTable(dedupedMain))
+
+    if (ivOn) {
+      pushAddl(mergedAddl.filter((it) => addlSection(it) === 'hm'))
+      // IV conditions (separate section)
+      const dedupedIV = clauseConds(ivClauseId, selectedAlt)
+      const ivClause = data.hullClauses.find((c) => c.id === ivClauseId)
+      content.push(polEmptyP())
+      content.push(polBupTight('Increased Value'))
+      content.push(polEmptyP())
+      if (ivClause) {
+        content.push(polNpTight(decodeHtmlEntities(ivClause.description || ivClause.name)))
+        content.push(polEmptyP())
+      }
+      if (dedupedIV.length > 0) content.push(makeCondTable(dedupedIV))
+      pushAddl(mergedAddl.filter((it) => addlSection(it) === 'iv'))
+      const both = mergedAddl.filter((it) => addlSection(it) === 'both')
+      if (renderAddl(both).length > 0) {
+        content.push(polEmptyP())
+        content.push(polBupTight('Applicable to both sections:'))
+        pushAddl(both)
+      }
+      return
+    }
+  } else if (dAlts.length > 1) {
+    // Legacy policy with no recorded alternative: every alternative with its own clause's
+    // conditions only
+    for (let i = 0; i < dAlts.length; i++) {
+      const alt = dAlts[i]
+      const clause = data.hullClauses.find((c) => c.id === alt.hullClauseId)
+      const altMerged = clauseConds(alt.hullClauseId, alt)
+      content.push(polBupTight(`Alternative ${i + 1}`))
+      content.push(polEmptyP())
+      if (clause) {
+        content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
+        content.push(polEmptyP())
+      }
+      if (altMerged.length > 0) content.push(makeCondTable(altMerged))
+      content.push(polEmptyP())
+    }
+  } else {
+    // No alternatives: the quotation's hull clause, its conditions only
+    const singleAlt = dAlts[0]
+    const clauseId = singleAlt?.hullClauseId || data.quotation.hullClauseId || null
+    const selectedClause = clauseId ? data.hullClauses.find((c) => c.id === clauseId) : null
+    if (selectedClause) {
+      content.push(
+        polNpTight(decodeHtmlEntities(selectedClause.description || selectedClause.name))
+      )
+      content.push(polEmptyP())
+    }
+    const conds = clauseConds(clauseId, singleAlt)
+    if (conds.length > 0) content.push(makeCondTable(conds))
+  }
+
+  // No IV section: additional + custom conditions as one list after the conditions
+  pushAddl(mergedAddl)
 }
 
 function polBuildWarConditionsContent(
@@ -3199,6 +3238,27 @@ function polBuildWarConditionsContent(
   }
   // The T&C version is NOT repeated under the conditions: the policy's closing sentence names it
   // ("The said Vessel is covered subject to {tc_text} - {jwla_code}")
+}
+
+/** Hull agreed value of this policy: the agreed-value option chosen in the converter, else the
+ *  chosen alternative's own agreed value (single-vessel quotes, as the quotation shows it), else
+ *  the vessel's, else the quotation's. Currency follows the same source. */
+function polHullAgreedValue(data: PolicyExportData): {
+  amount: number | null | undefined
+  currency: string | null
+} {
+  const opt = data.policy.selectedAgreedValueOptionId
+    ? data.agreedValueOptions.find((o) => o.id === data.policy.selectedAgreedValueOptionId)
+    : null
+  if (opt) return { amount: opt.amount, currency: opt.currency || null }
+  const alt = data.policy.selectedAlternativeId
+    ? data.hullAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)
+    : null
+  if (alt && alt.agreedValue != null && data.quotationVessels.length <= 1)
+    return { amount: alt.agreedValue, currency: alt.agreedValueCurrency || null }
+  if (data.vessel?.agreedValue != null)
+    return { amount: data.vessel.agreedValue, currency: data.vessel.agreedValueCurrency || null }
+  return { amount: data.quotation.agreedValue, currency: null }
 }
 
 function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
@@ -3303,16 +3363,16 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
         ])
     }
   } else if (typeCode === 'H') {
-    const vesselCur = data.vessel?.agreedValueCurrency || null
+    const hav = polHullAgreedValue(data)
+    const vesselCur = hav.currency || data.vessel?.agreedValueCurrency || null
     const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
     const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
     const hmItems = data.hullAgreedValueItems.filter((it) => (it.section || 'hm') === 'hm')
     const ivItems = data.quotation.ivEnabled
       ? data.hullAgreedValueItems.filter((it) => it.section === 'iv')
       : []
-    // Use per-vessel agreed value if available, falling back to quotation-level
-    const vesselAgreedValue =
-      data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    // Converter's agreed-value option / alternative / vessel / quotation (polHullAgreedValue)
+    const vesselAgreedValue = hav.amount
     const vesselIvValue =
       data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
 
@@ -4136,9 +4196,13 @@ export async function exportPolicyDocx(
 
   // VALUE / LIMIT — Hull with IV gets split into Interest + Agreed Insured Value
   {
-    // Use per-vessel agreed value if available, falling back to quotation-level
-    const polVesselAv =
-      data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    // Hull: converter's agreed-value option / alternative / vessel / quotation
+    const polHav = typeCode === 'H' ? polHullAgreedValue(data) : null
+    const polVesselAv = polHav
+      ? polHav.amount
+      : data.vessel?.agreedValue != null
+        ? data.vessel.agreedValue
+        : data.quotation.agreedValue
     const polVesselIv = data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
     if (typeCode === 'H' && data.quotation.ivEnabled && polVesselIv != null) {
       const hmItems = data.hullAgreedValueItems.filter((it) => (it.section || 'hm') === 'hm')
@@ -4158,7 +4222,7 @@ export async function exportPolicyDocx(
       }
       // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
       const avContent: (Paragraph | Table)[] = []
-      const vesselCur = data.vessel?.agreedValueCurrency || null
+      const vesselCur = polHav?.currency || data.vessel?.agreedValueCurrency || null
       const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
       const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
       if (ivCurrency === hmCurrency) {
