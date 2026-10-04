@@ -459,6 +459,17 @@ export const FEATURES: Feature[] = [
     keywords: 'claims loss'
   },
   {
+    id: 'report-statement',
+    title: 'Statement of account',
+    area: 'Reports',
+    kind: 'view',
+    permission: 'reports:view',
+    target: { tab: 'reports', sub: 'statement' },
+    description:
+      'Format an accounting Excel as a statement of account or invoice letter on the letterhead (Word or PDF).',
+    keywords: 'statement soa invoice letter outstanding premium quickbooks excel'
+  },
+  {
     id: 'report-customer',
     title: 'Customer compliance report',
     area: 'Reports',

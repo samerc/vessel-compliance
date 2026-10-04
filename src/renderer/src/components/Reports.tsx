@@ -6,10 +6,12 @@ import {
   Users,
   ClipboardCheck,
   CalendarClock,
+  Receipt,
   type LucideIcon
 } from 'lucide-react'
 import { PageHeader, Tabs } from './ui'
 import LossRecordReport from './LossRecordReport'
+import StatementReport from './StatementReport'
 import CustomerComplianceReport from './CustomerComplianceReport'
 import AssuredReport from './AssuredReport'
 import ConditionSurveyReport from './ConditionSurveyReport'
@@ -20,6 +22,7 @@ const ReportBuilder = lazy(() => import('./ReportBuilder'))
 type ReportTab =
   | 'report-builder'
   | 'loss-record'
+  | 'statement'
   | 'customer-compliance'
   | 'assured-report'
   | 'condition-survey'
@@ -28,6 +31,7 @@ type ReportTab =
 const TABS: { id: ReportTab; label: string; icon: LucideIcon }[] = [
   { id: 'report-builder', label: 'Report Builder', icon: Database },
   { id: 'loss-record', label: 'Loss Record', icon: FileBarChart2 },
+  { id: 'statement', label: 'Statement of Account', icon: Receipt },
   { id: 'customer-compliance', label: 'Customer Compliance', icon: FileBarChart2 },
   { id: 'assured-report', label: 'Assured Report', icon: Users },
   { id: 'condition-survey', label: 'Condition Surveys', icon: ClipboardCheck },
@@ -70,6 +74,7 @@ export default function Reports({ subTab, subTabNonce }: SubTabProps = {}): Reac
         </Suspense>
       )}
       {activeTab === 'loss-record' && <LossRecordReport />}
+      {activeTab === 'statement' && <StatementReport />}
       {activeTab === 'customer-compliance' && <CustomerComplianceReport />}
       {activeTab === 'assured-report' && <AssuredReport />}
       {activeTab === 'condition-survey' && <ConditionSurveyReport />}
