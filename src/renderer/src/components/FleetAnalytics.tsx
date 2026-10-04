@@ -1,9 +1,23 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Ship, Globe, Anchor, Calendar, TrendingUp, Shield, BarChart3,
-  RefreshCw, Loader2, ChevronDown, ChevronRight, Save, Trash2,
-  FileDown, Users, Filter, X,
-  BarChart2,
+  Ship,
+  Globe,
+  Anchor,
+  Calendar,
+  TrendingUp,
+  Shield,
+  BarChart3,
+  RefreshCw,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Save,
+  Trash2,
+  FileDown,
+  Users,
+  Filter,
+  X,
+  BarChart2
 } from 'lucide-react'
 import { PageHeader, Badge } from './ui'
 import { jsPDF } from 'jspdf'
@@ -13,8 +27,13 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  AnalyticsFilters, AnalyticsPreset,
-  PolicyType, Fleet, Entity, FlagState, VesselType,
+  AnalyticsFilters,
+  AnalyticsPreset,
+  PolicyType,
+  Fleet,
+  Entity,
+  FlagState,
+  VesselType
 } from '../../../shared/types'
 import { getReportSettings } from '../services/ReportSettingsService'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -41,7 +60,7 @@ const AGE_BUCKETS = [
   { label: '10-15', min: 10, max: 15, color: '#84cc16' },
   { label: '15-20', min: 15, max: 20, color: '#eab308' },
   { label: '20-25', min: 20, max: 25, color: '#f59e0b' },
-  { label: '25+', min: 25, max: 999, color: '#ef4444' },
+  { label: '25+', min: 25, max: 999, color: '#ef4444' }
 ]
 
 const TONNAGE_BUCKETS = [
@@ -50,15 +69,19 @@ const TONNAGE_BUCKETS = [
   { label: '10-25K', min: 10000, max: 25000, color: '#3b82f6' },
   { label: '25-50K', min: 25000, max: 50000, color: '#6366f1' },
   { label: '50-100K', min: 50000, max: 100000, color: '#8b5cf6' },
-  { label: '100K+', min: 100000, max: Infinity, color: '#a855f7' },
+  { label: '100K+', min: 100000, max: Infinity, color: '#a855f7' }
 ]
 
 const OFAC_STYLES: Record<string, { bg: string; border: string; text: string }> = {
   CLEARED: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)', text: '#10b981' },
   PENDING: { bg: 'rgba(128,128,128,0.1)', border: 'rgba(128,128,128,0.2)', text: '#888888' },
-  POTENTIAL_MATCH: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', text: '#f59e0b' },
+  POTENTIAL_MATCH: {
+    bg: 'rgba(245,158,11,0.12)',
+    border: 'rgba(245,158,11,0.35)',
+    text: '#f59e0b'
+  },
   MATCH: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', text: '#ef4444' },
-  NOT_CHECKED: { bg: 'rgba(128,128,128,0.08)', border: 'rgba(128,128,128,0.15)', text: '#6b7280' },
+  NOT_CHECKED: { bg: 'rgba(128,128,128,0.08)', border: 'rgba(128,128,128,0.15)', text: '#6b7280' }
 }
 
 const DEFAULT_FILTERS: AnalyticsFilters = {
@@ -67,12 +90,20 @@ const DEFAULT_FILTERS: AnalyticsFilters = {
   fleetIds: [],
   customerIds: [],
   flagStateIds: [],
-  vesselTypeIds: [],
+  vesselTypeIds: []
 }
 
 // ── Chip ──────────────────────────────────────────────────────────────────────
 
-function Chip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+function Chip({
+  label,
+  selected,
+  onClick
+}: {
+  label: string
+  selected: boolean
+  onClick: () => void
+}) {
   return (
     <button
       onClick={onClick}
@@ -87,7 +118,7 @@ function Chip({ label, selected, onClick }: { label: string; selected: boolean; 
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         transition: 'all 0.15s',
         whiteSpace: 'nowrap',
-        lineHeight: '1.4',
+        lineHeight: '1.4'
       }}
     >
       {label}
@@ -100,14 +131,16 @@ function Chip({ label, selected, onClick }: { label: string; selected: boolean; 
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
-      <div style={{
-        fontSize: '0.7rem',
-        fontWeight: 700,
-        color: 'var(--text-secondary)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.6px',
-        marginBottom: '10px',
-      }}>
+      <div
+        style={{
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: 'var(--text-secondary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.6px',
+          marginBottom: '10px'
+        }}
+      >
         {label}
       </div>
       {children}
@@ -117,7 +150,11 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
 
 // ── CollapsibleFilter ─────────────────────────────────────────────────────────
 
-function CollapsibleFilter({ label, children, defaultCollapsed = false }: {
+function CollapsibleFilter({
+  label,
+  children,
+  defaultCollapsed = false
+}: {
   label: string
   children: React.ReactNode
   defaultCollapsed?: boolean
@@ -126,22 +163,35 @@ function CollapsibleFilter({ label, children, defaultCollapsed = false }: {
   return (
     <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--table-border)' }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         style={{
-          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', marginBottom: open ? '10px' : 0,
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          marginBottom: open ? '10px' : 0
         }}
       >
-        <span style={{
-          fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)',
-          textTransform: 'uppercase', letterSpacing: '0.6px',
-        }}>
+        <span
+          style={{
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: 'var(--text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px'
+          }}
+        >
           {label}
         </span>
-        {open
-          ? <ChevronDown size={13} color="var(--text-secondary)" />
-          : <ChevronRight size={13} color="var(--text-secondary)" />}
+        {open ? (
+          <ChevronDown size={13} color="var(--text-secondary)" />
+        ) : (
+          <ChevronRight size={13} color="var(--text-secondary)" />
+        )}
       </button>
       {open && children}
     </div>
@@ -150,7 +200,13 @@ function CollapsibleFilter({ label, children, defaultCollapsed = false }: {
 
 // ── MultiSelectDropdown ───────────────────────────────────────────────────────
 
-function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }: {
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedIds,
+  onChange,
+  isLight
+}: {
   label: string
   options: { id: string; name: string }[]
   selectedIds: string[]
@@ -165,53 +221,85 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }:
   const filtered = useMemo(() => {
     if (!search) return options
     const q = search.toLowerCase()
-    return options.filter(o => o.name.toLowerCase().includes(q))
+    return options.filter((o) => o.name.toLowerCase().includes(q))
   }, [options, search])
 
   const toggle = (id: string) => {
-    onChange(selectedIds.includes(id)
-      ? selectedIds.filter(x => x !== id)
-      : [...selectedIds, id])
+    onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id])
   }
 
   return (
     <div style={{ position: 'relative' }}>
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         style={{
-          width: '100%', padding: '6px 10px', borderRadius: '6px',
-          border: '1px solid var(--input-border)', background: dropdownBg,
-          color: 'var(--text-primary)', fontSize: '0.78rem', textAlign: 'left',
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          width: '100%',
+          padding: '6px 10px',
+          borderRadius: '6px',
+          border: '1px solid var(--input-border)',
+          background: dropdownBg,
+          color: 'var(--text-primary)',
+          fontSize: '0.78rem',
+          textAlign: 'left',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {selectedIds.length === 0 ? `Select ${label}...` : `${selectedIds.length} selected`}
         </span>
-        <ChevronDown size={13} style={{
-          flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: '0.15s',
-        }} />
+        <ChevronDown
+          size={13}
+          style={{
+            flexShrink: 0,
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: '0.15s'
+          }}
+        />
       </button>
       {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-          background: dropdownBg, border: '1px solid var(--input-border)',
-          borderRadius: '6px', marginTop: '2px', maxHeight: '240px', overflowY: 'auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            background: dropdownBg,
+            border: '1px solid var(--input-border)',
+            borderRadius: '6px',
+            marginTop: '2px',
+            maxHeight: '240px',
+            overflowY: 'auto',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}
+        >
           {/* All / None buttons */}
-          <div style={{
-            display: 'flex', gap: '4px', padding: '6px 8px',
-            borderBottom: '1px solid var(--table-border)',
-            position: 'sticky', top: 0, background: dropdownBg, zIndex: 1,
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '4px',
+              padding: '6px 8px',
+              borderBottom: '1px solid var(--table-border)',
+              position: 'sticky',
+              top: 0,
+              background: dropdownBg,
+              zIndex: 1
+            }}
+          >
             <button
-              onClick={() => onChange(options.map(o => o.id))}
+              onClick={() => onChange(options.map((o) => o.id))}
               style={{
-                padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
-                borderRadius: '4px', border: '1px solid var(--input-border)',
-                background: 'transparent', color: 'var(--accent-primary)',
-                cursor: 'pointer',
+                padding: '2px 8px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                borderRadius: '4px',
+                border: '1px solid var(--input-border)',
+                background: 'transparent',
+                color: 'var(--accent-primary)',
+                cursor: 'pointer'
               }}
             >
               All
@@ -219,39 +307,61 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }:
             <button
               onClick={() => onChange([])}
               style={{
-                padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
-                borderRadius: '4px', border: '1px solid var(--input-border)',
-                background: 'transparent', color: 'var(--text-secondary)',
-                cursor: 'pointer',
+                padding: '2px 8px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                borderRadius: '4px',
+                border: '1px solid var(--input-border)',
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
               }}
             >
               None
             </button>
           </div>
           {options.length > 6 && (
-            <div style={{
-              padding: '6px', borderBottom: '1px solid var(--table-border)',
-              position: 'sticky', top: 32, background: dropdownBg, zIndex: 1,
-            }}>
+            <div
+              style={{
+                padding: '6px',
+                borderBottom: '1px solid var(--table-border)',
+                position: 'sticky',
+                top: 32,
+                background: dropdownBg,
+                zIndex: 1
+              }}
+            >
               <input
                 placeholder="Search..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 autoFocus
                 style={{
-                  width: '100%', padding: '4px 8px', fontSize: '0.78rem',
-                  borderRadius: '4px', border: '1px solid var(--input-border)',
-                  background: dropdownBg, color: 'var(--text-primary)', boxSizing: 'border-box',
+                  width: '100%',
+                  padding: '4px 8px',
+                  fontSize: '0.78rem',
+                  borderRadius: '4px',
+                  border: '1px solid var(--input-border)',
+                  background: dropdownBg,
+                  color: 'var(--text-primary)',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
           )}
-          {filtered.map(o => (
-            <label key={o.id} style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem',
-              color: 'var(--text-primary)',
-            }}>
+          {filtered.map((o) => (
+            <label
+              key={o.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '5px 10px',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                color: 'var(--text-primary)'
+              }}
+            >
               <input
                 type="checkbox"
                 checked={selectedIds.includes(o.id)}
@@ -262,7 +372,14 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }:
             </label>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+            <div
+              style={{
+                padding: '10px',
+                fontSize: '0.78rem',
+                color: 'var(--text-secondary)',
+                textAlign: 'center'
+              }}
+            >
               No results
             </div>
           )}
@@ -274,7 +391,13 @@ function MultiSelectDropdown({ label, options, selectedIds, onChange, isLight }:
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
-function KPI({ icon, gradient, label, value, sub }: {
+function KPI({
+  icon,
+  gradient,
+  label,
+  value,
+  sub
+}: {
   icon: React.ReactNode
   gradient: string
   label: string
@@ -282,33 +405,51 @@ function KPI({ icon, gradient, label, value, sub }: {
   sub?: string
 }) {
   return (
-    <div className="glass-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-      <div style={{
-        width: '48px', height: '48px', borderRadius: '14px',
-        background: gradient,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-        boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-      }}>
+    <div
+      className="glass-card"
+      style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}
+    >
+      <div
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '14px',
+          background: gradient,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
+        }}
+      >
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600',
-          textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px',
-        }}>
+        <div
+          style={{
+            fontSize: '0.7rem',
+            color: 'var(--text-secondary)',
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: '3px'
+          }}
+        >
           {label}
         </div>
-        <div style={{
-          fontSize: String(value).length > 12 ? '1rem' : String(value).length > 8 ? '1.25rem' : '1.75rem',
-          fontWeight: '800',
-          lineHeight: 1,
-          letterSpacing: '-0.03em',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          width: '100%',
-        }}>
+        <div
+          style={{
+            fontSize:
+              String(value).length > 12 ? '1rem' : String(value).length > 8 ? '1.25rem' : '1.75rem',
+            fontWeight: '800',
+            lineHeight: 1,
+            letterSpacing: '-0.03em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}
+        >
           {value}
         </div>
         {sub && (
@@ -323,7 +464,13 @@ function KPI({ icon, gradient, label, value, sub }: {
 
 // ── ChartCard ─────────────────────────────────────────────────────────────────
 
-function ChartCard({ title, icon, accentColor, count, children }: {
+function ChartCard({
+  title,
+  icon,
+  accentColor,
+  count,
+  children
+}: {
   title: string
   icon: React.ReactNode
   accentColor: string
@@ -332,26 +479,44 @@ function ChartCard({ title, icon, accentColor, count, children }: {
 }) {
   return (
     <div className="glass-card" style={{ padding: '20px 22px' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid var(--table-border)',
-      }}>
-        <h3 style={{
-          margin: 0, fontSize: '0.8rem', fontWeight: '700',
-          textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)',
-          display: 'flex', alignItems: 'center', gap: '7px',
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '14px',
+          paddingBottom: '12px',
+          borderBottom: '1px solid var(--table-border)'
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '0.8rem',
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px'
+          }}
+        >
           <span style={{ color: accentColor, display: 'flex', alignItems: 'center' }}>{icon}</span>
           {title}
         </h3>
         {count !== undefined && (
-          <span style={{
-            fontSize: '0.74rem', fontWeight: '700',
-            color: 'var(--text-secondary)',
-            background: 'var(--table-header-bg)',
-            padding: '2px 9px', borderRadius: '10px',
-            border: '1px solid var(--table-border)',
-          }}>
+          <span
+            style={{
+              fontSize: '0.74rem',
+              fontWeight: '700',
+              color: 'var(--text-secondary)',
+              background: 'var(--table-header-bg)',
+              padding: '2px 9px',
+              borderRadius: '10px',
+              border: '1px solid var(--table-border)'
+            }}
+          >
             {count}
           </span>
         )}
@@ -365,17 +530,24 @@ function ChartCard({ title, icon, accentColor, count, children }: {
 
 function ProgressBar({ pct }: { pct: number }) {
   return (
-    <div style={{
-      height: '6px', borderRadius: '3px',
-      background: 'rgba(var(--accent-primary-rgb), 0.15)',
-      flex: 1, minWidth: '60px',
-    }}>
-      <div style={{
-        height: '100%', borderRadius: '3px',
-        background: 'var(--accent-primary)',
-        width: `${Math.min(pct, 100)}%`,
-        transition: 'width 0.5s ease',
-      }} />
+    <div
+      style={{
+        height: '6px',
+        borderRadius: '3px',
+        background: 'rgba(var(--accent-primary-rgb), 0.15)',
+        flex: 1,
+        minWidth: '60px'
+      }}
+    >
+      <div
+        style={{
+          height: '100%',
+          borderRadius: '3px',
+          background: 'var(--accent-primary)',
+          width: `${Math.min(pct, 100)}%`,
+          transition: 'width 0.5s ease'
+        }}
+      />
     </div>
   )
 }
@@ -383,15 +555,22 @@ function ProgressBar({ pct }: { pct: number }) {
 // ── table cell style helpers ──────────────────────────────────────────────────
 
 const thStyle: React.CSSProperties = {
-  padding: '10px 14px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600,
-  color: 'var(--text-secondary)', background: 'var(--table-header-bg)',
-  borderBottom: '1px solid var(--table-border)', whiteSpace: 'nowrap',
+  padding: '10px 14px',
+  textAlign: 'left',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  background: 'var(--table-header-bg)',
+  borderBottom: '1px solid var(--table-border)',
+  whiteSpace: 'nowrap'
 }
 
 const tdStyle = (idx: number): React.CSSProperties => ({
-  padding: '9px 14px', fontSize: '0.84rem', color: 'var(--text-primary)',
+  padding: '9px 14px',
+  fontSize: '0.84rem',
+  color: 'var(--text-primary)',
   borderBottom: '1px solid var(--table-border)',
-  background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)',
+  background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -436,11 +615,11 @@ export default function FleetAnalytics() {
     policyCoverage: true,
     topCustomers: true,
     ofacStatus: true,
-    rawVesselData: true,
+    rawVesselData: true
   })
 
   const toggleExportSection = (key: keyof typeof exportSections) => {
-    setExportSections(prev => ({ ...prev, [key]: !prev[key] }))
+    setExportSections((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   // ── Load reference data on mount ────────────────────────────────────────────
@@ -453,7 +632,7 @@ export default function FleetAnalytics() {
           window.api.getEntities(),
           window.api.getFlagStates(),
           window.api.getVesselTypes(),
-          window.api.analyticsGetPresets(),
+          window.api.analyticsGetPresets()
         ])
         setPolicyTypes(Array.isArray(pt) ? pt : [])
         setFleets(Array.isArray(fl) ? fl : [])
@@ -461,7 +640,9 @@ export default function FleetAnalytics() {
         setFlagStates(Array.isArray(fs) ? fs : [])
         setVesselTypes(Array.isArray(vt) ? vt : [])
         setPresets(Array.isArray(pr) ? pr : [])
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     load()
   }, [])
@@ -469,16 +650,14 @@ export default function FleetAnalytics() {
   // ── Derived: customers (entities that are customers of at least one vessel) ─
   // We don't know at filter-load time which entities are customers, so we show all entities.
   // The backend filters by customer_id anyway.
-  const customerEntities = useMemo(() =>
-    entities.filter(e => e.type === 'company'),
-  [entities])
+  const customerEntities = useMemo(() => entities.filter((e) => e.type === 'company'), [entities])
 
   // ── Apply filters ───────────────────────────────────────────────────────────
   const applyFilters = useCallback(async () => {
     setLoading(true)
     setHasQueried(true)
     try {
-      const result = await window.api.analyticsGetData(filters) as any
+      const result = (await window.api.analyticsGetData(filters)) as any
       if (result && !result.error) {
         setVessels(Array.isArray(result.vessels) ? result.vessels : [])
         setPolicyCoverage(Array.isArray(result.policyCoverage) ? result.policyCoverage : [])
@@ -500,9 +679,9 @@ export default function FleetAnalytics() {
       return
     }
     try {
-      const created = await window.api.analyticsAddPreset(presetNameInput.trim(), filters) as any
+      const created = (await window.api.analyticsAddPreset(presetNameInput.trim(), filters)) as any
       if (created && !created.error && created.id) {
-        setPresets(p => [...p, created])
+        setPresets((p) => [...p, created])
         setSelectedPresetId(created.id)
         showSuccess(`Preset "${presetNameInput.trim()}" saved`)
         setPresetNameInput('')
@@ -517,11 +696,11 @@ export default function FleetAnalytics() {
 
   const handleLoadPreset = (id: string) => {
     setSelectedPresetId(id)
-    const preset = presets.find(p => p.id === id)
+    const preset = presets.find((p) => p.id === id)
     if (preset?.filters) {
       setFilters({
         ...DEFAULT_FILTERS,
-        ...preset.filters,
+        ...preset.filters
       })
     }
   }
@@ -529,7 +708,7 @@ export default function FleetAnalytics() {
   const handleDeletePreset = async (id: string) => {
     try {
       await window.api.analyticsDeletePreset(id)
-      setPresets(p => p.filter(x => x.id !== id))
+      setPresets((p) => p.filter((x) => x.id !== id))
       if (selectedPresetId === id) setSelectedPresetId('')
       showSuccess('Preset deleted')
     } catch {
@@ -539,7 +718,7 @@ export default function FleetAnalytics() {
 
   // ── Filter update helpers ───────────────────────────────────────────────────
   const updateFilter = <K extends keyof AnalyticsFilters>(key: K, value: AnalyticsFilters[K]) => {
-    setFilters(f => ({ ...f, [key]: value }))
+    setFilters((f) => ({ ...f, [key]: value }))
   }
 
   // ── Vessel status helper ────────────────────────────────────────────────────
@@ -579,7 +758,11 @@ export default function FleetAnalytics() {
       let needNewPage = false
 
       const ensurePage = () => {
-        if (needNewPage) { doc.addPage(); y = 15; needNewPage = false }
+        if (needNewPage) {
+          doc.addPage()
+          y = 15
+          needNewPage = false
+        }
       }
 
       // ── KPI summary (2 rows of 3) ──
@@ -590,7 +773,7 @@ export default function FleetAnalytics() {
           { label: 'Avg Tonnage', value: kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A' },
           { label: 'Total Tonnage', value: fmt(kpis.totalTonnage) },
           { label: 'Flags', value: String(kpis.flags) },
-          { label: 'Policy Coverage', value: `${kpis.policyCoveragePct}%` },
+          { label: 'Policy Coverage', value: `${kpis.policyCoveragePct}%` }
         ]
         const boxW = (pw - 20 - 8) / 3
         const boxH = 14
@@ -624,17 +807,17 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Type', 'Count', '%', 'Avg Age', 'Avg Tonnage']],
-          body: vesselTypeBreakdown.map(r => [
+          body: vesselTypeBreakdown.map((r) => [
             r.name,
             String(r.count),
             `${r.pct.toFixed(1)}%`,
             r.avgAge != null ? `${r.avgAge} yrs` : 'N/A',
-            r.avgTonnage != null ? fmt(r.avgTonnage) : 'N/A',
+            r.avgTonnage != null ? fmt(r.avgTonnage) : 'N/A'
           ]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
         y = (doc as any).lastAutoTable.finalY + 8
       }
@@ -653,16 +836,21 @@ export default function FleetAnalytics() {
           startY: y,
           head: [['Flag', 'Count', '%']],
           body: [
-            ...flagDistribution.rows.map(r => [r.name, String(r.count), `${r.pct.toFixed(1)}%`]),
+            ...flagDistribution.rows.map((r) => [r.name, String(r.count), `${r.pct.toFixed(1)}%`]),
             ...(flagDistribution.othersCount > 0
-              ? [['Others', String(flagDistribution.othersCount),
-                `${pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(1) : 0}%`]]
-              : []),
+              ? [
+                  [
+                    'Others',
+                    String(flagDistribution.othersCount),
+                    `${pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(1) : 0}%`
+                  ]
+                ]
+              : [])
           ],
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
         y = (doc as any).lastAutoTable.finalY + 8
       }
@@ -679,11 +867,11 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Range', 'Count', '%']],
-          body: ageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+          body: ageProfile.map((r) => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: sections.tonnageDistribution ? pw / 2 + 5 : 10 },
+          margin: { left: 10, right: sections.tonnageDistribution ? pw / 2 + 5 : 10 }
         })
         const ageTableBottom = (doc as any).lastAutoTable.finalY
 
@@ -697,11 +885,11 @@ export default function FleetAnalytics() {
           autoTable(doc, {
             startY: ageStartY + 2,
             head: [['Range', 'Count', '%']],
-            body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+            body: tonnageProfile.map((r) => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
             theme: 'grid',
             headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
             bodyStyles: { fontSize: 7.5 },
-            margin: { left: pw / 2 + 5, right: 10 },
+            margin: { left: pw / 2 + 5, right: 10 }
           })
           y = Math.max(ageTableBottom, (doc as any).lastAutoTable.finalY) + 8
         } else {
@@ -717,11 +905,11 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Range', 'Count', '%']],
-          body: tonnageProfile.map(r => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
+          body: tonnageProfile.map((r) => [r.label, String(r.count), `${r.pct.toFixed(1)}%`]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
         y = (doc as any).lastAutoTable.finalY + 8
       }
@@ -739,15 +927,15 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Policy Type', 'Vessels Covered', '%']],
-          body: policyCoverage.map(r => [
+          body: policyCoverage.map((r) => [
             r.name,
             String(r.vesselCount),
-            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
+            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`
           ]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
         y = (doc as any).lastAutoTable.finalY + 8
       }
@@ -763,16 +951,16 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Customer', 'Vessels', '%', 'Types']],
-          body: customerConcentration.map(r => [
+          body: customerConcentration.map((r) => [
             r.name,
             String(r.count),
             `${r.pct.toFixed(1)}%`,
-            r.types,
+            r.types
           ]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
         y = (doc as any).lastAutoTable.finalY + 8
       }
@@ -788,15 +976,15 @@ export default function FleetAnalytics() {
         autoTable(doc, {
           startY: y,
           head: [['Status', 'Count', '%']],
-          body: ofacStatus.map(r => [
+          body: ofacStatus.map((r) => [
             r.label,
             String(r.count),
-            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
+            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`
           ]),
           theme: 'grid',
           headStyles: { fillColor: navy, fontSize: 7.5, fontStyle: 'bold' },
           bodyStyles: { fontSize: 7.5 },
-          margin: { left: 10, right: 10 },
+          margin: { left: 10, right: 10 }
         })
       }
 
@@ -843,7 +1031,7 @@ export default function FleetAnalytics() {
           ['Average Tonnage', kpis.avgTonnage != null ? fmt(kpis.avgTonnage) : 'N/A'],
           ['Total Tonnage', fmt(kpis.totalTonnage)],
           ['Flags', kpis.flags],
-          ['Policy Coverage', `${kpis.policyCoveragePct}%`],
+          ['Policy Coverage', `${kpis.policyCoveragePct}%`]
         ]
         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
         wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]
@@ -855,13 +1043,13 @@ export default function FleetAnalytics() {
       if (sections.vesselTypes) {
         const typeData = [
           ['Type', 'Count', 'Percentage', 'Avg Age', 'Avg Tonnage'],
-          ...vesselTypeBreakdown.map(r => [
+          ...vesselTypeBreakdown.map((r) => [
             r.name,
             r.count,
             `${r.pct.toFixed(1)}%`,
             r.avgAge != null ? r.avgAge : 'N/A',
-            r.avgTonnage != null ? r.avgTonnage : 'N/A',
-          ]),
+            r.avgTonnage != null ? r.avgTonnage : 'N/A'
+          ])
         ]
         const wsTypes = XLSX.utils.aoa_to_sheet(typeData)
         wsTypes['!cols'] = [{ wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 14 }]
@@ -872,18 +1060,20 @@ export default function FleetAnalytics() {
       if (sections.flagStates) {
         const allFlags = Array.from(
           groupBy(pool, (v: any) => v.flagStateId || '__none__').entries()
-        ).map(([flagId, vs]) => {
-          const fs = flagMap.get(flagId)
-          return {
-            name: fs?.name ?? '(Unassigned)',
-            count: vs.length,
-            pct: pool.length > 0 ? (vs.length / pool.length) * 100 : 0,
-          }
-        }).sort((a, b) => b.count - a.count)
+        )
+          .map(([flagId, vs]) => {
+            const fs = flagMap.get(flagId)
+            return {
+              name: fs?.name ?? '(Unassigned)',
+              count: vs.length,
+              pct: pool.length > 0 ? (vs.length / pool.length) * 100 : 0
+            }
+          })
+          .sort((a, b) => b.count - a.count)
 
         const flagData = [
           ['Flag', 'Count', 'Percentage'],
-          ...allFlags.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`]),
+          ...allFlags.map((r) => [r.name, r.count, `${r.pct.toFixed(1)}%`])
         ]
         const wsFlags = XLSX.utils.aoa_to_sheet(flagData)
         wsFlags['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 12 }]
@@ -894,7 +1084,7 @@ export default function FleetAnalytics() {
       if (sections.ageDistribution) {
         const ageData = [
           ['Range', 'Count', 'Percentage'],
-          ...ageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+          ...ageProfile.map((r) => [r.label, r.count, `${r.pct.toFixed(1)}%`])
         ]
         const wsAge = XLSX.utils.aoa_to_sheet(ageData)
         wsAge['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
@@ -905,7 +1095,7 @@ export default function FleetAnalytics() {
       if (sections.tonnageDistribution) {
         const tonnageData = [
           ['Range', 'Count', 'Percentage'],
-          ...tonnageProfile.map(r => [r.label, r.count, `${r.pct.toFixed(1)}%`]),
+          ...tonnageProfile.map((r) => [r.label, r.count, `${r.pct.toFixed(1)}%`])
         ]
         const wsTonnage = XLSX.utils.aoa_to_sheet(tonnageData)
         wsTonnage['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 12 }]
@@ -916,11 +1106,11 @@ export default function FleetAnalytics() {
       if (sections.policyCoverage) {
         const policyData = [
           ['Policy Type', 'Vessels Covered', 'Percentage'],
-          ...policyCoverage.map(r => [
+          ...policyCoverage.map((r) => [
             r.name,
             r.vesselCount,
-            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`,
-          ]),
+            `${pool.length > 0 ? ((r.vesselCount / pool.length) * 100).toFixed(1) : 0}%`
+          ])
         ]
         const wsPolicy = XLSX.utils.aoa_to_sheet(policyData)
         wsPolicy['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 12 }]
@@ -931,7 +1121,7 @@ export default function FleetAnalytics() {
       if (sections.topCustomers) {
         const customerData = [
           ['Customer', 'Vessels', 'Percentage', 'Types'],
-          ...customerConcentration.map(r => [r.name, r.count, `${r.pct.toFixed(1)}%`, r.types]),
+          ...customerConcentration.map((r) => [r.name, r.count, `${r.pct.toFixed(1)}%`, r.types])
         ]
         const wsCustomers = XLSX.utils.aoa_to_sheet(customerData)
         wsCustomers['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 30 }]
@@ -942,11 +1132,11 @@ export default function FleetAnalytics() {
       if (sections.ofacStatus) {
         const ofacData = [
           ['Status', 'Count', 'Percentage'],
-          ...ofacStatus.map(r => [
+          ...ofacStatus.map((r) => [
             r.label,
             r.count,
-            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`,
-          ]),
+            `${pool.length > 0 ? ((r.count / pool.length) * 100).toFixed(1) : 0}%`
+          ])
         ]
         const wsOfac = XLSX.utils.aoa_to_sheet(ofacData)
         wsOfac['!cols'] = [{ wch: 20 }, { wch: 8 }, { wch: 12 }]
@@ -956,8 +1146,19 @@ export default function FleetAnalytics() {
       // ── Sheet 9: Vessels (raw data) ──
       if (sections.rawVesselData) {
         const vesselData = [
-          ['Name', 'IMO', 'Type', 'Flag', 'Built Year', 'Rebuilt Year', 'Age', 'Gross Tonnage',
-            'Active', 'Customer Type', 'OFAC Status'],
+          [
+            'Name',
+            'IMO',
+            'Type',
+            'Flag',
+            'Built Year',
+            'Rebuilt Year',
+            'Age',
+            'Gross Tonnage',
+            'Active',
+            'Customer Type',
+            'OFAC Status'
+          ],
           ...pool.map((v: any) => {
             const fs = flagMap.get(v.flagStateId)
             const age = v.builtYear ? currentYear - v.builtYear : ''
@@ -972,14 +1173,22 @@ export default function FleetAnalytics() {
               v.grossTonnage ? Number(v.grossTonnage) : '',
               v.isActive ? 'Yes' : 'No',
               v.customerType || '',
-              v.ofacStatus || 'NOT_CHECKED',
+              v.ofacStatus || 'NOT_CHECKED'
             ]
-          }),
+          })
         ]
         const wsVessels = XLSX.utils.aoa_to_sheet(vesselData)
         wsVessels['!cols'] = [
-          { wch: 28 }, { wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 12 },
-          { wch: 6 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 },
+          { wch: 28 },
+          { wch: 12 },
+          { wch: 18 },
+          { wch: 22 },
+          { wch: 12 },
+          { wch: 6 },
+          { wch: 14 },
+          { wch: 8 },
+          { wch: 14 },
+          { wch: 16 }
         ]
         XLSX.utils.book_append_sheet(wb, wsVessels, 'Vessels')
       }
@@ -995,23 +1204,30 @@ export default function FleetAnalytics() {
   // ── Derived analytics ───────────────────────────────────────────────────────
   const pool = vessels
 
-  const flagMap = useMemo(() => new Map(flagStates.map(f => [f.id, f])), [flagStates])
-  const entityMap = useMemo(() => new Map(entities.map(e => [e.id, e])), [entities])
+  const flagMap = useMemo(() => new Map(flagStates.map((f) => [f.id, f])), [flagStates])
+  const entityMap = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities])
 
   const kpis = useMemo(() => {
     const withAge = pool.filter((v: any) => v.builtYear)
-    const avgAge = withAge.length > 0
-      ? (withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length)
-      : null
+    const avgAge =
+      withAge.length > 0
+        ? withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length
+        : null
     const withTonnage = pool.filter((v: any) => v.grossTonnage)
-    const avgTonnage = withTonnage.length > 0
-      ? Math.round(withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) / withTonnage.length)
-      : null
+    const avgTonnage =
+      withTonnage.length > 0
+        ? Math.round(
+            withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) /
+              withTonnage.length
+          )
+        : null
     const totalTonnage = withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0)
-    const flags = new Set(pool.filter((v: any) => v.flagStateId).map((v: any) => v.flagStateId)).size
-    const withPolicy = policyCoverage.length > 0
-      ? new Set(policyCoverage.flatMap(() => pool.filter((v: any) => v.id).map((v: any) => v.id)))
-      : new Set<string>()
+    const flags = new Set(pool.filter((v: any) => v.flagStateId).map((v: any) => v.flagStateId))
+      .size
+    const withPolicy =
+      policyCoverage.length > 0
+        ? new Set(policyCoverage.flatMap(() => pool.filter((v: any) => v.id).map((v: any) => v.id)))
+        : new Set<string>()
     // Policy coverage % = vessels with at least 1 active policy / total
     const coveredVesselIds = new Set<string>()
     for (const pc of policyCoverage) {
@@ -1020,10 +1236,12 @@ export default function FleetAnalytics() {
     }
     // Better: count vessels that appear in policyCoverage data
     // Since we only have aggregated counts, use the total covered count
-    const totalCoveredVessels = policyCoverage.reduce((s, pc) => Math.max(s, Number(pc.vesselCount)), 0)
-    const policyCoveragePct = pool.length > 0
-      ? Math.round((totalCoveredVessels / pool.length) * 100)
-      : 0
+    const totalCoveredVessels = policyCoverage.reduce(
+      (s, pc) => Math.max(s, Number(pc.vesselCount)),
+      0
+    )
+    const policyCoveragePct =
+      pool.length > 0 ? Math.round((totalCoveredVessels / pool.length) * 100) : 0
 
     void withPolicy
     void coveredVesselIds
@@ -1034,7 +1252,7 @@ export default function FleetAnalytics() {
       avgTonnage,
       totalTonnage,
       flags,
-      policyCoveragePct,
+      policyCoveragePct
     }
   }, [pool, policyCoverage])
 
@@ -1044,14 +1262,28 @@ export default function FleetAnalytics() {
     return Array.from(grouped.entries())
       .map(([name, items]) => {
         const withAge = items.filter((v: any) => v.builtYear)
-        const avgAge = withAge.length > 0
-          ? +(withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) / withAge.length).toFixed(1)
-          : null
+        const avgAge =
+          withAge.length > 0
+            ? +(
+                withAge.reduce((s: number, v: any) => s + (currentYear - v.builtYear), 0) /
+                withAge.length
+              ).toFixed(1)
+            : null
         const withTonnage = items.filter((v: any) => v.grossTonnage)
-        const avgTonnage = withTonnage.length > 0
-          ? Math.round(withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) / withTonnage.length)
-          : null
-        return { name, count: items.length, pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0, avgAge, avgTonnage }
+        const avgTonnage =
+          withTonnage.length > 0
+            ? Math.round(
+                withTonnage.reduce((s: number, v: any) => s + Number(v.grossTonnage), 0) /
+                  withTonnage.length
+              )
+            : null
+        return {
+          name,
+          count: items.length,
+          pct: pool.length > 0 ? (items.length / pool.length) * 100 : 0,
+          avgAge,
+          avgTonnage
+        }
       })
       .sort((a, b) => b.count - a.count)
   }, [pool])
@@ -1066,7 +1298,7 @@ export default function FleetAnalytics() {
           name: fs?.name ?? '(Unassigned)',
           iso3: fs?.iso3Code ?? '',
           count: vessels.length,
-          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
+          pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -1078,7 +1310,7 @@ export default function FleetAnalytics() {
 
   // ── Age Profile ─────────────────────────────────────────────────────────────
   const ageProfile = useMemo(() => {
-    return AGE_BUCKETS.map(b => {
+    return AGE_BUCKETS.map((b) => {
       const count = pool.filter((v: any) => {
         if (!v.builtYear) return false
         const age = currentYear - v.builtYear
@@ -1090,7 +1322,7 @@ export default function FleetAnalytics() {
 
   // ── Tonnage Profile ─────────────────────────────────────────────────────────
   const tonnageProfile = useMemo(() => {
-    return TONNAGE_BUCKETS.map(b => {
+    return TONNAGE_BUCKETS.map((b) => {
       const count = pool.filter((v: any) => {
         const gt = Number(v.grossTonnage)
         if (!gt) return false
@@ -1112,7 +1344,7 @@ export default function FleetAnalytics() {
           name: entity?.name ?? '(Unknown)',
           count: vessels.length,
           pct: pool.length > 0 ? (vessels.length / pool.length) * 100 : 0,
-          types,
+          types
         }
       })
       .sort((a, b) => b.count - a.count)
@@ -1123,10 +1355,10 @@ export default function FleetAnalytics() {
   const ofacStatus = useMemo(() => {
     const groups = groupBy(pool, (v: any) => v.ofacStatus || 'NOT_CHECKED')
     const order = ['CLEARED', 'PENDING', 'POTENTIAL_MATCH', 'MATCH', 'NOT_CHECKED'] as const
-    return order.map(status => ({
+    return order.map((status) => ({
       label: status.replace(/_/g, ' '),
       key: status,
-      count: groups.get(status)?.length ?? 0,
+      count: groups.get(status)?.length ?? 0
     }))
   }, [pool])
 
@@ -1140,40 +1372,60 @@ export default function FleetAnalytics() {
     green: 'linear-gradient(135deg, #10b981, #059669)',
     amber: 'linear-gradient(135deg, #f59e0b, #d97706)',
     pink: 'linear-gradient(135deg, #ec4899, #be185d)',
-    teal: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+    teal: 'linear-gradient(135deg, #14b8a6, #0d9488)'
   }
 
   return (
-    <div className="fade-in" style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
-
+    <div
+      className="fade-in"
+      style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 100px)', overflow: 'hidden' }}
+    >
       {/* ── Left Sidebar: Filters ─────────────────────────────────── */}
-      <aside style={{
-        width: '280px',
-        flexShrink: 0,
-        background: 'var(--bg-card)',
-        borderRadius: '14px',
-        border: '1px solid var(--table-border)',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        overflowY: 'auto',
-      }}>
+      <aside
+        style={{
+          width: '280px',
+          flexShrink: 0,
+          background: 'var(--bg-card)',
+          borderRadius: '14px',
+          border: '1px solid var(--table-border)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          overflowY: 'auto'
+        }}
+      >
         {/* Sidebar header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          paddingBottom: '16px', borderBottom: '1px solid var(--table-border)',
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 9,
-            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid var(--table-border)'
+          }}
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
             <Filter size={16} color="#fff" />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Filters</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Refine your analysis</div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+              Filters
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              Refine your analysis
+            </div>
           </div>
         </div>
 
@@ -1182,25 +1434,36 @@ export default function FleetAnalytics() {
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <select
               value={selectedPresetId}
-              onChange={e => handleLoadPreset(e.target.value)}
+              onChange={(e) => handleLoadPreset(e.target.value)}
               style={{
-                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
-                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
               }}
             >
               <option value="">Select preset...</option>
-              {presets.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
             <button
               onClick={() => setShowPresetInput(!showPresetInput)}
               title="Save current filters"
               style={{
-                background: 'none', border: '1px solid var(--input-border)',
-                borderRadius: '6px', padding: '5px 7px', cursor: 'pointer',
-                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+                background: 'none',
+                border: '1px solid var(--input-border)',
+                borderRadius: '6px',
+                padding: '5px 7px',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center'
               }}
             >
               <Save size={14} />
@@ -1211,14 +1474,20 @@ export default function FleetAnalytics() {
               <input
                 type="text"
                 value={presetNameInput}
-                onChange={e => setPresetNameInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSavePreset() }}
+                onChange={(e) => setPresetNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSavePreset()
+                }}
                 placeholder="Preset name..."
                 autoFocus
                 style={{
-                  flex: 1, padding: '6px 10px', fontSize: '0.82rem',
-                  borderRadius: '6px', border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg)', color: 'var(--text-primary)',
+                  flex: 1,
+                  padding: '6px 10px',
+                  fontSize: '0.82rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg)',
+                  color: 'var(--text-primary)'
                 }}
               />
               <button
@@ -1229,9 +1498,20 @@ export default function FleetAnalytics() {
               >
                 Save
               </button>
-              <button title="Close" aria-label="Close"
-                onClick={() => { setShowPresetInput(false); setPresetNameInput('') }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px' }}
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => {
+                  setShowPresetInput(false)
+                  setPresetNameInput('')
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '4px'
+                }}
               >
                 <X size={14} />
               </button>
@@ -1241,9 +1521,16 @@ export default function FleetAnalytics() {
             <button
               onClick={() => handleDeletePreset(selectedPresetId)}
               style={{
-                marginTop: '6px', background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--danger)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px',
-                padding: 0,
+                marginTop: '6px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--danger)',
+                fontSize: '0.72rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: 0
               }}
             >
               <Trash2 size={12} /> Delete preset
@@ -1254,7 +1541,7 @@ export default function FleetAnalytics() {
         {/* Vessel Status */}
         <FilterSection label="Vessel Status">
           <div style={{ display: 'flex', gap: '6px' }}>
-            {(['active', 'inactive', 'all'] as const).map(s => (
+            {(['active', 'inactive', 'all'] as const).map((s) => (
               <Chip
                 key={s}
                 label={s.charAt(0).toUpperCase() + s.slice(1)}
@@ -1269,16 +1556,19 @@ export default function FleetAnalytics() {
         {policyTypes.length > 0 && (
           <CollapsibleFilter label="Policy Types">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {policyTypes.map(pt => (
+              {policyTypes.map((pt) => (
                 <Chip
                   key={pt.id}
                   label={pt.name}
                   selected={filters.policyTypeIds.includes(pt.id)}
-                  onClick={() => updateFilter('policyTypeIds',
-                    filters.policyTypeIds.includes(pt.id)
-                      ? filters.policyTypeIds.filter(x => x !== pt.id)
-                      : [...filters.policyTypeIds, pt.id]
-                  )}
+                  onClick={() =>
+                    updateFilter(
+                      'policyTypeIds',
+                      filters.policyTypeIds.includes(pt.id)
+                        ? filters.policyTypeIds.filter((x) => x !== pt.id)
+                        : [...filters.policyTypeIds, pt.id]
+                    )
+                  }
                 />
               ))}
             </div>
@@ -1289,9 +1579,9 @@ export default function FleetAnalytics() {
         <CollapsibleFilter label="Flag States">
           <MultiSelectDropdown
             label="flag states"
-            options={flagStates.map(f => ({ id: f.id, name: f.name }))}
+            options={flagStates.map((f) => ({ id: f.id, name: f.name }))}
             selectedIds={filters.flagStateIds}
-            onChange={ids => updateFilter('flagStateIds', ids)}
+            onChange={(ids) => updateFilter('flagStateIds', ids)}
             isLight={isLight}
           />
         </CollapsibleFilter>
@@ -1300,9 +1590,9 @@ export default function FleetAnalytics() {
         <CollapsibleFilter label="Vessel Types">
           <MultiSelectDropdown
             label="vessel types"
-            options={vesselTypes.map(vt => ({ id: vt.id, name: vt.name }))}
+            options={vesselTypes.map((vt) => ({ id: vt.id, name: vt.name }))}
             selectedIds={filters.vesselTypeIds}
-            onChange={ids => updateFilter('vesselTypeIds', ids)}
+            onChange={(ids) => updateFilter('vesselTypeIds', ids)}
             isLight={isLight}
           />
         </CollapsibleFilter>
@@ -1311,9 +1601,9 @@ export default function FleetAnalytics() {
         <CollapsibleFilter label="Fleets" defaultCollapsed>
           <MultiSelectDropdown
             label="fleets"
-            options={fleets.map(f => ({ id: f.id, name: f.name }))}
+            options={fleets.map((f) => ({ id: f.id, name: f.name }))}
             selectedIds={filters.fleetIds}
-            onChange={ids => updateFilter('fleetIds', ids)}
+            onChange={(ids) => updateFilter('fleetIds', ids)}
             isLight={isLight}
           />
         </CollapsibleFilter>
@@ -1322,9 +1612,9 @@ export default function FleetAnalytics() {
         <CollapsibleFilter label="Customers" defaultCollapsed>
           <MultiSelectDropdown
             label="customers"
-            options={customerEntities.map(e => ({ id: e.id, name: e.name }))}
+            options={customerEntities.map((e) => ({ id: e.id, name: e.name }))}
             selectedIds={filters.customerIds}
-            onChange={ids => updateFilter('customerIds', ids)}
+            onChange={(ids) => updateFilter('customerIds', ids)}
             isLight={isLight}
           />
         </CollapsibleFilter>
@@ -1336,12 +1626,19 @@ export default function FleetAnalytics() {
               type="number"
               placeholder="Min"
               value={filters.ageMin ?? ''}
-              onChange={e => updateFilter('ageMin', e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                updateFilter('ageMin', e.target.value ? Number(e.target.value) : undefined)
+              }
               min={0}
               style={{
-                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
-                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
-                color: 'var(--text-primary)', width: '100%',
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                width: '100%'
               }}
             />
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
@@ -1349,12 +1646,19 @@ export default function FleetAnalytics() {
               type="number"
               placeholder="Max"
               value={filters.ageMax ?? ''}
-              onChange={e => updateFilter('ageMax', e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                updateFilter('ageMax', e.target.value ? Number(e.target.value) : undefined)
+              }
               min={0}
               style={{
-                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
-                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
-                color: 'var(--text-primary)', width: '100%',
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                width: '100%'
               }}
             />
           </div>
@@ -1367,12 +1671,19 @@ export default function FleetAnalytics() {
               type="number"
               placeholder="Min"
               value={filters.tonnageMin ?? ''}
-              onChange={e => updateFilter('tonnageMin', e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                updateFilter('tonnageMin', e.target.value ? Number(e.target.value) : undefined)
+              }
               min={0}
               style={{
-                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
-                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
-                color: 'var(--text-primary)', width: '100%',
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                width: '100%'
               }}
             />
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>to</span>
@@ -1380,12 +1691,19 @@ export default function FleetAnalytics() {
               type="number"
               placeholder="Max"
               value={filters.tonnageMax ?? ''}
-              onChange={e => updateFilter('tonnageMax', e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                updateFilter('tonnageMax', e.target.value ? Number(e.target.value) : undefined)
+              }
               min={0}
               style={{
-                flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '0.78rem',
-                border: '1px solid var(--input-border)', background: 'var(--bg-primary)',
-                color: 'var(--text-primary)', width: '100%',
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                width: '100%'
               }}
             />
           </div>
@@ -1397,8 +1715,12 @@ export default function FleetAnalytics() {
           disabled={loading}
           className="btn-primary"
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '8px', width: '100%', marginTop: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            width: '100%',
+            marginTop: '4px'
           }}
         >
           {loading ? <Loader2 size={16} className="spinner" /> : <BarChart3 size={16} />}
@@ -1408,43 +1730,87 @@ export default function FleetAnalytics() {
 
       {/* ── Right Panel: Analytics Content ──────────────────────── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-
         {/* Top bar */}
         <PageHeader
           icon={<BarChart2 size={26} />}
-          title={<>Fleet Analytics {hasQueried && <Badge tone="accent">{pool.length} vessel{pool.length !== 1 ? 's' : ''}</Badge>}</>}
-          actions={hasQueried && <>
-            <button onClick={applyFilters} className="btn-secondary btn-icon" title="Refresh data" aria-label="Refresh data" disabled={loading}>
-              {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
-            </button>
-            {pool.length > 0 && (
-              <button onClick={() => setExportModalOpen(true)} className="btn-secondary">
-                <FileDown size={16} /> Export
-              </button>
-            )}
-          </>}
+          title={
+            <>
+              Fleet Analytics{' '}
+              {hasQueried && (
+                <Badge tone="accent">
+                  {pool.length} vessel{pool.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+            </>
+          }
+          actions={
+            hasQueried && (
+              <>
+                <button
+                  onClick={applyFilters}
+                  className="btn-secondary btn-icon"
+                  title="Refresh data"
+                  aria-label="Refresh data"
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 size={16} className="spinner" /> : <RefreshCw size={16} />}
+                </button>
+                {pool.length > 0 && (
+                  <button onClick={() => setExportModalOpen(true)} className="btn-secondary">
+                    <FileDown size={16} /> Export
+                  </button>
+                )}
+              </>
+            )
+          }
         />
 
         {/* ── Content ── */}
         {!hasQueried ? (
           <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center' }}>
-            <BarChart3 size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.25 }} />
-            <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            <BarChart3
+              size={48}
+              color="var(--text-secondary)"
+              style={{ marginBottom: '16px', opacity: 0.25 }}
+            />
+            <div
+              style={{
+                fontSize: '1.05rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                marginBottom: '8px'
+              }}
+            >
               No analysis run yet
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-              Configure filters on the left, then click <strong>Apply Filters</strong> to generate analytics.
+              Configure filters on the left, then click <strong>Apply Filters</strong> to generate
+              analytics.
             </p>
           </div>
         ) : loading ? (
-          <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div
+            className="glass-card"
+            style={{ padding: '80px 40px', textAlign: 'center', color: 'var(--text-secondary)' }}
+          >
             <Loader2 size={32} className="spinner" style={{ marginBottom: '12px', opacity: 0.5 }} />
             <p style={{ margin: 0 }}>Analyzing fleet data...</p>
           </div>
         ) : pool.length === 0 ? (
           <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center' }}>
-            <Ship size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.25 }} />
-            <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            <Ship
+              size={48}
+              color="var(--text-secondary)"
+              style={{ marginBottom: '16px', opacity: 0.25 }}
+            />
+            <div
+              style={{
+                fontSize: '1.05rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                marginBottom: '8px'
+              }}
+            >
               No vessels match filters
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
@@ -1454,7 +1820,14 @@ export default function FleetAnalytics() {
         ) : (
           <>
             {/* ── Section 1: KPI Cards ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '14px',
+                marginBottom: '20px'
+              }}
+            >
               <KPI
                 icon={<Ship size={20} color="#fff" />}
                 gradient={G.blue}
@@ -1467,7 +1840,11 @@ export default function FleetAnalytics() {
                 gradient={G.amber}
                 label="Avg Age"
                 value={kpis.avgAge != null ? `${kpis.avgAge} yr` : '--'}
-                sub={kpis.avgAge != null ? `Built ~${currentYear - Math.round(kpis.avgAge)}` : 'No age data'}
+                sub={
+                  kpis.avgAge != null
+                    ? `Built ~${currentYear - Math.round(kpis.avgAge)}`
+                    : 'No age data'
+                }
               />
               <KPI
                 icon={<TrendingUp size={20} color="#fff" />}
@@ -1524,19 +1901,40 @@ export default function FleetAnalytics() {
                       {vesselTypeBreakdown.map((row, idx) => (
                         <tr key={row.name}>
                           <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                            {row.count}
+                          </td>
                           <td style={tdStyle(idx)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <ProgressBar pct={row.pct} />
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                  minWidth: '36px',
+                                  textAlign: 'right'
+                                }}
+                              >
                                 {row.pct.toFixed(0)}%
                               </span>
                             </div>
                           </td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                          <td
+                            style={{
+                              ...tdStyle(idx),
+                              textAlign: 'right',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
                             {row.avgAge != null ? `${row.avgAge} yr` : '--'}
                           </td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                          <td
+                            style={{
+                              ...tdStyle(idx),
+                              textAlign: 'right',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
                             {row.avgTonnage != null ? fmt(row.avgTonnage) : '--'}
                           </td>
                         </tr>
@@ -1576,18 +1974,45 @@ export default function FleetAnalytics() {
                             <td style={tdStyle(idx)}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {flagCls ? (
-                                  <span className={`fi ${flagCls}`} style={{ width: '20px', height: '14px', borderRadius: '2px', display: 'block', flexShrink: 0 }} />
+                                  <span
+                                    className={`fi ${flagCls}`}
+                                    style={{
+                                      width: '20px',
+                                      height: '14px',
+                                      borderRadius: '2px',
+                                      display: 'block',
+                                      flexShrink: 0
+                                    }}
+                                  />
                                 ) : (
-                                  <span style={{ display: 'block', width: '20px', height: '14px', borderRadius: '2px', background: 'var(--table-border)', flexShrink: 0 }} />
+                                  <span
+                                    style={{
+                                      display: 'block',
+                                      width: '20px',
+                                      height: '14px',
+                                      borderRadius: '2px',
+                                      background: 'var(--table-border)',
+                                      flexShrink: 0
+                                    }}
+                                  />
                                 )}
                                 <span style={{ fontWeight: 600 }}>{row.name}</span>
                               </div>
                             </td>
-                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
+                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                              {row.count}
+                            </td>
                             <td style={tdStyle(idx)}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <ProgressBar pct={row.pct} />
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'var(--text-secondary)',
+                                    minWidth: '36px',
+                                    textAlign: 'right'
+                                  }}
+                                >
                                   {row.pct.toFixed(0)}%
                                 </span>
                               </div>
@@ -1597,17 +2022,45 @@ export default function FleetAnalytics() {
                       })}
                       {flagDistribution.othersCount > 0 && (
                         <tr>
-                          <td style={{ ...tdStyle(flagDistribution.rows.length), fontStyle: 'italic', color: 'var(--text-secondary)' }}>
+                          <td
+                            style={{
+                              ...tdStyle(flagDistribution.rows.length),
+                              fontStyle: 'italic',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
                             Others
                           </td>
-                          <td style={{ ...tdStyle(flagDistribution.rows.length), textAlign: 'right', fontWeight: 700 }}>
+                          <td
+                            style={{
+                              ...tdStyle(flagDistribution.rows.length),
+                              textAlign: 'right',
+                              fontWeight: 700
+                            }}
+                          >
                             {flagDistribution.othersCount}
                           </td>
                           <td style={tdStyle(flagDistribution.rows.length)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <ProgressBar pct={pool.length > 0 ? (flagDistribution.othersCount / pool.length) * 100 : 0} />
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
-                                {pool.length > 0 ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(0) : 0}%
+                              <ProgressBar
+                                pct={
+                                  pool.length > 0
+                                    ? (flagDistribution.othersCount / pool.length) * 100
+                                    : 0
+                                }
+                              />
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                  minWidth: '36px',
+                                  textAlign: 'right'
+                                }}
+                              >
+                                {pool.length > 0
+                                  ? ((flagDistribution.othersCount / pool.length) * 100).toFixed(0)
+                                  : 0}
+                                %
                               </span>
                             </div>
                           </td>
@@ -1622,26 +2075,47 @@ export default function FleetAnalytics() {
             <div style={{ height: '14px' }} />
 
             {/* ── Section 4: Age Profile ── */}
-            <ChartCard
-              title="Age Distribution"
-              icon={<Calendar size={13} />}
-              accentColor="#f59e0b"
-            >
+            <ChartCard title="Age Distribution" icon={<Calendar size={13} />} accentColor="#f59e0b">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {ageProfile.map(b => (
-                  <div key={b.label} style={{
-                    padding: '12px 16px', borderRadius: '8px',
-                    border: '1px solid var(--glass-border-color)',
-                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                    minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: b.color, marginBottom: '4px' }}>
+                {ageProfile.map((b) => (
+                  <div
+                    key={b.label}
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--glass-border-color)',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      minWidth: '100px',
+                      flex: '1 1 100px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '1.2rem',
+                        fontWeight: 800,
+                        color: b.color,
+                        marginBottom: '4px'
+                      }}
+                    >
                       {b.count}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '2px'
+                      }}
+                    >
                       {b.pct.toFixed(0)}%
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600
+                      }}
+                    >
                       {b.label}
                     </div>
                   </div>
@@ -1658,20 +2132,45 @@ export default function FleetAnalytics() {
               accentColor="#14b8a6"
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {tonnageProfile.map(b => (
-                  <div key={b.label} style={{
-                    padding: '12px 16px', borderRadius: '8px',
-                    border: '1px solid var(--glass-border-color)',
-                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                    minWidth: '100px', flex: '1 1 100px', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: b.color, marginBottom: '4px' }}>
+                {tonnageProfile.map((b) => (
+                  <div
+                    key={b.label}
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--glass-border-color)',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      minWidth: '100px',
+                      flex: '1 1 100px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '1.2rem',
+                        fontWeight: 800,
+                        color: b.color,
+                        marginBottom: '4px'
+                      }}
+                    >
                       {b.count}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '2px'
+                      }}
+                    >
                       {b.pct.toFixed(0)}%
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600
+                      }}
+                    >
                       {b.label}
                     </div>
                   </div>
@@ -1689,7 +2188,9 @@ export default function FleetAnalytics() {
               count={policyCoverage.length}
             >
               {policyCoverage.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No active policies found</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  No active policies found
+                </p>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1702,15 +2203,25 @@ export default function FleetAnalytics() {
                     </thead>
                     <tbody>
                       {policyCoverage.map((row, idx) => {
-                        const pct = pool.length > 0 ? (Number(row.vesselCount) / pool.length) * 100 : 0
+                        const pct =
+                          pool.length > 0 ? (Number(row.vesselCount) / pool.length) * 100 : 0
                         return (
                           <tr key={row.name}>
                             <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.vesselCount}</td>
+                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                              {row.vesselCount}
+                            </td>
                             <td style={tdStyle(idx)}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <ProgressBar pct={pct} />
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'right' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'var(--text-secondary)',
+                                    minWidth: '36px',
+                                    textAlign: 'right'
+                                  }}
+                                >
                                   {pct.toFixed(0)}%
                                 </span>
                               </div>
@@ -1734,7 +2245,9 @@ export default function FleetAnalytics() {
               count={customerConcentration.length}
             >
               {customerConcentration.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No customer data</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  No customer data
+                </p>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1750,11 +2263,26 @@ export default function FleetAnalytics() {
                       {customerConcentration.map((row, idx) => (
                         <tr key={row.name}>
                           <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>{row.count}</td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', color: 'var(--text-secondary)' }}>
+                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                            {row.count}
+                          </td>
+                          <td
+                            style={{
+                              ...tdStyle(idx),
+                              textAlign: 'right',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
                             {row.pct.toFixed(0)}%
                           </td>
-                          <td style={{ ...tdStyle(idx), color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: '200px' }}>
+                          <td
+                            style={{
+                              ...tdStyle(idx),
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.8rem',
+                              maxWidth: '200px'
+                            }}
+                          >
                             {row.types || '--'}
                           </td>
                         </tr>
@@ -1774,24 +2302,39 @@ export default function FleetAnalytics() {
               accentColor="#ef4444"
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {ofacStatus.map(s => {
+                {ofacStatus.map((s) => {
                   const style = OFAC_STYLES[s.key] ?? OFAC_STYLES.PENDING
                   return (
-                    <div key={s.key} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      padding: '8px 14px', borderRadius: '20px',
-                      background: style.bg,
-                      border: `1px solid ${style.border}`,
-                    }}>
-                      <span style={{
-                        fontSize: '0.75rem', fontWeight: 700, color: style.text,
-                        textTransform: 'uppercase', letterSpacing: '0.02em',
-                      }}>
+                    <div
+                      key={s.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 14px',
+                        borderRadius: '20px',
+                        background: style.bg,
+                        border: `1px solid ${style.border}`
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: style.text,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em'
+                        }}
+                      >
                         {s.label}:
                       </span>
-                      <span style={{
-                        fontSize: '0.95rem', fontWeight: 800, color: style.text,
-                      }}>
+                      <span
+                        style={{
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          color: style.text
+                        }}
+                      >
                         {s.count}
                       </span>
                     </div>
@@ -1807,26 +2350,47 @@ export default function FleetAnalytics() {
       {exportModalOpen && (
         <div
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
-          onClick={e => { if (e.target === e.currentTarget) setExportModalOpen(false) }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setExportModalOpen(false)
+          }}
         >
-          <div style={{
-            background: isLight ? '#ffffff' : '#1a1d28',
-            borderRadius: '16px', padding: '24px', width: '440px', maxWidth: '90vw',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
-          }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginBottom: '20px',
-            }}>
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '440px',
+              maxWidth: '90vw',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.3)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Export Analytics</h3>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setExportModalOpen(false)}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-secondary)', padding: '4px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '4px'
                 }}
               >
                 <X size={18} />
@@ -1835,23 +2399,39 @@ export default function FleetAnalytics() {
 
             {/* Format selector */}
             <div style={{ marginBottom: '18px' }}>
-              <div style={{
-                fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)',
-                textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
-              }}>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}
+              >
                 Format
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                {(['pdf', 'excel'] as const).map(fmt => (
-                  <label key={fmt} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    cursor: 'pointer', fontSize: '0.88rem',
-                    padding: '6px 14px', borderRadius: '8px',
-                    border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-                    background: exportFormat === fmt
-                      ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.12)')
-                      : 'transparent',
-                  }}>
+                {(['pdf', 'excel'] as const).map((fmt) => (
+                  <label
+                    key={fmt}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
+                      background:
+                        exportFormat === fmt
+                          ? isLight
+                            ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                            : 'rgba(var(--accent-primary-rgb), 0.12)'
+                          : 'transparent'
+                    }}
+                  >
                     <input
                       type="radio"
                       name="exportFormat"
@@ -1868,14 +2448,20 @@ export default function FleetAnalytics() {
 
             {/* Section checkboxes */}
             <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)',
-                textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
-              }}>
+              <div
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}
+              >
                 Sections to include
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {([
+                {[
                   { key: 'kpi' as const, label: 'KPI Summary' },
                   { key: 'vesselTypes' as const, label: 'Vessel Type Distribution' },
                   { key: 'flagStates' as const, label: 'Flag State Distribution' },
@@ -1884,19 +2470,24 @@ export default function FleetAnalytics() {
                   { key: 'policyCoverage' as const, label: 'Policy Coverage' },
                   { key: 'topCustomers' as const, label: 'Top Customers' },
                   { key: 'ofacStatus' as const, label: 'OFAC Status' },
-                  { key: 'rawVesselData' as const, label: 'Raw Vessel Data' },
-                ]).map(item => {
+                  { key: 'rawVesselData' as const, label: 'Raw Vessel Data' }
+                ].map((item) => {
                   const isExcelOnly = item.key === 'rawVesselData'
                   const disabled = isExcelOnly && exportFormat === 'pdf'
                   return (
-                    <label key={item.key} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      cursor: disabled ? 'default' : 'pointer',
-                      fontSize: '0.86rem',
-                      color: disabled ? 'var(--text-secondary)' : 'var(--text-primary)',
-                      opacity: disabled ? 0.5 : 1,
-                      padding: '3px 0',
-                    }}>
+                    <label
+                      key={item.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: disabled ? 'default' : 'pointer',
+                        fontSize: '0.86rem',
+                        color: disabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                        opacity: disabled ? 0.5 : 1,
+                        padding: '3px 0'
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={disabled ? false : exportSections[item.key]}
@@ -1906,10 +2497,13 @@ export default function FleetAnalytics() {
                       />
                       {item.label}
                       {isExcelOnly && (
-                        <span style={{
-                          fontSize: '0.68rem', color: 'var(--text-secondary)',
-                          fontStyle: 'italic',
-                        }}>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            color: 'var(--text-secondary)',
+                            fontStyle: 'italic'
+                          }}
+                        >
                           (Excel only)
                         </span>
                       )}

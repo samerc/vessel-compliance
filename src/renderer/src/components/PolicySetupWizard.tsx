@@ -1,9 +1,41 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft, ArrowRight, Check, Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, AlertTriangle, Pencil, Loader2, LayoutList, ListChecks } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Ship,
+  Calendar,
+  DollarSign,
+  Settings,
+  Shield,
+  ClipboardCheck,
+  AlertTriangle,
+  Pencil,
+  Loader2,
+  LayoutList,
+  ListChecks
+} from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Quotation, QuotationVessel, QuotationPIAlternative, QuotationHullAlternative, QuotationInstalment, FlagState, QuotationAgreedValueOption, QuotationDiscount } from '../../../shared/types'
-import { computePayablePremium, splitInstalments, addMonthsISO, round2, vesselTechnical, PremiumContext, PremiumLolOption } from '../../../shared/premium'
+import {
+  Quotation,
+  QuotationVessel,
+  QuotationPIAlternative,
+  QuotationHullAlternative,
+  QuotationInstalment,
+  FlagState,
+  QuotationAgreedValueOption,
+  QuotationDiscount
+} from '../../../shared/types'
+import {
+  computePayablePremium,
+  splitInstalments,
+  addMonthsISO,
+  round2,
+  vesselTechnical,
+  PremiumContext,
+  PremiumLolOption
+} from '../../../shared/premium'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { formatDate } from '../utils/dateUtils'
@@ -15,14 +47,7 @@ interface PolicySetupWizardProps {
   onCancel: () => void
 }
 
-const DEFAULT_TIMEZONE_OPTIONS = [
-  'Lebanon Standard Time',
-  'GMT',
-  'UTC',
-  'CET',
-  'EST',
-  'PST'
-]
+const DEFAULT_TIMEZONE_OPTIONS = ['Lebanon Standard Time', 'GMT', 'UTC', 'CET', 'EST', 'PST']
 
 // Step id 6 (Subjectivities) is inserted between Details and Cards when the quotation has any.
 const STEP_LABELS = ['Vessel', 'Period', 'Premium', 'Details', 'Cards', 'Review', 'Subjectivities']
@@ -30,12 +55,12 @@ const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck
 
 interface InsuredRow {
   entityId: string
-  entityName: string   // typed/selected name — may be a custom name with no matching entity
+  entityName: string // typed/selected name — may be a custom name with no matching entity
   role: string
   addressText: string
   addressLabel: string // internal name for a NEW address saved back to the entity
-  addressId: string    // id of a picked existing entity_address, '' when typing a new one
-  isNew: boolean       // true when addressText is a new address to save back to the entity
+  addressId: string // id of a picked existing entity_address, '' when typing a new one
+  isNew: boolean // true when addressText is a new address to save back to the entity
 }
 
 interface WizardData {
@@ -65,14 +90,14 @@ interface WizardData {
   commissionPercent: number | ''
   bankId: string
   exchangeRate: number
-  insuredByVessel: Record<string, InsuredRow[]>  // vesselId → insured rows
+  insuredByVessel: Record<string, InsuredRow[]> // vesselId → insured rows
   // Step 5
   blueCards: string[]
   blueCardNone: boolean
   blueCardAddressedTo: Record<string, string>
   blueCardInception: string
   blueCardExpiry: string
-  blueCardOwners: Record<string, string>  // cardType → entityId
+  blueCardOwners: Record<string, string> // cardType → entityId
   // LOL / Agreed Value Option selection
   selectedLolOptionId: string
   selectedAgreedValueOptionId: string
@@ -87,15 +112,30 @@ interface WizardData {
 type LolOptionLite = PremiumLolOption
 
 // Payable premium per selected vessel + the instalment amounts (summed over vessels).
-function seedPremiums(ctx: PremiumContext, selectedIds: string[], altId: string, lolId: string, instalmentCount: number) {
+function seedPremiums(
+  ctx: PremiumContext,
+  selectedIds: string[],
+  altId: string,
+  lolId: string,
+  instalmentCount: number
+) {
   const vesselPremiums: Record<string, number> = {}
   for (const vid of selectedIds) {
-    const qv = ctx.vessels.find(v => (v.vesselId || v.id) === vid)
+    const qv = ctx.vessels.find((v) => (v.vesselId || v.id) === vid)
     if (!qv) continue
-    vesselPremiums[vid] = computePayablePremium(vesselTechnical(ctx, qv, altId, lolId), ctx.quotation, ctx.discounts, qv)
+    vesselPremiums[vid] = computePayablePremium(
+      vesselTechnical(ctx, qv, altId, lolId),
+      ctx.quotation,
+      ctx.discounts,
+      qv
+    )
   }
   const totalPremium = round2(Object.values(vesselPremiums).reduce((s, a) => s + a, 0))
-  return { vesselPremiums, totalPremium, instalmentAmounts: sumVesselInstalments(vesselPremiums, instalmentCount) }
+  return {
+    vesselPremiums,
+    totalPremium,
+    instalmentAmounts: sumVesselInstalments(vesselPremiums, instalmentCount)
+  }
 }
 
 // Instalment due date: each 30 days = 1 calendar month from inception (month-end clamped)
@@ -107,11 +147,12 @@ function instalmentDueDate(inception: string, daysFromInception: number): string
 function sumVesselInstalments(vesselPremiums: Record<string, number>, count: number): number[] {
   const totals = Array.from({ length: count }, () => 0)
   for (const amt of Object.values(vesselPremiums)) {
-    splitInstalments(amt, count).forEach((a, i) => { totals[i] += a })
+    splitInstalments(amt, count).forEach((a, i) => {
+      totals[i] += a
+    })
   }
   return totals.map(round2)
 }
-
 
 /** A broker is on the business when the quotation's customer is a broker, a c/o name is set, or
  *  an insured carries a Broker role. Commission (and so a Credit Advice) only applies then. */
@@ -119,10 +160,14 @@ function quoteHasBroker(q: Quotation | null, rows: InsuredRow[]): boolean {
   if (!q) return false
   if (q.customerType === 'broker' && q.customerEntityId) return true
   if (q.coName && q.coName.trim()) return true
-  return rows.some(r => /broker/i.test(r.role || ''))
+  return rows.some((r) => /broker/i.test(r.role || ''))
 }
 
-export default function PolicySetupWizard({ quotationId, onComplete, onCancel }: PolicySetupWizardProps) {
+export default function PolicySetupWizard({
+  quotationId,
+  onComplete,
+  onCancel
+}: PolicySetupWizardProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
@@ -137,7 +182,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const [piAlts, setPiAlts] = useState<QuotationPIAlternative[]>([])
   const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
   const [instalments, setInstalments] = useState<QuotationInstalment[]>([])
-  const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
+  const [banks, setBanks] = useState<
+    { id: string; name: string; details: string; order: number }[]
+  >([])
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(DEFAULT_TIMEZONE_OPTIONS)
   const [baseCurrency, setBaseCurrency] = useState('USD')
@@ -187,7 +234,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const [agreedValueOptions, setAgreedValueOptions] = useState<QuotationAgreedValueOption[]>([])
   // Insured editor data
   const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([])
-  const [entityAddrs, setEntityAddrs] = useState<Record<string, { id: string; addressLine1: string; label?: string }[]>>({})
+  const [entityAddrs, setEntityAddrs] = useState<
+    Record<string, { id: string; addressLine1: string; label?: string }[]>
+  >({})
   // Vessels of this quotation that already have a policy (multi-vessel: convert the rest later)
   const [convertedVesselIds, setConvertedVesselIds] = useState<string[]>([])
   const [showSectionOrder, setShowSectionOrder] = useState(false)
@@ -220,7 +269,20 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, qv, bankData, instData, piAltsRes, hullAltsRes, fs, entRes, qaRes, eaRes, convRes, subjRes] = await Promise.all([
+      const [
+        q,
+        qv,
+        bankData,
+        instData,
+        piAltsRes,
+        hullAltsRes,
+        fs,
+        entRes,
+        qaRes,
+        eaRes,
+        convRes,
+        subjRes
+      ] = await Promise.all([
         window.api.getQuotation(quotationId),
         window.api.getQuotationVessels(quotationId),
         window.api.bankGetAll(),
@@ -241,9 +303,12 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       setConvertedVesselIds(alreadyConverted)
 
       // Subjectivities: show the quotation's list, all kept by default
-      const safeSubj = (Array.isArray(subjRes) ? subjRes : []).map((s: any) => ({ id: s.id, text: s.text }))
+      const safeSubj = (Array.isArray(subjRes) ? subjRes : []).map((s: any) => ({
+        id: s.id,
+        text: s.text
+      }))
       setSubjectivityItems(safeSubj)
-      setData(d => ({ ...d, selectedSubjectivityIds: safeSubj.map(s => s.id) }))
+      setData((d) => ({ ...d, selectedSubjectivityIds: safeSubj.map((s) => s.id) }))
 
       if (!q || (q as any).error) {
         showError('Failed to load quotation')
@@ -264,14 +329,17 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       setHullAlts(safeHullAlts)
 
       // Insured editor: entities, per-entity address map, per-vessel insured rows (from quotation assureds)
-      setAllEntities((Array.isArray(entRes) ? entRes : []).map((e: any) => ({ id: e.id, name: e.name })))
+      setAllEntities(
+        (Array.isArray(entRes) ? entRes : []).map((e: any) => ({ id: e.id, name: e.name }))
+      )
       const addrMap: Record<string, { id: string; addressLine1: string; label?: string }[]> = {}
       for (const a of (Array.isArray(eaRes) ? eaRes : []) as any[]) {
         if (!addrMap[a.entityId]) addrMap[a.entityId] = []
         addrMap[a.entityId].push({ id: a.id, addressLine1: a.addressLine1 || '', label: a.label })
       }
       setEntityAddrs(addrMap)
-      const entName = (id: string) => (Array.isArray(entRes) ? entRes : []).find((e: any) => e.id === id)?.name || ''
+      const entName = (id: string) =>
+        (Array.isArray(entRes) ? entRes : []).find((e: any) => e.id === id)?.name || ''
       const safeQA = Array.isArray(qaRes) ? qaRes : []
       const insuredByVessel: Record<string, InsuredRow[]> = {}
       for (const v of vessels) {
@@ -292,10 +360,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           })
       }
       const allInsuredRows = Object.values(insuredByVessel).flat()
-      const regOwner = allInsuredRows.find(r => r.role.toLowerCase().includes('registered owner')) || allInsuredRows[0]
+      const regOwner =
+        allInsuredRows.find((r) => r.role.toLowerCase().includes('registered owner')) ||
+        allInsuredRows[0]
       const defaultOwnerId = regOwner?.entityId || ''
       const defaultBlueCardOwners: Record<string, string> = {}
-      for (const ct of ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']) defaultBlueCardOwners[ct] = defaultOwnerId
+      for (const ct of ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'])
+        defaultBlueCardOwners[ct] = defaultOwnerId
 
       // Load LOL options and agreed value options
       let safeLolOptions: typeof lolOptions = []
@@ -304,9 +375,14 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           window.api.lolGetOptions(quotationId),
           window.api.hullGetAgreedValueOptions(quotationId)
         ])
-        if (Array.isArray(lolRes)) { safeLolOptions = lolRes; setLolOptions(lolRes) }
+        if (Array.isArray(lolRes)) {
+          safeLolOptions = lolRes
+          setLolOptions(lolRes)
+        }
         if (Array.isArray(avRes)) setAgreedValueOptions(avRes)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       // Load custom timezones
       try {
@@ -315,13 +391,17 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           const parsed = JSON.parse(tzSetting)
           if (Array.isArray(parsed) && parsed.length > 0) setTimezoneOptions(parsed)
         }
-      } catch { /* use defaults */ }
+      } catch {
+        /* use defaults */
+      }
 
       // Load base currency
       try {
         const bcSetting = await window.api.getSetting('base_currency')
         if (bcSetting) setBaseCurrency(bcSetting)
-      } catch { /* use default USD */ }
+      } catch {
+        /* use default USD */
+      }
 
       // Extra discounts + hull alternative × vessel premiums (both feed the payable maths)
       const quot = q as Quotation
@@ -330,27 +410,50 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       try {
         const [discRes, avpRes] = await Promise.all([
           window.api.quotationDiscountGetByQuotation(quotationId),
-          quot.quotationTypeCode === 'H' ? window.api.hullGetAltVesselPremiums(quotationId) : Promise.resolve([])
+          quot.quotationTypeCode === 'H'
+            ? window.api.hullGetAltVesselPremiums(quotationId)
+            : Promise.resolve([])
         ])
         if (Array.isArray(discRes)) safeDiscounts = discRes
         for (const r of (Array.isArray(avpRes) ? avpRes : []) as any[]) {
-          if (r.premiumAmount != null) safeAltVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+          if (r.premiumAmount != null)
+            safeAltVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(
+              r.premiumAmount
+            )
         }
-      } catch { /* non-critical — falls back to fleet-level premiums */ }
+      } catch {
+        /* non-critical — falls back to fleet-level premiums */
+      }
       setDiscounts(safeDiscounts)
       setAltVesselPrems(safeAltVesselPrems)
 
       // Default alternative / LOL option = the first one (only when there is a real choice)
       const allAltsLocal = [...safePiAlts, ...safeHullAlts]
       const firstAltId = allAltsLocal.length > 1 ? allAltsLocal[0].id : ''
-      const firstLolId = safeLolOptions.length > 0 && safeLolOptions.some(o => o.premiumAmount != null) ? safeLolOptions[0].id : ''
+      const firstLolId =
+        safeLolOptions.length > 0 && safeLolOptions.some((o) => o.premiumAmount != null)
+          ? safeLolOptions[0].id
+          : ''
 
       // Payable premium per vessel being converted (skip vessels that already have a policy),
       // so a multi-vessel conversion gives every policy its own premium and instalments.
-      const initialSelection = vessels.map(v => v.vesselId || v.id).filter(id => !alreadyConverted.includes(id))
+      const initialSelection = vessels
+        .map((v) => v.vesselId || v.id)
+        .filter((id) => !alreadyConverted.includes(id))
       const seeded = seedPremiums(
-        { quotation: quot, vessels, piAlts: safePiAlts, hullAlts: safeHullAlts, lolOptions: safeLolOptions, altVesselPrems: safeAltVesselPrems, discounts: safeDiscounts },
-        initialSelection, firstAltId, firstLolId, safeInstalments.length
+        {
+          quotation: quot,
+          vessels,
+          piAlts: safePiAlts,
+          hullAlts: safeHullAlts,
+          lolOptions: safeLolOptions,
+          altVesselPrems: safeAltVesselPrems,
+          discounts: safeDiscounts
+        },
+        initialSelection,
+        firstAltId,
+        firstLolId,
+        safeInstalments.length
       )
       const payable = seeded.totalPremium
       let initDates: string[] = safeInstalments.map(() => '')
@@ -359,7 +462,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       // Try to pre-fill inception/expiry from vessel's existing policy
       let inception = ''
       let expiry = ''
-      const withVessel = vessels.filter(v => v.vesselId)
+      const withVessel = vessels.filter((v) => v.vesselId)
       if (withVessel.length > 0) {
         try {
           const policies = await window.api.getVesselDynamicPolicies(withVessel[0].vesselId!)
@@ -369,12 +472,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             // +1 year (string math, clamps 29 Feb → 28 Feb)
             expiry = addMonthsISO(endDate, 12)
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
 
       // Calculate instalment dates from inception if we have both
       if (inception && safeInstalments.length > 0) {
-        initDates = safeInstalments.map(inst => instalmentDueDate(inception, inst.daysFromInception))
+        initDates = safeInstalments.map((inst) =>
+          instalmentDueDate(inception, inst.daysFromInception)
+        )
       }
 
       // Resolve commission from hierarchy: customer override → policy type default
@@ -386,16 +493,20 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
           const comm = await window.api.commissionResolve(customerId, typeId)
           if (comm != null) resolvedCommission = comm
         }
-      } catch (err) { console.warn('[PolicyWizard] Commission resolve failed:', err) }
+      } catch (err) {
+        console.warn('[PolicyWizard] Commission resolve failed:', err)
+      }
 
       // QR default (P&I only) — settings toggle pre-fills the per-policy choice
       let qrDefault = false
       try {
         const isPICode = (quot.quotationTypeCode || '') === 'P'
         if (isPICode) qrDefault = (await window.api.getSetting('qr_default_enabled')) === 'true'
-      } catch { /* default off */ }
+      } catch {
+        /* default off */
+      }
 
-      setData(prev => ({
+      setData((prev) => ({
         ...prev,
         // Don't pre-select vessels that already have a policy (avoids duplicate conversion)
         selectedVesselIds: initialSelection,
@@ -410,7 +521,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         nonRefundableType: (quot.nonRefundableType as WizardData['nonRefundableType']) || null,
         nonRefundablePercent: quot.nonRefundablePercent || 0,
         // No broker on the business = no commission by default (can still be ticked by hand)
-        commissionEnabled: quoteHasBroker(quot, allInsuredRows) && resolvedCommission !== '' && Number(resolvedCommission) > 0,
+        commissionEnabled:
+          quoteHasBroker(quot, allInsuredRows) &&
+          resolvedCommission !== '' &&
+          Number(resolvedCommission) > 0,
         commissionPercent: resolvedCommission,
         insuredByVessel,
         outstandingPremiumEnabled: !!quot.outstandingPremiumEnabled,
@@ -427,7 +541,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     }
   }, [quotationId])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Auto-calculate expiry date/time when inception changes
   useEffect(() => {
@@ -438,28 +554,33 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       const [y, m, d] = oneYear.split('-').map(Number)
       const exp = new Date(y, m - 1, d - 1)
       const expiryDate = `${exp.getFullYear()}-${String(exp.getMonth() + 1).padStart(2, '0')}-${String(exp.getDate()).padStart(2, '0')}`
-      setData(prev => ({ ...prev, expiryDate, expiryTime: '23:59' }))
+      setData((prev) => ({ ...prev, expiryDate, expiryTime: '23:59' }))
     } else {
       // Other times → expiry = 1 year same time
-      setData(prev => ({ ...prev, expiryDate: oneYear, expiryTime: data.inceptionTime }))
+      setData((prev) => ({ ...prev, expiryDate: oneYear, expiryTime: data.inceptionTime }))
     }
   }, [data.inceptionDate, data.inceptionTime])
 
   // Recalculate instalment dates when inception date changes
   useEffect(() => {
     if (!data.inceptionDate || instalments.length === 0) return
-    const dates = instalments.map(inst => instalmentDueDate(data.inceptionDate, inst.daysFromInception))
-    setData(prev => ({ ...prev, instalmentDates: dates }))
+    const dates = instalments.map((inst) =>
+      instalmentDueDate(data.inceptionDate, inst.daysFromInception)
+    )
+    setData((prev) => ({ ...prev, instalmentDates: dates }))
   }, [data.inceptionDate, instalments])
 
   const updateData = (partial: Partial<WizardData>) => {
-    setData(prev => ({ ...prev, ...partial }))
+    setData((prev) => ({ ...prev, ...partial }))
   }
 
   // Default day-from-inception spacing per instalment count (mirrors PremiumTab)
   const instalmentDaysFor = (count: number, index: number): number => {
     const known: Record<number, number[]> = {
-      1: [0], 2: [0, 180], 3: [0, 120, 240], 4: [0, 90, 180, 270],
+      1: [0],
+      2: [0, 180],
+      3: [0, 120, 240],
+      4: [0, 90, 180, 270],
       12: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
     }
     return known[count]?.[index] ?? Math.round((index * 360) / count)
@@ -475,21 +596,28 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       daysFromInception: instalmentDaysFor(count, i)
     }))
     const dates = data.inceptionDate
-      ? newInstalments.map(inst => instalmentDueDate(data.inceptionDate, inst.daysFromInception))
+      ? newInstalments.map((inst) => instalmentDueDate(data.inceptionDate, inst.daysFromInception))
       : Array.from({ length: count }, () => '')
     const amounts = isMultiSelection
       ? sumVesselInstalments(data.vesselPremiums, count)
       : splitInstalments(data.totalPremium || 0, count)
     setInstalments(newInstalments)
-    setData(prev => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts }))
+    setData((prev) => ({ ...prev, instalmentDates: dates, instalmentAmounts: amounts }))
   }
 
   // Re-derive per-vessel payable premiums + instalment amounts for a selection / alternative / LOL
-  const reseedPremiums = (selection: string[], altId: string, lolId: string): Partial<WizardData> => {
+  const reseedPremiums = (
+    selection: string[],
+    altId: string,
+    lolId: string
+  ): Partial<WizardData> => {
     if (!quotation) return {}
     return seedPremiums(
       { quotation, vessels: qVessels, piAlts, hullAlts, lolOptions, altVesselPrems, discounts },
-      selection, altId, lolId, data.instalmentDates.length
+      selection,
+      altId,
+      lolId,
+      data.instalmentDates.length
     )
   }
   const computePayable = (techPremium: number): number =>
@@ -497,10 +625,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
   // Hull technical premium (selected alternative, else quotation premium) — excludes IV
   const hullTechnical = (() => {
-    const piAlt = piAlts.find(a => a.id === data.selectedAltId)
-    const hullAlt = hullAlts.find(a => a.id === data.selectedAltId)
+    const piAlt = piAlts.find((a) => a.id === data.selectedAltId)
+    const hullAlt = hullAlts.find((a) => a.id === data.selectedAltId)
     const altPremium = piAlt?.premiumAmount ?? hullAlt?.premiumAmount ?? null
-    return altPremium != null ? altPremium : (quotation?.premiumAmount || 0)
+    return altPremium != null ? altPremium : quotation?.premiumAmount || 0
   })()
 
   // Named-assured options for blue cards — unique insured entities across selected vessels (Registered Owner first)
@@ -508,7 +636,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     const seen = new Set<string>()
     const opts: { id: string; name: string; role: string }[] = []
     for (const vid of data.selectedVesselIds) {
-      for (const r of (data.insuredByVessel[vid] || [])) {
+      for (const r of data.insuredByVessel[vid] || []) {
         if (!r.entityId || seen.has(r.entityId)) continue
         seen.add(r.entityId)
         opts.push({ id: r.entityId, name: r.entityName, role: r.role })
@@ -524,7 +652,10 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
   const handleAltChange = (altId: string) => {
     if (!quotation) return
-    updateData({ selectedAltId: altId, ...reseedPremiums(data.selectedVesselIds, altId, data.selectedLolOptionId) })
+    updateData({
+      selectedAltId: altId,
+      ...reseedPremiums(data.selectedVesselIds, altId, data.selectedLolOptionId)
+    })
   }
 
   // Edit one vessel's payable premium (multi-vessel conversion) → re-split that vessel's instalments
@@ -540,7 +671,11 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   const recalcPremiumFromInstalments = (amounts: number[]) => {
     const sum = round2(amounts.reduce((s, a) => s + (a || 0), 0))
     const only = data.selectedVesselIds[0]
-    updateData({ instalmentAmounts: amounts, totalPremium: sum, ...(only ? { vesselPremiums: { [only]: sum } } : {}) })
+    updateData({
+      instalmentAmounts: amounts,
+      totalPremium: sum,
+      ...(only ? { vesselPremiums: { [only]: sum } } : {})
+    })
   }
 
   // Validation per step
@@ -549,7 +684,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       case 0: // Vessel & Alternative
         if (data.selectedVesselIds.length === 0) return 'Select at least one vessel'
         if (hasAlts && !data.selectedAltId) return 'Please select an alternative'
-        if (lolOptions.length > 1 && !data.selectedLolOptionId) return 'Please select a limit of liability option'
+        if (lolOptions.length > 1 && !data.selectedLolOptionId)
+          return 'Please select a limit of liability option'
         return null
       case 1: // Period & Premium
         if (!data.inceptionDate) return 'Inception date is required'
@@ -560,12 +696,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         if (data.totalPremium <= 0) return 'Premium must be greater than 0'
         return null
       case 2: // Instalments
-        if (data.instalmentDates.some(d => !d)) return 'All instalment dates are required'
-        if (data.instalmentAmounts.some(a => !a || a <= 0)) return 'All instalment amounts must be greater than 0'
+        if (data.instalmentDates.some((d) => !d)) return 'All instalment dates are required'
+        if (data.instalmentAmounts.some((a) => !a || a <= 0))
+          return 'All instalment amounts must be greater than 0'
         if (isMultiSelection) {
-          const zero = data.selectedVesselIds.find(vid => !(data.vesselPremiums[vid] > 0))
+          const zero = data.selectedVesselIds.find((vid) => !(data.vesselPremiums[vid] > 0))
           if (zero) {
-            const qv = qVessels.find(v => (v.vesselId || v.id) === zero)
+            const qv = qVessels.find((v) => (v.vesselId || v.id) === zero)
             return `Premium for ${(qv?.name || qv?.vesselLabel || 'a vessel').toUpperCase()} must be greater than 0`
           }
         }
@@ -574,7 +711,8 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         if (!data.bankId && banks.length > 0) return 'Please select a bank'
         return null
       case 4: // Blue Cards
-        if (!data.blueCardNone && data.blueCards.length === 0) return 'Please select blue cards or choose "None"'
+        if (!data.blueCardNone && data.blueCards.length === 0)
+          return 'Please select blue cards or choose "None"'
         return null
       default:
         return null
@@ -617,23 +755,35 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
     setConverting(true)
     try {
-      const commPct = data.commissionEnabled && typeof data.commissionPercent === 'number' ? data.commissionPercent : 0
+      const commPct =
+        data.commissionEnabled && typeof data.commissionPercent === 'number'
+          ? data.commissionPercent
+          : 0
       // Flatten the per-vessel insured lists into a single array with vesselId
       const insured = Object.entries(data.insuredByVessel).flatMap(([vesselId, rows]) =>
-        (rows || []).filter(r => r.entityId || (r.entityName || '').trim()).map(r => ({
-          vesselId, entityId: r.entityId, entityName: (r.entityName || '').trim(), role: r.role,
-          addressText: r.addressText || '', addressLabel: (r.addressLabel || '').trim(), isNewAddress: !!r.isNew
-        }))
+        (rows || [])
+          .filter((r) => r.entityId || (r.entityName || '').trim())
+          .map((r) => ({
+            vesselId,
+            entityId: r.entityId,
+            entityName: (r.entityName || '').trim(),
+            role: r.role,
+            addressText: r.addressText || '',
+            addressLabel: (r.addressLabel || '').trim(),
+            isNewAddress: !!r.isNew
+          }))
       )
       // Each vessel gets its own policy → its own premium + instalment split (same dates).
       // A single vessel keeps the instalment amounts exactly as edited in the wizard.
       const instCount = data.instalmentDates.length
       const perVessel: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> = {}
       for (const vid of data.selectedVesselIds) {
-        const prem = isMultiSelection ? (data.vesselPremiums[vid] || 0) : (data.totalPremium || 0)
+        const prem = isMultiSelection ? data.vesselPremiums[vid] || 0 : data.totalPremium || 0
         perVessel[vid] = {
           premiumAmount: prem,
-          instalmentAmounts: isMultiSelection ? splitInstalments(prem, instCount) : data.instalmentAmounts.slice(0, instCount)
+          instalmentAmounts: isMultiSelection
+            ? splitInstalments(prem, instCount)
+            : data.instalmentAmounts.slice(0, instCount)
         }
       }
       const result = await window.api.policyConvertFromQuotation(quotation.id, {
@@ -647,15 +797,17 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         instalments: data.instalmentDates.map((dueDate, i) => ({
           dueDate,
           premiumAmount: data.instalmentAmounts[i] || 0,
-          commissionAmount: Math.round((data.instalmentAmounts[i] || 0) * commPct / 100 * 100) / 100,
+          commissionAmount:
+            Math.round((((data.instalmentAmounts[i] || 0) * commPct) / 100) * 100) / 100,
           // Only the 1st instalment can be non-refundable (percentage is a policy-level note)
           isNonRefundable: data.nonRefundableType === 'first_instalment' && i === 0
         })),
         // Always store the wizard's explicit choice on the policy ('none' distinguishes it
         // from legacy NULL = inherit-from-quotation)
         nonRefundableType: data.nonRefundableType || 'none',
-        nonRefundablePercent: data.nonRefundableType === 'percentage' ? (data.nonRefundablePercent || 0) : null,
-        commissionPercent: data.commissionEnabled ? (commPct || null) : null,
+        nonRefundablePercent:
+          data.nonRefundableType === 'percentage' ? data.nonRefundablePercent || 0 : null,
+        commissionPercent: data.commissionEnabled ? commPct || null : null,
         bankId: data.bankId || null,
         showAddresses: true,
         blueCards: data.blueCardNone ? [] : data.blueCards,
@@ -681,7 +833,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
         return
       }
       const policies = Array.isArray(result) ? result : []
-      showSuccess(`${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`)
+      showSuccess(
+        `${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} created successfully`
+      )
       if (policies[0]?.id) onComplete(policies[0].id)
     } catch (err: any) {
       showError(err.message || 'Failed to convert to policy')
@@ -691,15 +845,24 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
   }
 
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.65rem', fontWeight: 700,
-    letterSpacing: '0.8px', textTransform: 'uppercase',
-    color: 'var(--text-secondary)', marginBottom: '6px'
+    display: 'block',
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    marginBottom: '6px'
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 12px', borderRadius: '8px',
-    border: '1px solid var(--input-border)', background: 'var(--input-bg)',
-    color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box'
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--input-border)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-primary)',
+    fontSize: '0.88rem',
+    boxSizing: 'border-box'
   }
 
   const cardBg = isLight ? '#ffffff' : 'var(--bg-card)'
@@ -708,7 +871,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     return (
       <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
         <Loader2 size={32} className="spinner" style={{ color: 'var(--accent-primary)' }} />
-        <p style={{ color: 'var(--text-secondary)', marginTop: '12px' }}>Loading quotation data...</p>
+        <p style={{ color: 'var(--text-secondary)', marginTop: '12px' }}>
+          Loading quotation data...
+        </p>
       </div>
     )
   }
@@ -717,7 +882,9 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
     return (
       <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
         <p style={{ color: 'var(--danger)' }}>Failed to load quotation</p>
-        <button onClick={onCancel} className="btn-secondary" style={{ marginTop: '12px' }}>Back</button>
+        <button onClick={onCancel} className="btn-secondary" style={{ marginTop: '12px' }}>
+          Back
+        </button>
       </div>
     )
   }
@@ -728,9 +895,15 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       <button
         onClick={onCancel}
         style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          color: 'var(--text-secondary)', fontSize: '0.85rem',
-          display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-secondary)',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginBottom: '16px',
           padding: 0
         }}
       >
@@ -738,7 +911,15 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       </button>
 
       {/* Title */}
-      <h1 style={{ fontSize: '1.5rem', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <h1
+        style={{
+          fontSize: '1.5rem',
+          margin: '0 0 8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}
+      >
         <Shield size={24} color="var(--accent-primary)" />
         Policy Setup
       </h1>
@@ -747,10 +928,15 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       </p>
 
       {/* Progress Bar */}
-      <div style={{
-        background: cardBg, borderRadius: '14px', padding: '24px 32px',
-        border: '1px solid var(--glass-border-color)', marginBottom: '24px'
-      }}>
+      <div
+        style={{
+          background: cardBg,
+          borderRadius: '14px',
+          padding: '24px 32px',
+          border: '1px solid var(--glass-border-color)',
+          marginBottom: '24px'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {steps.map((step, idx) => {
             const StepIcon = STEP_ICONS[step]
@@ -761,39 +947,71 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               <div key={step} style={{ display: 'flex', alignItems: 'center' }}>
                 {/* Step circle */}
                 <div
-                  onClick={() => isCompleted ? goToStep(step) : undefined}
+                  onClick={() => (isCompleted ? goToStep(step) : undefined)}
                   style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '6px',
                     cursor: isCompleted ? 'pointer' : 'default'
                   }}
                 >
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isCompleted ? 'var(--accent-primary)' : isCurrent ? 'var(--accent-primary)' : 'transparent',
-                    border: isCurrent ? '3px solid var(--accent-primary)' : isCompleted ? 'none' : '2px solid var(--text-secondary)',
-                    boxShadow: isCurrent ? '0 0 0 4px rgba(var(--accent-primary-rgb), 0.2)' : 'none',
-                    color: isCompleted || isCurrent ? '#fff' : 'var(--text-secondary)',
-                    transition: 'all 0.2s'
-                  }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: isCompleted
+                        ? 'var(--accent-primary)'
+                        : isCurrent
+                          ? 'var(--accent-primary)'
+                          : 'transparent',
+                      border: isCurrent
+                        ? '3px solid var(--accent-primary)'
+                        : isCompleted
+                          ? 'none'
+                          : '2px solid var(--text-secondary)',
+                      boxShadow: isCurrent
+                        ? '0 0 0 4px rgba(var(--accent-primary-rgb), 0.2)'
+                        : 'none',
+                      color: isCompleted || isCurrent ? '#fff' : 'var(--text-secondary)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
                     {isCompleted ? <Check size={16} /> : <StepIcon size={16} />}
                   </div>
-                  <span style={{
-                    fontSize: '0.68rem', fontWeight: 600,
-                    color: isCurrent ? 'var(--accent-primary)' : isFuture ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    textTransform: 'uppercase', letterSpacing: '0.5px'
-                  }}>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      color: isCurrent
+                        ? 'var(--accent-primary)'
+                        : isFuture
+                          ? 'var(--text-secondary)'
+                          : 'var(--text-primary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
                     {STEP_LABELS[step]}
                   </span>
                 </div>
                 {/* Connector line */}
                 {idx < steps.length - 1 && (
-                  <div style={{
-                    width: '48px', height: '2px', margin: '0 8px',
-                    marginBottom: '22px',
-                    background: idx < currentStepIndex ? 'var(--accent-primary)' : 'var(--glass-border)',
-                    transition: 'background 0.2s'
-                  }} />
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '2px',
+                      margin: '0 8px',
+                      marginBottom: '22px',
+                      background:
+                        idx < currentStepIndex ? 'var(--accent-primary)' : 'var(--glass-border)',
+                      transition: 'background 0.2s'
+                    }}
+                  />
                 )}
               </div>
             )
@@ -802,11 +1020,16 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
       </div>
 
       {/* Step Content */}
-      <div style={{
-        background: cardBg, borderRadius: '14px', padding: '28px',
-        border: '1px solid var(--glass-border-color)', marginBottom: '24px',
-        minHeight: '200px'
-      }}>
+      <div
+        style={{
+          background: cardBg,
+          borderRadius: '14px',
+          padding: '28px',
+          border: '1px solid var(--glass-border-color)',
+          marginBottom: '24px',
+          minHeight: '200px'
+        }}
+      >
         {currentStep === 0 && (
           <StepVesselAlternative
             qVessels={qVessels}
@@ -822,12 +1045,20 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
             onToggleVessel={(id) => {
               if (convertedVesselIds.includes(id)) return
               const newSelection = data.selectedVesselIds.includes(id)
-                ? data.selectedVesselIds.filter(v => v !== id)
+                ? data.selectedVesselIds.filter((v) => v !== id)
                 : [...data.selectedVesselIds, id]
-              updateData({ selectedVesselIds: newSelection, ...reseedPremiums(newSelection, data.selectedAltId, data.selectedLolOptionId) })
+              updateData({
+                selectedVesselIds: newSelection,
+                ...reseedPremiums(newSelection, data.selectedAltId, data.selectedLolOptionId)
+              })
             }}
             onSelectAlt={handleAltChange}
-            onSelectLolOption={(id) => updateData({ selectedLolOptionId: id, ...reseedPremiums(data.selectedVesselIds, data.selectedAltId, id) })}
+            onSelectLolOption={(id) =>
+              updateData({
+                selectedLolOptionId: id,
+                ...reseedPremiums(data.selectedVesselIds, data.selectedAltId, id)
+              })
+            }
             onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
             labelStyle={labelStyle}
           />
@@ -934,7 +1165,13 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
               onClick={handleConvert}
               disabled={converting}
               className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 28px', fontSize: '0.95rem' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 28px',
+                fontSize: '0.95rem'
+              }}
             >
               {converting ? <Loader2 size={18} className="spinner" /> : <Check size={18} />}
               Create Policy
@@ -953,17 +1190,30 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
       {showSectionOrder && quotation && (
         <SectionOrderModal
-          quotation={{ id: quotationId, quotationTypeCode: quotation.quotationTypeCode, sectionOrder: data.sectionOrder } as any}
+          quotation={
+            {
+              id: quotationId,
+              quotationTypeCode: quotation.quotationTypeCode,
+              sectionOrder: data.sectionOrder
+            } as any
+          }
           docLabel="policy"
           isLight={isLight}
           showSuccess={showSuccess}
           showError={showError}
           // Load defaults from the policy settings (not the quotation defaults)
           defaultsLoader={async (tc) => {
-            try { const raw = await window.api.getSetting(`policy_section_order_defaults_${tc}`); return raw ? JSON.parse(raw) : [] } catch { return [] }
+            try {
+              const raw = await window.api.getSetting(`policy_section_order_defaults_${tc}`)
+              return raw ? JSON.parse(raw) : []
+            } catch {
+              return []
+            }
           }}
           // Don't persist here — just capture the order onto the wizard state
-          persist={async (order) => { updateData({ sectionOrder: order }) }}
+          persist={async (order) => {
+            updateData({ sectionOrder: order })
+          }}
           onClose={() => setShowSectionOrder(false)}
           onSave={() => setShowSectionOrder(false)}
         />
@@ -974,7 +1224,23 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
 
 // ==================== Step Components ====================
 
-function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data, quotation, isLight, lolOptions, agreedValueOptions, convertedVesselIds, onToggleVessel, onSelectAlt, onSelectLolOption, onSelectAgreedValueOption, labelStyle }: {
+function StepVesselAlternative({
+  qVessels,
+  allAlts,
+  hasAlts,
+  isMultiVessel,
+  data,
+  quotation,
+  isLight,
+  lolOptions,
+  agreedValueOptions,
+  convertedVesselIds,
+  onToggleVessel,
+  onSelectAlt,
+  onSelectLolOption,
+  onSelectAgreedValueOption,
+  labelStyle
+}: {
   qVessels: QuotationVessel[]
   allAlts: (QuotationPIAlternative | QuotationHullAlternative)[]
   hasAlts: boolean
@@ -982,7 +1248,14 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
   data: WizardData
   quotation: Quotation
   isLight: boolean
-  lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
+  lolOptions: {
+    id: string
+    label: string | null
+    amount: number
+    currency: string
+    premiumAmount: number | null
+    order: number
+  }[]
   agreedValueOptions: QuotationAgreedValueOption[]
   convertedVesselIds: string[]
   onToggleVessel: (id: string) => void
@@ -995,27 +1268,37 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
     <div>
       <h2 style={{ fontSize: '1.1rem', margin: '0 0 4px' }}>Vessel & Alternative Selection</h2>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-        {isMultiVessel ? 'Select which vessels to create policies for. Each vessel gets its own policy.' : 'Confirm the vessel for this policy.'}
+        {isMultiVessel
+          ? 'Select which vessels to create policies for. Each vessel gets its own policy.'
+          : 'Confirm the vessel for this policy.'}
       </p>
 
       {/* Vessel list */}
       <div style={{ marginBottom: hasAlts ? '24px' : '0' }}>
         <label style={labelStyle}>Vessels</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {qVessels.map(v => {
+          {qVessels.map((v) => {
             const id = v.vesselId || v.id
             const isConverted = convertedVesselIds.includes(id)
             const selected = data.selectedVesselIds.includes(id)
             return (
-              <label key={v.id} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 14px', borderRadius: '10px',
-                border: selected ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                background: selected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
-                cursor: isConverted ? 'not-allowed' : (isMultiVessel ? 'pointer' : 'default'),
-                opacity: isConverted ? 0.55 : 1,
-                transition: 'all 0.15s'
-              }}>
+              <label
+                key={v.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: selected
+                    ? '1.5px solid var(--accent-primary)'
+                    : '1px solid var(--input-border)',
+                  background: selected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
+                  cursor: isConverted ? 'not-allowed' : isMultiVessel ? 'pointer' : 'default',
+                  opacity: isConverted ? 0.55 : 1,
+                  transition: 'all 0.15s'
+                }}
+              >
                 {isMultiVessel && (
                   <input
                     type="checkbox"
@@ -1026,20 +1309,59 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                   />
                 )}
                 {!isMultiVessel && (
-                  <div style={{
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background:
+                        'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
                     <Ship size={16} color="#fff" />
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
                     {v.name || v.vesselLabel}
-                    {isConverted && <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#b464ff', background: 'rgba(180,100,255,0.14)', border: '1px solid rgba(180,100,255,0.35)', borderRadius: '5px', padding: '1px 6px' }}>Converted</span>}
+                    {isConverted && (
+                      <span
+                        style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase',
+                          color: '#b464ff',
+                          background: 'rgba(180,100,255,0.14)',
+                          border: '1px solid rgba(180,100,255,0.35)',
+                          borderRadius: '5px',
+                          padding: '1px 6px'
+                        }}
+                      >
+                        Converted
+                      </span>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '2px'
+                    }}
+                  >
                     {v.imoNumber && <span>IMO {v.imoNumber}</span>}
                     {v.vesselType && <span>{v.vesselType}</span>}
                   </div>
@@ -1060,23 +1382,66 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 key={alt.id}
                 onClick={() => onSelectAlt(alt.id)}
                 style={{
-                  padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
-                  border: data.selectedAltId === alt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedAltId === alt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
-                  color: data.selectedAltId === alt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  cursor: 'pointer', transition: 'all 0.15s'
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  border:
+                    data.selectedAltId === alt.id
+                      ? '2px solid var(--accent-primary)'
+                      : '1px solid var(--input-border)',
+                  background:
+                    data.selectedAltId === alt.id
+                      ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                      : 'transparent',
+                  color:
+                    data.selectedAltId === alt.id
+                      ? 'var(--accent-primary)'
+                      : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
                 }}
               >
                 {(alt as any).label || `Alternative ${idx + 1}`}
-                {(alt as any).premiumAmount != null ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}` : ''}
-                {quotation.ivEnabled && quotation.ivPremiumAmount ? ` + IV ${quotation.ivPremiumAmount.toLocaleString()}` : ''}
+                {(alt as any).premiumAmount != null
+                  ? ` — ${quotation.premiumCurrency || 'USD'} ${((alt as any).premiumAmount as number).toLocaleString()}`
+                  : ''}
+                {quotation.ivEnabled && quotation.ivPremiumAmount
+                  ? ` + IV ${quotation.ivPremiumAmount.toLocaleString()}`
+                  : ''}
               </button>
             ))}
           </div>
           {(quotation.ncbEnabled || quotation.upccEnabled) && (
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-              {quotation.ncbEnabled && <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '6px', background: 'rgba(34,197,94,0.1)', color: isLight ? '#166534' : '#86efac', fontWeight: 600 }}>NCB {quotation.ncbDiscountPercent}%</span>}
-              {quotation.upccEnabled && <span style={{ fontSize: '0.75rem', padding: '3px 10px', borderRadius: '6px', background: 'rgba(59,130,246,0.1)', color: isLight ? '#1e40af' : '#93c5fd', fontWeight: 600 }}>UPCC {quotation.upccDiscountPercent}%</span>}
+              {quotation.ncbEnabled && (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    background: 'rgba(34,197,94,0.1)',
+                    color: isLight ? '#166534' : '#86efac',
+                    fontWeight: 600
+                  }}
+                >
+                  NCB {quotation.ncbDiscountPercent}%
+                </span>
+              )}
+              {quotation.upccEnabled && (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    background: 'rgba(59,130,246,0.1)',
+                    color: isLight ? '#1e40af' : '#93c5fd',
+                    fontWeight: 600
+                  }}
+                >
+                  UPCC {quotation.upccDiscountPercent}%
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -1092,11 +1457,24 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 key={opt.id}
                 onClick={() => onSelectLolOption(opt.id)}
                 style={{
-                  padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
-                  border: data.selectedLolOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedLolOptionId === opt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
-                  color: data.selectedLolOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  cursor: 'pointer', transition: 'all 0.15s'
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  border:
+                    data.selectedLolOptionId === opt.id
+                      ? '2px solid var(--accent-primary)'
+                      : '1px solid var(--input-border)',
+                  background:
+                    data.selectedLolOptionId === opt.id
+                      ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                      : 'transparent',
+                  color:
+                    data.selectedLolOptionId === opt.id
+                      ? 'var(--accent-primary)'
+                      : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
                 }}
               >
                 {opt.label || `LOL ${idx + 1}`} — {opt.currency} {opt.amount?.toLocaleString()}
@@ -1116,14 +1494,28 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 key={opt.id}
                 onClick={() => onSelectAgreedValueOption(opt.id)}
                 style={{
-                  padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
-                  border: data.selectedAgreedValueOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedAgreedValueOptionId === opt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
-                  color: data.selectedAgreedValueOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  cursor: 'pointer', transition: 'all 0.15s'
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  border:
+                    data.selectedAgreedValueOptionId === opt.id
+                      ? '2px solid var(--accent-primary)'
+                      : '1px solid var(--input-border)',
+                  background:
+                    data.selectedAgreedValueOptionId === opt.id
+                      ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                      : 'transparent',
+                  color:
+                    data.selectedAgreedValueOptionId === opt.id
+                      ? 'var(--accent-primary)'
+                      : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
                 }}
               >
-                {opt.label || `Option ${idx + 1}`} — {opt.currency || 'USD'} {opt.amount?.toLocaleString()}
+                {opt.label || `Option ${idx + 1}`} — {opt.currency || 'USD'}{' '}
+                {opt.amount?.toLocaleString()}
               </button>
             ))}
           </div>
@@ -1135,7 +1527,13 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
   )
 }
 
-function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputStyle }: {
+function StepPeriodPremium({
+  data,
+  timezoneOptions,
+  onUpdate,
+  labelStyle,
+  inputStyle
+}: {
   data: WizardData
   timezoneOptions: string[]
   onUpdate: (partial: Partial<WizardData>) => void
@@ -1150,14 +1548,31 @@ function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputS
       </p>
 
       {/* Inception */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '12px',
+          marginBottom: '16px'
+        }}
+      >
         <div>
           <label style={labelStyle}>Inception Date</label>
-          <input type="date" value={data.inceptionDate} onChange={e => onUpdate({ inceptionDate: e.target.value })} style={inputStyle} />
+          <input
+            type="date"
+            value={data.inceptionDate}
+            onChange={(e) => onUpdate({ inceptionDate: e.target.value })}
+            style={inputStyle}
+          />
         </div>
         <div>
           <label style={labelStyle}>Time</label>
-          <input type="time" value={data.inceptionTime} onChange={e => onUpdate({ inceptionTime: e.target.value })} style={inputStyle} />
+          <input
+            type="time"
+            value={data.inceptionTime}
+            onChange={(e) => onUpdate({ inceptionTime: e.target.value })}
+            style={inputStyle}
+          />
         </div>
         <div>
           <label style={labelStyle}>Timezone</label>
@@ -1165,34 +1580,65 @@ function StepPeriodPremium({ data, timezoneOptions, onUpdate, labelStyle, inputS
             type="text"
             list="wizard-tz-options"
             value={data.timezone}
-            onChange={e => onUpdate({ timezone: e.target.value })}
+            onChange={(e) => onUpdate({ timezone: e.target.value })}
             style={inputStyle}
             placeholder="Type or select..."
           />
           <datalist id="wizard-tz-options">
-            {timezoneOptions.map(tz => <option key={tz} value={tz} />)}
+            {timezoneOptions.map((tz) => (
+              <option key={tz} value={tz} />
+            ))}
           </datalist>
         </div>
       </div>
 
       {/* Expiry */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '12px',
+          marginBottom: '20px'
+        }}
+      >
         <div>
           <label style={labelStyle}>Expiry Date</label>
-          <input type="date" value={data.expiryDate} onChange={e => onUpdate({ expiryDate: e.target.value })} style={inputStyle} />
+          <input
+            type="date"
+            value={data.expiryDate}
+            onChange={(e) => onUpdate({ expiryDate: e.target.value })}
+            style={inputStyle}
+          />
         </div>
         <div>
           <label style={labelStyle}>Time</label>
-          <input type="time" value={data.expiryTime} onChange={e => onUpdate({ expiryTime: e.target.value })} style={inputStyle} />
+          <input
+            type="time"
+            value={data.expiryTime}
+            onChange={(e) => onUpdate({ expiryTime: e.target.value })}
+            style={inputStyle}
+          />
         </div>
         <div />
       </div>
-
     </div>
   )
 }
 
-function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFromInstalments, onChangeCount, hullTechnical, inputStyle, qVessels, isMultiSelection, onUpdateVesselPremium, computePayable }: {
+function StepInstalments({
+  data,
+  quotation,
+  isLight,
+  onUpdate,
+  recalcPremiumFromInstalments,
+  onChangeCount,
+  hullTechnical,
+  inputStyle,
+  qVessels,
+  isMultiSelection,
+  onUpdateVesselPremium,
+  computePayable
+}: {
   data: WizardData
   quotation: Quotation
   isLight: boolean
@@ -1206,7 +1652,14 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
   onUpdateVesselPremium: (vesselId: string, amount: number) => void
   computePayable: (tech: number) => number
 }) {
-  const labelUpper: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }
+  const labelUpper: React.CSSProperties = {
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    marginBottom: '8px'
+  }
   const count = data.instalmentDates.length
 
   return (
@@ -1221,19 +1674,65 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         {isMultiSelection ? (
           <div style={{ flex: '1 1 320px', maxWidth: '420px' }}>
             <div style={labelUpper}>Payable Premium per Vessel</div>
-            <div style={{ border: '1px solid var(--table-border)', borderRadius: '10px', overflow: 'hidden' }}>
-              {data.selectedVesselIds.map(vid => {
-                const qv = qVessels.find(v => (v.vesselId || v.id) === vid)
+            <div
+              style={{
+                border: '1px solid var(--table-border)',
+                borderRadius: '10px',
+                overflow: 'hidden'
+              }}
+            >
+              {data.selectedVesselIds.map((vid) => {
+                const qv = qVessels.find((v) => (v.vesselId || v.id) === vid)
                 return (
-                  <div key={vid} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderBottom: '1px solid var(--table-border)' }}>
-                    <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase' }}>{qv?.name || qv?.vesselLabel || vid}</span>
-                    <MoneyInput value={data.vesselPremiums[vid]} onChange={val => onUpdateVesselPremium(vid, val || 0)} style={{ ...inputStyle, width: '140px', flex: 'none', textAlign: 'right', padding: '5px 8px' }} showZero />
+                  <div
+                    key={vid}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 10px',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase'
+                      }}
+                    >
+                      {qv?.name || qv?.vesselLabel || vid}
+                    </span>
+                    <MoneyInput
+                      value={data.vesselPremiums[vid]}
+                      onChange={(val) => onUpdateVesselPremium(vid, val || 0)}
+                      style={{
+                        ...inputStyle,
+                        width: '140px',
+                        flex: 'none',
+                        textAlign: 'right',
+                        padding: '5px 8px'
+                      }}
+                      showZero
+                    />
                   </div>
                 )
               })}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(var(--accent-primary-rgb), 0.06)', fontSize: '0.82rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '8px 10px',
+                  background: 'rgba(var(--accent-primary-rgb), 0.06)',
+                  fontSize: '0.82rem'
+                }}
+              >
                 <span style={{ fontWeight: 700 }}>Total</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{data.totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })} {quotation?.premiumCurrency || 'USD'}</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  {data.totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                  {quotation?.premiumCurrency || 'USD'}
+                </span>
               </div>
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
@@ -1241,24 +1740,33 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             </p>
           </div>
         ) : (
-        <div>
-          <div style={labelUpper}>Payable Premium</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
-            <MoneyInput value={data.totalPremium} onChange={v => {
-                const val = v || 0
-                const only = data.selectedVesselIds[0]
-                onUpdate({
-                  totalPremium: val,
-                  instalmentAmounts: splitInstalments(val, data.instalmentDates.length),
-                  ...(only ? { vesselPremiums: { [only]: val } } : {})
-                })
-              }} placeholder="Premium amount" style={{ ...inputStyle, flex: 1, textAlign: 'right' }} />
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{quotation?.premiumCurrency || 'USD'}</span>
+          <div>
+            <div style={labelUpper}>Payable Premium</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '300px' }}>
+              <MoneyInput
+                value={data.totalPremium}
+                onChange={(v) => {
+                  const val = v || 0
+                  const only = data.selectedVesselIds[0]
+                  onUpdate({
+                    totalPremium: val,
+                    instalmentAmounts: splitInstalments(val, data.instalmentDates.length),
+                    ...(only ? { vesselPremiums: { [only]: val } } : {})
+                  })
+                }}
+                placeholder="Premium amount"
+                style={{ ...inputStyle, flex: 1, textAlign: 'right' }}
+              />
+              <span
+                style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}
+              >
+                {quotation?.premiumCurrency || 'USD'}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+              Changing premium will recalculate instalment amounts
+            </p>
           </div>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-            Changing premium will recalculate instalment amounts
-          </p>
-        </div>
         )}
         <div>
           <div style={labelUpper}>Number of Instalments</div>
@@ -1267,7 +1775,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             min={1}
             max={24}
             value={count || 1}
-            onChange={e => onChangeCount(parseInt(e.target.value) || 1)}
+            onChange={(e) => onChangeCount(parseInt(e.target.value) || 1)}
             style={{ ...inputStyle, width: '120px', textAlign: 'right' }}
           />
           <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
@@ -1278,146 +1786,281 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
 
       {/* Hull + IV premium breakdown (Hull quotations with IV). Technical/Payable split
           only shown when there's an NCB/UPCC discount — otherwise a single amount. */}
-      {quotation.ivEnabled && (() => {
-        const cp = computePayable
-        const hasDiscount = cp(100) !== 100
-        const cur = quotation.premiumCurrency || 'USD'
-        const fmt = (n: number) => `${cur} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-        const rows = [
-          { label: 'Hull', tech: hullTechnical, pay: cp(hullTechnical) },
-          { label: 'IV', tech: quotation.ivPremiumAmount || 0, pay: cp(quotation.ivPremiumAmount || 0) }
-        ]
-        const totalTech = rows.reduce((s, r) => s + r.tech, 0)
-        const totalPay = rows.reduce((s, r) => s + r.pay, 0)
-        const cols = hasDiscount ? '1.2fr 1fr 1fr' : '1.2fr 1fr'
-        return (
-          <div style={{ marginBottom: '20px', border: '1px solid var(--glass-border-color)', borderRadius: '10px', overflow: 'hidden', maxWidth: '540px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', background: 'rgba(var(--accent-primary-rgb), 0.06)', ...labelUpper, marginBottom: 0 }}>
-              <span>Premium</span>
-              {hasDiscount && <span style={{ textAlign: 'right' }}>Technical</span>}
-              <span style={{ textAlign: 'right' }}>{hasDiscount ? 'Payable' : 'Amount'}</span>
-            </div>
-            {rows.map(r => (
-              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--table-border)' }}>
-                <span style={{ fontWeight: 600 }}>{r.label}</span>
-                {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(r.tech)}</span>}
-                <span style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(hasDiscount ? r.pay : r.tech)}</span>
+      {quotation.ivEnabled &&
+        (() => {
+          const cp = computePayable
+          const hasDiscount = cp(100) !== 100
+          const cur = quotation.premiumCurrency || 'USD'
+          const fmt = (n: number) =>
+            `${cur} ${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+          const rows = [
+            { label: 'Hull', tech: hullTechnical, pay: cp(hullTechnical) },
+            {
+              label: 'IV',
+              tech: quotation.ivPremiumAmount || 0,
+              pay: cp(quotation.ivPremiumAmount || 0)
+            }
+          ]
+          const totalTech = rows.reduce((s, r) => s + r.tech, 0)
+          const totalPay = rows.reduce((s, r) => s + r.pay, 0)
+          const cols = hasDiscount ? '1.2fr 1fr 1fr' : '1.2fr 1fr'
+          return (
+            <div
+              style={{
+                marginBottom: '20px',
+                border: '1px solid var(--glass-border-color)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                maxWidth: '540px'
+              }}
+            >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: cols,
+                  padding: '8px 14px',
+                  background: 'rgba(var(--accent-primary-rgb), 0.06)',
+                  ...labelUpper,
+                  marginBottom: 0
+                }}
+              >
+                <span>Premium</span>
+                {hasDiscount && <span style={{ textAlign: 'right' }}>Technical</span>}
+                <span style={{ textAlign: 'right' }}>{hasDiscount ? 'Payable' : 'Amount'}</span>
               </div>
-            ))}
-            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border-color)', background: 'rgba(var(--accent-primary-rgb), 0.04)' }}>
-              <span style={{ fontWeight: 700 }}>Total</span>
-              {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(totalTech)}</span>}
-              <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>{fmt(hasDiscount ? totalPay : totalTech)}</span>
+              {rows.map((r) => (
+                <div
+                  key={r.label}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: cols,
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderTop: '1px solid var(--table-border)'
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{r.label}</span>
+                  {hasDiscount && (
+                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
+                      {fmt(r.tech)}
+                    </span>
+                  )}
+                  <span style={{ textAlign: 'right', fontWeight: 600 }}>
+                    {fmt(hasDiscount ? r.pay : r.tech)}
+                  </span>
+                </div>
+              ))}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: cols,
+                  padding: '8px 14px',
+                  fontSize: '0.85rem',
+                  borderTop: '1px solid var(--glass-border-color)',
+                  background: 'rgba(var(--accent-primary-rgb), 0.04)'
+                }}
+              >
+                <span style={{ fontWeight: 700 }}>Total</span>
+                {hasDiscount && (
+                  <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
+                    {fmt(totalTech)}
+                  </span>
+                )}
+                <span
+                  style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}
+                >
+                  {fmt(hasDiscount ? totalPay : totalTech)}
+                </span>
+              </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
 
       {count === 0 && (
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-          Full premium is due as a single payment on inception. Increase the count above to split it into instalments.
+          Full premium is due as a single payment on inception. Increase the count above to split it
+          into instalments.
         </p>
       )}
 
-      {count > 0 && (<>
-      <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 16px' }} />
+      {count > 0 && (
+        <>
+          <div style={{ height: '1px', background: 'var(--glass-border)', margin: '0 0 16px' }} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {data.instalmentDates.map((date, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '10px 14px', borderRadius: '10px',
-            border: '1px solid var(--table-border)',
-            background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
-          }}>
-            <span style={{
-              fontSize: '0.82rem', color: 'var(--text-secondary)',
-              minWidth: '32px', fontWeight: 700,
-              background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '2px 8px',
-              borderRadius: '6px', textAlign: 'center'
-            }}>
-              #{i + 1}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {data.instalmentDates.map((date, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--table-border)',
+                  background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    color: 'var(--text-secondary)',
+                    minWidth: '32px',
+                    fontWeight: 700,
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    textAlign: 'center'
+                  }}
+                >
+                  #{i + 1}
+                </span>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    const updated = [...data.instalmentDates]
+                    updated[i] = e.target.value
+                    onUpdate({ instalmentDates: updated })
+                  }}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <input
+                  type="number"
+                  value={data.instalmentAmounts[i] || ''}
+                  readOnly={isMultiSelection}
+                  title={
+                    isMultiSelection
+                      ? 'Sum of the per-vessel instalments — edit the vessel premiums above'
+                      : undefined
+                  }
+                  onChange={(e) => {
+                    if (isMultiSelection) return
+                    const updated = [...data.instalmentAmounts]
+                    updated[i] = parseFloat(e.target.value) || 0
+                    recalcPremiumFromInstalments(updated)
+                  }}
+                  placeholder="Amount"
+                  style={{ ...inputStyle, width: '130px', flex: 'none', textAlign: 'right' }}
+                />
+                <span
+                  style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '36px' }}
+                >
+                  {quotation.premiumCurrency || 'USD'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginTop: '12px',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              background: 'rgba(var(--accent-primary-rgb), 0.06)'
+            }}
+          >
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Total
             </span>
-            <input
-              type="date"
-              value={date}
-              onChange={e => {
-                const updated = [...data.instalmentDates]
-                updated[i] = e.target.value
-                onUpdate({ instalmentDates: updated })
-              }}
-              style={{ ...inputStyle, flex: 1 }}
-            />
-            <input
-              type="number"
-              value={data.instalmentAmounts[i] || ''}
-              readOnly={isMultiSelection}
-              title={isMultiSelection ? 'Sum of the per-vessel instalments — edit the vessel premiums above' : undefined}
-              onChange={e => {
-                if (isMultiSelection) return
-                const updated = [...data.instalmentAmounts]
-                updated[i] = parseFloat(e.target.value) || 0
-                recalcPremiumFromInstalments(updated)
-              }}
-              placeholder="Amount"
-              style={{ ...inputStyle, width: '130px', flex: 'none', textAlign: 'right' }}
-            />
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', minWidth: '36px' }}>{quotation.premiumCurrency || 'USD'}</span>
+            <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+              {data.totalPremium.toLocaleString()} {quotation.premiumCurrency || 'USD'}
+            </span>
           </div>
-        ))}
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.06)' }}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total</span>
-        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-          {data.totalPremium.toLocaleString()} {quotation.premiumCurrency || 'USD'}
-        </span>
-      </div>
-
-      {/* Non-refundable — 1st instalment OR a percentage (mirrors the quotation) */}
-      <div style={{ marginTop: '16px' }}>
-        <label style={labelUpper}>Non-Refundable</label>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {([
-            { key: null, label: 'None' },
-            { key: 'first_instalment', label: '1st Instalment' },
-            { key: 'percentage', label: 'Percentage' }
-          ] as { key: WizardData['nonRefundableType']; label: string }[]).map(opt => {
-            const active = data.nonRefundableType === opt.key
-            return (
-              <button key={String(opt.key)} type="button"
-                onClick={() => onUpdate({ nonRefundableType: opt.key })}
-                style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: active ? 700 : 400, border: active ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
-        {data.nonRefundableType === 'percentage' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-            <input type="number" min={0} max={100} step={0.01}
-              value={data.nonRefundablePercent || ''}
-              onChange={e => onUpdate({ nonRefundablePercent: parseFloat(e.target.value) || 0 })}
-              placeholder="e.g. 25" style={{ ...inputStyle, width: '160px' }} />
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>% of premium is non-refundable</span>
+          {/* Non-refundable — 1st instalment OR a percentage (mirrors the quotation) */}
+          <div style={{ marginTop: '16px' }}>
+            <label style={labelUpper}>Non-Refundable</label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {(
+                [
+                  { key: null, label: 'None' },
+                  { key: 'first_instalment', label: '1st Instalment' },
+                  { key: 'percentage', label: 'Percentage' }
+                ] as { key: WizardData['nonRefundableType']; label: string }[]
+              ).map((opt) => {
+                const active = data.nonRefundableType === opt.key
+                return (
+                  <button
+                    key={String(opt.key)}
+                    type="button"
+                    onClick={() => onUpdate({ nonRefundableType: opt.key })}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      fontWeight: active ? 700 : 400,
+                      border: active
+                        ? '2px solid var(--accent-primary)'
+                        : '1px solid var(--input-border)',
+                      background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                      color: active ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {data.nonRefundableType === 'percentage' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={data.nonRefundablePercent || ''}
+                  onChange={(e) =>
+                    onUpdate({ nonRefundablePercent: parseFloat(e.target.value) || 0 })
+                  }
+                  placeholder="e.g. 25"
+                  style={{ ...inputStyle, width: '160px' }}
+                />
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  % of premium is non-refundable
+                </span>
+              </div>
+            )}
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
+              Each 30 days from inception equals 1 calendar month.
+            </p>
           </div>
-        )}
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '8px 0 0' }}>
-          Each 30 days from inception equals 1 calendar month.
-        </p>
-      </div>
-      </>)}
+        </>
+      )}
 
       {/* Outstanding premium notice — toggle + editable text (overrides the quotation for this policy) */}
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem', marginBottom: data.outstandingPremiumEnabled ? '8px' : 0 }}>
-          <input type="checkbox" checked={data.outstandingPremiumEnabled} onChange={e => onUpdate({ outstandingPremiumEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+      <div
+        style={{
+          marginTop: '20px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--glass-border-color)'
+        }}
+      >
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            cursor: 'pointer',
+            fontSize: '0.88rem',
+            marginBottom: data.outstandingPremiumEnabled ? '8px' : 0
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={data.outstandingPremiumEnabled}
+            onChange={(e) => onUpdate({ outstandingPremiumEnabled: e.target.checked })}
+            style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+          />
           Show outstanding-premium notice on the policy
         </label>
         {data.outstandingPremiumEnabled && (
           <textarea
             value={data.outstandingPremiumText}
-            onChange={e => onUpdate({ outstandingPremiumText: e.target.value })}
+            onChange={(e) => onUpdate({ outstandingPremiumText: e.target.value })}
             rows={2}
             placeholder="All outstanding premium to be settled prior inception"
             style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
@@ -1428,7 +2071,21 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
   )
 }
 
-function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, onUpdate, allEntities, entityAddrs, qVessels, isLight, labelStyle, inputStyle, onEditSectionOrder }: {
+function StepDetails({
+  data,
+  banks,
+  hasBroker,
+  premiumCurrency,
+  baseCurrency,
+  onUpdate,
+  allEntities,
+  entityAddrs,
+  qVessels,
+  isLight,
+  labelStyle,
+  inputStyle,
+  onEditSectionOrder
+}: {
   data: WizardData
   banks: { id: string; name: string; details: string; order: number }[]
   hasBroker: boolean
@@ -1446,28 +2103,54 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
   const sameAsBase = premiumCurrency.toUpperCase() === baseCurrency.toUpperCase()
   const vesselIds = data.selectedVesselIds
   const [activeVid, setActiveVid] = useState(vesselIds[0] || '')
-  const vid = vesselIds.includes(activeVid) ? activeVid : (vesselIds[0] || '')
+  const vid = vesselIds.includes(activeVid) ? activeVid : vesselIds[0] || ''
   const rows = data.insuredByVessel[vid] || []
-  const setRows = (newRows: InsuredRow[]) => onUpdate({ insuredByVessel: { ...data.insuredByVessel, [vid]: newRows } })
-  const updateRow = (idx: number, patch: Partial<InsuredRow>) => setRows(rows.map((r, i) => i === idx ? { ...r, ...patch } : r))
-  const addRow = () => setRows([...rows, { entityId: '', entityName: '', role: '', addressText: '', addressLabel: '', addressId: '', isNew: false }])
+  const setRows = (newRows: InsuredRow[]) =>
+    onUpdate({ insuredByVessel: { ...data.insuredByVessel, [vid]: newRows } })
+  const updateRow = (idx: number, patch: Partial<InsuredRow>) =>
+    setRows(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
+  const addRow = () =>
+    setRows([
+      ...rows,
+      {
+        entityId: '',
+        entityName: '',
+        role: '',
+        addressText: '',
+        addressLabel: '',
+        addressId: '',
+        isNew: false
+      }
+    ])
   const removeRow = (idx: number) => setRows(rows.filter((_, i) => i !== idx))
   // Typed value matches an existing entity → link it (and default its address); otherwise keep as a custom name
   const onEntityInput = (idx: number, text: string) => {
-    const match = allEntities.find(e => e.name.toLowerCase() === text.trim().toLowerCase())
+    const match = allEntities.find((e) => e.name.toLowerCase() === text.trim().toLowerCase())
     if (match) {
       const first = (entityAddrs[match.id] || [])[0]
-      updateRow(idx, { entityId: match.id, entityName: match.name, addressText: first?.addressLine1 || '', addressId: first?.id || '', isNew: false })
+      updateRow(idx, {
+        entityId: match.id,
+        entityName: match.name,
+        addressText: first?.addressLine1 || '',
+        addressId: first?.id || '',
+        isNew: false
+      })
     } else {
       updateRow(idx, { entityId: '', entityName: text, addressId: '', isNew: false })
     }
   }
   const onAddrChange = (idx: number, r: InsuredRow, val: string) => {
-    if (val === '__new__') { updateRow(idx, { addressId: '', isNew: true, addressText: '' }); return }
-    const a = (entityAddrs[r.entityId] || []).find(x => x.id === val)
+    if (val === '__new__') {
+      updateRow(idx, { addressId: '', isNew: true, addressText: '' })
+      return
+    }
+    const a = (entityAddrs[r.entityId] || []).find((x) => x.id === val)
     updateRow(idx, { addressId: val, isNew: false, addressText: a?.addressLine1 || '' })
   }
-  const vesselName = (id: string) => { const v = qVessels.find(q => (q.vesselId || q.id) === id); return v ? (v.name || v.vesselLabel || id) : id }
+  const vesselName = (id: string) => {
+    const v = qVessels.find((q) => (q.vesselId || q.id) === id)
+    return v ? v.name || v.vesselLabel || id : id
+  }
   const cellInput: React.CSSProperties = { ...inputStyle, padding: '6px 8px', fontSize: '0.82rem' }
 
   return (
@@ -1479,12 +2162,32 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
 
       {/* Commission — toggle to include/skip */}
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.88rem', marginBottom: data.commissionEnabled ? '8px' : 0 }}>
-          <input type="checkbox" checked={data.commissionEnabled} onChange={e => onUpdate({ commissionEnabled: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            cursor: 'pointer',
+            fontSize: '0.88rem',
+            marginBottom: data.commissionEnabled ? '8px' : 0
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={data.commissionEnabled}
+            onChange={(e) => onUpdate({ commissionEnabled: e.target.checked })}
+            style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
+          />
           Include commission{hasBroker ? ' (broker — generates Credit Advice)' : ''}
         </label>
         {!hasBroker && (
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '-2px 0 8px 26px' }}>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              margin: '-2px 0 8px 26px'
+            }}
+          >
             No broker on this business, so commission is off by default.
           </div>
         )}
@@ -1493,8 +2196,14 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
             <input
               type="number"
               value={data.commissionPercent}
-              onChange={e => onUpdate({ commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-              min={0} max={100} step={0.01}
+              onChange={(e) =>
+                onUpdate({
+                  commissionPercent: e.target.value === '' ? '' : parseFloat(e.target.value)
+                })
+              }
+              min={0}
+              max={100}
+              step={0.01}
               placeholder="e.g. 15"
               style={{ ...inputStyle, width: '160px' }}
             />
@@ -1505,29 +2214,49 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
 
       {/* Exchange Rate */}
       <div style={{ marginBottom: '20px' }}>
-        <label style={labelStyle}>Exchange Rate ({premiumCurrency} to {baseCurrency})</label>
+        <label style={labelStyle}>
+          Exchange Rate ({premiumCurrency} to {baseCurrency})
+        </label>
         <input
           type="number"
           value={data.exchangeRate}
-          onChange={e => onUpdate({ exchangeRate: parseFloat(e.target.value) || 1 })}
+          onChange={(e) => onUpdate({ exchangeRate: parseFloat(e.target.value) || 1 })}
           min={0}
           step={0.000001}
           readOnly={sameAsBase}
-          style={{ ...inputStyle, width: '200px', ...(sameAsBase ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+          style={{
+            ...inputStyle,
+            width: '200px',
+            ...(sameAsBase ? { opacity: 0.6, cursor: 'not-allowed' } : {})
+          }}
         />
-        {sameAsBase && <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Same as base currency — rate fixed at 1</p>}
+        {sameAsBase && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+            Same as base currency — rate fixed at 1
+          </p>
+        )}
       </div>
 
       {/* Bank */}
       <div style={{ marginBottom: '20px' }}>
         <label style={labelStyle}>Bank</label>
         {banks.length > 0 ? (
-          <select value={data.bankId} onChange={e => onUpdate({ bankId: e.target.value })} style={inputStyle}>
+          <select
+            value={data.bankId}
+            onChange={(e) => onUpdate({ bankId: e.target.value })}
+            style={inputStyle}
+          >
             <option value="">Select bank...</option>
-            {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {banks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
           </select>
         ) : (
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>No banks configured</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            No banks configured
+          </p>
         )}
       </div>
 
@@ -1535,13 +2264,30 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
       <div>
         <label style={labelStyle}>Insured & Addresses</label>
         <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 10px' }}>
-          These appear on the policy. Pick an existing address or add a new one (a new address is saved back to the entity).
+          These appear on the policy. Pick an existing address or add a new one (a new address is
+          saved back to the entity).
         </p>
         {vesselIds.length > 1 && (
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            {vesselIds.map(id => (
-              <button key={id} type="button" onClick={() => setActiveVid(id)}
-                style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: id === vid ? 700 : 400, border: id === vid ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: id === vid ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: id === vid ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+            {vesselIds.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveVid(id)}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  fontWeight: id === vid ? 700 : 400,
+                  border:
+                    id === vid
+                      ? '2px solid var(--accent-primary)'
+                      : '1px solid var(--input-border)',
+                  background: id === vid ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                  color: id === vid ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                }}
+              >
                 {vesselName(id)}
               </button>
             ))}
@@ -1551,22 +2297,83 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
           {rows.map((r, idx) => {
             const addrs = entityAddrs[r.entityId] || []
             return (
-              <div key={idx} style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr auto', gap: '8px', alignItems: 'center' }}>
-                  <input type="text" list={`wiz-ent-${vid}-${idx}`} value={r.entityName} onChange={e => onEntityInput(idx, e.target.value)} placeholder="Type to search or add a name…" style={cellInput} />
+              <div
+                key={idx}
+                style={{
+                  border: '1px solid var(--table-border)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.4fr 1fr auto',
+                    gap: '8px',
+                    alignItems: 'center'
+                  }}
+                >
+                  <input
+                    type="text"
+                    list={`wiz-ent-${vid}-${idx}`}
+                    value={r.entityName}
+                    onChange={(e) => onEntityInput(idx, e.target.value)}
+                    placeholder="Type to search or add a name…"
+                    style={cellInput}
+                  />
                   <datalist id={`wiz-ent-${vid}-${idx}`}>
-                    {allEntities.map(e => <option key={e.id} value={e.name} />)}
+                    {allEntities.map((e) => (
+                      <option key={e.id} value={e.name} />
+                    ))}
                   </datalist>
-                  <input type="text" value={r.role} onChange={e => updateRow(idx, { role: e.target.value })} placeholder="Role (e.g. Registered Owners)" style={cellInput} />
-                  <button type="button" onClick={() => removeRow(idx)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', fontSize: '0.9rem' }}>✕</button>
+                  <input
+                    type="text"
+                    value={r.role}
+                    onChange={(e) => updateRow(idx, { role: e.target.value })}
+                    placeholder="Role (e.g. Registered Owners)"
+                    style={cellInput}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    title="Remove"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--danger)',
+                      padding: '4px',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
                 {!r.entityId && (r.entityName || '').trim() && (
-                  <p style={{ fontSize: '0.68rem', color: 'var(--accent-primary)', margin: '4px 0 0' }}>Custom insured — not linked to an existing entity.</p>
+                  <p
+                    style={{
+                      fontSize: '0.68rem',
+                      color: 'var(--accent-primary)',
+                      margin: '4px 0 0'
+                    }}
+                  >
+                    Custom insured — not linked to an existing entity.
+                  </p>
                 )}
                 <div style={{ marginTop: '8px' }}>
                   {r.entityId && (
-                    <select value={r.isNew ? '__new__' : r.addressId} onChange={e => onAddrChange(idx, r, e.target.value)} style={{ ...cellInput, width: '100%' }}>
-                      {addrs.map(a => <option key={a.id} value={a.id}>{a.addressLine1}{a.label ? ` (${a.label})` : ''}</option>)}
+                    <select
+                      value={r.isNew ? '__new__' : r.addressId}
+                      onChange={(e) => onAddrChange(idx, r, e.target.value)}
+                      style={{ ...cellInput, width: '100%' }}
+                    >
+                      {addrs.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.addressLine1}
+                          {a.label ? ` (${a.label})` : ''}
+                        </option>
+                      ))}
                       {addrs.length === 0 && !r.isNew && <option value="">No saved address</option>}
                       <option value="__new__">+ New address…</option>
                     </select>
@@ -1574,32 +2381,104 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
                   {(r.isNew || !r.entityId) && (
                     <>
                       {r.entityId && (
-                        <input type="text" value={r.addressLabel} onChange={e => updateRow(idx, { addressLabel: e.target.value })} placeholder="Address name (internal, optional)" style={{ ...cellInput, width: '100%', marginTop: '6px' }} />
+                        <input
+                          type="text"
+                          value={r.addressLabel}
+                          onChange={(e) => updateRow(idx, { addressLabel: e.target.value })}
+                          placeholder="Address name (internal, optional)"
+                          style={{ ...cellInput, width: '100%', marginTop: '6px' }}
+                        />
                       )}
-                      <textarea value={r.addressText} onChange={e => updateRow(idx, { addressText: e.target.value, isNew: !!r.entityId, addressId: '' })} rows={2} placeholder="Full address…" style={{ ...cellInput, width: '100%', marginTop: '6px', resize: 'vertical', fontFamily: 'inherit' }} />
+                      <textarea
+                        value={r.addressText}
+                        onChange={(e) =>
+                          updateRow(idx, {
+                            addressText: e.target.value,
+                            isNew: !!r.entityId,
+                            addressId: ''
+                          })
+                        }
+                        rows={2}
+                        placeholder="Full address…"
+                        style={{
+                          ...cellInput,
+                          width: '100%',
+                          marginTop: '6px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit'
+                        }}
+                      />
                     </>
                   )}
                 </div>
               </div>
             )
           })}
-          {rows.length === 0 && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No insured on this vessel yet.</p>}
+          {rows.length === 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              No insured on this vessel yet.
+            </p>
+          )}
         </div>
-        <button type="button" onClick={addRow} className="btn-secondary" style={{ marginTop: '10px', padding: '5px 14px', fontSize: '0.8rem' }}>+ Add insured</button>
+        <button
+          type="button"
+          onClick={addRow}
+          className="btn-secondary"
+          style={{ marginTop: '10px', padding: '5px 14px', fontSize: '0.8rem' }}
+        >
+          + Add insured
+        </button>
       </div>
 
       {/* Section order — override the policy-settings default for this policy */}
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
+      <div
+        style={{
+          marginTop: '20px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--glass-border-color)'
+        }}
+      >
         <label style={labelStyle}>Section Order</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button type="button" onClick={onEditSectionOrder} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.82rem' }}>
+          <button
+            type="button"
+            onClick={onEditSectionOrder}
+            className="btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              fontSize: '0.82rem'
+            }}
+          >
             <LayoutList size={14} /> {data.sectionOrder ? 'Edit Section Order' : 'Reorder Sections'}
           </button>
-          <span style={{ fontSize: '0.75rem', color: data.sectionOrder ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
-            {data.sectionOrder ? 'Custom order for this policy' : 'Using the default order for this type'}
+          <span
+            style={{
+              fontSize: '0.75rem',
+              color: data.sectionOrder ? 'var(--accent-primary)' : 'var(--text-secondary)'
+            }}
+          >
+            {data.sectionOrder
+              ? 'Custom order for this policy'
+              : 'Using the default order for this type'}
           </span>
           {data.sectionOrder && (
-            <button type="button" onClick={() => onUpdate({ sectionOrder: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.75rem', textDecoration: 'underline' }}>Reset to default</button>
+            <button
+              type="button"
+              onClick={() => onUpdate({ sectionOrder: null })}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                fontSize: '0.75rem',
+                textDecoration: 'underline'
+              }}
+            >
+              Reset to default
+            </button>
           )}
         </div>
       </div>
@@ -1607,7 +2486,15 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
   )
 }
 
-function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOptions, labelStyle }: {
+function StepBlueCards({
+  data,
+  qVessels,
+  flagStates,
+  isLight,
+  onUpdate,
+  ownerOptions,
+  labelStyle
+}: {
   data: WizardData
   qVessels: QuotationVessel[]
   flagStates: FlagState[]
@@ -1621,7 +2508,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
     const result: { vesselName: string; flagState: FlagState | null }[] = []
     for (const v of qVessels) {
       if (v.flag) {
-        const fs = flagStates.find(f => f.name === v.flag || f.iso3Code === v.flag)
+        const fs = flagStates.find((f) => f.name === v.flag || f.iso3Code === v.flag)
         result.push({ vesselName: v.name || v.vesselLabel, flagState: fs || null })
       } else {
         result.push({ vesselName: v.name || v.vesselLabel, flagState: null })
@@ -1634,26 +2521,35 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
 
   const toggleCard = (card: string) => {
     const current = data.blueCards
-    const updated = current.includes(card)
-      ? current.filter(c => c !== card)
-      : [...current, card]
+    const updated = current.includes(card) ? current.filter((c) => c !== card) : [...current, card]
     onUpdate({ blueCards: updated, blueCardNone: false })
   }
 
   const setNone = () => {
-    onUpdate({ blueCardNone: !data.blueCardNone, blueCards: !data.blueCardNone ? [] : data.blueCards })
+    onUpdate({
+      blueCardNone: !data.blueCardNone,
+      blueCards: !data.blueCardNone ? [] : data.blueCards
+    })
   }
 
   const bbcWarning = data.blueCards.includes('BBC') && primaryFlag && !primaryFlag.ratifiedBunker
   const wrcWarning = data.blueCards.includes('WRC') && primaryFlag && !primaryFlag.ratifiedWreck
 
-  const ratifiedBunkerFlags = useMemo(() => flagStates.filter(f => f.ratifiedBunker), [flagStates])
-  const ratifiedWreckFlags = useMemo(() => flagStates.filter(f => f.ratifiedWreck), [flagStates])
+  const ratifiedBunkerFlags = useMemo(
+    () => flagStates.filter((f) => f.ratifiedBunker),
+    [flagStates]
+  )
+  const ratifiedWreckFlags = useMemo(() => flagStates.filter((f) => f.ratifiedWreck), [flagStates])
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 12px', borderRadius: '8px',
-    border: '1px solid var(--input-border)', background: 'var(--input-bg)',
-    color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box'
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--input-border)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-primary)',
+    fontSize: '0.88rem',
+    boxSizing: 'border-box'
   }
 
   return (
@@ -1669,59 +2565,112 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
           <label style={labelStyle}>Blue-card period</label>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Inception</div>
-              <input type="date" value={data.blueCardInception} onChange={e => onUpdate({ blueCardInception: e.target.value })} style={inputStyle} />
+              <div
+                style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}
+              >
+                Inception
+              </div>
+              <input
+                type="date"
+                value={data.blueCardInception}
+                onChange={(e) => onUpdate({ blueCardInception: e.target.value })}
+                style={inputStyle}
+              />
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Expiry</div>
-              <input type="date" value={data.blueCardExpiry} onChange={e => onUpdate({ blueCardExpiry: e.target.value })} style={inputStyle} />
+              <div
+                style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}
+              >
+                Expiry
+              </div>
+              <input
+                type="date"
+                value={data.blueCardExpiry}
+                onChange={(e) => onUpdate({ blueCardExpiry: e.target.value })}
+                style={inputStyle}
+              />
             </div>
           </div>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Defaults to the policy period. Set a shorter period if the cards are issued for less than the policy term.</p>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+            Defaults to the policy period. Set a shorter period if the cards are issued for less
+            than the policy term.
+          </p>
         </div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {/* None option */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '10px 14px', borderRadius: '10px',
-          border: data.blueCardNone ? '1.5px solid var(--text-secondary)' : '1px solid var(--input-border)',
-          background: data.blueCardNone ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'transparent',
-          cursor: 'pointer', transition: 'all 0.15s'
-        }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: data.blueCardNone
+              ? '1.5px solid var(--text-secondary)'
+              : '1px solid var(--input-border)',
+            background: data.blueCardNone
+              ? isLight
+                ? 'rgba(0,0,0,0.03)'
+                : 'rgba(255,255,255,0.03)'
+              : 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.15s'
+          }}
+        >
           <input
             type="radio"
             checked={data.blueCardNone}
             onChange={setNone}
             style={{ width: '16px', height: '16px', accentColor: 'var(--text-secondary)' }}
           />
-          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>None</span>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+            None
+          </span>
         </label>
 
         {/* Card options — always visible so selecting a card clears "None" and you never get locked */}
         <div>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
             <button
-              onClick={() => { const all = ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']; onUpdate({ blueCards: all, blueCardNone: false }) }}
+              onClick={() => {
+                const all = ['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2']
+                onUpdate({ blueCards: all, blueCardNone: false })
+              }}
               className="btn-secondary"
               style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-            >Select All</button>
+            >
+              Select All
+            </button>
             <button
               onClick={() => onUpdate({ blueCards: [] })}
               className="btn-secondary"
               style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-            >Clear</button>
+            >
+              Clear
+            </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map(card => (
-              <label key={card} style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '10px 14px', borderRadius: '10px',
-                border: data.blueCards.includes(card) ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                background: data.blueCards.includes(card) ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
-                cursor: 'pointer', transition: 'all 0.15s'
-              }}>
+            {['BBC', 'WRC', 'MLC4.2', 'MLC2.5.2'].map((card) => (
+              <label
+                key={card}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: data.blueCards.includes(card)
+                    ? '1.5px solid var(--accent-primary)'
+                    : '1px solid var(--input-border)',
+                  background: data.blueCards.includes(card)
+                    ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                    : 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={data.blueCards.includes(card)}
@@ -1732,7 +2681,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
               </label>
             ))}
           </div>
-          </div>
+        </div>
       </div>
 
       {/* Named assured per card (defaults to Registered Owner) */}
@@ -1740,25 +2689,51 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
         <div style={{ marginTop: '18px' }}>
           <label style={labelStyle}>Named assured on each card</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {data.blueCards.map(card => (
-              <div key={card} style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '10px', alignItems: 'center' }}>
+            {data.blueCards.map((card) => (
+              <div
+                key={card}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '90px 1fr',
+                  gap: '10px',
+                  alignItems: 'center'
+                }}
+              >
                 <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{card}</span>
-                <select value={data.blueCardOwners[card] || ''} onChange={e => onUpdate({ blueCardOwners: { ...data.blueCardOwners, [card]: e.target.value } })} style={inputStyle}>
-                  {ownerOptions.map(o => <option key={o.id} value={o.id}>{o.name}{o.role ? ` — ${o.role}` : ''}</option>)}
+                <select
+                  value={data.blueCardOwners[card] || ''}
+                  onChange={(e) =>
+                    onUpdate({ blueCardOwners: { ...data.blueCardOwners, [card]: e.target.value } })
+                  }
+                  style={inputStyle}
+                >
+                  {ownerOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                      {o.role ? ` — ${o.role}` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Defaults to the Registered Owner.</p>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+            Defaults to the Registered Owner.
+          </p>
         </div>
       )}
 
       {/* BBC ratification warning */}
       {bbcWarning && (
-        <div style={{
-          marginTop: '16px', padding: '12px 14px', borderRadius: '10px',
-          background: 'rgba(255,180,30,0.1)', border: '1px solid rgba(255,180,30,0.3)'
-        }}>
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '12px 14px',
+            borderRadius: '10px',
+            background: 'rgba(255,180,30,0.1)',
+            border: '1px solid rgba(255,180,30,0.3)'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <AlertTriangle size={16} color="#ffb020" />
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ffb020' }}>
@@ -1768,21 +2743,34 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
           <label style={labelStyle}>Issue BBC to:</label>
           <select
             value={data.blueCardAddressedTo['BBC'] || ''}
-            onChange={e => onUpdate({ blueCardAddressedTo: { ...data.blueCardAddressedTo, BBC: e.target.value } })}
+            onChange={(e) =>
+              onUpdate({
+                blueCardAddressedTo: { ...data.blueCardAddressedTo, BBC: e.target.value }
+              })
+            }
             style={inputStyle}
           >
             <option value="">Select flag state...</option>
-            {ratifiedBunkerFlags.map(f => <option key={f.id} value={f.id}>{f.name} ({f.iso3Code})</option>)}
+            {ratifiedBunkerFlags.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name} ({f.iso3Code})
+              </option>
+            ))}
           </select>
         </div>
       )}
 
       {/* WRC ratification warning */}
       {wrcWarning && (
-        <div style={{
-          marginTop: '16px', padding: '12px 14px', borderRadius: '10px',
-          background: 'rgba(255,180,30,0.1)', border: '1px solid rgba(255,180,30,0.3)'
-        }}>
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '12px 14px',
+            borderRadius: '10px',
+            background: 'rgba(255,180,30,0.1)',
+            border: '1px solid rgba(255,180,30,0.3)'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <AlertTriangle size={16} color="#ffb020" />
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ffb020' }}>
@@ -1792,48 +2780,85 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
           <label style={labelStyle}>Issue WRC to:</label>
           <select
             value={data.blueCardAddressedTo['WRC'] || ''}
-            onChange={e => onUpdate({ blueCardAddressedTo: { ...data.blueCardAddressedTo, WRC: e.target.value } })}
+            onChange={(e) =>
+              onUpdate({
+                blueCardAddressedTo: { ...data.blueCardAddressedTo, WRC: e.target.value }
+              })
+            }
             style={inputStyle}
           >
             <option value="">Select flag state...</option>
-            {ratifiedWreckFlags.map(f => <option key={f.id} value={f.id}>{f.name} ({f.iso3Code})</option>)}
+            {ratifiedWreckFlags.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name} ({f.iso3Code})
+              </option>
+            ))}
           </select>
         </div>
       )}
 
       {/* QR verification code toggle (P&I policy) */}
-      <div style={{ marginTop: '22px', paddingTop: '16px', borderTop: '1px solid var(--table-border)' }}>
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '10px 14px', borderRadius: '10px',
-          border: data.qrEnabled ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-          background: data.qrEnabled ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
-          cursor: 'pointer', transition: 'all 0.15s'
-        }}>
+      <div
+        style={{
+          marginTop: '22px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--table-border)'
+        }}
+      >
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: data.qrEnabled
+              ? '1.5px solid var(--accent-primary)'
+              : '1px solid var(--input-border)',
+            background: data.qrEnabled ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
+            cursor: 'pointer',
+            transition: 'all 0.15s'
+          }}
+        >
           <input
             type="checkbox"
             checked={data.qrEnabled}
-            onChange={e => onUpdate({ qrEnabled: e.target.checked })}
+            onChange={(e) => onUpdate({ qrEnabled: e.target.checked })}
             style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }}
           />
-          <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Include QR verification code in the policy</span>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+            Include QR verification code in the policy
+          </span>
         </label>
         <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '6px 0 0' }}>
-          Embeds a verification QR code on the closing page of the exported P&amp;I policy. Requires a verification URL configured in Policy Settings &rarr; QR Verification.
+          Embeds a verification QR code on the closing page of the exported P&amp;I policy. Requires
+          a verification URL configured in Policy Settings &rarr; QR Verification.
         </p>
       </div>
     </div>
   )
 }
 
-function StepSubjectivities({ items, selectedIds, isLight, onUpdate }: {
+function StepSubjectivities({
+  items,
+  selectedIds,
+  isLight,
+  onUpdate
+}: {
   items: { id: string; text: string }[]
   selectedIds: string[]
   isLight: boolean
   onUpdate: (partial: Partial<WizardData>) => void
 }) {
-  const stripHtml = (s: string) => (s || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
-  const setSelected = (ids: string[]) => onUpdate({ selectedSubjectivityIds: items.filter(i => ids.includes(i.id)).map(i => i.id) })
+  const stripHtml = (s: string) =>
+    (s || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .trim()
+  const setSelected = (ids: string[]) =>
+    onUpdate({ selectedSubjectivityIds: items.filter((i) => ids.includes(i.id)).map((i) => i.id) })
   const toggle = (id: string) => {
     const set = new Set(selectedIds)
     set.has(id) ? set.delete(id) : set.add(id)
@@ -1845,38 +2870,72 @@ function StepSubjectivities({ items, selectedIds, isLight, onUpdate }: {
     <div>
       <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem' }}>Subjectivities</h3>
       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
-        Uncheck any subjectivity you don&apos;t want on this policy. Kept items render exactly as in the quotation.
-        If none are kept, the policy shows <strong>NIL</strong> in this section.
+        Uncheck any subjectivity you don&apos;t want on this policy. Kept items render exactly as in
+        the quotation. If none are kept, the policy shows <strong>NIL</strong> in this section.
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
         <button
           type="button"
-          onClick={() => setSelected(allChecked ? [] : items.map(i => i.id))}
-          style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-secondary)' }}
+          onClick={() => setSelected(allChecked ? [] : items.map((i) => i.id))}
+          style={{
+            padding: '5px 12px',
+            borderRadius: '6px',
+            fontSize: '0.78rem',
+            cursor: 'pointer',
+            border: '1px solid var(--input-border)',
+            background: 'transparent',
+            color: 'var(--text-secondary)'
+          }}
         >
           {allChecked ? 'Clear all' : 'Select all'}
         </button>
-        <span style={{ fontSize: '0.78rem', color: selectedIds.length === 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
-          {selectedIds.length} of {items.length} kept{selectedIds.length === 0 ? ' — will show NIL' : ''}
+        <span
+          style={{
+            fontSize: '0.78rem',
+            color: selectedIds.length === 0 ? 'var(--danger)' : 'var(--text-secondary)'
+          }}
+        >
+          {selectedIds.length} of {items.length} kept
+          {selectedIds.length === 0 ? ' — will show NIL' : ''}
         </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {items.map(it => {
+        {items.map((it) => {
           const checked = selectedIds.includes(it.id)
           return (
             <label
               key={it.id}
               style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '10px 12px',
+                borderRadius: '8px',
                 cursor: 'pointer',
                 border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-                background: checked ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.10)') : 'transparent'
+                background: checked
+                  ? isLight
+                    ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                    : 'rgba(var(--accent-primary-rgb), 0.10)'
+                  : 'transparent'
               }}
             >
-              <input type="checkbox" checked={checked} onChange={() => toggle(it.id)} style={{ marginTop: '2px' }} />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', textDecoration: checked ? 'none' : 'line-through', opacity: checked ? 1 : 0.55 }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(it.id)}
+                style={{ marginTop: '2px' }}
+              />
+              <span
+                style={{
+                  fontSize: '0.85rem',
+                  color: 'var(--text-primary)',
+                  textDecoration: checked ? 'none' : 'line-through',
+                  opacity: checked ? 1 : 0.55
+                }}
+              >
                 {stripHtml(it.text)}
               </span>
             </label>
@@ -1887,7 +2946,17 @@ function StepSubjectivities({ items, selectedIds, isLight, onUpdate }: {
   )
 }
 
-function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, isLight, onGoToStep }: {
+function StepReview({
+  data,
+  quotation,
+  qVessels,
+  allAlts,
+  hasAlts,
+  banks,
+  isPI,
+  isLight,
+  onGoToStep
+}: {
   data: WizardData
   quotation: Quotation
   qVessels: QuotationVessel[]
@@ -1900,13 +2969,18 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
   onGoToStep: (step: number) => void
 }) {
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.65rem', fontWeight: 700,
-    letterSpacing: '0.8px', textTransform: 'uppercase',
-    color: 'var(--text-secondary)', marginBottom: '6px'
+    display: 'block',
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    marginBottom: '6px'
   }
 
   const sectionStyle: React.CSSProperties = {
-    padding: '14px 16px', borderRadius: '10px',
+    padding: '14px 16px',
+    borderRadius: '10px',
     border: '1px solid var(--table-border)',
     background: isLight ? '#fafbfc' : 'rgba(255,255,255,0.02)',
     marginBottom: '12px'
@@ -1916,17 +2990,24 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
     <button
       onClick={() => onGoToStep(step)}
       style={{
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 600,
-        display: 'flex', alignItems: 'center', gap: '4px', padding: 0
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--accent-primary)',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: 0
       }}
     >
       <Pencil size={12} /> Edit
     </button>
   )
 
-  const selectedAlt = allAlts.find(a => a.id === data.selectedAltId)
-  const selectedBank = banks.find(b => b.id === data.bankId)
+  const selectedAlt = allAlts.find((a) => a.id === data.selectedAltId)
+  const selectedBank = banks.find((b) => b.id === data.bankId)
 
   return (
     <div>
@@ -1937,79 +3018,167 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
 
       {/* Vessels */}
       <div style={sectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px'
+          }}
+        >
           <span style={{ ...labelStyle, marginBottom: 0 }}>Vessels</span>
           {editLink(0)}
         </div>
-        {qVessels.filter(v => data.selectedVesselIds.includes(v.vesselId || v.id)).map(v => (
-          <div key={v.id} style={{ fontSize: '0.88rem', marginBottom: '2px' }}>
-            <strong>{v.name || v.vesselLabel}</strong>
-            {v.imoNumber && <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>IMO {v.imoNumber}</span>}
-          </div>
-        ))}
+        {qVessels
+          .filter((v) => data.selectedVesselIds.includes(v.vesselId || v.id))
+          .map((v) => (
+            <div key={v.id} style={{ fontSize: '0.88rem', marginBottom: '2px' }}>
+              <strong>{v.name || v.vesselLabel}</strong>
+              {v.imoNumber && (
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                  IMO {v.imoNumber}
+                </span>
+              )}
+            </div>
+          ))}
       </div>
 
       {/* Alternative */}
       {hasAlts && selectedAlt && (
         <div style={sectionStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}
+          >
             <span style={{ ...labelStyle, marginBottom: 0 }}>Alternative</span>
             {editLink(0)}
           </div>
           <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
             {(selectedAlt as any).label || 'Alternative'}
-            {(selectedAlt as any).premiumAmount != null ? ` — ${quotation.premiumCurrency || 'USD'} ${((selectedAlt as any).premiumAmount as number).toLocaleString()}` : ''}
+            {(selectedAlt as any).premiumAmount != null
+              ? ` — ${quotation.premiumCurrency || 'USD'} ${((selectedAlt as any).premiumAmount as number).toLocaleString()}`
+              : ''}
           </span>
         </div>
       )}
 
       {/* Period */}
       <div style={sectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px'
+          }}
+        >
           <span style={{ ...labelStyle, marginBottom: 0 }}>Period</span>
           {editLink(1)}
         </div>
         <div style={{ fontSize: '0.88rem' }}>
-          <strong>{formatDate(data.inceptionDate) || data.inceptionDate}</strong> {data.inceptionTime} &rarr; <strong>{formatDate(data.expiryDate) || data.expiryDate}</strong> {data.expiryTime}
-          <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>({data.timezone})</span>
+          <strong>{formatDate(data.inceptionDate) || data.inceptionDate}</strong>{' '}
+          {data.inceptionTime} &rarr;{' '}
+          <strong>{formatDate(data.expiryDate) || data.expiryDate}</strong> {data.expiryTime}
+          <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>
+            ({data.timezone})
+          </span>
         </div>
       </div>
 
       {/* Premium & Instalments */}
       <div style={sectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px'
+          }}
+        >
           <span style={{ ...labelStyle, marginBottom: 0 }}>Premium & Instalments</span>
           {editLink(2)}
         </div>
-        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '10px' }}>
+        <div
+          style={{
+            fontSize: '0.95rem',
+            fontWeight: 700,
+            color: 'var(--accent-primary)',
+            marginBottom: '10px'
+          }}
+        >
           {data.totalPremium.toLocaleString()} {quotation.premiumCurrency || 'USD'}
         </div>
         {data.selectedVesselIds.length > 1 && (
           <div style={{ fontSize: '0.82rem', marginBottom: '10px' }}>
-            {data.selectedVesselIds.map(vid => {
-              const qv = qVessels.find(v => (v.vesselId || v.id) === vid)
+            {data.selectedVesselIds.map((vid) => {
+              const qv = qVessels.find((v) => (v.vesselId || v.id) === vid)
               return (
-                <div key={vid} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                  <span style={{ textTransform: 'uppercase' }}>{qv?.name || qv?.vesselLabel || vid}</span>
-                  <span style={{ fontWeight: 600 }}>{(data.vesselPremiums[vid] || 0).toLocaleString()} {quotation.premiumCurrency || 'USD'}</span>
+                <div
+                  key={vid}
+                  style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}
+                >
+                  <span style={{ textTransform: 'uppercase' }}>
+                    {qv?.name || qv?.vesselLabel || vid}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>
+                    {(data.vesselPremiums[vid] || 0).toLocaleString()}{' '}
+                    {quotation.premiumCurrency || 'USD'}
+                  </span>
                 </div>
               )
             })}
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>One policy per vessel. Instalments below are fleet totals.</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              One policy per vessel. Instalments below are fleet totals.
+            </div>
           </div>
         )}
         {data.instalmentDates.length > 0 && (
           <div style={{ fontSize: '0.82rem' }}>
             {data.instalmentDates.map((date, i) => (
-              <div key={i} style={{ display: 'flex', gap: '12px', padding: '3px 0', borderBottom: i < data.instalmentDates.length - 1 ? '1px solid var(--table-border)' : 'none' }}>
-                <span style={{ minWidth: '28px', fontWeight: 600, color: 'var(--text-secondary)' }}>#{i + 1}</span>
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  padding: '3px 0',
+                  borderBottom:
+                    i < data.instalmentDates.length - 1 ? '1px solid var(--table-border)' : 'none'
+                }}
+              >
+                <span style={{ minWidth: '28px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  #{i + 1}
+                </span>
                 <span style={{ flex: 1 }}>{date}</span>
-                <span style={{ fontWeight: 600 }}>{(data.instalmentAmounts[i] || 0).toLocaleString()} {quotation.premiumCurrency || 'USD'}</span>
-                {data.nonRefundableType === 'first_instalment' && i === 0 && <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,77,77,0.1)', color: 'var(--danger)', fontWeight: 600 }}>NR</span>}
+                <span style={{ fontWeight: 600 }}>
+                  {(data.instalmentAmounts[i] || 0).toLocaleString()}{' '}
+                  {quotation.premiumCurrency || 'USD'}
+                </span>
+                {data.nonRefundableType === 'first_instalment' && i === 0 && (
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(255,77,77,0.1)',
+                      color: 'var(--danger)',
+                      fontWeight: 600
+                    }}
+                  >
+                    NR
+                  </span>
+                )}
               </div>
             ))}
             {data.nonRefundableType === 'percentage' && data.nonRefundablePercent > 0 && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{data.nonRefundablePercent}% of premium is non-refundable</div>
+              <div
+                style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}
+              >
+                {data.nonRefundablePercent}% of premium is non-refundable
+              </div>
             )}
           </div>
         )}
@@ -2017,21 +3186,47 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
 
       {/* Details */}
       <div style={sectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px'
+          }}
+        >
           <span style={{ ...labelStyle, marginBottom: 0 }}>Details</span>
           {editLink(3)}
         </div>
         <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div>Commission: <strong>{data.commissionEnabled && typeof data.commissionPercent === 'number' ? `${data.commissionPercent}%` : 'None'}</strong></div>
-          <div>Bank: <strong>{selectedBank?.name || 'Not selected'}</strong></div>
-          <div>Outstanding premium: <strong>{data.outstandingPremiumEnabled ? 'Shown' : 'Hidden'}</strong></div>
+          <div>
+            Commission:{' '}
+            <strong>
+              {data.commissionEnabled && typeof data.commissionPercent === 'number'
+                ? `${data.commissionPercent}%`
+                : 'None'}
+            </strong>
+          </div>
+          <div>
+            Bank: <strong>{selectedBank?.name || 'Not selected'}</strong>
+          </div>
+          <div>
+            Outstanding premium:{' '}
+            <strong>{data.outstandingPremiumEnabled ? 'Shown' : 'Hidden'}</strong>
+          </div>
         </div>
       </div>
 
       {/* Blue Cards */}
       {isPI && (
         <div style={sectionStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}
+          >
             <span style={{ ...labelStyle, marginBottom: 0 }}>Blue Cards</span>
             {editLink(4)}
           </div>
@@ -2040,11 +3235,18 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
               <span style={{ color: 'var(--text-secondary)' }}>None</span>
             ) : data.blueCards.length > 0 ? (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {data.blueCards.map(card => (
-                  <span key={card} style={{
-                    padding: '3px 10px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600,
-                    background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
-                  }}>
+                {data.blueCards.map((card) => (
+                  <span
+                    key={card}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
                     {card}
                   </span>
                 ))}

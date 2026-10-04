@@ -11,7 +11,7 @@ import {
   CheckCheck,
   Trash2,
   Filter,
-  Inbox,
+  Inbox
 } from 'lucide-react'
 import { PageHeader, Badge } from './ui'
 import { useTheme } from '../contexts/ThemeContext'
@@ -26,13 +26,19 @@ const FILTER_TABS = [
   { id: 'unread', label: 'Unread' },
   { id: 'notes', label: 'Notes' },
   { id: 'policies', label: 'Policies' },
-  { id: 'system', label: 'System' },
+  { id: 'system', label: 'System' }
 ] as const
 
 type FilterTab = (typeof FILTER_TABS)[number]['id']
 
 const NOTE_TYPES = ['note_reply', 'note_mention']
-const POLICY_TYPES = ['policy_created', 'quotation_edited', 'warranty_deadline', 'document_expiring', 'blue_card_expiring']
+const POLICY_TYPES = [
+  'policy_created',
+  'quotation_edited',
+  'warranty_deadline',
+  'document_expiring',
+  'blue_card_expiring'
+]
 const SYSTEM_TYPES = ['workflow_action_needed']
 
 function getTypeIcon(type: string) {
@@ -94,7 +100,9 @@ function relativeTime(dateStr: string): string {
   return date.toLocaleDateString()
 }
 
-export default function NotificationsPage({ onNavigate }: NotificationsPageProps): React.JSX.Element {
+export default function NotificationsPage({
+  onNavigate
+}: NotificationsPageProps): React.JSX.Element {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -116,12 +124,14 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleMarkAllRead = async () => {
     try {
       await window.api.notificationsMarkAllRead()
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
       setUnreadCount(0)
     } catch (err) {
       console.error('Failed to mark all read:', err)
@@ -132,10 +142,10 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
     if (!notif.isRead) {
       try {
         await window.api.notificationsMarkRead(notif.id)
-        setNotifications(prev =>
-          prev.map(n => (n.id === notif.id ? { ...n, isRead: true } : n))
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
         )
-        setUnreadCount(prev => Math.max(0, prev - 1))
+        setUnreadCount((prev) => Math.max(0, prev - 1))
       } catch (err) {
         console.error('Failed to mark read:', err)
       }
@@ -149,14 +159,14 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
     e.stopPropagation()
     try {
       await window.api.notificationsDelete(notif.id)
-      setNotifications(prev => prev.filter(n => n.id !== notif.id))
-      if (!notif.isRead) setUnreadCount(prev => Math.max(0, prev - 1))
+      setNotifications((prev) => prev.filter((n) => n.id !== notif.id))
+      if (!notif.isRead) setUnreadCount((prev) => Math.max(0, prev - 1))
     } catch (err) {
       console.error('Failed to delete notification:', err)
     }
   }
 
-  const filtered = notifications.filter(n => {
+  const filtered = notifications.filter((n) => {
     if (activeFilter === 'unread') return !n.isRead
     if (activeFilter === 'notes') return NOTE_TYPES.includes(n.type)
     if (activeFilter === 'policies') return POLICY_TYPES.includes(n.type)
@@ -168,24 +178,30 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
     <div className="fade-in page" style={{ maxWidth: '900px' }}>
       <PageHeader
         icon={<Bell size={26} />}
-        title={<>Notifications {unreadCount > 0 && <Badge tone="danger">{unreadCount} unread</Badge>}</>}
-        actions={unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} className="btn-secondary">
-            <CheckCheck size={15} /> Mark All Read
-          </button>
-        )}
+        title={
+          <>Notifications {unreadCount > 0 && <Badge tone="danger">{unreadCount} unread</Badge>}</>
+        }
+        actions={
+          unreadCount > 0 && (
+            <button onClick={handleMarkAllRead} className="btn-secondary">
+              <CheckCheck size={15} /> Mark All Read
+            </button>
+          )
+        }
       />
 
       {/* Filter Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '16px',
-        padding: '4px',
-        borderRadius: '8px',
-        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
-      }}>
-        {FILTER_TABS.map(tab => (
+      <div
+        style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '16px',
+          padding: '4px',
+          borderRadius: '8px',
+          background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'
+        }}
+      >
+        {FILTER_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
@@ -196,12 +212,15 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
               cursor: 'pointer',
               fontSize: '0.82rem',
               fontWeight: activeFilter === tab.id ? 600 : 400,
-              background: activeFilter === tab.id
-                ? (isLight ? '#fff' : 'rgba(255,255,255,0.1)')
-                : 'transparent',
+              background:
+                activeFilter === tab.id
+                  ? isLight
+                    ? '#fff'
+                    : 'rgba(255,255,255,0.1)'
+                  : 'transparent',
               color: activeFilter === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
               boxShadow: activeFilter === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s ease',
+              transition: 'all 0.15s ease'
             }}
           >
             {tab.label}
@@ -215,26 +234,34 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
           Loading...
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px 20px',
-          color: 'var(--text-secondary)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px',
-        }}>
-          {activeFilter === 'all' ? <Inbox size={48} style={{ opacity: 0.3 }} /> : <Filter size={48} style={{ opacity: 0.3 }} />}
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+        >
+          {activeFilter === 'all' ? (
+            <Inbox size={48} style={{ opacity: 0.3 }} />
+          ) : (
+            <Filter size={48} style={{ opacity: 0.3 }} />
+          )}
           <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>
             {activeFilter === 'unread' ? 'All caught up!' : 'No notifications'}
           </div>
           <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-            {activeFilter === 'unread' ? 'You have no unread notifications' : 'Nothing to show here yet'}
+            {activeFilter === 'unread'
+              ? 'You have no unread notifications'
+              : 'Nothing to show here yet'}
           </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {filtered.map(notif => {
+          {filtered.map((notif) => {
             const typeColor = getTypeColor(notif.type)
             return (
               <div
@@ -250,55 +277,65 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
                   borderLeft: notif.isRead ? '3px solid transparent' : `3px solid ${typeColor}`,
                   background: notif.isRead
                     ? 'transparent'
-                    : (isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)'),
-                  transition: 'background 0.15s ease',
+                    : isLight
+                      ? 'rgba(var(--accent-primary-rgb), 0.04)'
+                      : 'rgba(var(--accent-primary-rgb), 0.06)',
+                  transition: 'background 0.15s ease'
                 }}
                 className="hover-effect"
               >
                 {/* Icon */}
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: `${typeColor}18`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: typeColor,
-                  flexShrink: 0,
-                  marginTop: '2px',
-                }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: `${typeColor}18`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: typeColor,
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}
+                >
                   {getTypeIcon(notif.type)}
                 </div>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: '0.88rem',
-                    fontWeight: notif.isRead ? 400 : 600,
-                    color: 'var(--text-primary)',
-                    lineHeight: 1.4,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: '0.88rem',
+                      fontWeight: notif.isRead ? 400 : 600,
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.4
+                    }}
+                  >
                     {notif.title}
                   </div>
                   {notif.message && (
-                    <div style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '2px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                        marginTop: '2px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       {notif.message}
                     </div>
                   )}
-                  <div style={{
-                    fontSize: '0.72rem',
-                    color: 'var(--text-secondary)',
-                    marginTop: '4px',
-                    opacity: 0.7,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '4px',
+                      opacity: 0.7
+                    }}
+                  >
                     {relativeTime(notif.createdAt)}
                   </div>
                 </div>
@@ -314,7 +351,7 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
                     padding: '4px',
                     borderRadius: '4px',
                     opacity: 0.5,
-                    flexShrink: 0,
+                    flexShrink: 0
                   }}
                   className="hover-effect"
                   title="Delete notification"

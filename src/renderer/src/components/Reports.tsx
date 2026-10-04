@@ -10,7 +10,13 @@ import RenewalPipelineReport from './RenewalPipelineReport'
 
 const ReportBuilder = lazy(() => import('./ReportBuilder'))
 
-type ReportTab = 'report-builder' | 'loss-record' | 'customer-compliance' | 'assured-report' | 'condition-survey' | 'renewal-pipeline'
+type ReportTab =
+  | 'report-builder'
+  | 'loss-record'
+  | 'customer-compliance'
+  | 'assured-report'
+  | 'condition-survey'
+  | 'renewal-pipeline'
 
 const TABS: { id: ReportTab; label: string; icon: any }[] = [
   { id: 'report-builder', label: 'Report Builder', icon: Database },
@@ -23,17 +29,26 @@ const TABS: { id: ReportTab; label: string; icon: any }[] = [
 
 export default function Reports({ subTab, subTabNonce }: SubTabProps = {}) {
   const [activeTab, setActiveTab] = useState<ReportTab>('report-builder')
-  useRequestedSubTab(subTab, subTabNonce, TABS.map(t => t.id), setActiveTab)
+  useRequestedSubTab(
+    subTab,
+    subTabNonce,
+    TABS.map((t) => t.id),
+    setActiveTab
+  )
 
   return (
     <div className="fade-in page">
-      <PageHeader icon={<FileBarChart2 size={26} />} title="Reports" subtitle="Generate and export compliance, renewal and loss reports." />
+      <PageHeader
+        icon={<FileBarChart2 size={26} />}
+        title="Reports"
+        subtitle="Generate and export compliance, renewal and loss reports."
+      />
 
       <Tabs
         style={{ marginBottom: '24px' }}
         value={activeTab}
         onChange={setActiveTab}
-        items={TABS.map(t => ({ key: t.id, label: t.label, icon: <t.icon size={16} /> }))}
+        items={TABS.map((t) => ({ key: t.id, label: t.label, icon: <t.icon size={16} /> }))}
       />
 
       {activeTab === 'report-builder' && (

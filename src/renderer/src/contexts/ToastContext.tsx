@@ -26,21 +26,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     // (e.g. exporting multiple blue cards), producing duplicate React keys that leave
     // toasts stuck on screen.
     const id = `toast-${Date.now()}-${idCounter.current++}`
-    setToasts(prev => [...prev, { id, message, type }])
+    setToasts((prev) => [...prev, { id, message, type }])
 
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
+      setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 5000)
   }, [])
 
-  const showError = useCallback((message: string) => {
-    showToast(message, 'error')
-  }, [showToast])
+  const showError = useCallback(
+    (message: string) => {
+      showToast(message, 'error')
+    },
+    [showToast]
+  )
 
-  const showSuccess = useCallback((message: string) => {
-    showToast(message, 'success')
-  }, [showToast])
+  const showSuccess = useCallback(
+    (message: string) => {
+      showToast(message, 'success')
+    },
+    [showToast]
+  )
 
   // Last line of defence: any promise rejection nobody handled (e.g. a failed save whose
   // caller has no catch) becomes an error toast instead of failing silently. Repeats of the
@@ -49,7 +55,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onUnhandled = (e: PromiseRejectionEvent) => {
       const reason: any = e.reason
-      const msg = (reason && (reason.message || (typeof reason === 'string' ? reason : ''))) || 'An unexpected error occurred'
+      const msg =
+        (reason && (reason.message || (typeof reason === 'string' ? reason : ''))) ||
+        'An unexpected error occurred'
       console.error('[unhandled rejection]', reason)
       const now = Date.now()
       if (lastUnhandled.current.msg === msg && now - lastUnhandled.current.at < 3000) return
@@ -61,28 +69,48 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [showToast])
 
   const dismissToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id))
+    setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
   const getIcon = (type: ToastType) => {
     switch (type) {
-      case 'success': return <CheckCircle size={20} />
-      case 'error': return <AlertCircle size={20} />
-      case 'warning': return <AlertTriangle size={20} />
-      default: return <Info size={20} />
+      case 'success':
+        return <CheckCircle size={20} />
+      case 'error':
+        return <AlertCircle size={20} />
+      case 'warning':
+        return <AlertTriangle size={20} />
+      default:
+        return <Info size={20} />
     }
   }
 
   const getStyles = (type: ToastType) => {
     switch (type) {
       case 'success':
-        return { background: 'rgba(0, 255, 136, 0.15)', border: '1px solid rgba(0, 255, 136, 0.3)', color: 'var(--success)' }
+        return {
+          background: 'rgba(0, 255, 136, 0.15)',
+          border: '1px solid rgba(0, 255, 136, 0.3)',
+          color: 'var(--success)'
+        }
       case 'error':
-        return { background: 'rgba(255, 77, 77, 0.15)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)' }
+        return {
+          background: 'rgba(255, 77, 77, 0.15)',
+          border: '1px solid rgba(255, 77, 77, 0.3)',
+          color: 'var(--danger)'
+        }
       case 'warning':
-        return { background: 'rgba(255, 193, 7, 0.15)', border: '1px solid rgba(255, 193, 7, 0.3)', color: '#ffc107' }
+        return {
+          background: 'rgba(255, 193, 7, 0.15)',
+          border: '1px solid rgba(255, 193, 7, 0.3)',
+          color: '#ffc107'
+        }
       default:
-        return { background: 'rgba(var(--accent-primary-rgb), 0.15)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)', color: '#00d2ff' }
+        return {
+          background: 'rgba(var(--accent-primary-rgb), 0.15)',
+          border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+          color: '#00d2ff'
+        }
     }
   }
 
@@ -102,7 +130,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           pointerEvents: 'none'
         }}
       >
-        {toasts.map(toast => {
+        {toasts.map((toast) => {
           const styles = getStyles(toast.type)
           return (
             <div
@@ -123,7 +151,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               }}
             >
               {getIcon(toast.type)}
-              <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{toast.message}</span>
+              <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                {toast.message}
+              </span>
               <button
                 onClick={() => dismissToast(toast.id)}
                 style={{

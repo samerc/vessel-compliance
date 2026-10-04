@@ -13,21 +13,33 @@ import { parseDefectTables, parseDefectText, type ParsedDefect } from './defectP
 // Node; it treats any Electron process whose process.type is not 'browser' as a web page. This is an
 // isolated utility process with no DOM, so hide the Electron process type BEFORE pdf-parse loads.
 if ((process as any).type && (process as any).type !== 'browser') {
-  try { Object.defineProperty(process, 'type', { value: undefined, configurable: true, writable: true }) } catch { /* keep going */ }
+  try {
+    Object.defineProperty(process, 'type', { value: undefined, configurable: true, writable: true })
+  } catch {
+    /* keep going */
+  }
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PDFParse } = require('pdf-parse') as { PDFParse: typeof PDFParseType }
 
 const utilityPort = (process as any).parentPort as
-  | { on: (ev: 'message', cb: (e: { data: any }) => void) => void; postMessage: (m: unknown) => void }
+  | {
+      on: (ev: 'message', cb: (e: { data: any }) => void) => void
+      postMessage: (m: unknown) => void
+    }
   | undefined
 const port = {
   on: (cb: (msg: any) => void): void => {
     if (utilityPort) utilityPort.on('message', (e) => cb(e.data))
     else parentPort?.on('message', cb)
   },
-  post: (m: unknown): void => { if (utilityPort) utilityPort.postMessage(m); else parentPort?.postMessage(m) },
-  close: (): void => { if (!utilityPort) parentPort?.close() }
+  post: (m: unknown): void => {
+    if (utilityPort) utilityPort.postMessage(m)
+    else parentPort?.postMessage(m)
+  },
+  close: (): void => {
+    if (!utilityPort) parentPort?.close()
+  }
 }
 
 port.on(async ({ filePath }) => {
@@ -46,11 +58,14 @@ port.on(async ({ filePath }) => {
       }
     } else {
       const { value: html } = await mammoth.convertToHtml({ buffer })
-      defects = parseDefectTables(html) ?? parseDefectText((await mammoth.extractRawText({ buffer })).value)
+      defects =
+        parseDefectTables(html) ?? parseDefectText((await mammoth.extractRawText({ buffer })).value)
     }
 
     if (defects.length === 0) {
-      throw new Error('No defects found. Is this the "Deficiencies & Recommendations" page of a condition survey report?')
+      throw new Error(
+        'No defects found. Is this the "Deficiencies & Recommendations" page of a condition survey report?'
+      )
     }
     port.post({ success: true, defects })
   } catch (error: any) {

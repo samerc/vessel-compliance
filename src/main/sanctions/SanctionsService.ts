@@ -55,8 +55,12 @@ const PREFILTER_MAX_SHARE = 0.6
 
 // Unicode-aware (keeps Arabic etc.), unlike normalizeText which keeps ASCII \w only
 function gramNormalize(s: string): string {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
 }
 
 function trigrams(s: string): Set<string> {
@@ -116,7 +120,16 @@ export class SanctionsService {
 
   // Inverted trigram index over every searched field (see prefilterOverlap)
   private indexGrams(e: any, idx: number): void {
-    const text = [e.name, e.name_normalized, e.aliasesFlat, e.mother_name, e.father_name, e.vessel_imo].filter(Boolean).join(' ')
+    const text = [
+      e.name,
+      e.name_normalized,
+      e.aliasesFlat,
+      e.mother_name,
+      e.father_name,
+      e.vessel_imo
+    ]
+      .filter(Boolean)
+      .join(' ')
     for (const g of trigrams(text)) {
       let list = this.gramIndex.get(g)
       if (!list) this.gramIndex.set(g, (list = []))
@@ -141,12 +154,18 @@ export class SanctionsService {
   // main process). Now: tombstone the old slot and append the new version; Fuse.add appends,
   // so Fuse refIndex stays equal to the `searchable` slot. Full rebuild after many edits.
   private patchIndex(id: number, replacement: SanctionsEntity | null): void {
-    if (!this.fuseIndex) { this.buildIndex(); return }
+    if (!this.fuseIndex) {
+      this.buildIndex()
+      return
+    }
     for (let i = 0; i < this.searchable.length; i++) {
       if (this.searchable[i].id === id && !this.dead.has(i)) this.dead.add(i)
     }
-    if (this.dead.size > 500) { this.buildIndex(); return }
-    this.entityCache = this.entityCache.filter(e => e.id !== id)
+    if (this.dead.size > 500) {
+      this.buildIndex()
+      return
+    }
+    this.entityCache = this.entityCache.filter((e) => e.id !== id)
     if (replacement) {
       const idx = this.searchable.length
       const doc = SanctionsService.toSearchable(replacement)
@@ -164,7 +183,7 @@ export class SanctionsService {
     if (!this.fuseIndex) return []
     const full = () => {
       const r = this.fuseIndex!.search(query)
-      return this.dead.size ? r.filter(x => !this.dead.has(x.refIndex)) : r
+      return this.dead.size ? r.filter((x) => !this.dead.has(x.refIndex)) : r
     }
     if (!(minScore >= PREFILTER_MIN_SCORE)) return full()
     const qGrams = trigrams(query)
@@ -180,15 +199,21 @@ export class SanctionsService {
       }
     }
     const need = Math.max(1, Math.ceil(qGrams.size * prefilterOverlap(minScore)))
-    const candidates = touched.filter(i => counts[i] >= need && !this.dead.has(i))
+    const candidates = touched.filter((i) => counts[i] >= need && !this.dead.has(i))
     for (const i of touched) counts[i] = 0
     if (candidates.length > this.searchable.length * PREFILTER_MAX_SHARE) return full()
     if (candidates.length === 0) return []
-    const sub = new Fuse(candidates.map(i => this.searchable[i]), FUSE_OPTIONS)
+    const sub = new Fuse(
+      candidates.map((i) => this.searchable[i]),
+      FUSE_OPTIONS
+    )
     return sub.search(query)
   }
 
-  search(query: string, options: SearchOptions = {}): { query: string; total: number; results: SearchResult[] } {
+  search(
+    query: string,
+    options: SearchOptions = {}
+  ): { query: string; total: number; results: SearchResult[] } {
     const mode = options.mode || 'both'
     const limit = options.limit || 100
     const threshold = options.threshold ?? 0.6
@@ -203,9 +228,10 @@ export class SanctionsService {
       const fuzzyResults = this.searchFuzzy(query, threshold, options)
       if (mode === 'both') {
         // Name in the key: SIC entries from one letter share their source_id (the letter reference)
-        const key = (r: SearchResult): string => `${r.entity.source}-${r.entity.source_id}-${r.entity.name}`
+        const key = (r: SearchResult): string =>
+          `${r.entity.source}-${r.entity.source_id}-${r.entity.name}`
         const exactKeys = new Set(results.map(key))
-        results.push(...fuzzyResults.filter(r => !exactKeys.has(key(r))))
+        results.push(...fuzzyResults.filter((r) => !exactKeys.has(key(r))))
       } else {
         results.push(...fuzzyResults)
       }
@@ -221,29 +247,42 @@ export class SanctionsService {
     const rows = this.db.searchExact(query, { source: sourceFilter, limit: options.limit || 100 })
     let filtered = rows
     if (options.sources && options.sources.length > 1) {
-      const srcSet = new Set(options.sources.map(s => s.toUpperCase()))
-      filtered = rows.filter(r => srcSet.has(r.source))
+      const srcSet = new Set(options.sources.map((s) => s.toUpperCase()))
+      filtered = rows.filter((r) => srcSet.has(r.source))
     }
-    return filtered.map(entity => ({ match_type: 'exact' as const, score: 1.0, entity: stripId(entity) }))
+    return filtered.map((entity) => ({
+      match_type: 'exact' as const,
+      score: 1.0,
+      entity: stripId(entity)
+    }))
   }
 
   private searchFuzzy(query: string, threshold: number, options: SearchOptions): SearchResult[] {
     if (!this.fuseIndex) return []
     let fuseResults = this.fuzzyCandidatesSearch(foldArabic(query), options.minScore ?? 0)
-    fuseResults = fuseResults.filter(r => (r.score ?? 1) <= threshold)
+    fuseResults = fuseResults.filter((r) => (r.score ?? 1) <= threshold)
     if (options.sources && options.sources.length > 0) {
-      const srcSet = new Set(options.sources.map(s => s.toUpperCase()))
-      fuseResults = fuseResults.filter(r => srcSet.has(r.item.source))
+      const srcSet = new Set(options.sources.map((s) => s.toUpperCase()))
+      fuseResults = fuseResults.filter((r) => srcSet.has(r.item.source))
     }
     fuseResults = fuseResults.slice(0, options.limit || 100)
-    return fuseResults.map(r => ({
+    return fuseResults.map((r) => ({
       match_type: 'fuzzy' as const,
       score: parseFloat((1 - (r.score ?? 1)).toFixed(4)),
       entity: stripId(r.item)
     }))
   }
 
-  async refreshSource(source: string, onProgress?: (msg: string) => void): Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }> {
+  async refreshSource(
+    source: string,
+    onProgress?: (msg: string) => void
+  ): Promise<{
+    source: string
+    count: number
+    status: string
+    releaseDate: string | null
+    error?: string
+  }> {
     const src = source.toUpperCase()
     try {
       console.log(`[Sanctions] Refreshing ${src}...`)
@@ -254,7 +293,9 @@ export class SanctionsService {
       if (src === 'OFAC') {
         console.log(`[Sanctions] Downloading OFAC from ${DATA_SOURCES.OFAC}...`)
         const xmlData = await this.fetchText(DATA_SOURCES.OFAC)
-        console.log(`[Sanctions] Downloaded OFAC XML: ${(xmlData.length / 1024 / 1024).toFixed(1)}MB, parsing...`)
+        console.log(
+          `[Sanctions] Downloaded OFAC XML: ${(xmlData.length / 1024 / 1024).toFixed(1)}MB, parsing...`
+        )
         const parsed = await parseOfacSdn(xmlData)
         console.log(`[Sanctions] Parsed ${parsed.entities.length} OFAC entities`)
         entities = parsed.entities
@@ -305,9 +346,19 @@ export class SanctionsService {
     }
   }
 
-  async refreshAll(onProgress?: (msg: string) => void): Promise<{ source: string; count: number; status: string; releaseDate: string | null; error?: string }[]> {
+  async refreshAll(
+    onProgress?: (msg: string) => void
+  ): Promise<
+    { source: string; count: number; status: string; releaseDate: string | null; error?: string }[]
+  > {
     const sources = ['OFAC', 'EU', 'UK', 'UN', 'ISF']
-    const results: { source: string; count: number; status: string; releaseDate: string | null; error?: string }[] = []
+    const results: {
+      source: string
+      count: number
+      status: string
+      releaseDate: string | null
+      error?: string
+    }[] = []
     for (const src of sources) {
       onProgress?.(`Refreshing ${src}...`)
       results.push(await this.refreshSource(src, onProgress))
@@ -318,8 +369,8 @@ export class SanctionsService {
   getStatus(): { sources: (DataUpdate & { entityCount: number })[]; totalEntities: number } {
     const updates = this.db.getDataUpdates()
     const allSources = ['OFAC', 'EU', 'UK', 'UN', 'ISF', 'SIC']
-    const sources = allSources.map(src => {
-      const update = updates.find(u => u.source === src)
+    const sources = allSources.map((src) => {
+      const update = updates.find((u) => u.source === src)
       return {
         source: src,
         updated_at: update?.updated_at || '',
@@ -371,38 +422,54 @@ export class SanctionsService {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
     try {
-      const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'VesselCompliance/1.0' } })
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'VesselCompliance/1.0' }
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       return await res.text()
-    } finally { clearTimeout(timer) }
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   private async fetchBuffer(url: string): Promise<Buffer> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
     try {
-      const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'VesselCompliance/1.0' } })
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'VesselCompliance/1.0' }
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       return Buffer.from(await res.arrayBuffer())
-    } finally { clearTimeout(timer) }
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   private async getIsfDownloadUrl(): Promise<string | null> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 30000)
     try {
-      const res = await fetch(DATA_SOURCES.ISF_PAGE, { signal: controller.signal, headers: { 'User-Agent': 'VesselCompliance/1.0' } })
+      const res = await fetch(DATA_SOURCES.ISF_PAGE, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'VesselCompliance/1.0' }
+      })
       if (!res.ok) return null
       const html = await res.text()
-      const match = html.match(/href=["'](https?:\/\/[^"']*?\.xlsx?)["']/i)
-        || html.match(/href=["']([^"']*?\.xlsx?)["']/i)
+      const match =
+        html.match(/href=["'](https?:\/\/[^"']*?\.xlsx?)["']/i) ||
+        html.match(/href=["']([^"']*?\.xlsx?)["']/i)
       if (match) {
         let url = match[1]
         if (url.startsWith('/')) url = 'https://isf.gov.lb' + url
         return url
       }
       return null
-    } finally { clearTimeout(timer) }
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   private extractDateFromUrl(url: string): string | null {

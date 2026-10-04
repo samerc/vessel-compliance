@@ -14,18 +14,36 @@ interface ModalProps {
 }
 
 /** Standard modal: solid themed surface, header with close button, optional footer */
-export default function Modal({ title, icon, onClose, children, footer, width = 520, closeOnOverlay = true }: ModalProps) {
+export default function Modal({
+  title,
+  icon,
+  onClose,
+  children,
+  footer,
+  width = 520,
+  closeOnOverlay = true
+}: ModalProps) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (
-    <div className="modal-overlay" onMouseDown={e => { if (closeOnOverlay && e.target === e.currentTarget) onClose() }}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (closeOnOverlay && e.target === e.currentTarget) onClose()
+      }}
+    >
       <div className="modal-dialog" role="dialog" aria-modal="true" style={{ width }}>
         <div className="modal-header">
-          <h3>{icon}{title}</h3>
+          <h3>
+            {icon}
+            {title}
+          </h3>
           <button className="btn-ghost btn-icon" title="Close" aria-label="Close" onClick={onClose}>
             <X size={18} />
           </button>

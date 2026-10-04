@@ -647,7 +647,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                     style={{
                       borderBottom: '1px solid var(--table-border)',
                       cursor: 'pointer',
-                      background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
+                      background: isSelected
+                        ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                        : 'transparent',
                       transition: 'background 0.15s'
                     }}
                     className="hover-effect"
@@ -778,7 +780,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.15), rgba(var(--accent-primary-rgb), 0.05))',
+                  background:
+                    'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.15), rgba(var(--accent-primary-rgb), 0.05))',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -829,7 +832,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                   <Pencil size={12} /> Edit
                 </button>
               )}
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setSelectedAssuredId(null)}
                 style={{
                   background: 'transparent',
@@ -888,7 +893,9 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                       <Save size={14} />
                     )}
                   </button>
-                  <button title="Close" aria-label="Close"
+                  <button
+                    title="Close"
+                    aria-label="Close"
                     onClick={() => setEditingVesselAssuredId(null)}
                     className="btn-secondary"
                     style={{ padding: '6px 8px' }}

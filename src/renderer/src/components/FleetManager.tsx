@@ -19,7 +19,7 @@ import {
   ExternalLink,
   UserMinus,
   ChevronsUpDown,
-  Layers,
+  Layers
 } from 'lucide-react'
 import { Fleet, Vessel, Entity, FlagState, VesselDynamicPolicy } from '../../../shared/types'
 import { getFlagClass } from '../utils/countryCodeMap'
@@ -77,9 +77,10 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
   const FLEET_COLUMNS: ColumnDef[] = [
     { id: 'name', label: 'Fleet', defaultVisible: true },
     { id: 'vessels', label: 'Vessels', defaultVisible: true },
-    { id: 'actions', label: 'Actions', defaultVisible: true },
+    { id: 'actions', label: 'Actions', defaultVisible: true }
   ]
-  const { visibleColumns: fleetVisibleCols, setVisibleColumns: setFleetVisibleCols } = useColumnPrefs('fleets', FLEET_COLUMNS)
+  const { visibleColumns: fleetVisibleCols, setVisibleColumns: setFleetVisibleCols } =
+    useColumnPrefs('fleets', FLEET_COLUMNS)
   const fleetVisibleSet = new Set(fleetVisibleCols)
   const [allPolicies, setAllPolicies] = useState<VesselDynamicPolicy[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
@@ -99,7 +100,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       window.api.getVessels(),
       window.api.getEntities(),
       window.api.getFlagStates(),
-      window.api.getAllVesselDynamicPolicies(),
+      window.api.getAllVesselDynamicPolicies()
     ])
     setFleets(Array.isArray(fData) ? fData : [])
     setVessels(Array.isArray(vData) ? vData : [])
@@ -154,7 +155,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     setAddSaving(true)
     try {
       await Promise.all(
-        [...pendingAdd].map(id => window.api.updateVessel(id, { fleetId: panelFleet.id }))
+        [...pendingAdd].map((id) => window.api.updateVessel(id, { fleetId: panelFleet.id }))
       )
       await loadData()
       setPendingAdd(new Set())
@@ -169,7 +170,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
   }
 
   const togglePending = (id: string) => {
-    setPendingAdd(prev => {
+    setPendingAdd((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -178,8 +179,8 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
   }
 
   // Stats
-  const assignedCount = useMemo(() => vessels.filter(v => v.fleetId).length, [vessels])
-  const unassignedCount = useMemo(() => vessels.filter(v => !v.fleetId).length, [vessels])
+  const assignedCount = useMemo(() => vessels.filter((v) => v.fleetId).length, [vessels])
+  const unassignedCount = useMemo(() => vessels.filter((v) => !v.fleetId).length, [vessels])
 
   // Lookup maps: the tables below used to scan the full vessel / entity / flag lists per row
   const fleetCounts = useMemo(() => {
@@ -193,16 +194,16 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     }
     return m
   }, [vessels])
-  const vesselById = useMemo(() => new Map(vessels.map(v => [v.id, v])), [vessels])
-  const entityById = useMemo(() => new Map(entities.map(e => [e.id, e])), [entities])
-  const flagById = useMemo(() => new Map(flagStates.map(f => [f.id, f])), [flagStates])
-  const fleetById = useMemo(() => new Map(fleets.map(f => [f.id, f])), [fleets])
+  const vesselById = useMemo(() => new Map(vessels.map((v) => [v.id, v])), [vessels])
+  const entityById = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities])
+  const flagById = useMemo(() => new Map(flagStates.map((f) => [f.id, f])), [flagStates])
+  const fleetById = useMemo(() => new Map(fleets.map((f) => [f.id, f])), [fleets])
 
   // Filtered fleet list
   const filteredFleets = useMemo(() => {
     if (!fleetSearch.trim()) return fleets
     const s = fleetSearch.toLowerCase()
-    return fleets.filter(f => f.name.toLowerCase().includes(s))
+    return fleets.filter((f) => f.name.toLowerCase().includes(s))
   }, [fleets, fleetSearch])
 
   // Sorted fleet list
@@ -213,15 +214,13 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
         const bCount = fleetCounts.get(b.id)?.total ?? 0
         return fleetSortDir === 'asc' ? aCount - bCount : bCount - aCount
       }
-      return fleetSortDir === 'asc'
-        ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name)
+      return fleetSortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
     })
   }, [filteredFleets, fleetSortKey, fleetSortDir, fleetCounts])
 
   const toggleFleetSort = (key: 'name' | 'vessels') => {
     if (fleetSortKey === key) {
-      setFleetSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+      setFleetSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setFleetSortKey(key)
       setFleetSortDir('asc')
@@ -230,18 +229,18 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
 
   // Panel: vessels already in this fleet
   const fleetVessels = useMemo(
-    () => (panelFleet ? vessels.filter(v => v.fleetId === panelFleet.id) : []),
+    () => (panelFleet ? vessels.filter((v) => v.fleetId === panelFleet.id) : []),
     [panelFleet, vessels]
   )
 
   // Panel: vessels available to add (not in this fleet), filtered by search
   const availableVessels = useMemo(() => {
     if (!panelFleet) return []
-    const base = vessels.filter(v => v.fleetId !== panelFleet.id)
+    const base = vessels.filter((v) => v.fleetId !== panelFleet.id)
     if (!addSearch.trim()) return base
     const s = addSearch.toLowerCase()
     return base.filter(
-      v => v.name.toLowerCase().includes(s) || v.imoNumber.toLowerCase().includes(s)
+      (v) => v.name.toLowerCase().includes(s) || v.imoNumber.toLowerCase().includes(s)
     )
   }, [panelFleet, vessels, addSearch])
 
@@ -253,7 +252,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     const assignedVesselIds = new Set<string>()
 
     // Derive customer groups from active policies
-    const activePolicies = allPolicies.filter(p => p.status === 'active' && p.customerEntityId)
+    const activePolicies = allPolicies.filter((p) => p.status === 'active' && p.customerEntityId)
     for (const policy of activePolicies) {
       const vessel = vesselById.get(policy.vesselId)
       if (!vessel) continue
@@ -262,7 +261,9 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
 
       if (search) {
         const customerName = policy.customerName?.toLowerCase() || ''
-        const vesselMatch = vessel.name.toLowerCase().includes(search) || vessel.imoNumber.toLowerCase().includes(search)
+        const vesselMatch =
+          vessel.name.toLowerCase().includes(search) ||
+          vessel.imoNumber.toLowerCase().includes(search)
         if (!vesselMatch && !customerName.includes(search)) continue
       }
 
@@ -270,7 +271,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       const map = policy.customerType === 'broker' ? brokerMap : directMap
       const existing = map.get(custId)
       if (existing) {
-        if (!existing.vessels.some(v => v.id === vessel.id)) existing.vessels.push(vessel)
+        if (!existing.vessels.some((v) => v.id === vessel.id)) existing.vessels.push(vessel)
       } else {
         const entity = entityById.get(custId)
         if (entity) map.set(custId, { entity, vessels: [vessel] })
@@ -279,11 +280,12 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     }
 
     // Unassigned: vessels with no customer on any active policy
-    const unassignedList = vessels.filter(v => {
+    const unassignedList = vessels.filter((v) => {
       if (assignedVesselIds.has(v.id)) return false
       if (typeFilter !== 'all' && typeFilter !== 'direct') return false
       if (search) {
-        const vesselMatch = v.name.toLowerCase().includes(search) || v.imoNumber.toLowerCase().includes(search)
+        const vesselMatch =
+          v.name.toLowerCase().includes(search) || v.imoNumber.toLowerCase().includes(search)
         if (!vesselMatch) return false
       }
       return true
@@ -295,7 +297,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     return {
       brokerGroups: sortGroups(Array.from(brokerMap.values())),
       directGroups: sortGroups(Array.from(directMap.values())),
-      customerUnassigned: unassignedList,
+      customerUnassigned: unassignedList
     }
   }, [vessels, vesselById, entityById, allPolicies, customerSearch, typeFilter])
 
@@ -337,7 +339,11 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
     const fs = vessel.flagStateId ? flagById.get(vessel.flagStateId) : undefined
     const flagCls = fs ? getFlagClass(fs.iso3Code) : ''
     return (
-      <tr key={vessel.id} style={{ borderBottom: '1px solid var(--table-border)' }} className="hover-effect">
+      <tr
+        key={vessel.id}
+        style={{ borderBottom: '1px solid var(--table-border)' }}
+        className="hover-effect"
+      >
         <td style={{ padding: '10px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Ship size={14} color="var(--accent-primary)" />
@@ -346,7 +352,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 fontWeight: 600,
                 cursor: 'pointer',
                 color: 'var(--accent-primary)',
-                textTransform: 'uppercase',
+                textTransform: 'uppercase'
               }}
               onClick={() => setSelectedVessel(vessel)}
             >
@@ -360,7 +366,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                   padding: '1px 5px',
                   borderRadius: '3px',
                   color: 'var(--text-secondary)',
-                  border: '1px solid rgba(0,0,0,0.1)',
+                  border: '1px solid rgba(0,0,0,0.1)'
                 }}
               >
                 INACTIVE
@@ -387,7 +393,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 color: 'var(--accent-primary)',
                 padding: '2px 8px',
                 borderRadius: '4px',
-                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)'
               }}
             >
               {fleet.name}
@@ -410,14 +416,20 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       >
         <div
           onClick={() =>
-            setExpandedCustomers(prev => {
+            setExpandedCustomers((prev) => {
               const next = new Set(prev)
               if (next.has(group.entity.id)) next.delete(group.entity.id)
               else next.add(group.entity.id)
               return next
             })
           }
-          style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+          style={{
+            padding: '14px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer'
+          }}
           className="hover-effect"
         >
           {isExpanded ? (
@@ -430,11 +442,12 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.25), rgba(var(--accent-primary-rgb), 0.08))',
+              background:
+                'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.25), rgba(var(--accent-primary-rgb), 0.08))',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0,
+              flexShrink: 0
             }}
           >
             <Building2 size={16} color="var(--accent-primary)" />
@@ -453,7 +466,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
               color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '4px'
             }}
           >
             <Ship size={13} /> {group.vessels.length}
@@ -465,7 +478,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
               <caption className="sr-only">Vessels for {group.entity.name}</caption>
               <thead>
                 <tr style={{ background: 'var(--table-header-bg)' }}>
-                  {['VESSEL', 'IMO', 'FLAG', 'FLEET'].map(h => (
+                  {['VESSEL', 'IMO', 'FLAG', 'FLEET'].map((h) => (
                     <th
                       key={h}
                       scope="col"
@@ -476,7 +489,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                         color: 'var(--text-secondary)',
                         fontWeight: 500,
                         letterSpacing: '0.04em',
-                        width: h === 'FLAG' ? 60 : undefined,
+                        width: h === 'FLAG' ? 60 : undefined
                       }}
                     >
                       {h}
@@ -505,7 +518,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       <section className="glass-card" style={{ padding: '20px', marginBottom: '14px' }}>
         <div
           onClick={() =>
-            setCollapsedSections(prev => {
+            setCollapsedSections((prev) => {
               const next = new Set(prev)
               if (next.has(title)) next.delete(title)
               else next.add(title)
@@ -518,7 +531,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
             gap: '10px',
             cursor: 'pointer',
             marginBottom: isCollapsed ? 0 : '16px',
-            userSelect: 'none',
+            userSelect: 'none'
           }}
         >
           {isCollapsed ? (
@@ -537,15 +550,15 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 background: 'rgba(var(--accent-primary-rgb), 0.1)',
                 color: 'var(--accent-primary)',
                 border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
-                fontWeight: 600,
+                fontWeight: 600
               }}
             >
               {badge}
             </span>
           )}
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-            {groups.length} client{groups.length !== 1 ? 's' : ''} ·{' '}
-            {totalVessels} vessel{totalVessels !== 1 ? 's' : ''}
+            {groups.length} client{groups.length !== 1 ? 's' : ''} · {totalVessels} vessel
+            {totalVessels !== 1 ? 's' : ''}
           </span>
         </div>
         {!isCollapsed && groups.map(renderCustomerGroup)}
@@ -557,32 +570,41 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
   return (
     <div className="fade-in page">
       {/* Header */}
-      <PageHeader icon={<Layers size={26} />} title="Fleets" subtitle="Manage fleets and view vessels by customer." />
+      <PageHeader
+        icon={<Layers size={26} />}
+        title="Fleets"
+        subtitle="Manage fleets and view vessels by customer."
+      />
 
       {/* Stats */}
       <div
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px',
+          marginBottom: '24px'
+        }}
       >
         {[
           {
             label: 'Total Fleets',
             value: fleets.length,
             icon: <Folder size={20} color="#00d2ff" />,
-            bg: 'rgba(var(--accent-primary-rgb), 0.15)',
+            bg: 'rgba(var(--accent-primary-rgb), 0.15)'
           },
           {
             label: 'Assigned Vessels',
             value: assignedCount,
             icon: <Ship size={20} color="#10b981" />,
-            bg: 'rgba(16,185,129,0.15)',
+            bg: 'rgba(16,185,129,0.15)'
           },
           {
             label: 'Unassigned',
             value: unassignedCount,
             icon: <HelpCircle size={20} color={unassignedCount > 0 ? '#f59e0b' : '#10b981'} />,
-            bg: unassignedCount > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
-          },
-        ].map(s => (
+            bg: unassignedCount > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)'
+          }
+        ].map((s) => (
           <div
             key={s.label}
             className="glass-card"
@@ -597,14 +619,16 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
+                flexShrink: 0
               }}
             >
               {s.icon}
             </div>
             <div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1 }}>{s.value}</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              <div
+                style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}
+              >
                 {s.label}
               </div>
             </div>
@@ -617,10 +641,10 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
         style={{
           display: 'flex',
           marginBottom: '20px',
-          borderBottom: '1px solid var(--table-border)',
+          borderBottom: '1px solid var(--table-border)'
         }}
       >
-        {(['fleets', 'customers'] as const).map(mode => (
+        {(['fleets', 'customers'] as const).map((mode) => (
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
@@ -638,7 +662,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              marginBottom: '-1px',
+              marginBottom: '-1px'
             }}
           >
             {mode === 'fleets' ? (
@@ -658,28 +682,41 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
       {viewMode === 'fleets' ? (
         <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
           {/* Left: table */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0 }}>
+          <div
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0 }}
+          >
             {/* Toolbar */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
                 <Search
-                  style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+                  style={{
+                    position: 'absolute',
+                    left: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)'
+                  }}
                   size={14}
                   color="var(--text-secondary)"
                 />
                 <input
                   type="text"
                   value={fleetSearch}
-                  onChange={e => setFleetSearch(e.target.value)}
+                  onChange={(e) => setFleetSearch(e.target.value)}
                   placeholder="Search fleets..."
                   style={{ width: '100%', paddingLeft: '36px' }}
                 />
               </div>
               {canManageFleets && (
                 <button
-                  onClick={() => setShowAddForm(v => !v)}
+                  onClick={() => setShowAddForm((v) => !v)}
                   className="btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '7px', whiteSpace: 'nowrap', marginLeft: 'auto' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: 'auto'
+                  }}
                 >
                   <Plus size={15} /> Add Fleet
                 </button>
@@ -697,7 +734,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                   <input
                     type="text"
                     value={newFleetName}
-                    onChange={e => setNewFleetName(e.target.value)}
+                    onChange={(e) => setNewFleetName(e.target.value)}
                     placeholder="Fleet name (e.g. Tanker Division)"
                     style={{ flex: 1 }}
                     autoFocus
@@ -705,7 +742,9 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                   <button type="submit" className="btn-primary" style={{ padding: '8px 16px' }}>
                     Create
                   </button>
-                  <button title="Close" aria-label="Close"
+                  <button
+                    title="Close"
+                    aria-label="Close"
                     type="button"
                     onClick={() => {
                       setShowAddForm(false)
@@ -716,7 +755,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       border: 'none',
                       cursor: 'pointer',
                       color: 'var(--text-secondary)',
-                      padding: '6px',
+                      padding: '6px'
                     }}
                   >
                     <X size={17} />
@@ -733,87 +772,118 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                   <tr
                     style={{
                       background: 'var(--table-header-bg)',
-                      borderBottom: '2px solid var(--table-border)',
+                      borderBottom: '2px solid var(--table-border)'
                     }}
                   >
                     {/* Sortable: FLEET */}
                     {fleetVisibleSet.has('name') && (
-                    <th
-                      scope="col"
-                      onClick={() => toggleFleetSort('name')}
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'left',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: fleetSortKey === 'name' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        letterSpacing: '0.05em',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        FLEET
-                        {fleetSortKey === 'name' ? (
-                          fleetSortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />
-                        ) : (
-                          <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
-                        )}
-                      </span>
-                    </th>
+                      <th
+                        scope="col"
+                        onClick={() => toggleFleetSort('name')}
+                        style={{
+                          padding: '11px 16px',
+                          textAlign: 'left',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color:
+                            fleetSortKey === 'name'
+                              ? 'var(--accent-primary)'
+                              : 'var(--text-secondary)',
+                          letterSpacing: '0.05em',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          FLEET
+                          {fleetSortKey === 'name' ? (
+                            fleetSortDir === 'asc' ? (
+                              <ChevronUp size={13} />
+                            ) : (
+                              <ChevronDown size={13} />
+                            )
+                          ) : (
+                            <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+                          )}
+                        </span>
+                      </th>
                     )}
                     {/* Sortable: VESSELS */}
                     {fleetVisibleSet.has('vessels') && (
-                    <th
-                      scope="col"
-                      onClick={() => toggleFleetSort('vessels')}
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'left',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: fleetSortKey === 'vessels' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        letterSpacing: '0.05em',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap',
-                        width: 130,
-                      }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        VESSELS
-                        {fleetSortKey === 'vessels' ? (
-                          fleetSortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />
-                        ) : (
-                          <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
-                        )}
-                      </span>
-                    </th>
+                      <th
+                        scope="col"
+                        onClick={() => toggleFleetSort('vessels')}
+                        style={{
+                          padding: '11px 16px',
+                          textAlign: 'left',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color:
+                            fleetSortKey === 'vessels'
+                              ? 'var(--accent-primary)'
+                              : 'var(--text-secondary)',
+                          letterSpacing: '0.05em',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          whiteSpace: 'nowrap',
+                          width: 130
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          VESSELS
+                          {fleetSortKey === 'vessels' ? (
+                            fleetSortDir === 'asc' ? (
+                              <ChevronUp size={13} />
+                            ) : (
+                              <ChevronDown size={13} />
+                            )
+                          ) : (
+                            <ChevronsUpDown size={12} style={{ opacity: 0.4 }} />
+                          )}
+                        </span>
+                      </th>
                     )}
                     {/* Non-sortable: ACTIONS */}
                     {fleetVisibleSet.has('actions') ? (
-                    <th
-                      scope="col"
-                      style={{
-                        padding: '11px 16px',
-                        textAlign: 'right',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        letterSpacing: '0.05em',
-                        width: 130,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                        ACTIONS
-                        <ColumnSelector pageKey="fleets" allColumns={FLEET_COLUMNS} visibleColumns={fleetVisibleCols} onChange={setFleetVisibleCols} />
-                      </div>
-                    </th>
+                      <th
+                        scope="col"
+                        style={{
+                          padding: '11px 16px',
+                          textAlign: 'right',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          color: 'var(--text-secondary)',
+                          letterSpacing: '0.05em',
+                          width: 130
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            gap: '8px'
+                          }}
+                        >
+                          ACTIONS
+                          <ColumnSelector
+                            pageKey="fleets"
+                            allColumns={FLEET_COLUMNS}
+                            visibleColumns={fleetVisibleCols}
+                            onChange={setFleetVisibleCols}
+                          />
+                        </div>
+                      </th>
                     ) : (
-                    <th scope="col" style={{ padding: '11px 16px', textAlign: 'right' }}>
-                      <ColumnSelector pageKey="fleets" allColumns={FLEET_COLUMNS} visibleColumns={fleetVisibleCols} onChange={setFleetVisibleCols} />
-                    </th>
+                      <th scope="col" style={{ padding: '11px 16px', textAlign: 'right' }}>
+                        <ColumnSelector
+                          pageKey="fleets"
+                          allColumns={FLEET_COLUMNS}
+                          visibleColumns={fleetVisibleCols}
+                          onChange={setFleetVisibleCols}
+                        />
+                      </th>
                     )}
                   </tr>
                 </thead>
@@ -822,7 +892,11 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                     <tr>
                       <td
                         colSpan={3}
-                        style={{ padding: '56px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                        style={{
+                          padding: '56px',
+                          textAlign: 'center',
+                          color: 'var(--text-secondary)'
+                        }}
                       >
                         <Folder
                           size={40}
@@ -846,116 +920,148 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                           key={fleet.id}
                           onClick={() => openPanel(fleet)}
                           style={{
-                            borderBottom: idx < sortedFleets.length - 1 ? '1px solid var(--table-border)' : 'none',
-                            background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
+                            borderBottom:
+                              idx < sortedFleets.length - 1
+                                ? '1px solid var(--table-border)'
+                                : 'none',
+                            background: isSelected
+                              ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                              : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.15s',
-                            borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                            borderLeft: isSelected
+                              ? '3px solid var(--accent-primary)'
+                              : '3px solid transparent'
                           }}
                           className="hover-effect"
                         >
                           {fleetVisibleSet.has('name') && (
-                          <td style={{ padding: '13px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div
-                                style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: 9,
-                                  background: isSelected
-                                    ? 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.35), rgba(var(--accent-primary-rgb), 0.15))'
-                                    : 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.18), rgba(var(--accent-primary-rgb), 0.06))',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  flexShrink: 0,
-                                  border: isSelected ? '1px solid rgba(var(--accent-primary-rgb), 0.3)' : '1px solid transparent',
-                                }}
-                              >
-                                <Folder size={16} color="var(--accent-primary)" />
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, fontSize: '0.92rem', lineHeight: 1.2 }}>
-                                  {fleet.name}
-                                </div>
-                                {inactiveCount > 0 && (
-                                  <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                                    {activeCount} active · {inactiveCount} inactive
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          )}
-                          {fleetVisibleSet.has('vessels') && (
-                          <td style={{ padding: '13px 16px' }}>
-                            {count === 0 ? (
-                              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                                Empty
-                              </span>
-                            ) : (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                                  border: '1px solid rgba(var(--accent-primary-rgb), 0.18)',
-                                  borderRadius: '20px',
-                                  padding: '3px 10px 3px 7px',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 600,
-                                  color: 'var(--accent-primary)',
-                                }}
-                              >
-                                <Ship size={12} />
-                                {count}
-                              </span>
-                            )}
-                          </td>
-                          )}
-                          {fleetVisibleSet.has('actions') && (
-                          <td
-                            style={{ padding: '13px 16px', textAlign: 'right' }}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <div
-                              style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}
-                            >
-                              <button
-                                onClick={() => setSelectedFleetDetail(fleet)}
-                                className="btn-secondary"
-                                style={{
-                                  padding: '5px 12px',
-                                  fontSize: '0.78rem',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                }}
-                              >
-                                <Eye size={12} /> View
-                              </button>
-                              {canManageFleets && (
-                                <button
-                                  onClick={() => handleDeleteFleet(fleet)}
+                            <td style={{ padding: '13px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div
                                   style={{
-                                    background: 'rgba(255,77,77,0.08)',
-                                    color: 'var(--danger)',
-                                    border: '1px solid rgba(255,77,77,0.2)',
-                                    borderRadius: '7px',
-                                    cursor: 'pointer',
-                                    padding: '5px 8px',
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 9,
+                                    background: isSelected
+                                      ? 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.35), rgba(var(--accent-primary-rgb), 0.15))'
+                                      : 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.18), rgba(var(--accent-primary-rgb), 0.06))',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    transition: 'background 0.15s',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    border: isSelected
+                                      ? '1px solid rgba(var(--accent-primary-rgb), 0.3)'
+                                      : '1px solid transparent'
                                   }}
-                                  title="Delete fleet"
                                 >
-                                  <Trash2 size={13} />
-                                </button>
+                                  <Folder size={16} color="var(--accent-primary)" />
+                                </div>
+                                <div>
+                                  <div
+                                    style={{
+                                      fontWeight: 700,
+                                      fontSize: '0.92rem',
+                                      lineHeight: 1.2
+                                    }}
+                                  >
+                                    {fleet.name}
+                                  </div>
+                                  {inactiveCount > 0 && (
+                                    <div
+                                      style={{
+                                        fontSize: '0.71rem',
+                                        color: 'var(--text-secondary)',
+                                        marginTop: '1px'
+                                      }}
+                                    >
+                                      {activeCount} active · {inactiveCount} inactive
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          )}
+                          {fleetVisibleSet.has('vessels') && (
+                            <td style={{ padding: '13px 16px' }}>
+                              {count === 0 ? (
+                                <span
+                                  style={{
+                                    fontSize: '0.78rem',
+                                    color: 'var(--text-secondary)',
+                                    fontStyle: 'italic'
+                                  }}
+                                >
+                                  Empty
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                                    border: '1px solid rgba(var(--accent-primary-rgb), 0.18)',
+                                    borderRadius: '20px',
+                                    padding: '3px 10px 3px 7px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    color: 'var(--accent-primary)'
+                                  }}
+                                >
+                                  <Ship size={12} />
+                                  {count}
+                                </span>
                               )}
-                            </div>
-                          </td>
+                            </td>
+                          )}
+                          {fleetVisibleSet.has('actions') && (
+                            <td
+                              style={{ padding: '13px 16px', textAlign: 'right' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '6px',
+                                  justifyContent: 'flex-end',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <button
+                                  onClick={() => setSelectedFleetDetail(fleet)}
+                                  className="btn-secondary"
+                                  style={{
+                                    padding: '5px 12px',
+                                    fontSize: '0.78rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}
+                                >
+                                  <Eye size={12} /> View
+                                </button>
+                                {canManageFleets && (
+                                  <button
+                                    onClick={() => handleDeleteFleet(fleet)}
+                                    style={{
+                                      background: 'rgba(255,77,77,0.08)',
+                                      color: 'var(--danger)',
+                                      border: '1px solid rgba(255,77,77,0.2)',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      padding: '5px 8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    title="Delete fleet"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           )}
                         </tr>
                       )
@@ -978,29 +1084,36 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                maxHeight: 'calc(100vh - 280px)',
+                maxHeight: 'calc(100vh - 280px)'
               }}
             >
               {/* Panel header */}
               <div
                 style={{
                   padding: '14px 16px',
-                  borderBottom: '1px solid var(--glass-border-color)',
+                  borderBottom: '1px solid var(--glass-border-color)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start'
+                  }}
+                >
                   <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
                     <div
                       style={{
                         width: 40,
                         height: 40,
                         borderRadius: 10,
-                        background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.4), rgba(var(--accent-primary-rgb), 0.12))',
+                        background:
+                          'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.4), rgba(var(--accent-primary-rgb), 0.12))',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        border: '1px solid rgba(var(--accent-primary-rgb), 0.25)',
+                        border: '1px solid rgba(var(--accent-primary-rgb), 0.25)'
                       }}
                     >
                       <Folder size={19} color="var(--accent-primary)" />
@@ -1009,7 +1122,13 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       <div style={{ fontWeight: 700, fontSize: '0.97rem', lineHeight: 1.2 }}>
                         {panelFleet.name}
                       </div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      <div
+                        style={{
+                          fontSize: '0.74rem',
+                          color: 'var(--text-secondary)',
+                          marginTop: '2px'
+                        }}
+                      >
                         Fleet · {fleetVessels.length} vessel{fleetVessels.length !== 1 ? 's' : ''}
                       </div>
                     </div>
@@ -1027,14 +1146,16 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                           display: 'flex',
                           alignItems: 'center',
                           opacity: 0.65,
-                          borderRadius: '6px',
+                          borderRadius: '6px'
                         }}
                         title="Delete fleet"
                       >
                         <Trash2 size={14} />
                       </button>
                     )}
-                    <button title="Close" aria-label="Close"
+                    <button
+                      title="Close"
+                      aria-label="Close"
                       onClick={() => setPanelFleet(null)}
                       style={{
                         background: 'transparent',
@@ -1044,7 +1165,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                         padding: '5px',
                         display: 'flex',
                         alignItems: 'center',
-                        borderRadius: '6px',
+                        borderRadius: '6px'
                       }}
                     >
                       <X size={16} />
@@ -1052,73 +1173,116 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                   </div>
                 </div>
                 {/* Mini stats strip */}
-                {fleetVessels.length > 0 && (() => {
-                  const active = fleetVessels.filter(v => v.isActive).length
-                  const inactive = fleetVessels.length - active
-                  return (
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '8px',
-                        marginTop: '12px',
-                      }}
-                    >
+                {fleetVessels.length > 0 &&
+                  (() => {
+                    const active = fleetVessels.filter((v) => v.isActive).length
+                    const inactive = fleetVessels.length - active
+                    return (
                       <div
                         style={{
-                          flex: 1,
-                          background: 'rgba(16,185,129,0.08)',
-                          border: '1px solid rgba(16,185,129,0.2)',
-                          borderRadius: '8px',
-                          padding: '7px 10px',
-                          textAlign: 'center',
+                          display: 'flex',
+                          gap: '8px',
+                          marginTop: '12px'
                         }}
                       >
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#10b981', lineHeight: 1 }}>
-                          {active}
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
-                          ACTIVE
-                        </div>
-                      </div>
-                      {inactive > 0 && (
                         <div
                           style={{
                             flex: 1,
-                            background: 'rgba(245,158,11,0.08)',
-                            border: '1px solid rgba(245,158,11,0.2)',
+                            background: 'rgba(16,185,129,0.08)',
+                            border: '1px solid rgba(16,185,129,0.2)',
                             borderRadius: '8px',
                             padding: '7px 10px',
-                            textAlign: 'center',
+                            textAlign: 'center'
                           }}
                         >
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f59e0b', lineHeight: 1 }}>
-                            {inactive}
+                          <div
+                            style={{
+                              fontSize: '1.1rem',
+                              fontWeight: 700,
+                              color: '#10b981',
+                              lineHeight: 1
+                            }}
+                          >
+                            {active}
                           </div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
-                            INACTIVE
+                          <div
+                            style={{
+                              fontSize: '0.65rem',
+                              color: 'var(--text-secondary)',
+                              marginTop: '2px',
+                              letterSpacing: '0.04em'
+                            }}
+                          >
+                            ACTIVE
                           </div>
                         </div>
-                      )}
-                      <div
-                        style={{
-                          flex: 1,
-                          background: 'rgba(var(--accent-primary-rgb), 0.06)',
-                          border: '1px solid rgba(var(--accent-primary-rgb), 0.15)',
-                          borderRadius: '8px',
-                          padding: '7px 10px',
-                          textAlign: 'center',
-                        }}
-                      >
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)', lineHeight: 1 }}>
-                          {fleetVessels.length}
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', letterSpacing: '0.04em' }}>
-                          TOTAL
+                        {inactive > 0 && (
+                          <div
+                            style={{
+                              flex: 1,
+                              background: 'rgba(245,158,11,0.08)',
+                              border: '1px solid rgba(245,158,11,0.2)',
+                              borderRadius: '8px',
+                              padding: '7px 10px',
+                              textAlign: 'center'
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                color: '#f59e0b',
+                                lineHeight: 1
+                              }}
+                            >
+                              {inactive}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '0.65rem',
+                                color: 'var(--text-secondary)',
+                                marginTop: '2px',
+                                letterSpacing: '0.04em'
+                              }}
+                            >
+                              INACTIVE
+                            </div>
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            flex: 1,
+                            background: 'rgba(var(--accent-primary-rgb), 0.06)',
+                            border: '1px solid rgba(var(--accent-primary-rgb), 0.15)',
+                            borderRadius: '8px',
+                            padding: '7px 10px',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '1.1rem',
+                              fontWeight: 700,
+                              color: 'var(--accent-primary)',
+                              lineHeight: 1
+                            }}
+                          >
+                            {fleetVessels.length}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.65rem',
+                              color: 'var(--text-secondary)',
+                              marginTop: '2px',
+                              letterSpacing: '0.04em'
+                            }}
+                          >
+                            TOTAL
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })()}
+                    )
+                  })()}
               </div>
 
               {/* Current fleet vessels */}
@@ -1131,7 +1295,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                     fontWeight: 600,
                     color: 'var(--text-secondary)',
                     letterSpacing: '0.07em',
-                    borderBottom: '1px solid var(--glass-border-color)',
+                    borderBottom: '1px solid var(--glass-border-color)'
                   }}
                 >
                   VESSELS IN FLEET
@@ -1143,14 +1307,17 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       padding: '28px 16px',
                       textAlign: 'center',
                       color: 'var(--text-secondary)',
-                      fontSize: '0.85rem',
+                      fontSize: '0.85rem'
                     }}
                   >
-                    <Ship size={28} style={{ opacity: 0.18, display: 'block', margin: '0 auto 10px' }} />
+                    <Ship
+                      size={28}
+                      style={{ opacity: 0.18, display: 'block', margin: '0 auto 10px' }}
+                    />
                     No vessels assigned yet.
                   </div>
                 ) : (
-                  fleetVessels.map(vessel => (
+                  fleetVessels.map((vessel) => (
                     <div
                       key={vessel.id}
                       style={{
@@ -1159,7 +1326,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                         gap: '9px',
                         padding: '10px 14px',
                         borderBottom: '1px solid rgba(0,0,0,0.04)',
-                        transition: 'background 0.12s',
+                        transition: 'background 0.12s'
                       }}
                       className="hover-effect"
                     >
@@ -1172,7 +1339,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                             textTransform: 'uppercase',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {vessel.name}
@@ -1195,7 +1362,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                           padding: '3px',
                           opacity: 0.5,
                           display: 'flex',
-                          alignItems: 'center',
+                          alignItems: 'center'
                         }}
                         title="Open vessel"
                       >
@@ -1213,7 +1380,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                             padding: '3px',
                             opacity: removingId === vessel.id ? 0.4 : 0.7,
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'center'
                           }}
                           title="Remove from fleet"
                         >
@@ -1226,190 +1393,225 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
 
                 {/* Add vessels section */}
                 {canManageFleets && (
-                <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
-                  <button
-                    onClick={() => {
-                      setAddOpen(v => !v)
-                      setPendingAdd(new Set())
-                      setAddSearch('')
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 16px',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      color: 'var(--accent-primary)',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {addOpen ? <ChevronDown size={15} /> : <Plus size={15} />}
-                    Add Vessels
-                    {!addOpen && availableVessels.length > 0 && (
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: '0.78rem', marginLeft: 2 }}>
-                        ({availableVessels.length} available)
-                      </span>
-                    )}
-                  </button>
+                  <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
+                    <button
+                      onClick={() => {
+                        setAddOpen((v) => !v)
+                        setPendingAdd(new Set())
+                        setAddSearch('')
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '11px 16px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      {addOpen ? <ChevronDown size={15} /> : <Plus size={15} />}
+                      Add Vessels
+                      {!addOpen && availableVessels.length > 0 && (
+                        <span
+                          style={{
+                            color: 'var(--text-secondary)',
+                            fontWeight: 400,
+                            fontSize: '0.78rem',
+                            marginLeft: 2
+                          }}
+                        >
+                          ({availableVessels.length} available)
+                        </span>
+                      )}
+                    </button>
 
-                  {addOpen && (
-                    <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
-                      {/* Search */}
-                      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--glass-border-color)' }}>
-                        <div style={{ position: 'relative' }}>
-                          <Search
-                            style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)' }}
-                            size={13}
-                            color="var(--text-secondary)"
-                          />
-                          <input
-                            type="text"
-                            value={addSearch}
-                            onChange={e => setAddSearch(e.target.value)}
-                            placeholder="Filter vessels..."
-                            style={{ width: '100%', padding: '6px 8px 6px 28px', fontSize: '0.82rem' }}
-                            autoFocus
-                          />
-                        </div>
-                      </div>
-
-                      {/* Vessel checklist */}
-                      <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                        {availableVessels.length === 0 ? (
-                          <div
-                            style={{
-                              padding: '20px',
-                              textAlign: 'center',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.83rem',
-                            }}
-                          >
-                            {addSearch ? 'No vessels match.' : 'All vessels are already in this fleet.'}
-                          </div>
-                        ) : (
-                          availableVessels.map(vessel => {
-                            const checked = pendingAdd.has(vessel.id)
-                            return (
-                              <div
-                                key={vessel.id}
-                                onClick={() => togglePending(vessel.id)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '9px',
-                                  padding: '8px 14px',
-                                  cursor: 'pointer',
-                                  background: checked ? 'rgba(var(--accent-primary-rgb), 0.07)' : 'transparent',
-                                  borderLeft: checked
-                                    ? '2px solid var(--accent-primary)'
-                                    : '2px solid transparent',
-                                  borderBottom: '1px solid rgba(0,0,0,0.04)',
-                                  transition: 'background 0.1s',
-                                }}
-                                className="hover-effect"
-                              >
-                                <div
-                                  style={{
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: 4,
-                                    flexShrink: 0,
-                                    background: checked ? 'var(--accent-primary)' : 'transparent',
-                                    border: checked ? 'none' : '1.5px solid var(--text-secondary)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                >
-                                  {checked && <Check size={10} color="#000" strokeWidth={2.5} />}
-                                </div>
-                                <Ship
-                                  size={13}
-                                  color={checked ? 'var(--accent-primary)' : 'var(--text-secondary)'}
-                                  style={{ flexShrink: 0 }}
-                                />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div
-                                    style={{
-                                      fontWeight: checked ? 600 : 400,
-                                      fontSize: '0.83rem',
-                                      textTransform: 'uppercase',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {vessel.name}
-                                  </div>
-                                  <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)' }}>
-                                    IMO {vessel.imoNumber}
-                                  </div>
-                                </div>
-                                <VesselFlag vessel={vessel} />
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
-
-                      {/* Add footer */}
-                      {pendingAdd.size > 0 && (
+                    {addOpen && (
+                      <div style={{ borderTop: '1px solid var(--glass-border-color)' }}>
+                        {/* Search */}
                         <div
                           style={{
                             padding: '10px 12px',
-                            borderTop: '1px solid var(--glass-border-color)',
-                            display: 'flex',
-                            gap: '8px',
+                            borderBottom: '1px solid var(--glass-border-color)'
                           }}
                         >
-                          <button
-                            onClick={handleAddSelected}
-                            className="btn-primary"
-                            disabled={addSaving}
-                            style={{
-                              flex: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            {addSaving ? (
-                              'Adding...'
-                            ) : (
-                              <>
-                                <Check size={14} /> Add {pendingAdd.size} Vessel{pendingAdd.size !== 1 ? 's' : ''}
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setAddOpen(false)
-                              setPendingAdd(new Set())
-                              setAddSearch('')
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid var(--glass-border-color)',
-                              cursor: 'pointer',
-                              color: 'var(--text-secondary)',
-                              padding: '7px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.82rem',
-                            }}
-                          >
-                            Cancel
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <Search
+                              style={{
+                                position: 'absolute',
+                                left: 9,
+                                top: '50%',
+                                transform: 'translateY(-50%)'
+                              }}
+                              size={13}
+                              color="var(--text-secondary)"
+                            />
+                            <input
+                              type="text"
+                              value={addSearch}
+                              onChange={(e) => setAddSearch(e.target.value)}
+                              placeholder="Filter vessels..."
+                              style={{
+                                width: '100%',
+                                padding: '6px 8px 6px 28px',
+                                fontSize: '0.82rem'
+                              }}
+                              autoFocus
+                            />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+
+                        {/* Vessel checklist */}
+                        <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                          {availableVessels.length === 0 ? (
+                            <div
+                              style={{
+                                padding: '20px',
+                                textAlign: 'center',
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.83rem'
+                              }}
+                            >
+                              {addSearch
+                                ? 'No vessels match.'
+                                : 'All vessels are already in this fleet.'}
+                            </div>
+                          ) : (
+                            availableVessels.map((vessel) => {
+                              const checked = pendingAdd.has(vessel.id)
+                              return (
+                                <div
+                                  key={vessel.id}
+                                  onClick={() => togglePending(vessel.id)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '9px',
+                                    padding: '8px 14px',
+                                    cursor: 'pointer',
+                                    background: checked
+                                      ? 'rgba(var(--accent-primary-rgb), 0.07)'
+                                      : 'transparent',
+                                    borderLeft: checked
+                                      ? '2px solid var(--accent-primary)'
+                                      : '2px solid transparent',
+                                    borderBottom: '1px solid rgba(0,0,0,0.04)',
+                                    transition: 'background 0.1s'
+                                  }}
+                                  className="hover-effect"
+                                >
+                                  <div
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 4,
+                                      flexShrink: 0,
+                                      background: checked ? 'var(--accent-primary)' : 'transparent',
+                                      border: checked
+                                        ? 'none'
+                                        : '1.5px solid var(--text-secondary)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                  >
+                                    {checked && <Check size={10} color="#000" strokeWidth={2.5} />}
+                                  </div>
+                                  <Ship
+                                    size={13}
+                                    color={
+                                      checked ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                                    }
+                                    style={{ flexShrink: 0 }}
+                                  />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontWeight: checked ? 600 : 400,
+                                        fontSize: '0.83rem',
+                                        textTransform: 'uppercase',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {vessel.name}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: '0.71rem',
+                                        color: 'var(--text-secondary)'
+                                      }}
+                                    >
+                                      IMO {vessel.imoNumber}
+                                    </div>
+                                  </div>
+                                  <VesselFlag vessel={vessel} />
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+
+                        {/* Add footer */}
+                        {pendingAdd.size > 0 && (
+                          <div
+                            style={{
+                              padding: '10px 12px',
+                              borderTop: '1px solid var(--glass-border-color)',
+                              display: 'flex',
+                              gap: '8px'
+                            }}
+                          >
+                            <button
+                              onClick={handleAddSelected}
+                              className="btn-primary"
+                              disabled={addSaving}
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              {addSaving ? (
+                                'Adding...'
+                              ) : (
+                                <>
+                                  <Check size={14} /> Add {pendingAdd.size} Vessel
+                                  {pendingAdd.size !== 1 ? 's' : ''}
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setAddOpen(false)
+                                setPendingAdd(new Set())
+                                setAddSearch('')
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--glass-border-color)',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                padding: '7px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.82rem'
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1424,26 +1626,31 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
               gap: '12px',
               marginBottom: '20px',
               flexWrap: 'wrap',
-              alignItems: 'center',
+              alignItems: 'center'
             }}
           >
             <div style={{ position: 'relative', flex: 1, minWidth: '200px', maxWidth: '380px' }}>
               <Search
-                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)'
+                }}
                 size={14}
                 color="var(--text-secondary)"
               />
               <input
                 type="text"
                 value={customerSearch}
-                onChange={e => setCustomerSearch(e.target.value)}
+                onChange={(e) => setCustomerSearch(e.target.value)}
                 placeholder="Search customers or vessels..."
                 style={{ width: '100%', paddingLeft: '36px' }}
               />
             </div>
             <select
               value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value as 'all' | 'broker' | 'direct')}
+              onChange={(e) => setTypeFilter(e.target.value as 'all' | 'broker' | 'direct')}
               style={{ padding: '10px' }}
             >
               <option value="all">All Types</option>
@@ -1474,7 +1681,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                 <section className="glass-card" style={{ padding: '20px', marginBottom: '14px' }}>
                   <div
                     onClick={() =>
-                      setCollapsedSections(prev => {
+                      setCollapsedSections((prev) => {
                         const next = new Set(prev)
                         if (next.has('Unassigned')) next.delete('Unassigned')
                         else next.add('Unassigned')
@@ -1487,7 +1694,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       gap: '10px',
                       cursor: 'pointer',
                       marginBottom: isCollapsed ? 0 : '16px',
-                      userSelect: 'none',
+                      userSelect: 'none'
                     }}
                   >
                     {isCollapsed ? (
@@ -1501,7 +1708,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       style={{
                         fontSize: '0.82rem',
                         color: 'var(--text-secondary)',
-                        marginLeft: 'auto',
+                        marginLeft: 'auto'
                       }}
                     >
                       {customerUnassigned.length} vessel
@@ -1513,14 +1720,14 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                       style={{
                         overflow: 'hidden',
                         borderRadius: '8px',
-                        border: '1px solid var(--table-border)',
+                        border: '1px solid var(--table-border)'
                       }}
                     >
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <caption className="sr-only">Unassigned vessels</caption>
                         <thead>
                           <tr style={{ background: 'var(--table-header-bg)' }}>
-                            {['VESSEL', 'IMO', 'FLAG', 'FLEET'].map(h => (
+                            {['VESSEL', 'IMO', 'FLAG', 'FLEET'].map((h) => (
                               <th
                                 key={h}
                                 scope="col"
@@ -1531,7 +1738,7 @@ export default function FleetManager({ subTab, subTabNonce }: SubTabProps = {}) 
                                   color: 'var(--text-secondary)',
                                   fontWeight: 500,
                                   letterSpacing: '0.04em',
-                                  width: h === 'FLAG' ? 60 : undefined,
+                                  width: h === 'FLAG' ? 60 : undefined
                                 }}
                               >
                                 {h}

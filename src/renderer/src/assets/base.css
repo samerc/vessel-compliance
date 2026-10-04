@@ -72,7 +72,10 @@ svg {
 }
 
 /* Ensure buttons and interactive elements render crisply */
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

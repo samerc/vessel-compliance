@@ -1,7 +1,7 @@
 import { VesselDynamicPolicy } from '../../../shared/types'
 
 function getEndDate(policy: VesselDynamicPolicy): string | undefined {
-  const endDateVal = policy.values?.find(v => {
+  const endDateVal = policy.values?.find((v) => {
     const name = v.characteristicName?.toLowerCase() || ''
     return name.includes('end') && (name.includes('date') || name.includes('expir'))
   })
@@ -21,11 +21,13 @@ function isHullPolicy(p: VesselDynamicPolicy): boolean {
 /**
  * Returns all active P&I policies with their end dates (for multi-policy picker).
  */
-export function getActivePIPolicies(policies: VesselDynamicPolicy[]): { policy: VesselDynamicPolicy; endDate: string | undefined }[] {
+export function getActivePIPolicies(
+  policies: VesselDynamicPolicy[]
+): { policy: VesselDynamicPolicy; endDate: string | undefined }[] {
   if (!policies || policies.length === 0) return []
   return policies
-    .filter(p => p.status === 'active' && isPIPolicy(p))
-    .map(p => ({ policy: p, endDate: getEndDate(p) }))
+    .filter((p) => p.status === 'active' && isPIPolicy(p))
+    .map((p) => ({ policy: p, endDate: getEndDate(p) }))
 }
 
 /**
@@ -39,11 +41,11 @@ export function resolveEffectivePolicyExpiry(
 ): string | undefined {
   if (!policies || policies.length === 0) return undefined
 
-  const activePolicies = policies.filter(p => p.status === 'active')
+  const activePolicies = policies.filter((p) => p.status === 'active')
 
   // If a preferred policy is specified, use it directly
   if (preferredPolicyId) {
-    const preferred = activePolicies.find(p => p.id === preferredPolicyId)
+    const preferred = activePolicies.find((p) => p.id === preferredPolicyId)
     if (preferred) {
       const d = getEndDate(preferred)
       if (d) return d
@@ -70,14 +72,16 @@ export function resolveEffectivePolicyExpiry(
 /**
  * Resolves the effective policy inception date (Inception Date).
  */
-export function resolveEffectivePolicyInception(policies: VesselDynamicPolicy[]): string | undefined {
+export function resolveEffectivePolicyInception(
+  policies: VesselDynamicPolicy[]
+): string | undefined {
   if (!policies || policies.length === 0) return undefined
 
-  const activePolicies = policies.filter(p => p.status === 'active')
+  const activePolicies = policies.filter((p) => p.status === 'active')
 
   const piPolicies = activePolicies.filter(isPIPolicy)
   for (const piPolicy of piPolicies) {
-    const val = piPolicy.values?.find(v =>
+    const val = piPolicy.values?.find((v) =>
       v.characteristicName?.toLowerCase().includes('inception')
     )
     if (val?.valueDate) return val.valueDate
@@ -85,7 +89,7 @@ export function resolveEffectivePolicyInception(policies: VesselDynamicPolicy[])
 
   const hullPolicies = activePolicies.filter(isHullPolicy)
   for (const hullPolicy of hullPolicies) {
-    const val = hullPolicy.values?.find(v =>
+    const val = hullPolicy.values?.find((v) =>
       v.characteristicName?.toLowerCase().includes('inception')
     )
     if (val?.valueDate) return val.valueDate

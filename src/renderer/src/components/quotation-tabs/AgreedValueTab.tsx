@@ -1,560 +1,1218 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, ChevronUp, ChevronDown, X, Trash2 } from 'lucide-react'
-import { Quotation, HullAgreedValueText, QuotationAgreedValueItem, QuotationVessel, QuotationHullAlternative, QuotationAgreedValueOption } from '../../../../shared/types'
+import {
+  Quotation,
+  HullAgreedValueText,
+  QuotationAgreedValueItem,
+  QuotationVessel,
+  QuotationHullAlternative,
+  QuotationAgreedValueOption
+} from '../../../../shared/types'
 import VesselScopeChips from '../VesselScopeChips'
 import { MoneyInput } from './shared'
 
-export default function AgreedValueTab({ quotation, updateField, setQ, showError }: {
-    quotation: Quotation
-    updateField: (f: string, v: any) => void
-    setQ: (fn: (p: Quotation) => Quotation) => void
-    showSuccess: (m: string) => void
-    showError: (m: string) => void
+export default function AgreedValueTab({
+  quotation,
+  updateField,
+  setQ,
+  showError
+}: {
+  quotation: Quotation
+  updateField: (f: string, v: any) => void
+  setQ: (fn: (p: Quotation) => Quotation) => void
+  showSuccess: (m: string) => void
+  showError: (m: string) => void
 }) {
-    const [items, setItems] = useState<QuotationAgreedValueItem[]>([])
-    const [allTexts, setAllTexts] = useState<HullAgreedValueText[]>([])
-    const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
-    const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
-    const [newText, setNewText] = useState('')
-    const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
-    const defaultsApplied = useRef(false)
+  const [items, setItems] = useState<QuotationAgreedValueItem[]>([])
+  const [allTexts, setAllTexts] = useState<HullAgreedValueText[]>([])
+  const [qVessels, setQVessels] = useState<QuotationVessel[]>([])
+  const [hullAlts, setHullAlts] = useState<QuotationHullAlternative[]>([])
+  const [newText, setNewText] = useState('')
+  const [valueOptions, setValueOptions] = useState<QuotationAgreedValueOption[]>([])
+  const defaultsApplied = useRef(false)
 
-    useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+  }, [])
 
-    const loadData = async () => {
-        const [texts, existingItems, qv, alts, opts] = await Promise.all([
-            window.api.hullGetAgreedValueTexts(),
-            window.api.hullGetQuotationAgreedValueItems(quotation.id),
-            window.api.getQuotationVessels(quotation.id),
-            window.api.hullGetQuotationAlternatives(quotation.id),
-            window.api.hullGetAgreedValueOptions(quotation.id)
-        ])
-        const safeTexts = Array.isArray(texts) ? texts : []
-        const safeItems = Array.isArray(existingItems) ? existingItems : []
-        setAllTexts(safeTexts)
-        setItems(safeItems)
-        setQVessels(Array.isArray(qv) ? qv : [])
-        setHullAlts(Array.isArray(alts) ? alts : [])
-        setValueOptions(Array.isArray(opts) ? opts : [])
+  const loadData = async () => {
+    const [texts, existingItems, qv, alts, opts] = await Promise.all([
+      window.api.hullGetAgreedValueTexts(),
+      window.api.hullGetQuotationAgreedValueItems(quotation.id),
+      window.api.getQuotationVessels(quotation.id),
+      window.api.hullGetQuotationAlternatives(quotation.id),
+      window.api.hullGetAgreedValueOptions(quotation.id)
+    ])
+    const safeTexts = Array.isArray(texts) ? texts : []
+    const safeItems = Array.isArray(existingItems) ? existingItems : []
+    setAllTexts(safeTexts)
+    setItems(safeItems)
+    setQVessels(Array.isArray(qv) ? qv : [])
+    setHullAlts(Array.isArray(alts) ? alts : [])
+    setValueOptions(Array.isArray(opts) ? opts : [])
 
-        // Sync sections from master texts (fixes items saved before section was tracked)
-        if (safeItems.length > 0 && safeTexts.length > 0) {
-            const masterMap = new Map(safeTexts.map(t => [t.id, t.section || 'hm']))
-            let needsSave = false
-            const synced = safeItems.map(it => {
-                if (it.hullTextId && masterMap.has(it.hullTextId)) {
-                    const masterSec = masterMap.get(it.hullTextId)!
-                    if ((it.section || 'hm') !== masterSec) {
-                        needsSave = true
-                        return { ...it, section: masterSec }
-                    }
-                }
-                return it
-            })
-            if (needsSave) {
-                try {
-                    await window.api.hullSetQuotationAgreedValueItems(quotation.id, synced.map(it => ({ hullTextId: it.hullTextId, text: it.text, section: it.section || 'hm', vesselScope: it.vesselScope })))
-                    const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-                    setItems(Array.isArray(fresh) ? fresh : [])
-                } catch {}
-            }
+    // Sync sections from master texts (fixes items saved before section was tracked)
+    if (safeItems.length > 0 && safeTexts.length > 0) {
+      const masterMap = new Map(safeTexts.map((t) => [t.id, t.section || 'hm']))
+      let needsSave = false
+      const synced = safeItems.map((it) => {
+        if (it.hullTextId && masterMap.has(it.hullTextId)) {
+          const masterSec = masterMap.get(it.hullTextId)!
+          if ((it.section || 'hm') !== masterSec) {
+            needsSave = true
+            return { ...it, section: masterSec }
+          }
         }
-
-        // Auto-populate default texts on first load if no items exist
-        if (!defaultsApplied.current && Array.isArray(existingItems) && safeItems.length === 0 && safeTexts.length > 0) {
-            defaultsApplied.current = true
-            const defaults = safeTexts.filter(t => t.defaultSelected)
-            if (defaults.length > 0) {
-                const newItems = defaults.map(t => ({ hullTextId: t.id, text: t.text, section: t.section || 'hm' }))
-                try {
-                    await window.api.hullSetQuotationAgreedValueItems(quotation.id, newItems)
-                    const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-                    setItems(Array.isArray(fresh) ? fresh : [])
-                } catch {}
-            }
-        } else {
-            defaultsApplied.current = true
-        }
-    }
-
-    const saveItems = async (updated: QuotationAgreedValueItem[]) => {
+        return it
+      })
+      if (needsSave) {
         try {
-            await window.api.hullSetQuotationAgreedValueItems(
-                quotation.id,
-                updated.map(it => ({ hullTextId: it.hullTextId, text: it.text, section: it.section || 'hm', vesselScope: it.vesselScope }))
-            )
-            const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
-            setItems(Array.isArray(fresh) ? fresh : [])
-        } catch (err: any) {
-            showError(err.message || 'Failed to save')
-        }
+          await window.api.hullSetQuotationAgreedValueItems(
+            quotation.id,
+            synced.map((it) => ({
+              hullTextId: it.hullTextId,
+              text: it.text,
+              section: it.section || 'hm',
+              vesselScope: it.vesselScope
+            }))
+          )
+          const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+          setItems(Array.isArray(fresh) ? fresh : [])
+        } catch {}
+      }
     }
 
-    const addFromTemplate = async (tmpl: HullAgreedValueText) => {
-        const already = items.some(it => it.hullTextId === tmpl.id)
-        if (already) return
-        const updated = [...items, { id: '', quotationId: quotation.id, hullTextId: tmpl.id, text: tmpl.text, section: tmpl.section || 'hm', order: items.length }]
-        await saveItems(updated)
+    // Auto-populate default texts on first load if no items exist
+    if (
+      !defaultsApplied.current &&
+      Array.isArray(existingItems) &&
+      safeItems.length === 0 &&
+      safeTexts.length > 0
+    ) {
+      defaultsApplied.current = true
+      const defaults = safeTexts.filter((t) => t.defaultSelected)
+      if (defaults.length > 0) {
+        const newItems = defaults.map((t) => ({
+          hullTextId: t.id,
+          text: t.text,
+          section: t.section || 'hm'
+        }))
+        try {
+          await window.api.hullSetQuotationAgreedValueItems(quotation.id, newItems)
+          const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+          setItems(Array.isArray(fresh) ? fresh : [])
+        } catch {}
+      }
+    } else {
+      defaultsApplied.current = true
     }
+  }
 
-    const addCustomText = async () => {
-        if (!newText.trim()) return
-        const updated = [...items, { id: '', quotationId: quotation.id, text: newText.trim(), section: 'hm', order: items.length }]
-        await saveItems(updated)
-        setNewText('')
+  const saveItems = async (updated: QuotationAgreedValueItem[]) => {
+    try {
+      await window.api.hullSetQuotationAgreedValueItems(
+        quotation.id,
+        updated.map((it) => ({
+          hullTextId: it.hullTextId,
+          text: it.text,
+          section: it.section || 'hm',
+          vesselScope: it.vesselScope
+        }))
+      )
+      const fresh = await window.api.hullGetQuotationAgreedValueItems(quotation.id)
+      setItems(Array.isArray(fresh) ? fresh : [])
+    } catch (err: any) {
+      showError(err.message || 'Failed to save')
     }
+  }
 
-    const removeItem = async (idx: number) => {
-        const updated = items.filter((_, i) => i !== idx)
-        await saveItems(updated)
-    }
+  const addFromTemplate = async (tmpl: HullAgreedValueText) => {
+    const already = items.some((it) => it.hullTextId === tmpl.id)
+    if (already) return
+    const updated = [
+      ...items,
+      {
+        id: '',
+        quotationId: quotation.id,
+        hullTextId: tmpl.id,
+        text: tmpl.text,
+        section: tmpl.section || 'hm',
+        order: items.length
+      }
+    ]
+    await saveItems(updated)
+  }
 
-    const updateItemText = async (idx: number, text: string) => {
-        const updated = items.map((it, i) => i === idx ? { ...it, text } : it)
-        setItems(updated)
-    }
+  const addCustomText = async () => {
+    if (!newText.trim()) return
+    const updated = [
+      ...items,
+      {
+        id: '',
+        quotationId: quotation.id,
+        text: newText.trim(),
+        section: 'hm',
+        order: items.length
+      }
+    ]
+    await saveItems(updated)
+    setNewText('')
+  }
 
-    const blurSave = async () => {
-        await saveItems(items)
-    }
+  const removeItem = async (idx: number) => {
+    const updated = items.filter((_, i) => i !== idx)
+    await saveItems(updated)
+  }
 
-    const moveItem = async (idx: number, dir: 'up' | 'down') => {
-        const arr = [...items]
-        const swap = dir === 'up' ? idx - 1 : idx + 1
-        if (swap < 0 || swap >= arr.length) return
-        ;[arr[idx], arr[swap]] = [arr[swap], arr[idx]]
-        await saveItems(arr)
-    }
+  const updateItemText = async (idx: number, text: string) => {
+    const updated = items.map((it, i) => (i === idx ? { ...it, text } : it))
+    setItems(updated)
+  }
 
-    const updateScope = async (idx: number, scope: string[] | null) => {
-        const updated = items.map((it, i) => i === idx ? { ...it, vesselScope: scope } : it)
-        await saveItems(updated)
-    }
+  const blurSave = async () => {
+    await saveItems(items)
+  }
 
-    const visibleItems = quotation.ivEnabled ? items : items.filter(it => it.section !== 'iv')
-    const unusedTexts = allTexts
-        .filter(t => !items.some(it => it.hullTextId === t.id))
-        .filter(t => quotation.ivEnabled || (t.section || 'hm') !== 'iv')
+  const moveItem = async (idx: number, dir: 'up' | 'down') => {
+    const arr = [...items]
+    const swap = dir === 'up' ? idx - 1 : idx + 1
+    if (swap < 0 || swap >= arr.length) return
+    ;[arr[idx], arr[swap]] = [arr[swap], arr[idx]]
+    await saveItems(arr)
+  }
 
-    // Per-vessel combined H&M/IV table (fleet quotations, no value options).
-    // Agreed value is a per-vessel property, so multiple vessels always use this table —
-    // alternatives only affect conditions/premium, not the value. Currency can be overridden
-    // per vessel; untouched vessels inherit the quotation default.
-    const perVesselMode = valueOptions.length === 0 && qVessels.length > 1
-    const curOf = (qv: QuotationVessel) => qv.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'
-    const sumByCur = (field: 'agreedValue' | 'ivValue') => {
-        const m: Record<string, number> = {}
-        qVessels.forEach(qv => { const val = (qv as any)[field]; if (val) { const c = curOf(qv); m[c] = (m[c] || 0) + Number(val) } })
-        return m
-    }
-    const fmtSums = (m: Record<string, number>) => {
-        const keys = Object.keys(m).filter(c => m[c])
-        if (keys.length === 0) return (0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        if (keys.length === 1) return m[keys[0]].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        return keys.map(c => `${c} ${m[c].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' · ')
-    }
-    const saveVesselCurrency = async (qv: QuotationVessel, cur: string) => {
-        const val = cur.trim().toUpperCase() || null
-        setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, agreedValueCurrency: val } : v))
-        await window.api.updateQuotationVessel(qv.id, { agreedValueCurrency: val })
-    }
+  const updateScope = async (idx: number, scope: string[] | null) => {
+    const updated = items.map((it, i) => (i === idx ? { ...it, vesselScope: scope } : it))
+    await saveItems(updated)
+  }
 
-    return (
-        <div>
-            <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Agreed Insured Value</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
-                Set the agreed value and select/add text items for the Hull quotation.
-            </p>
+  const visibleItems = quotation.ivEnabled ? items : items.filter((it) => it.section !== 'iv')
+  const unusedTexts = allTexts
+    .filter((t) => !items.some((it) => it.hullTextId === t.id))
+    .filter((t) => quotation.ivEnabled || (t.section || 'hm') !== 'iv')
 
-            {/* H&M Value + Currency */}
-            {valueOptions.length > 0 ? (
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Value Options</label>
-                    {valueOptions.map((opt, idx) => (
-                        <div key={opt.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
-                            <input
-                                value={opt.label || ''}
-                                placeholder={`Option ${idx + 1}`}
-                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, label: e.target.value } : o))}
-                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { label: e.target.value })}
-                                style={{ width: '120px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
-                            />
-                            <input
-                                value={opt.currency || 'USD'}
-                                onChange={e => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, currency: e.target.value } : o))}
-                                onBlur={e => window.api.hullUpdateAgreedValueOption(opt.id, { currency: e.target.value })}
-                                style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
-                            />
-                            <MoneyInput
-                                value={opt.amount}
-                                onChange={val => setValueOptions(prev => prev.map(o => o.id === opt.id ? { ...o, amount: val || 0 } : o))}
-                                onBlur={val => window.api.hullUpdateAgreedValueOption(opt.id, { amount: val || 0 })}
-                                placeholder="Insured value"
-                                style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}
-                            />
-                            <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.hullDeleteAgreedValueOption(opt.id); setValueOptions(prev => prev.filter(o => o.id !== opt.id)) }}
-                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                    ))}
-                    <button onClick={async () => {
-                        const result = await window.api.hullAddAgreedValueOption(quotation.id, 0, quotation.agreedValueCurrency || 'USD')
-                        if (result && !(result as any).error) setValueOptions(prev => [...prev, result])
-                    }} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px', marginTop: '6px' }}>
-                        <Plus size={12} /> Add Option
-                    </button>
-                </div>
-            ) : hullAlts.filter(a => !a.vesselScopeId).length > 1 && qVessels.length <= 1 ? (
-                <>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>H&M Values per Alternative</label>
-                            <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {hullAlts.filter(a => !a.vesselScopeId).map((alt, ai) => {
-                                    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-                                    const altColor = altColors[ai % altColors.length]
-                                    return (
-                                        <div key={alt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                <span style={{ display: 'inline-block', width: '3px', height: '14px', background: altColor, borderRadius: '2px', marginRight: '6px', verticalAlign: 'middle' }} />
-                                                Alternative {ai + 1}{alt.label ? ` (${alt.label})` : ''}:
-                                            </span>
-                                            <input
-                                                type="text"
-                                                value={alt.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'}
-                                                onChange={e => {
-                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValueCurrency: e.target.value } : a))
-                                                }}
-                                                onBlur={async e => {
-                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValueCurrency: e.target.value })
-                                                }}
-                                                style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
-                                            />
-                                            <MoneyInput
-                                                value={alt.agreedValue}
-                                                onChange={val => {
-                                                    const nv = val ?? null
-                                                    setHullAlts(prev => prev.map(a => a.id === alt.id ? { ...a, agreedValue: nv } : a))
-                                                }}
-                                                onBlur={async val => {
-                                                    const nv = val ?? null
-                                                    await window.api.hullUpdateQuotationAlternative(alt.id, { agreedValue: nv })
-                                                    // Sync total to quotation-level agreedValue
-                                                    const updatedAlts = hullAlts.map(a => a.id === alt.id ? { ...a, agreedValue: nv } : a)
-                                                    const total = updatedAlts.reduce((sum, a) => sum + (a.agreedValue || 0), 0)
-                                                    setQ(p => ({ ...p, agreedValue: total || undefined }))
-                                                    updateField('agreedValue', total || null)
-                                                }}
-                                                placeholder="0.00"
-                                                style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                            />
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                    <button onClick={async () => {
-                        const amt = quotation.agreedValue || 0
-                        const cur = quotation.agreedValueCurrency || 'USD'
-                        const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
-                        if (result && !(result as any).error) setValueOptions([result])
-                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Plus size={12} /> Add value options (quote multiple values)
-                    </button>
-                </>
-            ) : qVessels.length > 1 ? (
-                <>
-                    {/* IV toggle (combined per-vessel table adds an IV column when enabled) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                        <input type="checkbox" checked={!!quotation.ivEnabled} onChange={e => { setQ(p => ({ ...p, ivEnabled: e.target.checked })); updateField('ivEnabled', e.target.checked) }} />
-                        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Include Increased Value (IV){quotation.ivEnabled ? ' — adds an IV column per vessel' : ''}</span>
-                    </div>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Agreed Values per Vessel</label>
-                    <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                        {/* header */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                            <span style={{ minWidth: '150px' }}>Vessel</span>
-                            <span style={{ flex: 1 }}>H&M Value</span>
-                            {quotation.ivEnabled && <span style={{ flex: 1 }}>IV Value</span>}
-                            <span style={{ width: '80px', textAlign: 'center' }}>Currency</span>
-                        </div>
-                        {qVessels.map(qv => (
-                            <div key={qv.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {qv.vesselLabel}: {qv.name || 'Unnamed'}
-                                </span>
-                                <MoneyInput
-                                    value={qv.agreedValue}
-                                    onChange={val => setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, agreedValue: val ?? null } : v))}
-                                    onBlur={async val => {
-                                        const nv = val ?? null
-                                        await window.api.updateQuotationVessel(qv.id, { agreedValue: nv })
-                                        const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, agreedValue: nv } : v)
-                                        const total = updatedVessels.reduce((sum, v) => sum + (v.agreedValue || 0), 0)
-                                        setQ(p => ({ ...p, agreedValue: total || undefined }))
-                                        updateField('agreedValue', total || null)
-                                    }}
-                                    placeholder="0.00"
-                                    style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                />
-                                {quotation.ivEnabled && (
-                                    <MoneyInput
-                                        value={qv.ivValue}
-                                        onChange={val => setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, ivValue: val ?? null } : v))}
-                                        onBlur={async val => {
-                                            const nv = val ?? null
-                                            await window.api.updateQuotationVessel(qv.id, { ivValue: nv })
-                                            const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, ivValue: nv } : v)
-                                            const total = updatedVessels.reduce((sum, v) => sum + (v.ivValue || 0), 0)
-                                            setQ(p => ({ ...p, ivValue: total || undefined }))
-                                            updateField('ivValue', total || null)
-                                        }}
-                                        placeholder="0.00"
-                                        style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                    />
-                                )}
-                                <input
-                                    type="text"
-                                    value={curOf(qv)}
-                                    onChange={e => setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, agreedValueCurrency: e.target.value } : v))}
-                                    onBlur={e => saveVesselCurrency(qv, e.target.value)}
-                                    style={{ width: '80px', padding: '6px 8px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' }}
-                                />
-                            </div>
-                        ))}
-                        {/* totals */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '150px' }}>Total</span>
-                            <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>{fmtSums(sumByCur('agreedValue'))}</span>
-                            {quotation.ivEnabled && <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>{fmtSums(sumByCur('ivValue'))}</span>}
-                            <span style={{ width: '80px' }} />
-                        </div>
-                    </div>
-                    <button onClick={async () => {
-                        const amt = quotation.agreedValue || 0
-                        const cur = quotation.agreedValueCurrency || 'USD'
-                        const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
-                        if (result && !(result as any).error) setValueOptions([result])
-                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Plus size={12} /> Add value options (quote multiple values)
-                    </button>
-                </>
-            ) : (
-                <>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
-                    <div style={{ flex: 1, maxWidth: '250px' }}>
-                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>H&M Value</label>
-                        <MoneyInput
-                            value={quotation.agreedValue}
-                            onChange={val => setQ(p => ({ ...p, agreedValue: val }))}
-                            onBlur={async val => {
-                                const nv = val ?? null
-                                updateField('agreedValue', nv)
-                                // Sync to single vessel record
-                                if (qVessels.length === 1) {
-                                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: nv })
-                                    setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, agreedValue: nv } : v))
-                                }
-                            }}
-                            placeholder="0.00"
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                        />
-                    </div>
-                    <div style={{ maxWidth: '120px' }}>
-                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
-                        <input
-                            type="text"
-                            value={quotation.agreedValueCurrency || 'USD'}
-                            onChange={e => setQ(p => ({ ...p, agreedValueCurrency: e.target.value }))}
-                            onBlur={e => updateField('agreedValueCurrency', e.target.value)}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                        />
-                    </div>
-                </div>
-                <button onClick={async () => {
-                    const amt = quotation.agreedValue || 0
-                    const cur = quotation.agreedValueCurrency || 'USD'
-                    const result = await window.api.hullAddAgreedValueOption(quotation.id, amt, cur, 'Option 1')
-                    if (result && !(result as any).error) setValueOptions([result])
-                }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.78rem', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Plus size={12} /> Add value options (quote multiple values)
-                </button>
-                </>
-            )}
+  // Per-vessel combined H&M/IV table (fleet quotations, no value options).
+  // Agreed value is a per-vessel property, so multiple vessels always use this table —
+  // alternatives only affect conditions/premium, not the value. Currency can be overridden
+  // per vessel; untouched vessels inherit the quotation default.
+  const perVesselMode = valueOptions.length === 0 && qVessels.length > 1
+  const curOf = (qv: QuotationVessel) =>
+    qv.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'
+  const sumByCur = (field: 'agreedValue' | 'ivValue') => {
+    const m: Record<string, number> = {}
+    qVessels.forEach((qv) => {
+      const val = (qv as any)[field]
+      if (val) {
+        const c = curOf(qv)
+        m[c] = (m[c] || 0) + Number(val)
+      }
+    })
+    return m
+  }
+  const fmtSums = (m: Record<string, number>) => {
+    const keys = Object.keys(m).filter((c) => m[c])
+    if (keys.length === 0)
+      return (0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    if (keys.length === 1)
+      return m[keys[0]].toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+    return keys
+      .map(
+        (c) =>
+          `${c} ${m[c].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      )
+      .join(' · ')
+  }
+  const saveVesselCurrency = async (qv: QuotationVessel, cur: string) => {
+    const val = cur.trim().toUpperCase() || null
+    setQVessels((prev) =>
+      prev.map((v) => (v.id === qv.id ? { ...v, agreedValueCurrency: val } : v))
+    )
+    await window.api.updateQuotationVessel(qv.id, { agreedValueCurrency: val })
+  }
 
-            {!perVesselMode && (<>
-            {/* IV toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: quotation.ivEnabled ? '12px' : '20px' }}>
-                <input type="checkbox" checked={!!quotation.ivEnabled} onChange={e => { setQ(p => ({ ...p, ivEnabled: e.target.checked })); updateField('ivEnabled', e.target.checked) }} />
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Include Increased Value (IV)</span>
+  return (
+    <div>
+      <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}>Agreed Insured Value</h3>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '0 0 16px' }}>
+        Set the agreed value and select/add text items for the Hull quotation.
+      </p>
+
+      {/* H&M Value + Currency */}
+      {valueOptions.length > 0 ? (
+        <div style={{ marginBottom: '12px' }}>
+          <label
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-secondary)',
+              display: 'block',
+              marginBottom: '8px'
+            }}
+          >
+            Value Options
+          </label>
+          {valueOptions.map((opt, idx) => (
+            <div
+              key={opt.id}
+              style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}
+            >
+              <input
+                value={opt.label || ''}
+                placeholder={`Option ${idx + 1}`}
+                onChange={(e) =>
+                  setValueOptions((prev) =>
+                    prev.map((o) => (o.id === opt.id ? { ...o, label: e.target.value } : o))
+                  )
+                }
+                onBlur={(e) =>
+                  window.api.hullUpdateAgreedValueOption(opt.id, { label: e.target.value })
+                }
+                style={{
+                  width: '120px',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  border: '1px solid var(--input-border)',
+                  background: 'transparent',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <input
+                value={opt.currency || 'USD'}
+                onChange={(e) =>
+                  setValueOptions((prev) =>
+                    prev.map((o) => (o.id === opt.id ? { ...o, currency: e.target.value } : o))
+                  )
+                }
+                onBlur={(e) =>
+                  window.api.hullUpdateAgreedValueOption(opt.id, { currency: e.target.value })
+                }
+                style={{
+                  width: '70px',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  border: '1px solid var(--input-border)',
+                  background: 'transparent',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <MoneyInput
+                value={opt.amount}
+                onChange={(val) =>
+                  setValueOptions((prev) =>
+                    prev.map((o) => (o.id === opt.id ? { ...o, amount: val || 0 } : o))
+                  )
+                }
+                onBlur={(val) =>
+                  window.api.hullUpdateAgreedValueOption(opt.id, { amount: val || 0 })
+                }
+                placeholder="Insured value"
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  border: '1px solid var(--input-border)',
+                  background: 'transparent',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <button
+                title="Delete"
+                aria-label="Delete"
+                onClick={async () => {
+                  await window.api.hullDeleteAgreedValueOption(opt.id)
+                  setValueOptions((prev) => prev.filter((o) => o.id !== opt.id))
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: 'var(--danger)'
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-
-            {/* IV Value + Currency */}
-            {quotation.ivEnabled && (
-            qVessels.length > 1 ? (
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>IV Values</label>
-                        <div style={{ border: '1px solid var(--table-border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {qVessels.map(qv => (
-                                <div key={qv.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, minWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {qv.vesselLabel}: {qv.name || 'Unnamed'}
-                                    </span>
-                                    <MoneyInput
-                                        value={qv.ivValue}
-                                        onChange={val => {
-                                            const nv = val ?? null
-                                            setQVessels(prev => prev.map(v => v.id === qv.id ? { ...v, ivValue: nv } : v))
-                                        }}
-                                        onBlur={async val => {
-                                            const nv = val ?? null
-                                            await window.api.updateQuotationVessel(qv.id, { ivValue: nv })
-                                            // Sync total to quotation-level
-                                            const updatedVessels = qVessels.map(v => v.id === qv.id ? { ...v, ivValue: nv } : v)
-                                            const total = updatedVessels.reduce((sum, v) => sum + (v.ivValue || 0), 0)
-                                            setQ(p => ({ ...p, ivValue: total || undefined }))
-                                            updateField('ivValue', total || null)
-                                        }}
-                                        placeholder="0.00"
-                                        style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                    />
-                                </div>
-                            ))}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--table-border)', paddingTop: '8px' }}>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '140px' }}>Total</span>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {(qVessels.reduce((s, v) => s + (v.ivValue || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div style={{ maxWidth: '120px' }}>
-                        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
+          ))}
+          <button
+            onClick={async () => {
+              const result = await window.api.hullAddAgreedValueOption(
+                quotation.id,
+                0,
+                quotation.agreedValueCurrency || 'USD'
+              )
+              if (result && !(result as any).error) setValueOptions((prev) => [...prev, result])
+            }}
+            className="btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '4px 10px', marginTop: '6px' }}
+          >
+            <Plus size={12} /> Add Option
+          </button>
+        </div>
+      ) : hullAlts.filter((a) => !a.vesselScopeId).length > 1 && qVessels.length <= 1 ? (
+        <>
+          <div
+            style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-end' }}
+          >
+            <div style={{ flex: 1 }}>
+              <label
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  display: 'block',
+                  marginBottom: '6px'
+                }}
+              >
+                H&M Values per Alternative
+              </label>
+              <div
+                style={{
+                  border: '1px solid var(--table-border)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                {hullAlts
+                  .filter((a) => !a.vesselScopeId)
+                  .map((alt, ai) => {
+                    const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
+                    const altColor = altColors[ai % altColors.length]
+                    return (
+                      <div
+                        key={alt.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            minWidth: '180px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              width: '3px',
+                              height: '14px',
+                              background: altColor,
+                              borderRadius: '2px',
+                              marginRight: '6px',
+                              verticalAlign: 'middle'
+                            }}
+                          />
+                          Alternative {ai + 1}
+                          {alt.label ? ` (${alt.label})` : ''}:
+                        </span>
                         <input
-                            type="text"
-                            value={quotation.ivCurrency || 'USD'}
-                            onChange={e => setQ(p => ({ ...p, ivCurrency: e.target.value }))}
-                            onBlur={e => updateField('ivCurrency', e.target.value)}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
+                          type="text"
+                          value={alt.agreedValueCurrency || quotation.agreedValueCurrency || 'USD'}
+                          onChange={(e) => {
+                            setHullAlts((prev) =>
+                              prev.map((a) =>
+                                a.id === alt.id ? { ...a, agreedValueCurrency: e.target.value } : a
+                              )
+                            )
+                          }}
+                          onBlur={async (e) => {
+                            await window.api.hullUpdateQuotationAlternative(alt.id, {
+                              agreedValueCurrency: e.target.value
+                            })
+                          }}
+                          style={{
+                            width: '70px',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            textAlign: 'center'
+                          }}
                         />
-                    </div>
-                </div>
-            ) : (
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
-                <div style={{ flex: 1, maxWidth: '250px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>IV Value</label>
-                    <MoneyInput
-                        value={quotation.ivValue}
-                        onChange={val => setQ(p => ({ ...p, ivValue: val }))}
-                        onBlur={async val => {
+                        <MoneyInput
+                          value={alt.agreedValue}
+                          onChange={(val) => {
                             const nv = val ?? null
-                            updateField('ivValue', nv)
-                            // Sync to single vessel record
-                            if (qVessels.length === 1) {
-                                await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: nv })
-                                setQVessels(prev => prev.map((v, i) => i === 0 ? { ...v, ivValue: nv } : v))
-                            }
-                        }}
-                        placeholder="0.00"
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                    />
+                            setHullAlts((prev) =>
+                              prev.map((a) => (a.id === alt.id ? { ...a, agreedValue: nv } : a))
+                            )
+                          }}
+                          onBlur={async (val) => {
+                            const nv = val ?? null
+                            await window.api.hullUpdateQuotationAlternative(alt.id, {
+                              agreedValue: nv
+                            })
+                            // Sync total to quotation-level agreedValue
+                            const updatedAlts = hullAlts.map((a) =>
+                              a.id === alt.id ? { ...a, agreedValue: nv } : a
+                            )
+                            const total = updatedAlts.reduce(
+                              (sum, a) => sum + (a.agreedValue || 0),
+                              0
+                            )
+                            setQ((p) => ({ ...p, agreedValue: total || undefined }))
+                            updateField('agreedValue', total || null)
+                          }}
+                          placeholder="0.00"
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const amt = quotation.agreedValue || 0
+              const cur = quotation.agreedValueCurrency || 'USD'
+              const result = await window.api.hullAddAgreedValueOption(
+                quotation.id,
+                amt,
+                cur,
+                'Option 1'
+              )
+              if (result && !(result as any).error) setValueOptions([result])
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.78rem',
+              padding: '0 0 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Plus size={12} /> Add value options (quote multiple values)
+          </button>
+        </>
+      ) : qVessels.length > 1 ? (
+        <>
+          {/* IV toggle (combined per-vessel table adds an IV column when enabled) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <input
+              type="checkbox"
+              checked={!!quotation.ivEnabled}
+              onChange={(e) => {
+                setQ((p) => ({ ...p, ivEnabled: e.target.checked }))
+                updateField('ivEnabled', e.target.checked)
+              }}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              Include Increased Value (IV)
+              {quotation.ivEnabled ? ' — adds an IV column per vessel' : ''}
+            </span>
+          </div>
+          <label
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-secondary)',
+              display: 'block',
+              marginBottom: '6px'
+            }}
+          >
+            Agreed Values per Vessel
+          </label>
+          <div
+            style={{
+              border: '1px solid var(--table-border)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginBottom: '12px'
+            }}
+          >
+            {/* header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '0.72rem',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.02em'
+              }}
+            >
+              <span style={{ minWidth: '150px' }}>Vessel</span>
+              <span style={{ flex: 1 }}>H&M Value</span>
+              {quotation.ivEnabled && <span style={{ flex: 1 }}>IV Value</span>}
+              <span style={{ width: '80px', textAlign: 'center' }}>Currency</span>
+            </div>
+            {qVessels.map((qv) => (
+              <div key={qv.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    minWidth: '150px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {qv.vesselLabel}: {qv.name || 'Unnamed'}
+                </span>
+                <MoneyInput
+                  value={qv.agreedValue}
+                  onChange={(val) =>
+                    setQVessels((prev) =>
+                      prev.map((v) => (v.id === qv.id ? { ...v, agreedValue: val ?? null } : v))
+                    )
+                  }
+                  onBlur={async (val) => {
+                    const nv = val ?? null
+                    await window.api.updateQuotationVessel(qv.id, { agreedValue: nv })
+                    const updatedVessels = qVessels.map((v) =>
+                      v.id === qv.id ? { ...v, agreedValue: nv } : v
+                    )
+                    const total = updatedVessels.reduce((sum, v) => sum + (v.agreedValue || 0), 0)
+                    setQ((p) => ({ ...p, agreedValue: total || undefined }))
+                    updateField('agreedValue', total || null)
+                  }}
+                  placeholder="0.00"
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
+                />
+                {quotation.ivEnabled && (
+                  <MoneyInput
+                    value={qv.ivValue}
+                    onChange={(val) =>
+                      setQVessels((prev) =>
+                        prev.map((v) => (v.id === qv.id ? { ...v, ivValue: val ?? null } : v))
+                      )
+                    }
+                    onBlur={async (val) => {
+                      const nv = val ?? null
+                      await window.api.updateQuotationVessel(qv.id, { ivValue: nv })
+                      const updatedVessels = qVessels.map((v) =>
+                        v.id === qv.id ? { ...v, ivValue: nv } : v
+                      )
+                      const total = updatedVessels.reduce((sum, v) => sum + (v.ivValue || 0), 0)
+                      setQ((p) => ({ ...p, ivValue: total || undefined }))
+                      updateField('ivValue', total || null)
+                    }}
+                    placeholder="0.00"
+                    style={{
+                      flex: 1,
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
+                    }}
+                  />
+                )}
+                <input
+                  type="text"
+                  value={curOf(qv)}
+                  onChange={(e) =>
+                    setQVessels((prev) =>
+                      prev.map((v) =>
+                        v.id === qv.id ? { ...v, agreedValueCurrency: e.target.value } : v
+                      )
+                    )
+                  }
+                  onBlur={(e) => saveVesselCurrency(qv, e.target.value)}
+                  style={{
+                    width: '80px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    textAlign: 'center'
+                  }}
+                />
+              </div>
+            ))}
+            {/* totals */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                borderTop: '1px solid var(--table-border)',
+                paddingTop: '8px'
+              }}
+            >
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '150px' }}>Total</span>
+              <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                {fmtSums(sumByCur('agreedValue'))}
+              </span>
+              {quotation.ivEnabled && (
+                <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                  {fmtSums(sumByCur('ivValue'))}
+                </span>
+              )}
+              <span style={{ width: '80px' }} />
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const amt = quotation.agreedValue || 0
+              const cur = quotation.agreedValueCurrency || 'USD'
+              const result = await window.api.hullAddAgreedValueOption(
+                quotation.id,
+                amt,
+                cur,
+                'Option 1'
+              )
+              if (result && !(result as any).error) setValueOptions([result])
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.78rem',
+              padding: '0 0 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Plus size={12} /> Add value options (quote multiple values)
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
+            <div style={{ flex: 1, maxWidth: '250px' }}>
+              <label
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  display: 'block',
+                  marginBottom: '4px'
+                }}
+              >
+                H&M Value
+              </label>
+              <MoneyInput
+                value={quotation.agreedValue}
+                onChange={(val) => setQ((p) => ({ ...p, agreedValue: val }))}
+                onBlur={async (val) => {
+                  const nv = val ?? null
+                  updateField('agreedValue', nv)
+                  // Sync to single vessel record
+                  if (qVessels.length === 1) {
+                    await window.api.updateQuotationVessel(qVessels[0].id, { agreedValue: nv })
+                    setQVessels((prev) =>
+                      prev.map((v, i) => (i === 0 ? { ...v, agreedValue: nv } : v))
+                    )
+                  }
+                }}
+                placeholder="0.00"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+            <div style={{ maxWidth: '120px' }}>
+              <label
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  display: 'block',
+                  marginBottom: '4px'
+                }}
+              >
+                Currency
+              </label>
+              <input
+                type="text"
+                value={quotation.agreedValueCurrency || 'USD'}
+                onChange={(e) => setQ((p) => ({ ...p, agreedValueCurrency: e.target.value }))}
+                onBlur={(e) => updateField('agreedValueCurrency', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem'
+                }}
+              />
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const amt = quotation.agreedValue || 0
+              const cur = quotation.agreedValueCurrency || 'USD'
+              const result = await window.api.hullAddAgreedValueOption(
+                quotation.id,
+                amt,
+                cur,
+                'Option 1'
+              )
+              if (result && !(result as any).error) setValueOptions([result])
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.78rem',
+              padding: '0 0 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Plus size={12} /> Add value options (quote multiple values)
+          </button>
+        </>
+      )}
+
+      {!perVesselMode && (
+        <>
+          {/* IV toggle */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: quotation.ivEnabled ? '12px' : '20px'
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={!!quotation.ivEnabled}
+              onChange={(e) => {
+                setQ((p) => ({ ...p, ivEnabled: e.target.checked }))
+                updateField('ivEnabled', e.target.checked)
+              }}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              Include Increased Value (IV)
+            </span>
+          </div>
+
+          {/* IV Value + Currency */}
+          {quotation.ivEnabled &&
+            (qVessels.length > 1 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  alignItems: 'flex-end'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: '6px'
+                    }}
+                  >
+                    IV Values
+                  </label>
+                  <div
+                    style={{
+                      border: '1px solid var(--table-border)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    {qVessels.map((qv) => (
+                      <div
+                        key={qv.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            minWidth: '140px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {qv.vesselLabel}: {qv.name || 'Unnamed'}
+                        </span>
+                        <MoneyInput
+                          value={qv.ivValue}
+                          onChange={(val) => {
+                            const nv = val ?? null
+                            setQVessels((prev) =>
+                              prev.map((v) => (v.id === qv.id ? { ...v, ivValue: nv } : v))
+                            )
+                          }}
+                          onBlur={async (val) => {
+                            const nv = val ?? null
+                            await window.api.updateQuotationVessel(qv.id, { ivValue: nv })
+                            // Sync total to quotation-level
+                            const updatedVessels = qVessels.map((v) =>
+                              v.id === qv.id ? { ...v, ivValue: nv } : v
+                            )
+                            const total = updatedVessels.reduce(
+                              (sum, v) => sum + (v.ivValue || 0),
+                              0
+                            )
+                            setQ((p) => ({ ...p, ivValue: total || undefined }))
+                            updateField('ivValue', total || null)
+                          }}
+                          placeholder="0.00"
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      </div>
+                    ))}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderTop: '1px solid var(--table-border)',
+                        paddingTop: '8px'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '140px' }}>
+                        Total
+                      </span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                        {qVessels
+                          .reduce((s, v) => s + (v.ivValue || 0), 0)
+                          .toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div style={{ maxWidth: '120px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Currency</label>
-                    <input
-                        type="text"
-                        value={quotation.ivCurrency || 'USD'}
-                        onChange={e => setQ(p => ({ ...p, ivCurrency: e.target.value }))}
-                        onBlur={e => updateField('ivCurrency', e.target.value)}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}
-                    />
+                  <label
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    Currency
+                  </label>
+                  <input
+                    type="text"
+                    value={quotation.ivCurrency || 'USD'}
+                    onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
+                    onBlur={(e) => updateField('ivCurrency', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem'
+                    }}
+                  />
                 </div>
-            </div>
-            )
-            )}
-            </>)}
-
-            {/* Template texts to add */}
-            {unusedTexts.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Add from templates</label>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {unusedTexts.map(t => (
-                            <button key={t.id} onClick={() => addFromTemplate(t)} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>
-                                + {t.text.length > 60 ? t.text.slice(0, 60) + '…' : t.text}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Selected items */}
-            <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                    Value Text Items ({visibleItems.length})
-                </label>
-                {visibleItems.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', border: '1px dashed var(--table-border)', borderRadius: '8px' }}>
-                        No text items yet. Add from templates above or write custom text below.
-                    </div>
-                ) : (
-                    visibleItems.map((it, _vIdx) => {
-                        const idx = items.indexOf(it)
-                        return (
-                        <div key={it.id || idx} style={{ marginBottom: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', background: it.hullTextId ? 'transparent' : 'rgba(160,100,255,0.04)' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '4px' }}>
-                                    <button title="Move up" aria-label="Move up" onClick={() => moveItem(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
-                                    <button title="Move down" aria-label="Move down" onClick={() => moveItem(idx, 'down')} disabled={idx === items.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === items.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
-                                </div>
-                                <textarea
-                                    value={it.text}
-                                    onChange={e => updateItemText(idx, e.target.value)}
-                                    onBlur={blurSave}
-                                    rows={2}
-                                    style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '0.85rem', resize: 'vertical', minHeight: '40px', fontFamily: 'inherit' }}
-                                />
-                                <button title="Remove" aria-label="Remove" onClick={() => removeItem(idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--danger)' }}>
-                                    <X size={16} />
-                                </button>
-                            </div>
-                            {qVessels.length > 1 && (
-                                <div style={{ marginTop: '6px', paddingLeft: '28px' }}>
-                                    <VesselScopeChips vessels={qVessels} vesselScope={it.vesselScope} onChange={scope => updateScope(idx, scope)} />
-                                </div>
-                            )}
-                            <div style={{ marginLeft: '28px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                {!it.hullTextId && <span style={{ fontSize: '0.7rem', color: '#a064ff' }}>(Custom)</span>}
-                                {quotation.ivEnabled && (
-                                    <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, background: it.section === 'iv' ? '#6464ff22' : '#ff64c822', color: it.section === 'iv' ? '#6464ff' : '#ff64c8', border: `1px solid ${it.section === 'iv' ? '#6464ff44' : '#ff64c844'}` }}>{it.section === 'iv' ? 'IV' : 'Hull'}</span>
-                                )}
-                            </div>
-                        </div>
+              </div>
+            ) : (
+              <div
+                style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}
+              >
+                <div style={{ flex: 1, maxWidth: '250px' }}>
+                  <label
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    IV Value
+                  </label>
+                  <MoneyInput
+                    value={quotation.ivValue}
+                    onChange={(val) => setQ((p) => ({ ...p, ivValue: val }))}
+                    onBlur={async (val) => {
+                      const nv = val ?? null
+                      updateField('ivValue', nv)
+                      // Sync to single vessel record
+                      if (qVessels.length === 1) {
+                        await window.api.updateQuotationVessel(qVessels[0].id, { ivValue: nv })
+                        setQVessels((prev) =>
+                          prev.map((v, i) => (i === 0 ? { ...v, ivValue: nv } : v))
                         )
-                    })
-                )}
-            </div>
-
-            {/* Add custom text */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Add custom text</label>
-                    <textarea
-                        value={newText}
-                        onChange={e => setNewText(e.target.value)}
-                        placeholder="Enter custom agreed value text..."
-                        rows={2}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem', resize: 'vertical', fontFamily: 'inherit' }}
-                    />
+                      }
+                    }}
+                    placeholder="0.00"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem'
+                    }}
+                  />
                 </div>
-                <button onClick={addCustomText} disabled={!newText.trim()} className="btn-primary" style={{ fontSize: '0.82rem', padding: '8px 16px', marginBottom: '2px' }}>
-                    <Plus size={14} /> Add
-                </button>
-            </div>
-        </div>
-    )
-}
+                <div style={{ maxWidth: '120px' }}>
+                  <label
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: '4px'
+                    }}
+                  >
+                    Currency
+                  </label>
+                  <input
+                    type="text"
+                    value={quotation.ivCurrency || 'USD'}
+                    onChange={(e) => setQ((p) => ({ ...p, ivCurrency: e.target.value }))}
+                    onBlur={(e) => updateField('ivCurrency', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+        </>
+      )}
 
+      {/* Template texts to add */}
+      {unusedTexts.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-secondary)',
+              display: 'block',
+              marginBottom: '6px'
+            }}
+          >
+            Add from templates
+          </label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {unusedTexts.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => addFromTemplate(t)}
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '4px 10px' }}
+              >
+                + {t.text.length > 60 ? t.text.slice(0, 60) + '…' : t.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Selected items */}
+      <div style={{ marginBottom: '16px' }}>
+        <label
+          style={{
+            fontSize: '0.78rem',
+            color: 'var(--text-secondary)',
+            display: 'block',
+            marginBottom: '6px'
+          }}
+        >
+          Value Text Items ({visibleItems.length})
+        </label>
+        {visibleItems.length === 0 ? (
+          <div
+            style={{
+              padding: '20px',
+              textAlign: 'center',
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+              border: '1px dashed var(--table-border)',
+              borderRadius: '8px'
+            }}
+          >
+            No text items yet. Add from templates above or write custom text below.
+          </div>
+        ) : (
+          visibleItems.map((it, _vIdx) => {
+            const idx = items.indexOf(it)
+            return (
+              <div
+                key={it.id || idx}
+                style={{
+                  marginBottom: '8px',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--table-border)',
+                  background: it.hullTextId ? 'transparent' : 'rgba(160,100,255,0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      paddingTop: '4px'
+                    }}
+                  >
+                    <button
+                      title="Move up"
+                      aria-label="Move up"
+                      onClick={() => moveItem(idx, 'up')}
+                      disabled={idx === 0}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '1px',
+                        color: 'var(--text-secondary)',
+                        opacity: idx === 0 ? 0.3 : 1
+                      }}
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      title="Move down"
+                      aria-label="Move down"
+                      onClick={() => moveItem(idx, 'down')}
+                      disabled={idx === items.length - 1}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '1px',
+                        color: 'var(--text-secondary)',
+                        opacity: idx === items.length - 1 ? 0.3 : 1
+                      }}
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={it.text}
+                    onChange={(e) => updateItemText(idx, e.target.value)}
+                    onBlur={blurSave}
+                    rows={2}
+                    style={{
+                      flex: 1,
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      resize: 'vertical',
+                      minHeight: '40px',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                  <button
+                    title="Remove"
+                    aria-label="Remove"
+                    onClick={() => removeItem(idx)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      color: 'var(--danger)'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                {qVessels.length > 1 && (
+                  <div style={{ marginTop: '6px', paddingLeft: '28px' }}>
+                    <VesselScopeChips
+                      vessels={qVessels}
+                      vesselScope={it.vesselScope}
+                      onChange={(scope) => updateScope(idx, scope)}
+                    />
+                  </div>
+                )}
+                <div
+                  style={{ marginLeft: '28px', display: 'flex', gap: '6px', alignItems: 'center' }}
+                >
+                  {!it.hullTextId && (
+                    <span style={{ fontSize: '0.7rem', color: '#a064ff' }}>(Custom)</span>
+                  )}
+                  {quotation.ivEnabled && (
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        background: it.section === 'iv' ? '#6464ff22' : '#ff64c822',
+                        color: it.section === 'iv' ? '#6464ff' : '#ff64c8',
+                        border: `1px solid ${it.section === 'iv' ? '#6464ff44' : '#ff64c844'}`
+                      }}
+                    >
+                      {it.section === 'iv' ? 'IV' : 'Hull'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Add custom text */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <label
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-secondary)',
+              display: 'block',
+              marginBottom: '4px'
+            }}
+          >
+            Add custom text
+          </label>
+          <textarea
+            value={newText}
+            onChange={(e) => setNewText(e.target.value)}
+            placeholder="Enter custom agreed value text..."
+            rows={2}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              resize: 'vertical',
+              fontFamily: 'inherit'
+            }}
+          />
+        </div>
+        <button
+          onClick={addCustomText}
+          disabled={!newText.trim()}
+          className="btn-primary"
+          style={{ fontSize: '0.82rem', padding: '8px 16px', marginBottom: '2px' }}
+        >
+          <Plus size={14} /> Add
+        </button>
+      </div>
+    </div>
+  )
+}

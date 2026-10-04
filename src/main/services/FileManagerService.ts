@@ -30,7 +30,7 @@ export class FileManagerService {
                   return {}
                 }
               })()
-            : {}),
+            : {})
         }))
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1

@@ -13,7 +13,14 @@ interface BadgeProps {
 }
 
 /** Status pill. Tints are derived from the text color, so it works in every theme */
-export default function Badge({ tone = 'neutral', color, dot, title, style, children }: BadgeProps) {
+export default function Badge({
+  tone = 'neutral',
+  color,
+  dot,
+  title,
+  style,
+  children
+}: BadgeProps) {
   return (
     <span
       className={`badge badge-${tone}${dot ? ' badge-dot' : ''}`}

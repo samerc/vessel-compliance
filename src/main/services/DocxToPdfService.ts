@@ -32,7 +32,9 @@ export async function convertDocxToPdf(docxPath: string): Promise<string> {
     console.log('[DocxToPdf] LibreOffice failed:', (loErr as Error).message)
   }
 
-  throw new Error('PDF conversion failed — neither Microsoft Word nor LibreOffice could convert the file. Please install one of them.')
+  throw new Error(
+    'PDF conversion failed — neither Microsoft Word nor LibreOffice could convert the file. Please install one of them.'
+  )
 }
 
 async function convertViaWord(docxPath: string, pdfPath: string): Promise<void> {
@@ -53,18 +55,32 @@ async function convertViaWord(docxPath: string, pdfPath: string): Promise<void> 
     '} finally {',
     '    $word.Quit([ref]$false)',
     '    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null',
-    '}',
+    '}'
   ].join('\n')
 
   fs.writeFileSync(tmpScript, script, 'utf-8')
   try {
     await execFileAsync(
       'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpScript, '-InPath', absDocx, '-OutPath', absPdf],
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        tmpScript,
+        '-InPath',
+        absDocx,
+        '-OutPath',
+        absPdf
+      ],
       { timeout: 120000, windowsHide: true }
     )
   } finally {
-    try { fs.unlinkSync(tmpScript) } catch { /* ignore */ }
+    try {
+      fs.unlinkSync(tmpScript)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -78,7 +94,7 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
     'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
     'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
     '/usr/bin/soffice',
-    '/usr/bin/libreoffice',
+    '/usr/bin/libreoffice'
   ]
 
   let loPath = ''
@@ -94,17 +110,18 @@ async function convertViaLibreOffice(docxPath: string, pdfPath: string): Promise
     try {
       await execFileAsync('soffice', ['--version'], { timeout: 5000, windowsHide: true })
       loPath = 'soffice'
-    } catch { /* not on PATH */ }
+    } catch {
+      /* not on PATH */
+    }
   }
 
   if (!loPath) throw new Error('LibreOffice not found. Checked: ' + loPaths.join(', '))
 
   console.log(`[DocxToPdf] Using LibreOffice at: ${loPath}`)
-  await execFileAsync(
-    loPath,
-    ['--headless', '--convert-to', 'pdf', '--outdir', outDir, absDocx],
-    { timeout: 120000, windowsHide: true }
-  )
+  await execFileAsync(loPath, ['--headless', '--convert-to', 'pdf', '--outdir', outDir, absDocx], {
+    timeout: 120000,
+    windowsHide: true
+  })
 }
 
 /**
@@ -164,10 +181,7 @@ export async function setDocxPageStart(
   docXml = docXml.replace(/<w:pgNumType[^/]*\/>/g, '')
 
   // Add pgNumType before the closing </w:sectPr>
-  docXml = docXml.replace(
-    /<\/w:sectPr>/,
-    `<w:pgNumType w:start="${startPage}"/></w:sectPr>`
-  )
+  docXml = docXml.replace(/<\/w:sectPr>/, `<w:pgNumType w:start="${startPage}"/></w:sectPr>`)
 
   // Inject a footer with policy type title + number + page numbers
   if (policyNumber && policyTypeTitle) {
@@ -190,15 +204,17 @@ export async function setDocxPageStart(
     <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
       <w:fldChar w:fldCharType="end"/></w:r>
     <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
-      <w:t xml:space="preserve"> of </w:t></w:r>${totalPages
-    ? `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+      <w:t xml:space="preserve"> of </w:t></w:r>${
+        totalPages
+          ? `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
       <w:t>${totalPages}</w:t></w:r>`
-    : `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
+          : `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
       <w:fldChar w:fldCharType="begin"/></w:r>
     <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
       <w:instrText> NUMPAGES </w:instrText></w:r>
     <w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="16"/><w:color w:val="999999"/></w:rPr>
-      <w:fldChar w:fldCharType="end"/></w:r>`}
+      <w:fldChar w:fldCharType="end"/></w:r>`
+      }
   </w:p>
 </w:ftr>`
     zip.file('word/footer_tc.xml', footerXml)
@@ -281,7 +297,12 @@ export async function buildPolicyWithTC(
     const policyPageCount = await countPdfPages(policyPdfPath)
 
     // 4. First pass T&C: get page count (no hardcoded total yet, use NUMPAGES field)
-    const tcPass1Buffer = await setDocxPageStart(tcDocxBuffer, policyPageCount + 1, policyNumber, policyTypeTitle)
+    const tcPass1Buffer = await setDocxPageStart(
+      tcDocxBuffer,
+      policyPageCount + 1,
+      policyNumber,
+      policyTypeTitle
+    )
     const tcPass1Path = path.join(outputDir, `${filePrefix}_tc_pass1.docx`)
     fs.writeFileSync(tcPass1Path, tcPass1Buffer)
     tempFiles.push(tcPass1Path)
@@ -293,7 +314,13 @@ export async function buildPolicyWithTC(
     const totalPages = policyPageCount + tcPageCount
 
     // 5. Second pass T&C: inject hardcoded combined total
-    const tcFinalBuffer = await setDocxPageStart(tcDocxBuffer, policyPageCount + 1, policyNumber, policyTypeTitle, totalPages)
+    const tcFinalBuffer = await setDocxPageStart(
+      tcDocxBuffer,
+      policyPageCount + 1,
+      policyNumber,
+      policyTypeTitle,
+      totalPages
+    )
     const tcDocxPath = path.join(outputDir, `${filePrefix}_tc.docx`)
     fs.writeFileSync(tcDocxPath, tcFinalBuffer)
     tempFiles.push(tcDocxPath)

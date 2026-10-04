@@ -7,7 +7,12 @@ import { throwsOnError } from './ipcErrorPolicy'
 const ipcRenderer = {
   invoke: async (channel: string, ...args: any[]): Promise<any> => {
     const result = await electronIpc.invoke(channel, ...args)
-    if (result && typeof result === 'object' && (result as any).error === true && throwsOnError(channel)) {
+    if (
+      result &&
+      typeof result === 'object' &&
+      (result as any).error === true &&
+      throwsOnError(channel)
+    ) {
       throw new Error((result as any).message || 'The operation failed')
     }
     return result
@@ -23,8 +28,10 @@ const api = {
   updateDocumentType: (id, updates) => ipcRenderer.invoke('db:updateDocumentType', id, updates),
   deleteDocumentType: (id) => ipcRenderer.invoke('db:deleteDocumentType', id),
 
-  getVesselCustomDocTypes: (vesselId: string) => ipcRenderer.invoke('db:getVesselCustomDocTypes', vesselId),
-  addVesselCustomDocType: (docType: any) => ipcRenderer.invoke('db:addVesselCustomDocType', docType),
+  getVesselCustomDocTypes: (vesselId: string) =>
+    ipcRenderer.invoke('db:getVesselCustomDocTypes', vesselId),
+  addVesselCustomDocType: (docType: any) =>
+    ipcRenderer.invoke('db:addVesselCustomDocType', docType),
   deleteVesselCustomDocType: (id: string) => ipcRenderer.invoke('db:deleteVesselCustomDocType', id),
 
   getFleets: () => ipcRenderer.invoke('db:getFleets'),
@@ -40,9 +47,12 @@ const api = {
 
   getVesselDocuments: (vesselId) => ipcRenderer.invoke('db:getVesselDocuments', vesselId),
   upsertVesselDocument: (doc) => ipcRenderer.invoke('db:upsertVesselDocument', doc),
-  updateVesselDocumentExpiry: (vesselId, docTypeId, expiryDate) => ipcRenderer.invoke('db:updateVesselDocumentExpiry', vesselId, docTypeId, expiryDate),
-  updateVesselDocumentReceivedDate: (vesselId, docTypeId, receivedDate) => ipcRenderer.invoke('db:updateVesselDocumentReceivedDate', vesselId, docTypeId, receivedDate),
-  duplicateVesselDocument: (docId, uploadedBy) => ipcRenderer.invoke('db:duplicateVesselDocument', docId, uploadedBy),
+  updateVesselDocumentExpiry: (vesselId, docTypeId, expiryDate) =>
+    ipcRenderer.invoke('db:updateVesselDocumentExpiry', vesselId, docTypeId, expiryDate),
+  updateVesselDocumentReceivedDate: (vesselId, docTypeId, receivedDate) =>
+    ipcRenderer.invoke('db:updateVesselDocumentReceivedDate', vesselId, docTypeId, receivedDate),
+  duplicateVesselDocument: (docId, uploadedBy) =>
+    ipcRenderer.invoke('db:duplicateVesselDocument', docId, uploadedBy),
   deleteVesselDocumentById: (docId) => ipcRenderer.invoke('db:deleteVesselDocumentById', docId),
 
   getEntities: () => ipcRenderer.invoke('db:getEntities'),
@@ -50,26 +60,36 @@ const api = {
   addEntity: (entity) => ipcRenderer.invoke('db:addEntity', entity),
   updateEntity: (id, updates) => ipcRenderer.invoke('db:updateEntity', id, updates),
   deleteEntity: (id) => ipcRenderer.invoke('db:deleteEntity', id),
-  mergeEntities: (sourceId, targetId, keepName?) => ipcRenderer.invoke('db:mergeEntities', sourceId, targetId, keepName),
-
+  mergeEntities: (sourceId, targetId, keepName?) =>
+    ipcRenderer.invoke('db:mergeEntities', sourceId, targetId, keepName),
 
   // Entity Document Types
   getEntityDocumentTypes: () => ipcRenderer.invoke('entityDocTypes:getAll'),
   addEntityDocumentType: (dt: any) => ipcRenderer.invoke('entityDocTypes:add', dt),
-  updateEntityDocumentType: (id: string, updates: any) => ipcRenderer.invoke('entityDocTypes:update', id, updates),
+  updateEntityDocumentType: (id: string, updates: any) =>
+    ipcRenderer.invoke('entityDocTypes:update', id, updates),
   deleteEntityDocumentType: (id: string) => ipcRenderer.invoke('entityDocTypes:delete', id),
 
   // Entity Documents
-  getEntityDocuments: (entityId?: string) => entityId ? ipcRenderer.invoke('entityDocs:getByEntity', entityId) : ipcRenderer.invoke('entityDocs:getAll'),
+  getEntityDocuments: (entityId?: string) =>
+    entityId
+      ? ipcRenderer.invoke('entityDocs:getByEntity', entityId)
+      : ipcRenderer.invoke('entityDocs:getAll'),
   upsertEntityDocument: (doc: any) => ipcRenderer.invoke('entityDocs:upsert', doc),
-  updateEntityDocumentExpiry: (entityId: string, documentTypeId: string, expiryDate: string | null) => ipcRenderer.invoke('entityDocs:updateExpiry', entityId, documentTypeId, expiryDate),
-  deleteEntityDocument: (entityId: string, documentTypeId: string) => ipcRenderer.invoke('entityDocs:delete', entityId, documentTypeId),
+  updateEntityDocumentExpiry: (
+    entityId: string,
+    documentTypeId: string,
+    expiryDate: string | null
+  ) => ipcRenderer.invoke('entityDocs:updateExpiry', entityId, documentTypeId, expiryDate),
+  deleteEntityDocument: (entityId: string, documentTypeId: string) =>
+    ipcRenderer.invoke('entityDocs:delete', entityId, documentTypeId),
 
   // File Path Resolution
   filePathCanonicalize: (filePath: string) => ipcRenderer.invoke('filePath:canonicalize', filePath),
   filePathResolve: (filePath: string) => ipcRenderer.invoke('filePath:resolve', filePath),
   filePathGetSettings: () => ipcRenderer.invoke('filePath:getSettings'),
-  filePathSetSettings: (settings: { localPath: string; networkPath: string }) => ipcRenderer.invoke('filePath:setSettings', settings),
+  filePathSetSettings: (settings: { localPath: string; networkPath: string }) =>
+    ipcRenderer.invoke('filePath:setSettings', settings),
 
   // Hot-Update (GitHub-based)
   hotUpdateGetInfo: () => ipcRenderer.invoke('hotUpdate:getInfo'),
@@ -104,24 +124,34 @@ const api = {
   addEntityAddress: (addr) => ipcRenderer.invoke('entityAddress:add', addr),
   updateEntityAddress: (id, updates) => ipcRenderer.invoke('entityAddress:update', id, updates),
   deleteEntityAddress: (id) => ipcRenderer.invoke('entityAddress:delete', id),
-  updateVesselAssuredAddress: (id, addressId) => ipcRenderer.invoke('vesselAssured:updateAddress', id, addressId),
+  updateVesselAssuredAddress: (id, addressId) =>
+    ipcRenderer.invoke('vesselAssured:updateAddress', id, addressId),
 
   // RBAC
   rbacGetGroups: () => ipcRenderer.invoke('rbac:getGroups'),
-  rbacAddGroup: (name: string, description?: string) => ipcRenderer.invoke('rbac:addGroup', name, description),
-  rbacUpdateGroup: (id: string, name: string, description?: string) => ipcRenderer.invoke('rbac:updateGroup', id, name, description),
+  rbacAddGroup: (name: string, description?: string) =>
+    ipcRenderer.invoke('rbac:addGroup', name, description),
+  rbacUpdateGroup: (id: string, name: string, description?: string) =>
+    ipcRenderer.invoke('rbac:updateGroup', id, name, description),
   rbacDeleteGroup: (id: string) => ipcRenderer.invoke('rbac:deleteGroup', id),
-  rbacGetGroupPermissions: (groupId: string) => ipcRenderer.invoke('rbac:getGroupPermissions', groupId),
-  rbacSetGroupPermissions: (groupId: string, keys: string[]) => ipcRenderer.invoke('rbac:setGroupPermissions', groupId, keys),
+  rbacGetGroupPermissions: (groupId: string) =>
+    ipcRenderer.invoke('rbac:getGroupPermissions', groupId),
+  rbacSetGroupPermissions: (groupId: string, keys: string[]) =>
+    ipcRenderer.invoke('rbac:setGroupPermissions', groupId, keys),
   rbacGetUserGroupIds: (userId: string) => ipcRenderer.invoke('rbac:getUserGroupIds', userId),
-  rbacSetUserGroups: (userId: string, groupIds: string[]) => ipcRenderer.invoke('rbac:setUserGroups', userId, groupIds),
-  rbacGetUserPermissionOverrides: (userId: string) => ipcRenderer.invoke('rbac:getUserPermissionOverrides', userId),
-  rbacSetUserPermissionOverrides: (userId: string, overrides: { permissionKey: string; granted: boolean }[]) => ipcRenderer.invoke('rbac:setUserPermissionOverrides', userId, overrides),
-  rbacResolveUserPermissions: (userId: string) => ipcRenderer.invoke('rbac:resolveUserPermissions', userId),
+  rbacSetUserGroups: (userId: string, groupIds: string[]) =>
+    ipcRenderer.invoke('rbac:setUserGroups', userId, groupIds),
+  rbacGetUserPermissionOverrides: (userId: string) =>
+    ipcRenderer.invoke('rbac:getUserPermissionOverrides', userId),
+  rbacSetUserPermissionOverrides: (
+    userId: string,
+    overrides: { permissionKey: string; granted: boolean }[]
+  ) => ipcRenderer.invoke('rbac:setUserPermissionOverrides', userId, overrides),
+  rbacResolveUserPermissions: (userId: string) =>
+    ipcRenderer.invoke('rbac:resolveUserPermissions', userId),
   rbacGetMyPermissions: () => ipcRenderer.invoke('rbac:getMyPermissions'),
 
   maintenanceSyncSettings: () => ipcRenderer.invoke('maintenance:syncSettings'),
-
 
   fsExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   fsExistsMany: (filePaths) => ipcRenderer.invoke('fs:existsMany', filePaths),
@@ -132,7 +162,9 @@ const api = {
     try {
       const canonical = await ipcRenderer.invoke('filePath:canonicalize', raw)
       return canonical || raw
-    } catch { return raw }
+    } catch {
+      return raw
+    }
   },
 
   dialogOpenFile: () => ipcRenderer.invoke('dialog:openFile'),
@@ -140,40 +172,60 @@ const api = {
   dialogOpenFileAny: () => ipcRenderer.invoke('dialog:openFileAny'),
   excelImport: (filePath) => ipcRenderer.invoke('excel:import', filePath),
   dialogOpenFileWord: () => ipcRenderer.invoke('dialog:openFileWord'),
-  importDefectsFromWord: (surveyId, filePath) => ipcRenderer.invoke('word:importDefects', surveyId, filePath),
+  importDefectsFromWord: (surveyId, filePath) =>
+    ipcRenderer.invoke('word:importDefects', surveyId, filePath),
 
   // Auth & Setup
-  login: (username: string, password: string) => ipcRenderer.invoke('auth:login', { username, password }),
+  login: (username: string, password: string) =>
+    ipcRenderer.invoke('auth:login', { username, password }),
   logout: () => ipcRenderer.invoke('auth:logout'),
-  changePassword: (currentPassword: string, newPassword: string) => ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
   getSession: () => ipcRenderer.invoke('auth:getSession'),
   authResetPassword: (username: string) => ipcRenderer.invoke('auth:resetPassword', { username }),
   authIsPasswordResetRequired: () => ipcRenderer.invoke('auth:isPasswordResetRequired'),
-  authForceResetPassword: (newPassword: string) => ipcRenderer.invoke('auth:forceResetPassword', newPassword),
+  authForceResetPassword: (newPassword: string) =>
+    ipcRenderer.invoke('auth:forceResetPassword', newPassword),
   adminForcePasswordResetAll: () => ipcRenderer.invoke('admin:forcePasswordResetAll'),
-  adminForcePasswordResetUsers: (userIds: string[]) => ipcRenderer.invoke('admin:forcePasswordResetUsers', userIds),
+  adminForcePasswordResetUsers: (userIds: string[]) =>
+    ipcRenderer.invoke('admin:forcePasswordResetUsers', userIds),
   authCreateUser: (userData) => ipcRenderer.invoke('auth:createUser', userData),
   getUsers: () => ipcRenderer.invoke('db:getUsers'),
   deleteUser: (id) => ipcRenderer.invoke('db:deleteUser', id),
-  updateUser: (userId: string, updates: { username?: string; fullName?: string }) => ipcRenderer.invoke('db:updateUser', userId, updates),
-  updateUserRole: (userId: string, role: 'admin' | 'user') => ipcRenderer.invoke('db:updateUserRole', userId, role),
+  updateUser: (userId: string, updates: { username?: string; fullName?: string }) =>
+    ipcRenderer.invoke('db:updateUser', userId, updates),
+  updateUserRole: (userId: string, role: 'admin' | 'user') =>
+    ipcRenderer.invoke('db:updateUserRole', userId, role),
 
   setupSelectDirectory: () => ipcRenderer.invoke('setup:selectDirectory'),
   setupSelectConfigFile: () => ipcRenderer.invoke('setup:selectConfigFile'),
-  setupSaveConfig: (config: any, directory: string) => ipcRenderer.invoke('setup:saveConfig', { config, directory }),
+  setupSaveConfig: (config: any, directory: string) =>
+    ipcRenderer.invoke('setup:saveConfig', { config, directory }),
   setupCheckConnection: () => ipcRenderer.invoke('setup:checkConnection'),
   setupGetConfigPath: () => ipcRenderer.invoke('setup:getConfigPath'),
-  setupLoadConfigFromDir: (directory: string) => ipcRenderer.invoke('setup:loadConfigFromDir', directory),
-  setupLoadConfigFromFile: (filePath: string) => ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
+  setupLoadConfigFromDir: (directory: string) =>
+    ipcRenderer.invoke('setup:loadConfigFromDir', directory),
+  setupLoadConfigFromFile: (filePath: string) =>
+    ipcRenderer.invoke('setup:loadConfigFromFile', filePath),
   // Both return an unsubscribe function (React effects remove their listener on unmount)
-  onDbStatus: (callback) => { const h = (_, status) => callback(status); ipcRenderer.on('app:db-status', h); return () => ipcRenderer.removeListener('app:db-status', h) },
-  onHotUpdateAvailable: (callback) => { const h = (_, version) => callback(version); ipcRenderer.on('hotUpdate:available', h); return () => ipcRenderer.removeListener('hotUpdate:available', h) },
+  onDbStatus: (callback) => {
+    const h = (_, status) => callback(status)
+    ipcRenderer.on('app:db-status', h)
+    return () => ipcRenderer.removeListener('app:db-status', h)
+  },
+  onHotUpdateAvailable: (callback) => {
+    const h = (_, version) => callback(version)
+    ipcRenderer.on('hotUpdate:available', h)
+    return () => ipcRenderer.removeListener('hotUpdate:available', h)
+  },
 
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (theme) => ipcRenderer.invoke('theme:set', theme),
-  updateSanctionsThreshold: (threshold: number) => ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
+  updateSanctionsThreshold: (threshold: number) =>
+    ipcRenderer.invoke('users:updateSanctionsThreshold', threshold),
   updateUserAppVersion: (version: string) => ipcRenderer.invoke('users:updateAppVersion', version),
-  updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => ipcRenderer.invoke('users:updateSidebarState', sidebarCollapsed, collapsedGroups),
+  updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) =>
+    ipcRenderer.invoke('users:updateSidebarState', sidebarCollapsed, collapsedGroups),
 
   // Window Preferences
   windowGetPreferences: () => ipcRenderer.invoke('window:getPreferences'),
@@ -185,7 +237,8 @@ const api = {
   fileTypesValidateFile: (filePath) => ipcRenderer.invoke('fileTypes:validateFile', filePath),
 
   // OFAC/Sanctions Check
-  checkSanctions: (name: string, threshold?: number, sources?: string[]) => ipcRenderer.invoke('ofac:checkSanctions', name, threshold, sources),
+  checkSanctions: (name: string, threshold?: number, sources?: string[]) =>
+    ipcRenderer.invoke('ofac:checkSanctions', name, threshold, sources),
 
   // Sanctions Data Management
   sanctionsGetStatus: () => ipcRenderer.invoke('sanctions:getStatus'),
@@ -200,7 +253,8 @@ const api = {
   sicDeleteEntity: (id: number) => ipcRenderer.invoke('sic:deleteEntity', id),
   sicImport: (filePath: string) => ipcRenderer.invoke('sic:import', filePath),
   sicGetRemarkTemplates: () => ipcRenderer.invoke('sic:getRemarkTemplates'),
-  sicSetRemarkTemplates: (templates: any[]) => ipcRenderer.invoke('sic:setRemarkTemplates', templates),
+  sicSetRemarkTemplates: (templates: any[]) =>
+    ipcRenderer.invoke('sic:setRemarkTemplates', templates),
   sicAddEntities: (entities: unknown[]) => ipcRenderer.invoke('sic:addEntities', entities),
   sicGetNameSpellings: () => ipcRenderer.invoke('sic:getNameSpellings'),
   sicLearnNameSpellings: (pairs: Record<string, string>) =>
@@ -211,43 +265,60 @@ const api = {
 
   // Compliance Schedule
   complianceGetScheduleSettings: () => ipcRenderer.invoke('compliance:getScheduleSettings'),
-  complianceSetScheduleSettings: (settings) => ipcRenderer.invoke('compliance:setScheduleSettings', settings),
+  complianceSetScheduleSettings: (settings) =>
+    ipcRenderer.invoke('compliance:setScheduleSettings', settings),
   complianceGetCheckLogs: () => ipcRenderer.invoke('compliance:getCheckLogs'),
-  complianceGetCheckResults: (logId?: string, status?: string) => ipcRenderer.invoke('compliance:getCheckResults', logId, status),
-  complianceGetCheckResultsPaginated: (params: any) => ipcRenderer.invoke('compliance:getCheckResultsPaginated', params),
+  complianceGetCheckResults: (logId?: string, status?: string) =>
+    ipcRenderer.invoke('compliance:getCheckResults', logId, status),
+  complianceGetCheckResultsPaginated: (params: any) =>
+    ipcRenderer.invoke('compliance:getCheckResultsPaginated', params),
   complianceGetPendingResults: () => ipcRenderer.invoke('compliance:getPendingResults'),
-  complianceMarkResultReviewed: (resultId: string) => ipcRenderer.invoke('compliance:markResultReviewed', resultId),
-  complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') => ipcRenderer.invoke('compliance:decideResult', resultId, decision),
+  complianceMarkResultReviewed: (resultId: string) =>
+    ipcRenderer.invoke('compliance:markResultReviewed', resultId),
+  complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') =>
+    ipcRenderer.invoke('compliance:decideResult', resultId, decision),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
-  onComplianceCheckProgress: (callback: (data: { current: number; total: number; entityName: string }) => void) => {
+  onComplianceCheckProgress: (
+    callback: (data: { current: number; total: number; entityName: string }) => void
+  ) => {
     const handler = (_: any, data: any) => callback(data)
     ipcRenderer.on('compliance:checkProgress', handler)
-    return () => { ipcRenderer.removeListener('compliance:checkProgress', handler) }
+    return () => {
+      ipcRenderer.removeListener('compliance:checkProgress', handler)
+    }
   },
 
   // Flag States
   getFlagStates: () => ipcRenderer.invoke('db:getFlagStates'),
   addFlagState: (flagState: any) => ipcRenderer.invoke('db:addFlagState', flagState),
-  updateFlagState: (id: string, updates: any) => ipcRenderer.invoke('db:updateFlagState', id, updates),
+  updateFlagState: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateFlagState', id, updates),
   deleteFlagState: (id: string) => ipcRenderer.invoke('db:deleteFlagState', id),
-  getVesselsByFlagState: (flagStateId: string) => ipcRenderer.invoke('db:getVesselsByFlagState', flagStateId),
+  getVesselsByFlagState: (flagStateId: string) =>
+    ipcRenderer.invoke('db:getVesselsByFlagState', flagStateId),
 
   // Flag State Ports
   flagStateGetPorts: (flagStateId: string) => ipcRenderer.invoke('flagState:getPorts', flagStateId),
-  flagStateAddPort: (flagStateId: string, name: string, isDefault: boolean) => ipcRenderer.invoke('flagState:addPort', flagStateId, name, isDefault),
-  flagStateUpdatePort: (id: string, name: string, isDefault: boolean) => ipcRenderer.invoke('flagState:updatePort', id, name, isDefault),
+  flagStateAddPort: (flagStateId: string, name: string, isDefault: boolean) =>
+    ipcRenderer.invoke('flagState:addPort', flagStateId, name, isDefault),
+  flagStateUpdatePort: (id: string, name: string, isDefault: boolean) =>
+    ipcRenderer.invoke('flagState:updatePort', id, name, isDefault),
   flagStateDeletePort: (id: string) => ipcRenderer.invoke('flagState:deletePort', id),
 
   // Policy Types
   getPolicyTypes: () => ipcRenderer.invoke('db:getPolicyTypes'),
-  addPolicyType: (name: string, code?: string) => ipcRenderer.invoke('db:addPolicyType', name, code),
-  updatePolicyType: (id: string, updates: any) => ipcRenderer.invoke('db:updatePolicyType', id, updates),
+  addPolicyType: (name: string, code?: string) =>
+    ipcRenderer.invoke('db:addPolicyType', name, code),
+  updatePolicyType: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updatePolicyType', id, updates),
   deletePolicyType: (id: string) => ipcRenderer.invoke('db:deletePolicyType', id),
-  reorderPolicyTypes: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderPolicyTypes', orderedIds),
+  reorderPolicyTypes: (orderedIds: string[]) =>
+    ipcRenderer.invoke('db:reorderPolicyTypes', orderedIds),
 
   // Vessel Policies
   getVesselPolicies: (vesselId: string) => ipcRenderer.invoke('db:getVesselPolicies', vesselId),
-  addVesselPolicy: (vesselId: string, policyTypeId: string) => ipcRenderer.invoke('db:addVesselPolicy', vesselId, policyTypeId),
+  addVesselPolicy: (vesselId: string, policyTypeId: string) =>
+    ipcRenderer.invoke('db:addVesselPolicy', vesselId, policyTypeId),
   deleteVesselPolicy: (id: string) => ipcRenderer.invoke('db:deleteVesselPolicy', id),
 
   // Dynamic Address Book
@@ -263,7 +334,8 @@ const api = {
   // Condition Surveys
   getConditionSurveys: (vesselId) => ipcRenderer.invoke('db:getConditionSurveys', vesselId),
   addConditionSurvey: (survey) => ipcRenderer.invoke('db:addConditionSurvey', survey),
-  updateConditionSurvey: (id, updates) => ipcRenderer.invoke('db:updateConditionSurvey', id, updates),
+  updateConditionSurvey: (id, updates) =>
+    ipcRenderer.invoke('db:updateConditionSurvey', id, updates),
   deleteConditionSurvey: (id) => ipcRenderer.invoke('db:deleteConditionSurvey', id),
 
   getConditionSurveyTypes: () => ipcRenderer.invoke('db:getConditionSurveyTypes'),
@@ -274,7 +346,8 @@ const api = {
   addSurveyDefect: (defect) => ipcRenderer.invoke('db:addSurveyDefect', defect),
   updateSurveyDefect: (id, updates) => ipcRenderer.invoke('db:updateSurveyDefect', id, updates),
   deleteSurveyDefect: (id) => ipcRenderer.invoke('db:deleteSurveyDefect', id),
-  closeDefect: (id, closedBy, closureNotes) => ipcRenderer.invoke('db:closeDefect', id, closedBy, closureNotes),
+  closeDefect: (id, closedBy, closureNotes) =>
+    ipcRenderer.invoke('db:closeDefect', id, closedBy, closureNotes),
   reopenDefect: (id, reopenReason?) => ipcRenderer.invoke('db:reopenDefect', id, reopenReason),
   getSurveyAttachments: (surveyId) => ipcRenderer.invoke('db:getSurveyAttachments', surveyId),
   addSurveyAttachment: (attachment) => ipcRenderer.invoke('db:addSurveyAttachment', attachment),
@@ -286,42 +359,72 @@ const api = {
   getOpenDefectsByVessel: () => ipcRenderer.invoke('db:getOpenDefectsByVessel'),
   getSurveyHistory: (vesselId) => ipcRenderer.invoke('db:getSurveyHistory', vesselId),
   closeSurvey: (surveyId, userId) => ipcRenderer.invoke('db:closeSurvey', surveyId, userId),
-  updateConditionSurveyEndorsement: (surveyId, issued) => ipcRenderer.invoke('db:updateConditionSurveyEndorsement', surveyId, issued),
+  updateConditionSurveyEndorsement: (surveyId, issued) =>
+    ipcRenderer.invoke('db:updateConditionSurveyEndorsement', surveyId, issued),
 
   // Dashboard
   dashboardGetActivity: () => ipcRenderer.invoke('dashboard:getActivity'),
   dashboardGetDataQualityAlerts: () => ipcRenderer.invoke('dashboard:getDataQualityAlerts'),
-  dashboardGetCalendarEvents: (year: number, month: number) => ipcRenderer.invoke('dashboard:getCalendarEvents', year, month),
+  dashboardGetCalendarEvents: (year: number, month: number) =>
+    ipcRenderer.invoke('dashboard:getCalendarEvents', year, month),
   complianceGetDataValidation: () => ipcRenderer.invoke('compliance:getDataValidation'),
   dashboardGetLayout: () => ipcRenderer.invoke('dashboard:getLayout'),
   dashboardSaveLayout: (layout: any) => ipcRenderer.invoke('dashboard:saveLayout', layout),
   dashboardSetOnboarded: () => ipcRenderer.invoke('dashboard:setOnboarded'),
 
   // Survey Warranties
-  surveyWarrantyGetByVessel: (vesselId) => ipcRenderer.invoke('survey_warranty:getByVessel', vesselId),
+  surveyWarrantyGetByVessel: (vesselId) =>
+    ipcRenderer.invoke('survey_warranty:getByVessel', vesselId),
   surveyWarrantyGetAll: () => ipcRenderer.invoke('survey_warranty:getAll'),
   surveyWarrantyGetDueToday: () => ipcRenderer.invoke('survey_warranty:getDueToday'),
   surveyWarrantyGetEndorsementsDue: () => ipcRenderer.invoke('survey_warranty:getEndorsementsDue'),
-  surveyWarrantyGetUnsentEndorsements: () => ipcRenderer.invoke('survey_warranty:getUnsentEndorsements'),
+  surveyWarrantyGetUnsentEndorsements: () =>
+    ipcRenderer.invoke('survey_warranty:getUnsentEndorsements'),
   surveyWarrantyCreate: (data) => ipcRenderer.invoke('survey_warranty:create', data),
   surveyWarrantyUpdate: (id, data) => ipcRenderer.invoke('survey_warranty:update', id, data),
   surveyWarrantyDelete: (id) => ipcRenderer.invoke('survey_warranty:delete', id),
   surveyWarrantyLogReminder: (data) => ipcRenderer.invoke('survey_warranty:logReminder', data),
-  surveyWarrantyGetReminders: (warrantyId) => ipcRenderer.invoke('survey_warranty:getReminders', warrantyId),
+  surveyWarrantyGetReminders: (warrantyId) =>
+    ipcRenderer.invoke('survey_warranty:getReminders', warrantyId),
   surveyWarrantyWaive: (id, reason) => ipcRenderer.invoke('survey_warranty:waive', id, reason),
-  surveyWarrantyCompleteWithSurvey: (warrantyId, completionNotes, userId) => ipcRenderer.invoke('survey_warranty:completeWithSurvey', warrantyId, completionNotes, userId),
+  surveyWarrantyCompleteWithSurvey: (warrantyId, completionNotes, userId) =>
+    ipcRenderer.invoke('survey_warranty:completeWithSurvey', warrantyId, completionNotes, userId),
 
   // Auto-Update
   updateCheckForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
   updateQuitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
   updateGetCurrentVersion: () => ipcRenderer.invoke('update:getCurrentVersion'),
   updateGetChangelogs: () => ipcRenderer.invoke('update:getChangelogs'),
-  onUpdateChecking: (callback) => { const h = () => callback(); ipcRenderer.on('update:checking', h); return () => ipcRenderer.removeListener('update:checking', h) },
-  onUpdateAvailable: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:available', h); return () => ipcRenderer.removeListener('update:available', h) },
-  onUpdateNotAvailable: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:not-available', h); return () => ipcRenderer.removeListener('update:not-available', h) },
-  onUpdateDownloadProgress: (callback) => { const h = (_, progress) => callback(progress); ipcRenderer.on('update:download-progress', h); return () => ipcRenderer.removeListener('update:download-progress', h) },
-  onUpdateDownloaded: (callback) => { const h = (_, info) => callback(info); ipcRenderer.on('update:downloaded', h); return () => ipcRenderer.removeListener('update:downloaded', h) },
-  onUpdateError: (callback) => { const h = (_, error) => callback(error); ipcRenderer.on('update:error', h); return () => ipcRenderer.removeListener('update:error', h) },
+  onUpdateChecking: (callback) => {
+    const h = () => callback()
+    ipcRenderer.on('update:checking', h)
+    return () => ipcRenderer.removeListener('update:checking', h)
+  },
+  onUpdateAvailable: (callback) => {
+    const h = (_, info) => callback(info)
+    ipcRenderer.on('update:available', h)
+    return () => ipcRenderer.removeListener('update:available', h)
+  },
+  onUpdateNotAvailable: (callback) => {
+    const h = (_, info) => callback(info)
+    ipcRenderer.on('update:not-available', h)
+    return () => ipcRenderer.removeListener('update:not-available', h)
+  },
+  onUpdateDownloadProgress: (callback) => {
+    const h = (_, progress) => callback(progress)
+    ipcRenderer.on('update:download-progress', h)
+    return () => ipcRenderer.removeListener('update:download-progress', h)
+  },
+  onUpdateDownloaded: (callback) => {
+    const h = (_, info) => callback(info)
+    ipcRenderer.on('update:downloaded', h)
+    return () => ipcRenderer.removeListener('update:downloaded', h)
+  },
+  onUpdateError: (callback) => {
+    const h = (_, error) => callback(error)
+    ipcRenderer.on('update:error', h)
+    return () => ipcRenderer.removeListener('update:error', h)
+  },
 
   // P&I Settings
   piGetClauses: () => ipcRenderer.invoke('pi:getClauses'),
@@ -331,191 +434,357 @@ const api = {
   piReorderClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderClauses', orderedIds),
 
   piGetClauseSets: () => ipcRenderer.invoke('pi:getClauseSets'),
-  piAddClauseSet: (name: string, clauseIds: string[], descOverrides?: Record<string, string>) => ipcRenderer.invoke('pi:addClauseSet', name, clauseIds, descOverrides),
-  piUpdateClauseSet: (id: string, name: string, clauseIds: string[], descOverrides?: Record<string, string>) => ipcRenderer.invoke('pi:updateClauseSet', id, name, clauseIds, descOverrides),
+  piAddClauseSet: (name: string, clauseIds: string[], descOverrides?: Record<string, string>) =>
+    ipcRenderer.invoke('pi:addClauseSet', name, clauseIds, descOverrides),
+  piUpdateClauseSet: (
+    id: string,
+    name: string,
+    clauseIds: string[],
+    descOverrides?: Record<string, string>
+  ) => ipcRenderer.invoke('pi:updateClauseSet', id, name, clauseIds, descOverrides),
   piDeleteClauseSet: (id: string) => ipcRenderer.invoke('pi:deleteClauseSet', id),
 
   // Hull settings
   hullGetAgreedValueTexts: () => ipcRenderer.invoke('hull:getAgreedValueTexts'),
-  hullAddAgreedValueText: (text: string, defaultSelected: boolean, section?: string) => ipcRenderer.invoke('hull:addAgreedValueText', text, defaultSelected, section),
-  hullUpdateAgreedValueText: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAgreedValueText', id, updates),
+  hullAddAgreedValueText: (text: string, defaultSelected: boolean, section?: string) =>
+    ipcRenderer.invoke('hull:addAgreedValueText', text, defaultSelected, section),
+  hullUpdateAgreedValueText: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateAgreedValueText', id, updates),
   hullDeleteAgreedValueText: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueText', id),
-  hullReorderAgreedValueTexts: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueTexts', ids),
+  hullReorderAgreedValueTexts: (ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderAgreedValueTexts', ids),
 
   hullGetClauses: () => ipcRenderer.invoke('hull:getClauses'),
-  hullAddClause: (name: string, code: string, description?: string, conditionSection?: string) => ipcRenderer.invoke('hull:addClause', name, code, description, conditionSection),
-  hullUpdateClause: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClause', id, updates),
+  hullAddClause: (name: string, code: string, description?: string, conditionSection?: string) =>
+    ipcRenderer.invoke('hull:addClause', name, code, description, conditionSection),
+  hullUpdateClause: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateClause', id, updates),
   hullDeleteClause: (id: string) => ipcRenderer.invoke('hull:deleteClause', id),
   hullReorderClauses: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauses', ids),
 
-  hullGetClauseConditions: (hullClauseId?: string) => ipcRenderer.invoke('hull:getClauseConditions', hullClauseId),
-  hullAddClauseCondition: (hullClauseId: string, conditionNumber: string, text: string, defaultSelected: boolean, conditionSection?: string, hasAmount?: boolean, amountPlaceholder?: string) => ipcRenderer.invoke('hull:addClauseCondition', hullClauseId, conditionNumber, text, defaultSelected, conditionSection, hasAmount, amountPlaceholder),
-  hullUpdateClauseCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateClauseCondition', id, updates),
+  hullGetClauseConditions: (hullClauseId?: string) =>
+    ipcRenderer.invoke('hull:getClauseConditions', hullClauseId),
+  hullAddClauseCondition: (
+    hullClauseId: string,
+    conditionNumber: string,
+    text: string,
+    defaultSelected: boolean,
+    conditionSection?: string,
+    hasAmount?: boolean,
+    amountPlaceholder?: string
+  ) =>
+    ipcRenderer.invoke(
+      'hull:addClauseCondition',
+      hullClauseId,
+      conditionNumber,
+      text,
+      defaultSelected,
+      conditionSection,
+      hasAmount,
+      amountPlaceholder
+    ),
+  hullUpdateClauseCondition: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateClauseCondition', id, updates),
   hullDeleteClauseCondition: (id: string) => ipcRenderer.invoke('hull:deleteClauseCondition', id),
-  hullReorderClauseConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderClauseConditions', ids),
+  hullReorderClauseConditions: (ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderClauseConditions', ids),
 
   hullGetAdditionalConditions: () => ipcRenderer.invoke('hull:getAdditionalConditions'),
-  hullAddAdditionalCondition: (title: string | null, text: string, defaultSelected: boolean, hullClauseIds?: string[], hasAmount?: boolean, amountPlaceholder?: string) => ipcRenderer.invoke('hull:addAdditionalCondition', title, text, defaultSelected, hullClauseIds, hasAmount, amountPlaceholder),
-  hullUpdateAdditionalCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateAdditionalCondition', id, updates),
-  hullDeleteAdditionalCondition: (id: string) => ipcRenderer.invoke('hull:deleteAdditionalCondition', id),
-  hullReorderAdditionalConditions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAdditionalConditions', ids),
+  hullAddAdditionalCondition: (
+    title: string | null,
+    text: string,
+    defaultSelected: boolean,
+    hullClauseIds?: string[],
+    hasAmount?: boolean,
+    amountPlaceholder?: string
+  ) =>
+    ipcRenderer.invoke(
+      'hull:addAdditionalCondition',
+      title,
+      text,
+      defaultSelected,
+      hullClauseIds,
+      hasAmount,
+      amountPlaceholder
+    ),
+  hullUpdateAdditionalCondition: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateAdditionalCondition', id, updates),
+  hullDeleteAdditionalCondition: (id: string) =>
+    ipcRenderer.invoke('hull:deleteAdditionalCondition', id),
+  hullReorderAdditionalConditions: (ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderAdditionalConditions', ids),
 
-  hullGetQuotationAgreedValueItems: (qId: string) => ipcRenderer.invoke('hull:getQuotationAgreedValueItems', qId),
-  hullSetQuotationAgreedValueItems: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationAgreedValueItems', qId, items),
+  hullGetQuotationAgreedValueItems: (qId: string) =>
+    ipcRenderer.invoke('hull:getQuotationAgreedValueItems', qId),
+  hullSetQuotationAgreedValueItems: (qId: string, items: any[]) =>
+    ipcRenderer.invoke('hull:setQuotationAgreedValueItems', qId, items),
   // P&I Alternatives
-  piGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('pi:getQuotationAlternatives', qId),
-  piAddQuotationAlternative: (qId: string, label?: string) => ipcRenderer.invoke('pi:addQuotationAlternative', qId, label),
-  piMigrateSharedToAlternative: (qId: string, altId: string) => ipcRenderer.invoke('pi:migrateSharedToAlternative', qId, altId),
-  piUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('pi:updateQuotationAlternative', id, updates),
-  piDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('pi:deleteQuotationAlternative', id),
-  piReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('pi:reorderQuotationAlternatives', ids),
-  updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) => ipcRenderer.invoke('quotation:updateItemAlternativeId', table, id, alternativeId),
+  piGetQuotationAlternatives: (qId: string) =>
+    ipcRenderer.invoke('pi:getQuotationAlternatives', qId),
+  piAddQuotationAlternative: (qId: string, label?: string) =>
+    ipcRenderer.invoke('pi:addQuotationAlternative', qId, label),
+  piMigrateSharedToAlternative: (qId: string, altId: string) =>
+    ipcRenderer.invoke('pi:migrateSharedToAlternative', qId, altId),
+  piUpdateQuotationAlternative: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateQuotationAlternative', id, updates),
+  piDeleteQuotationAlternative: (id: string) =>
+    ipcRenderer.invoke('pi:deleteQuotationAlternative', id),
+  piReorderQuotationAlternatives: (ids: string[]) =>
+    ipcRenderer.invoke('pi:reorderQuotationAlternatives', ids),
+  updateQuotationItemAlternativeId: (table: string, id: string, alternativeId: string | null) =>
+    ipcRenderer.invoke('quotation:updateItemAlternativeId', table, id, alternativeId),
   // Agreed Value Options
   hullGetAgreedValueOptions: (qId: string) => ipcRenderer.invoke('hull:getAgreedValueOptions', qId),
-  hullAddAgreedValueOption: (qId: string, amount: number, currency?: string, label?: string) => ipcRenderer.invoke('hull:addAgreedValueOption', qId, amount, currency, label),
-  hullUpdateAgreedValueOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
-  hullDeleteAgreedValueOption: (id: string) => ipcRenderer.invoke('hull:deleteAgreedValueOption', id),
-  hullReorderAgreedValueOptions: (ids: string[]) => ipcRenderer.invoke('hull:reorderAgreedValueOptions', ids),
+  hullAddAgreedValueOption: (qId: string, amount: number, currency?: string, label?: string) =>
+    ipcRenderer.invoke('hull:addAgreedValueOption', qId, amount, currency, label),
+  hullUpdateAgreedValueOption: (
+    id: string,
+    updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }
+  ) => ipcRenderer.invoke('hull:updateAgreedValueOption', id, updates),
+  hullDeleteAgreedValueOption: (id: string) =>
+    ipcRenderer.invoke('hull:deleteAgreedValueOption', id),
+  hullReorderAgreedValueOptions: (ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderAgreedValueOptions', ids),
   // LOL Options
   lolGetOptions: (qId: string) => ipcRenderer.invoke('lol:getOptions', qId),
-  lolAddOption: (qId: string, amount: number, currency?: string, label?: string) => ipcRenderer.invoke('lol:addOption', qId, amount, currency, label),
-  lolUpdateOption: (id: string, updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }) => ipcRenderer.invoke('lol:updateOption', id, updates),
+  lolAddOption: (qId: string, amount: number, currency?: string, label?: string) =>
+    ipcRenderer.invoke('lol:addOption', qId, amount, currency, label),
+  lolUpdateOption: (
+    id: string,
+    updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }
+  ) => ipcRenderer.invoke('lol:updateOption', id, updates),
   lolDeleteOption: (id: string) => ipcRenderer.invoke('lol:deleteOption', id),
   // Hull Alternatives
-  hullGetQuotationAlternatives: (qId: string) => ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
-  hullAddQuotationAlternative: (qId: string, hullClauseId?: string | null, label?: string, vesselScopeId?: string | null) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label, vesselScopeId),
-  hullUpdateQuotationAlternative: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationAlternative', id, updates),
-  hullDeleteQuotationAlternative: (id: string) => ipcRenderer.invoke('hull:deleteQuotationAlternative', id),
-  hullReorderQuotationAlternatives: (ids: string[]) => ipcRenderer.invoke('hull:reorderQuotationAlternatives', ids),
-  hullGetAltVesselPremiums: (quotationId: string) => ipcRenderer.invoke('hull:getAltVesselPremiums', quotationId),
-  hullSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) => ipcRenderer.invoke('hull:setAltVesselPremium', altId, vesselId, amount),
-  quotationDiscountGetByQuotation: (quotationId: string) => ipcRenderer.invoke('quotationDiscount:getByQuotation', quotationId),
-  quotationDiscountAdd: (quotationId: string, data: any) => ipcRenderer.invoke('quotationDiscount:add', quotationId, data),
-  quotationDiscountUpdate: (id: string, updates: any) => ipcRenderer.invoke('quotationDiscount:update', id, updates),
+  hullGetQuotationAlternatives: (qId: string) =>
+    ipcRenderer.invoke('hull:getQuotationAlternatives', qId),
+  hullAddQuotationAlternative: (
+    qId: string,
+    hullClauseId?: string | null,
+    label?: string,
+    vesselScopeId?: string | null
+  ) => ipcRenderer.invoke('hull:addQuotationAlternative', qId, hullClauseId, label, vesselScopeId),
+  hullUpdateQuotationAlternative: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateQuotationAlternative', id, updates),
+  hullDeleteQuotationAlternative: (id: string) =>
+    ipcRenderer.invoke('hull:deleteQuotationAlternative', id),
+  hullReorderQuotationAlternatives: (ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderQuotationAlternatives', ids),
+  hullGetAltVesselPremiums: (quotationId: string) =>
+    ipcRenderer.invoke('hull:getAltVesselPremiums', quotationId),
+  hullSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) =>
+    ipcRenderer.invoke('hull:setAltVesselPremium', altId, vesselId, amount),
+  quotationDiscountGetByQuotation: (quotationId: string) =>
+    ipcRenderer.invoke('quotationDiscount:getByQuotation', quotationId),
+  quotationDiscountAdd: (quotationId: string, data: any) =>
+    ipcRenderer.invoke('quotationDiscount:add', quotationId, data),
+  quotationDiscountUpdate: (id: string, updates: any) =>
+    ipcRenderer.invoke('quotationDiscount:update', id, updates),
   quotationDiscountDelete: (id: string) => ipcRenderer.invoke('quotationDiscount:delete', id),
   quotationDiscountReorder: (ids: string[]) => ipcRenderer.invoke('quotationDiscount:reorder', ids),
-  hullGetQuotationHullConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullConditions', qId),
-  hullSetQuotationHullConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullConditions', qId, items),
-  hullGetQuotationHullAdditionalConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationHullAdditionalConditions', qId),
-  hullSetQuotationHullAdditionalConditions: (qId: string, items: any[]) => ipcRenderer.invoke('hull:setQuotationHullAdditionalConditions', qId, items),
+  hullGetQuotationHullConditions: (qId: string) =>
+    ipcRenderer.invoke('hull:getQuotationHullConditions', qId),
+  hullSetQuotationHullConditions: (qId: string, items: any[]) =>
+    ipcRenderer.invoke('hull:setQuotationHullConditions', qId, items),
+  hullGetQuotationHullAdditionalConditions: (qId: string) =>
+    ipcRenderer.invoke('hull:getQuotationHullAdditionalConditions', qId),
+  hullSetQuotationHullAdditionalConditions: (qId: string, items: any[]) =>
+    ipcRenderer.invoke('hull:setQuotationHullAdditionalConditions', qId, items),
 
   // Custom hull additional conditions (per quotation)
-  hullGetQuotationCustomConditions: (qId: string) => ipcRenderer.invoke('hull:getQuotationCustomConditions', qId),
-  hullAddQuotationCustomCondition: (data: any) => ipcRenderer.invoke('hull:addQuotationCustomCondition', data),
-  hullUpdateQuotationCustomCondition: (id: string, updates: any) => ipcRenderer.invoke('hull:updateQuotationCustomCondition', id, updates),
-  hullDeleteQuotationCustomCondition: (id: string) => ipcRenderer.invoke('hull:deleteQuotationCustomCondition', id),
-  hullReorderQuotationCustomConditions: (qId: string, ids: string[]) => ipcRenderer.invoke('hull:reorderQuotationCustomConditions', qId, ids),
+  hullGetQuotationCustomConditions: (qId: string) =>
+    ipcRenderer.invoke('hull:getQuotationCustomConditions', qId),
+  hullAddQuotationCustomCondition: (data: any) =>
+    ipcRenderer.invoke('hull:addQuotationCustomCondition', data),
+  hullUpdateQuotationCustomCondition: (id: string, updates: any) =>
+    ipcRenderer.invoke('hull:updateQuotationCustomCondition', id, updates),
+  hullDeleteQuotationCustomCondition: (id: string) =>
+    ipcRenderer.invoke('hull:deleteQuotationCustomCondition', id),
+  hullReorderQuotationCustomConditions: (qId: string, ids: string[]) =>
+    ipcRenderer.invoke('hull:reorderQuotationCustomConditions', qId, ids),
 
   warGetConditions: () => ipcRenderer.invoke('war:getConditions'),
-  warAddCondition: (text: string, defaultSelected: boolean) => ipcRenderer.invoke('war:addCondition', text, defaultSelected),
-  warUpdateCondition: (id: string, updates: any) => ipcRenderer.invoke('war:updateCondition', id, updates),
+  warAddCondition: (text: string, defaultSelected: boolean) =>
+    ipcRenderer.invoke('war:addCondition', text, defaultSelected),
+  warUpdateCondition: (id: string, updates: any) =>
+    ipcRenderer.invoke('war:updateCondition', id, updates),
   warDeleteCondition: (id: string) => ipcRenderer.invoke('war:deleteCondition', id),
   warReorderConditions: (ids: string[]) => ipcRenderer.invoke('war:reorderConditions', ids),
-  warGetQuotationWarConditions: (qId: string) => ipcRenderer.invoke('war:getQuotationWarConditions', qId),
-  warSetQuotationWarConditions: (qId: string, items: any[]) => ipcRenderer.invoke('war:setQuotationWarConditions', qId, items),
+  warGetQuotationWarConditions: (qId: string) =>
+    ipcRenderer.invoke('war:getQuotationWarConditions', qId),
+  warSetQuotationWarConditions: (qId: string, items: any[]) =>
+    ipcRenderer.invoke('war:setQuotationWarConditions', qId, items),
   warGetSettings: () => ipcRenderer.invoke('war:getSettings'),
   warSetSettings: (settings: any) => ipcRenderer.invoke('war:setSettings', settings),
 
   // Cargo
   cargoGetInstituteClauses: () => ipcRenderer.invoke('cargo:getInstituteClauses'),
-  cargoAddInstituteClause: (name: string, code?: string, description?: string) => ipcRenderer.invoke('cargo:addInstituteClause', name, code, description),
-  cargoUpdateInstituteClause: (id: string, updates: any) => ipcRenderer.invoke('cargo:updateInstituteClause', id, updates),
+  cargoAddInstituteClause: (name: string, code?: string, description?: string) =>
+    ipcRenderer.invoke('cargo:addInstituteClause', name, code, description),
+  cargoUpdateInstituteClause: (id: string, updates: any) =>
+    ipcRenderer.invoke('cargo:updateInstituteClause', id, updates),
   cargoDeleteInstituteClause: (id: string) => ipcRenderer.invoke('cargo:deleteInstituteClause', id),
-  cargoReorderInstituteClauses: (ids: string[]) => ipcRenderer.invoke('cargo:reorderInstituteClauses', ids),
+  cargoReorderInstituteClauses: (ids: string[]) =>
+    ipcRenderer.invoke('cargo:reorderInstituteClauses', ids),
   cargoGetClauses: (section: string) => ipcRenderer.invoke('cargo:getClauses', section),
   cargoGetAllClauses: () => ipcRenderer.invoke('cargo:getAllClauses'),
-  cargoAddClause: (section: string, title: string, text?: string, code?: string, hasAmount?: boolean, amountPlaceholder?: string) => ipcRenderer.invoke('cargo:addClause', section, title, text, code, hasAmount, amountPlaceholder),
-  cargoUpdateClause: (id: string, updates: any) => ipcRenderer.invoke('cargo:updateClause', id, updates),
+  cargoAddClause: (
+    section: string,
+    title: string,
+    text?: string,
+    code?: string,
+    hasAmount?: boolean,
+    amountPlaceholder?: string
+  ) =>
+    ipcRenderer.invoke('cargo:addClause', section, title, text, code, hasAmount, amountPlaceholder),
+  cargoUpdateClause: (id: string, updates: any) =>
+    ipcRenderer.invoke('cargo:updateClause', id, updates),
   cargoDeleteClause: (id: string) => ipcRenderer.invoke('cargo:deleteClause', id),
   cargoReorderClauses: (ids: string[]) => ipcRenderer.invoke('cargo:reorderClauses', ids),
   cargoGetClauseSets: (section?: string) => ipcRenderer.invoke('cargo:getClauseSets', section),
-  cargoAddClauseSet: (section: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('cargo:addClauseSet', section, name, clauseIds),
-  cargoUpdateClauseSet: (id: string, name: string, clauseIds: string[]) => ipcRenderer.invoke('cargo:updateClauseSet', id, name, clauseIds),
+  cargoAddClauseSet: (section: string, name: string, clauseIds: string[]) =>
+    ipcRenderer.invoke('cargo:addClauseSet', section, name, clauseIds),
+  cargoUpdateClauseSet: (id: string, name: string, clauseIds: string[]) =>
+    ipcRenderer.invoke('cargo:updateClauseSet', id, name, clauseIds),
   cargoDeleteClauseSet: (id: string) => ipcRenderer.invoke('cargo:deleteClauseSet', id),
-  cargoGetQuotationClauses: (qId: string, section: string) => ipcRenderer.invoke('cargo:getQuotationClauses', qId, section),
-  cargoSetQuotationClauses: (qId: string, section: string, items: any[]) => ipcRenderer.invoke('cargo:setQuotationClauses', qId, section, items),
-  cargoGetQuotationCustomClauses: (qId: string, section: string) => ipcRenderer.invoke('cargo:getQuotationCustomClauses', qId, section),
-  cargoAddQuotationCustomClause: (qId: string, section: string, text: string) => ipcRenderer.invoke('cargo:addQuotationCustomClause', qId, section, text),
-  cargoUpdateQuotationCustomClause: (id: string, updates: any) => ipcRenderer.invoke('cargo:updateQuotationCustomClause', id, updates),
-  cargoDeleteQuotationCustomClause: (id: string) => ipcRenderer.invoke('cargo:deleteQuotationCustomClause', id),
-  cargoReorderQuotationCustomClauses: (ids: string[]) => ipcRenderer.invoke('cargo:reorderQuotationCustomClauses', ids),
+  cargoGetQuotationClauses: (qId: string, section: string) =>
+    ipcRenderer.invoke('cargo:getQuotationClauses', qId, section),
+  cargoSetQuotationClauses: (qId: string, section: string, items: any[]) =>
+    ipcRenderer.invoke('cargo:setQuotationClauses', qId, section, items),
+  cargoGetQuotationCustomClauses: (qId: string, section: string) =>
+    ipcRenderer.invoke('cargo:getQuotationCustomClauses', qId, section),
+  cargoAddQuotationCustomClause: (qId: string, section: string, text: string) =>
+    ipcRenderer.invoke('cargo:addQuotationCustomClause', qId, section, text),
+  cargoUpdateQuotationCustomClause: (id: string, updates: any) =>
+    ipcRenderer.invoke('cargo:updateQuotationCustomClause', id, updates),
+  cargoDeleteQuotationCustomClause: (id: string) =>
+    ipcRenderer.invoke('cargo:deleteQuotationCustomClause', id),
+  cargoReorderQuotationCustomClauses: (ids: string[]) =>
+    ipcRenderer.invoke('cargo:reorderQuotationCustomClauses', ids),
 
   piGetWarrantyTags: () => ipcRenderer.invoke('pi:getWarrantyTags'),
   piAddWarrantyTag: (name: string) => ipcRenderer.invoke('pi:addWarrantyTag', name),
-  piUpdateWarrantyTag: (id: string, name: string) => ipcRenderer.invoke('pi:updateWarrantyTag', id, name),
+  piUpdateWarrantyTag: (id: string, name: string) =>
+    ipcRenderer.invoke('pi:updateWarrantyTag', id, name),
   piDeleteWarrantyTag: (id: string) => ipcRenderer.invoke('pi:deleteWarrantyTag', id),
-  piReorderWarrantyTags: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderWarrantyTags', orderedIds),
+  piReorderWarrantyTags: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderWarrantyTags', orderedIds),
 
   piGetWarranties: () => ipcRenderer.invoke('pi:getWarranties'),
   piAddWarranty: (warranty: any) => ipcRenderer.invoke('pi:addWarranty', warranty),
-  piUpdateWarranty: (id: string, updates: any) => ipcRenderer.invoke('pi:updateWarranty', id, updates),
+  piUpdateWarranty: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateWarranty', id, updates),
   piDeleteWarranty: (id: string) => ipcRenderer.invoke('pi:deleteWarranty', id),
-  piReorderWarranties: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderWarranties', orderedIds),
+  piReorderWarranties: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderWarranties', orderedIds),
 
   piGetWarrantySets: () => ipcRenderer.invoke('pi:getWarrantySets'),
-  piAddWarrantySet: (name: string, warrantyIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:addWarrantySet', name, warrantyIds, defaultSelected),
-  piUpdateWarrantySet: (id: string, name: string, warrantyIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:updateWarrantySet', id, name, warrantyIds, defaultSelected),
+  piAddWarrantySet: (name: string, warrantyIds: string[], defaultSelected?: boolean) =>
+    ipcRenderer.invoke('pi:addWarrantySet', name, warrantyIds, defaultSelected),
+  piUpdateWarrantySet: (
+    id: string,
+    name: string,
+    warrantyIds: string[],
+    defaultSelected?: boolean
+  ) => ipcRenderer.invoke('pi:updateWarrantySet', id, name, warrantyIds, defaultSelected),
   piDeleteWarrantySet: (id: string) => ipcRenderer.invoke('pi:deleteWarrantySet', id),
 
   piGetDeductibles: () => ipcRenderer.invoke('pi:getDeductibles'),
   piAddDeductible: (ded: any) => ipcRenderer.invoke('pi:addDeductible', ded),
-  piUpdateDeductible: (id: string, updates: any) => ipcRenderer.invoke('pi:updateDeductible', id, updates),
+  piUpdateDeductible: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateDeductible', id, updates),
   piDeleteDeductible: (id: string) => ipcRenderer.invoke('pi:deleteDeductible', id),
-  piReorderDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderDeductibles', orderedIds),
+  piReorderDeductibles: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderDeductibles', orderedIds),
 
   piGetDeductibleSets: () => ipcRenderer.invoke('pi:getDeductibleSets'),
   piGetDeductibleSetItems: (setId: string) => ipcRenderer.invoke('pi:getDeductibleSetItems', setId),
-  piAddDeductibleSet: (name: string, items: any[]) => ipcRenderer.invoke('pi:addDeductibleSet', name, items),
-  piUpdateDeductibleSet: (id: string, name: string, items: any[]) => ipcRenderer.invoke('pi:updateDeductibleSet', id, name, items),
+  piAddDeductibleSet: (name: string, items: any[]) =>
+    ipcRenderer.invoke('pi:addDeductibleSet', name, items),
+  piUpdateDeductibleSet: (id: string, name: string, items: any[]) =>
+    ipcRenderer.invoke('pi:updateDeductibleSet', id, name, items),
   piDeleteDeductibleSet: (id: string) => ipcRenderer.invoke('pi:deleteDeductibleSet', id),
 
   piGetTextDeductibles: () => ipcRenderer.invoke('pi:getTextDeductibles'),
-  piAddTextDeductible: (data: { text: string; defaultIncluded?: boolean }) => ipcRenderer.invoke('pi:addTextDeductible', data),
-  piUpdateTextDeductible: (id: string, updates: { text?: string; defaultIncluded?: boolean }) => ipcRenderer.invoke('pi:updateTextDeductible', id, updates),
+  piAddTextDeductible: (data: { text: string; defaultIncluded?: boolean }) =>
+    ipcRenderer.invoke('pi:addTextDeductible', data),
+  piUpdateTextDeductible: (id: string, updates: { text?: string; defaultIncluded?: boolean }) =>
+    ipcRenderer.invoke('pi:updateTextDeductible', id, updates),
   piDeleteTextDeductible: (id: string) => ipcRenderer.invoke('pi:deleteTextDeductible', id),
-  piReorderTextDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderTextDeductibles', orderedIds),
+  piReorderTextDeductibles: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderTextDeductibles', orderedIds),
 
   piGetExclusions: () => ipcRenderer.invoke('pi:getExclusions'),
-  piAddExclusion: (exclusion: { text: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => ipcRenderer.invoke('pi:addExclusion', exclusion),
-  piUpdateExclusion: (id: string, updates: { text?: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }) => ipcRenderer.invoke('pi:updateExclusion', id, updates),
+  piAddExclusion: (exclusion: {
+    text: string
+    isCargoRelated?: boolean
+    vesselTypeIds?: string[]
+  }) => ipcRenderer.invoke('pi:addExclusion', exclusion),
+  piUpdateExclusion: (
+    id: string,
+    updates: { text?: string; isCargoRelated?: boolean; vesselTypeIds?: string[] }
+  ) => ipcRenderer.invoke('pi:updateExclusion', id, updates),
   piDeleteExclusion: (id: string) => ipcRenderer.invoke('pi:deleteExclusion', id),
-  piReorderExclusions: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderExclusions', orderedIds),
+  piReorderExclusions: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderExclusions', orderedIds),
 
   piGetSubLimitTemplates: () => ipcRenderer.invoke('pi:getSubLimitTemplates'),
   piAddSubLimitTemplate: (tmpl: any) => ipcRenderer.invoke('pi:addSubLimitTemplate', tmpl),
-  piUpdateSubLimitTemplate: (id: string, updates: any) => ipcRenderer.invoke('pi:updateSubLimitTemplate', id, updates),
+  piUpdateSubLimitTemplate: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateSubLimitTemplate', id, updates),
   piDeleteSubLimitTemplate: (id: string) => ipcRenderer.invoke('pi:deleteSubLimitTemplate', id),
-  piReorderSubLimitTemplates: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderSubLimitTemplates', orderedIds),
+  piReorderSubLimitTemplates: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderSubLimitTemplates', orderedIds),
 
   piGetAdditionalClauses: () => ipcRenderer.invoke('pi:getAdditionalClauses'),
-  piAddAdditionalClause: (title: string | null, code: string | null, text: string) => ipcRenderer.invoke('pi:addAdditionalClause', title, code, text),
-  piUpdateAdditionalClause: (id: string, title: string | null, code: string | null, text: string) => ipcRenderer.invoke('pi:updateAdditionalClause', id, title, code, text),
+  piAddAdditionalClause: (title: string | null, code: string | null, text: string) =>
+    ipcRenderer.invoke('pi:addAdditionalClause', title, code, text),
+  piUpdateAdditionalClause: (id: string, title: string | null, code: string | null, text: string) =>
+    ipcRenderer.invoke('pi:updateAdditionalClause', id, title, code, text),
   piDeleteAdditionalClause: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClause', id),
-  piReorderAdditionalClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
-  piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) => ipcRenderer.invoke('pi:toggleAdditionalClauseDefault', id, defaultSelected),
+  piReorderAdditionalClauses: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderAdditionalClauses', orderedIds),
+  piToggleAdditionalClauseDefault: (id: string, defaultSelected: boolean) =>
+    ipcRenderer.invoke('pi:toggleAdditionalClauseDefault', id, defaultSelected),
   piGetAdditionalClauseSets: () => ipcRenderer.invoke('pi:getAdditionalClauseSets'),
-  piAddAdditionalClauseSet: (name: string, clauseIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds, defaultSelected),
-  piUpdateAdditionalClauseSet: (id: string, name: string, clauseIds: string[], defaultSelected?: boolean) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds, defaultSelected),
-  piDeleteAdditionalClauseSet: (id: string) => ipcRenderer.invoke('pi:deleteAdditionalClauseSet', id),
+  piAddAdditionalClauseSet: (name: string, clauseIds: string[], defaultSelected?: boolean) =>
+    ipcRenderer.invoke('pi:addAdditionalClauseSet', name, clauseIds, defaultSelected),
+  piUpdateAdditionalClauseSet: (
+    id: string,
+    name: string,
+    clauseIds: string[],
+    defaultSelected?: boolean
+  ) => ipcRenderer.invoke('pi:updateAdditionalClauseSet', id, name, clauseIds, defaultSelected),
+  piDeleteAdditionalClauseSet: (id: string) =>
+    ipcRenderer.invoke('pi:deleteAdditionalClauseSet', id),
 
   piGetTradingExcludedCountries: () => ipcRenderer.invoke('pi:getTradingExcludedCountries'),
-  piAddTradingExcludedCountry: (country: any) => ipcRenderer.invoke('pi:addTradingExcludedCountry', country),
-  piUpdateTradingExcludedCountry: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingExcludedCountry', id, updates),
-  piDeleteTradingExcludedCountry: (id: string) => ipcRenderer.invoke('pi:deleteTradingExcludedCountry', id),
+  piAddTradingExcludedCountry: (country: any) =>
+    ipcRenderer.invoke('pi:addTradingExcludedCountry', country),
+  piUpdateTradingExcludedCountry: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateTradingExcludedCountry', id, updates),
+  piDeleteTradingExcludedCountry: (id: string) =>
+    ipcRenderer.invoke('pi:deleteTradingExcludedCountry', id),
 
   // Trading Warranty Templates
   piGetTradingWarrantyTemplates: () => ipcRenderer.invoke('pi:getTradingWarrantyTemplates'),
-  piAddTradingWarrantyTemplate: (name: string, text: string) => ipcRenderer.invoke('pi:addTradingWarrantyTemplate', name, text),
-  piUpdateTradingWarrantyTemplate: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingWarrantyTemplate', id, updates),
-  piDeleteTradingWarrantyTemplate: (id: string) => ipcRenderer.invoke('pi:deleteTradingWarrantyTemplate', id),
-  piReorderTradingWarrantyTemplates: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingWarrantyTemplates', ids),
+  piAddTradingWarrantyTemplate: (name: string, text: string) =>
+    ipcRenderer.invoke('pi:addTradingWarrantyTemplate', name, text),
+  piUpdateTradingWarrantyTemplate: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateTradingWarrantyTemplate', id, updates),
+  piDeleteTradingWarrantyTemplate: (id: string) =>
+    ipcRenderer.invoke('pi:deleteTradingWarrantyTemplate', id),
+  piReorderTradingWarrantyTemplates: (ids: string[]) =>
+    ipcRenderer.invoke('pi:reorderTradingWarrantyTemplates', ids),
 
   // Trading Custom Texts
   piGetTradingCustomTexts: () => ipcRenderer.invoke('pi:getTradingCustomTexts'),
-  piAddTradingCustomText: (name: string, text: string) => ipcRenderer.invoke('pi:addTradingCustomText', name, text),
-  piUpdateTradingCustomText: (id: string, updates: any) => ipcRenderer.invoke('pi:updateTradingCustomText', id, updates),
+  piAddTradingCustomText: (name: string, text: string) =>
+    ipcRenderer.invoke('pi:addTradingCustomText', name, text),
+  piUpdateTradingCustomText: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateTradingCustomText', id, updates),
   piDeleteTradingCustomText: (id: string) => ipcRenderer.invoke('pi:deleteTradingCustomText', id),
-  piReorderTradingCustomTexts: (ids: string[]) => ipcRenderer.invoke('pi:reorderTradingCustomTexts', ids),
+  piReorderTradingCustomTexts: (ids: string[]) =>
+    ipcRenderer.invoke('pi:reorderTradingCustomTexts', ids),
 
   // Generic Settings
   getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
@@ -523,10 +792,13 @@ const api = {
 
   // Premium Text Templates (NCB / UPCC)
   premiumGetTextTemplates: (type?: string) => ipcRenderer.invoke('premium:getTextTemplates', type),
-  premiumAddTextTemplate: (data: { name: string; text: string; type: string }) => ipcRenderer.invoke('premium:addTextTemplate', data),
-  premiumUpdateTextTemplate: (id: string, updates: any) => ipcRenderer.invoke('premium:updateTextTemplate', id, updates),
+  premiumAddTextTemplate: (data: { name: string; text: string; type: string }) =>
+    ipcRenderer.invoke('premium:addTextTemplate', data),
+  premiumUpdateTextTemplate: (id: string, updates: any) =>
+    ipcRenderer.invoke('premium:updateTextTemplate', id, updates),
   premiumDeleteTextTemplate: (id: string) => ipcRenderer.invoke('premium:deleteTextTemplate', id),
-  premiumReorderTextTemplates: (ids: string[]) => ipcRenderer.invoke('premium:reorderTextTemplates', ids),
+  premiumReorderTextTemplates: (ids: string[]) =>
+    ipcRenderer.invoke('premium:reorderTextTemplates', ids),
 
   // P&I Section Texts
   piGetSectionTexts: () => ipcRenderer.invoke('pi:getSectionTexts'),
@@ -534,33 +806,43 @@ const api = {
 
   // Instalment Defaults & Logo
   piGetInstalmentDefaults: () => ipcRenderer.invoke('pi:getInstalmentDefaults'),
-  piSetInstalmentDefaults: (defaults: any) => ipcRenderer.invoke('pi:setInstalmentDefaults', defaults),
+  piSetInstalmentDefaults: (defaults: any) =>
+    ipcRenderer.invoke('pi:setInstalmentDefaults', defaults),
   piGetQuotationLogoPath: () => ipcRenderer.invoke('pi:getQuotationLogoPath'),
   piSetQuotationLogoPath: (path: string) => ipcRenderer.invoke('pi:setQuotationLogoPath', path),
 
   // P&I Sanctions Versions
   piGetSanctionsVersions: () => ipcRenderer.invoke('pi:getSanctionsVersions'),
   piAddSanctionsVersion: (data: any) => ipcRenderer.invoke('pi:addSanctionsVersion', data),
-  piUpdateSanctionsVersion: (id: string, updates: any) => ipcRenderer.invoke('pi:updateSanctionsVersion', id, updates),
+  piUpdateSanctionsVersion: (id: string, updates: any) =>
+    ipcRenderer.invoke('pi:updateSanctionsVersion', id, updates),
   piDeleteSanctionsVersion: (id: string) => ipcRenderer.invoke('pi:deleteSanctionsVersion', id),
-  piReorderSanctionsVersions: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderSanctionsVersions', orderedIds),
+  piReorderSanctionsVersions: (orderedIds: string[]) =>
+    ipcRenderer.invoke('pi:reorderSanctionsVersions', orderedIds),
 
   // Vessel Insurance Policies (imported)
-  getVesselInsurancePolicies: (vesselId: string) => ipcRenderer.invoke('vessels:getInsurancePolicies', vesselId),
+  getVesselInsurancePolicies: (vesselId: string) =>
+    ipcRenderer.invoke('vessels:getInsurancePolicies', vesselId),
 
   // Classification Societies
   getClassificationSocieties: () => ipcRenderer.invoke('db:getClassificationSocieties'),
   addClassificationSociety: (cs: any) => ipcRenderer.invoke('db:addClassificationSociety', cs),
-  updateClassificationSociety: (id: string, updates: any) => ipcRenderer.invoke('db:updateClassificationSociety', id, updates),
-  deleteClassificationSociety: (id: string) => ipcRenderer.invoke('db:deleteClassificationSociety', id),
-  reorderClassificationSocieties: (ids: string[]) => ipcRenderer.invoke('db:reorderClassificationSocieties', ids),
-  getVesselClassifications: (vesselId: string) => ipcRenderer.invoke('vessels:getClassifications', vesselId),
-  setVesselClassifications: (vesselId: string, csIds: string[]) => ipcRenderer.invoke('vessels:setClassifications', vesselId, csIds),
+  updateClassificationSociety: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateClassificationSociety', id, updates),
+  deleteClassificationSociety: (id: string) =>
+    ipcRenderer.invoke('db:deleteClassificationSociety', id),
+  reorderClassificationSocieties: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderClassificationSocieties', ids),
+  getVesselClassifications: (vesselId: string) =>
+    ipcRenderer.invoke('vessels:getClassifications', vesselId),
+  setVesselClassifications: (vesselId: string, csIds: string[]) =>
+    ipcRenderer.invoke('vessels:setClassifications', vesselId, csIds),
 
   // Vessel Types
   getVesselTypes: () => ipcRenderer.invoke('db:getVesselTypes'),
   addVesselType: (vt: any) => ipcRenderer.invoke('db:addVesselType', vt),
-  updateVesselType: (id: string, updates: any) => ipcRenderer.invoke('db:updateVesselType', id, updates),
+  updateVesselType: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateVesselType', id, updates),
   deleteVesselType: (id: string) => ipcRenderer.invoke('db:deleteVesselType', id),
   reorderVesselTypes: (ids: string[]) => ipcRenderer.invoke('db:reorderVesselTypes', ids),
 
@@ -570,25 +852,34 @@ const api = {
   getVesselAuditLog: (vesselId: string) => ipcRenderer.invoke('vessels:getAuditLog', vesselId),
 
   // Policy Type Characteristics
-  getPolicyTypeCharacteristics: (policyTypeId?: string) => ipcRenderer.invoke('db:getPolicyTypeCharacteristics', policyTypeId),
+  getPolicyTypeCharacteristics: (policyTypeId?: string) =>
+    ipcRenderer.invoke('db:getPolicyTypeCharacteristics', policyTypeId),
   addPolicyTypeCharacteristic: (c: any) => ipcRenderer.invoke('db:addPolicyTypeCharacteristic', c),
-  updatePolicyTypeCharacteristic: (id: string, updates: any) => ipcRenderer.invoke('db:updatePolicyTypeCharacteristic', id, updates),
-  deletePolicyTypeCharacteristic: (id: string) => ipcRenderer.invoke('db:deletePolicyTypeCharacteristic', id),
-  reorderPolicyTypeCharacteristics: (ids: string[]) => ipcRenderer.invoke('db:reorderPolicyTypeCharacteristics', ids),
+  updatePolicyTypeCharacteristic: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updatePolicyTypeCharacteristic', id, updates),
+  deletePolicyTypeCharacteristic: (id: string) =>
+    ipcRenderer.invoke('db:deletePolicyTypeCharacteristic', id),
+  reorderPolicyTypeCharacteristics: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderPolicyTypeCharacteristics', ids),
 
   // Policy Type Conditions
-  getPolicyTypeConditions: (policyTypeId?: string) => ipcRenderer.invoke('db:getPolicyTypeConditions', policyTypeId),
+  getPolicyTypeConditions: (policyTypeId?: string) =>
+    ipcRenderer.invoke('db:getPolicyTypeConditions', policyTypeId),
   addPolicyTypeCondition: (c: any) => ipcRenderer.invoke('db:addPolicyTypeCondition', c),
-  updatePolicyTypeCondition: (id: string, updates: any) => ipcRenderer.invoke('db:updatePolicyTypeCondition', id, updates),
+  updatePolicyTypeCondition: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updatePolicyTypeCondition', id, updates),
   deletePolicyTypeCondition: (id: string) => ipcRenderer.invoke('db:deletePolicyTypeCondition', id),
 
   // Vessel Dynamic Policies
-  getVesselDynamicPolicies: (vesselId: string) => ipcRenderer.invoke('vessels:getDynamicPolicies', vesselId),
+  getVesselDynamicPolicies: (vesselId: string) =>
+    ipcRenderer.invoke('vessels:getDynamicPolicies', vesselId),
   getAllVesselDynamicPolicies: () => ipcRenderer.invoke('vessels:getAllDynamicPolicies'),
   addVesselDynamicPolicy: (policy: any) => ipcRenderer.invoke('vessels:addDynamicPolicy', policy),
-  updateVesselDynamicPolicy: (id: string, updates: any) => ipcRenderer.invoke('vessels:updateDynamicPolicy', id, updates),
+  updateVesselDynamicPolicy: (id: string, updates: any) =>
+    ipcRenderer.invoke('vessels:updateDynamicPolicy', id, updates),
   deleteVesselDynamicPolicy: (id: string) => ipcRenderer.invoke('vessels:deleteDynamicPolicy', id),
-  setVesselDynamicPolicyValues: (policyId: string, values: any[]) => ipcRenderer.invoke('vessels:setDynamicPolicyValues', policyId, values),
+  setVesselDynamicPolicyValues: (policyId: string, values: any[]) =>
+    ipcRenderer.invoke('vessels:setDynamicPolicyValues', policyId, values),
 
   // Policy List
   getPoliciesList: () => ipcRenderer.invoke('policies:getList'),
@@ -596,31 +887,41 @@ const api = {
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => ipcRenderer.invoke('policies:getExpiredActive'),
   getExpiringSoonPolicies: (days?: number) => ipcRenderer.invoke('policies:getExpiringSoon', days),
-  getPolicyRenewalsByMonth: (year: number, month: number) => ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
-  setQuotationSentDate: (policyId: string, date: string | null) => ipcRenderer.invoke('policies:setQuotationSentDate', policyId, date),
-  getRenewalPipeline: (dateFrom: string, dateTo: string) => ipcRenderer.invoke('renewals:getPipeline', dateFrom, dateTo),
+  getPolicyRenewalsByMonth: (year: number, month: number) =>
+    ipcRenderer.invoke('policies:getRenewalsByMonth', year, month),
+  setQuotationSentDate: (policyId: string, date: string | null) =>
+    ipcRenderer.invoke('policies:setQuotationSentDate', policyId, date),
+  getRenewalPipeline: (dateFrom: string, dateTo: string) =>
+    ipcRenderer.invoke('renewals:getPipeline', dateFrom, dateTo),
 
   // Renewal Status Types
   getRenewalStatusTypes: () => ipcRenderer.invoke('renewalStates:getAll'),
-  addRenewalStatusType: (name: string, color: string) => ipcRenderer.invoke('renewalStates:add', name, color),
-  updateRenewalStatusType: (id: string, name: string, color: string) => ipcRenderer.invoke('renewalStates:update', id, name, color),
+  addRenewalStatusType: (name: string, color: string) =>
+    ipcRenderer.invoke('renewalStates:add', name, color),
+  updateRenewalStatusType: (id: string, name: string, color: string) =>
+    ipcRenderer.invoke('renewalStates:update', id, name, color),
   deleteRenewalStatusType: (id: string) => ipcRenderer.invoke('renewalStates:delete', id),
-  setRenewalStatusForPolicy: (policyId: string, statusId: string | null) => ipcRenderer.invoke('renewalStates:setForPolicy', policyId, statusId),
+  setRenewalStatusForPolicy: (policyId: string, statusId: string | null) =>
+    ipcRenderer.invoke('renewalStates:setForPolicy', policyId, statusId),
 
   // Policy Renewal Notes
-  getPolicyRenewalNotes: (policyId: string, policyNumber: string) => ipcRenderer.invoke('renewalNotes:get', policyId, policyNumber),
-  addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => ipcRenderer.invoke('renewalNotes:add', policyId, policyNumber, note),
+  getPolicyRenewalNotes: (policyId: string, policyNumber: string) =>
+    ipcRenderer.invoke('renewalNotes:get', policyId, policyNumber),
+  addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) =>
+    ipcRenderer.invoke('renewalNotes:add', policyId, policyNumber, note),
   deletePolicyRenewalNote: (noteId: string) => ipcRenderer.invoke('renewalNotes:delete', noteId),
 
   // Vessel Notes
   getVesselNotes: (vesselId: string) => ipcRenderer.invoke('vesselNotes:get', vesselId),
-  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) => ipcRenderer.invoke('vesselNotes:add', vesselId, note, parentNoteId),
+  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) =>
+    ipcRenderer.invoke('vesselNotes:add', vesselId, note, parentNoteId),
   deleteVesselNote: (noteId: string) => ipcRenderer.invoke('vesselNotes:delete', noteId),
 
   // Quotation Types
   getQuotationTypes: () => ipcRenderer.invoke('db:getQuotationTypes'),
   addQuotationType: (data: any) => ipcRenderer.invoke('db:addQuotationType', data),
-  updateQuotationType: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationType', id, updates),
+  updateQuotationType: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotationType', id, updates),
   deleteQuotationType: (id: string) => ipcRenderer.invoke('db:deleteQuotationType', id),
   reorderQuotationTypes: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationTypes', ids),
 
@@ -629,21 +930,29 @@ const api = {
   quotationGetPaginated: (params: any) => ipcRenderer.invoke('quotation:getPaginated', params),
   quotationGetCreators: () => ipcRenderer.invoke('quotation:getCreators'),
   quotationGetSavedFilters: () => ipcRenderer.invoke('quotation:getSavedFilters'),
-  quotationSaveFilter: (name: string, filters: any) => ipcRenderer.invoke('quotation:saveFilter', name, filters),
+  quotationSaveFilter: (name: string, filters: any) =>
+    ipcRenderer.invoke('quotation:saveFilter', name, filters),
   quotationDeleteFilter: (id: string) => ipcRenderer.invoke('quotation:deleteFilter', id),
   quotationGetFavorites: () => ipcRenderer.invoke('quotation:getFavorites'),
-  quotationToggleFavorite: (quotationId: string) => ipcRenderer.invoke('quotation:toggleFavorite', quotationId),
+  quotationToggleFavorite: (quotationId: string) =>
+    ipcRenderer.invoke('quotation:toggleFavorite', quotationId),
   quotationBulkDelete: (ids: string[]) => ipcRenderer.invoke('quotation:bulkDelete', ids),
 
   // Quotation Groups
   quotationGroupGetAll: () => ipcRenderer.invoke('quotationGroup:getAll'),
-  quotationGroupAdd: (name: string, userId: string | null, color?: string) => ipcRenderer.invoke('quotationGroup:add', name, userId, color),
-  quotationGroupUpdate: (id: string, updates: { name?: string; color?: string }) => ipcRenderer.invoke('quotationGroup:update', id, updates),
+  quotationGroupAdd: (name: string, userId: string | null, color?: string) =>
+    ipcRenderer.invoke('quotationGroup:add', name, userId, color),
+  quotationGroupUpdate: (id: string, updates: { name?: string; color?: string }) =>
+    ipcRenderer.invoke('quotationGroup:update', id, updates),
   quotationGroupDelete: (id: string) => ipcRenderer.invoke('quotationGroup:delete', id),
-  quotationGroupGetMembers: (groupId: string) => ipcRenderer.invoke('quotationGroup:getMembers', groupId),
-  quotationGroupAddMember: (groupId: string, quotationId: string) => ipcRenderer.invoke('quotationGroup:addMember', groupId, quotationId),
-  quotationGroupRemoveMember: (groupId: string, quotationId: string) => ipcRenderer.invoke('quotationGroup:removeMember', groupId, quotationId),
-  quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => ipcRenderer.invoke('quotationGroup:bulkAdd', groupId, quotationIds),
+  quotationGroupGetMembers: (groupId: string) =>
+    ipcRenderer.invoke('quotationGroup:getMembers', groupId),
+  quotationGroupAddMember: (groupId: string, quotationId: string) =>
+    ipcRenderer.invoke('quotationGroup:addMember', groupId, quotationId),
+  quotationGroupRemoveMember: (groupId: string, quotationId: string) =>
+    ipcRenderer.invoke('quotationGroup:removeMember', groupId, quotationId),
+  quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) =>
+    ipcRenderer.invoke('quotationGroup:bulkAdd', groupId, quotationIds),
 
   vesselGetQuotations: (vesselId: string) => ipcRenderer.invoke('vessel:getQuotations', vesselId),
   getQuotation: (id: string) => ipcRenderer.invoke('db:getQuotation', id),
@@ -653,148 +962,234 @@ const api = {
   quotationForceUnlock: (id: string) => ipcRenderer.invoke('quotation:forceUnlock', id),
   quotationGetLock: (id: string) => ipcRenderer.invoke('quotation:getLock', id),
   addQuotation: (q: any) => ipcRenderer.invoke('db:addQuotation', q),
-  updateQuotation: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotation', id, updates),
+  updateQuotation: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotation', id, updates),
   deleteQuotation: (id: string) => ipcRenderer.invoke('db:deleteQuotation', id),
   restoreQuotation: (id: string) => ipcRenderer.invoke('db:restoreQuotation', id),
-  permanentlyDeleteQuotation: (id: string) => ipcRenderer.invoke('db:permanentlyDeleteQuotation', id),
+  permanentlyDeleteQuotation: (id: string) =>
+    ipcRenderer.invoke('db:permanentlyDeleteQuotation', id),
   getDeletedQuotations: () => ipcRenderer.invoke('db:getDeletedQuotations'),
-  getQuotationRevisionCount: (revisionGroupId: string) => ipcRenderer.invoke('db:getQuotationRevisionCount', revisionGroupId),
-  deleteQuotationGroup: (revisionGroupId: string) => ipcRenderer.invoke('db:deleteQuotationGroup', revisionGroupId),
-  createQuotationRevision: (sourceId: string) => ipcRenderer.invoke('db:createQuotationRevision', sourceId),
-  stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) => ipcRenderer.invoke('db:stripNonSelectedAlternative', quotationId, keepAlternativeId),
+  getQuotationRevisionCount: (revisionGroupId: string) =>
+    ipcRenderer.invoke('db:getQuotationRevisionCount', revisionGroupId),
+  deleteQuotationGroup: (revisionGroupId: string) =>
+    ipcRenderer.invoke('db:deleteQuotationGroup', revisionGroupId),
+  createQuotationRevision: (sourceId: string) =>
+    ipcRenderer.invoke('db:createQuotationRevision', sourceId),
+  stripNonSelectedAlternative: (quotationId: string, keepAlternativeId: string) =>
+    ipcRenderer.invoke('db:stripNonSelectedAlternative', quotationId, keepAlternativeId),
   duplicateQuotation: (sourceId: string) => ipcRenderer.invoke('db:duplicateQuotation', sourceId),
-  copyQuotationSections: (targetId: string, sourceId: string, sections: string[]) => ipcRenderer.invoke('quotation:copySections', targetId, sourceId, sections),
-  getQuotationRevisions: (revisionGroupId: string) => ipcRenderer.invoke('db:getQuotationRevisions', revisionGroupId),
-  saveExportSnapshot: (quotationId: string, snapshot: string) => ipcRenderer.invoke('db:saveExportSnapshot', quotationId, snapshot),
-  clearExportSnapshot: (quotationId: string) => ipcRenderer.invoke('db:clearExportSnapshot', quotationId),
+  copyQuotationSections: (targetId: string, sourceId: string, sections: string[]) =>
+    ipcRenderer.invoke('quotation:copySections', targetId, sourceId, sections),
+  getQuotationRevisions: (revisionGroupId: string) =>
+    ipcRenderer.invoke('db:getQuotationRevisions', revisionGroupId),
+  saveExportSnapshot: (quotationId: string, snapshot: string) =>
+    ipcRenderer.invoke('db:saveExportSnapshot', quotationId, snapshot),
+  clearExportSnapshot: (quotationId: string) =>
+    ipcRenderer.invoke('db:clearExportSnapshot', quotationId),
 
   // Quotation Sub-Tables
   getQuotationAssureds: (qId: string) => ipcRenderer.invoke('db:getQuotationAssureds', qId),
   addQuotationAssured: (data: any) => ipcRenderer.invoke('db:addQuotationAssured', data),
-  updateQuotationAssured: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationAssured', id, updates),
+  updateQuotationAssured: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotationAssured', id, updates),
   deleteQuotationAssured: (id: string) => ipcRenderer.invoke('db:deleteQuotationAssured', id),
-  reorderQuotationAssureds: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationAssureds', ids),
+  reorderQuotationAssureds: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationAssureds', ids),
 
   // Quotation Assured Groups
-  getQuotationAssuredGroups: (qId: string) => ipcRenderer.invoke('db:getQuotationAssuredGroups', qId),
-  addQuotationAssuredGroup: (qId: string, name: string) => ipcRenderer.invoke('db:addQuotationAssuredGroup', qId, name),
-  updateQuotationAssuredGroup: (id: string, updates: { name?: string }) => ipcRenderer.invoke('db:updateQuotationAssuredGroup', id, updates),
-  deleteQuotationAssuredGroup: (id: string) => ipcRenderer.invoke('db:deleteQuotationAssuredGroup', id),
-  reorderQuotationAssuredGroups: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationAssuredGroups', ids),
+  getQuotationAssuredGroups: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationAssuredGroups', qId),
+  addQuotationAssuredGroup: (qId: string, name: string) =>
+    ipcRenderer.invoke('db:addQuotationAssuredGroup', qId, name),
+  updateQuotationAssuredGroup: (id: string, updates: { name?: string }) =>
+    ipcRenderer.invoke('db:updateQuotationAssuredGroup', id, updates),
+  deleteQuotationAssuredGroup: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationAssuredGroup', id),
+  reorderQuotationAssuredGroups: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationAssuredGroups', ids),
 
   getQuotationVessels: (qId: string) => ipcRenderer.invoke('db:getQuotationVessels', qId),
   addQuotationVessel: (data: any) => ipcRenderer.invoke('db:addQuotationVessel', data),
-  updateQuotationVessel: (id: string, data: any) => ipcRenderer.invoke('db:updateQuotationVessel', id, data),
+  updateQuotationVessel: (id: string, data: any) =>
+    ipcRenderer.invoke('db:updateQuotationVessel', id, data),
   deleteQuotationVessel: (id: string) => ipcRenderer.invoke('db:deleteQuotationVessel', id),
   reorderQuotationVessels: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationVessels', ids),
 
   getQuotationNewVessel: (qId: string) => ipcRenderer.invoke('db:getQuotationNewVessel', qId),
-  upsertQuotationNewVessel: (qId: string, data: any) => ipcRenderer.invoke('db:upsertQuotationNewVessel', qId, data),
+  upsertQuotationNewVessel: (qId: string, data: any) =>
+    ipcRenderer.invoke('db:upsertQuotationNewVessel', qId, data),
   deleteQuotationNewVessel: (qId: string) => ipcRenderer.invoke('db:deleteQuotationNewVessel', qId),
 
   getQuotationSubLimits: (qId: string) => ipcRenderer.invoke('db:getQuotationSubLimits', qId),
   addQuotationSubLimit: (data: any) => ipcRenderer.invoke('db:addQuotationSubLimit', data),
-  updateQuotationSubLimit: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationSubLimit', id, updates),
+  updateQuotationSubLimit: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotationSubLimit', id, updates),
   deleteQuotationSubLimit: (id: string) => ipcRenderer.invoke('db:deleteQuotationSubLimit', id),
 
   getQuotationClauses: (qId: string) => ipcRenderer.invoke('db:getQuotationClauses', qId),
-  setQuotationClauses: (qId: string, ids: string[], overrides?: Record<string, string>) => ipcRenderer.invoke('db:setQuotationClauses', qId, ids, overrides),
-  addQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => ipcRenderer.invoke('db:addQuotationClause', qId, piClauseId, alternativeId),
-  deleteQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) => ipcRenderer.invoke('db:deleteQuotationClause', qId, piClauseId, alternativeId),
-  getQuotationClauseOverrides: (qId: string) => ipcRenderer.invoke('db:getQuotationClauseOverrides', qId),
-  updateQuotationClauseOverride: (qId: string, clauseId: string, override: string | null, alternativeId?: string | null) => ipcRenderer.invoke('db:updateQuotationClauseOverride', qId, clauseId, override, alternativeId),
+  setQuotationClauses: (qId: string, ids: string[], overrides?: Record<string, string>) =>
+    ipcRenderer.invoke('db:setQuotationClauses', qId, ids, overrides),
+  addQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) =>
+    ipcRenderer.invoke('db:addQuotationClause', qId, piClauseId, alternativeId),
+  deleteQuotationClause: (qId: string, piClauseId: string, alternativeId?: string | null) =>
+    ipcRenderer.invoke('db:deleteQuotationClause', qId, piClauseId, alternativeId),
+  getQuotationClauseOverrides: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationClauseOverrides', qId),
+  updateQuotationClauseOverride: (
+    qId: string,
+    clauseId: string,
+    override: string | null,
+    alternativeId?: string | null
+  ) =>
+    ipcRenderer.invoke('db:updateQuotationClauseOverride', qId, clauseId, override, alternativeId),
 
-  getQuotationAdditionalClauses: (qId: string) => ipcRenderer.invoke('db:getQuotationAdditionalClauses', qId),
-  addQuotationAdditionalClause: (data: any) => ipcRenderer.invoke('db:addQuotationAdditionalClause', data),
-  deleteQuotationAdditionalClause: (id: string) => ipcRenderer.invoke('db:deleteQuotationAdditionalClause', id),
+  getQuotationAdditionalClauses: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationAdditionalClauses', qId),
+  addQuotationAdditionalClause: (data: any) =>
+    ipcRenderer.invoke('db:addQuotationAdditionalClause', data),
+  deleteQuotationAdditionalClause: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationAdditionalClause', id),
 
   getQuotationWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationWarranties', qId),
-  setQuotationWarranties: (qId: string, ids: string[]) => ipcRenderer.invoke('db:setQuotationWarranties', qId, ids),
-  updateQuotationWarrantyVesselScope: (qId: string, piWarrantyId: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationWarrantyVesselScope', qId, piWarrantyId, vesselScope),
-  updateQuotationClauseVesselScope: (qId: string, piClauseId: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationClauseVesselScope', qId, piClauseId, vesselScope),
-  getQuotationCustomWarranties: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomWarranties', qId),
-  addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomWarranty', data),
-  updateQuotationCustomWarranty: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomWarranty', id, updates),
-  deleteQuotationCustomWarranty: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomWarranty', id),
-  reorderQuotationCustomWarranties: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomWarranties', ids),
+  setQuotationWarranties: (qId: string, ids: string[]) =>
+    ipcRenderer.invoke('db:setQuotationWarranties', qId, ids),
+  updateQuotationWarrantyVesselScope: (
+    qId: string,
+    piWarrantyId: string,
+    vesselScope: string[] | null
+  ) => ipcRenderer.invoke('db:updateQuotationWarrantyVesselScope', qId, piWarrantyId, vesselScope),
+  updateQuotationClauseVesselScope: (
+    qId: string,
+    piClauseId: string,
+    vesselScope: string[] | null
+  ) => ipcRenderer.invoke('db:updateQuotationClauseVesselScope', qId, piClauseId, vesselScope),
+  getQuotationCustomWarranties: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationCustomWarranties', qId),
+  addQuotationCustomWarranty: (data: { quotationId: string; text: string; order?: number }) =>
+    ipcRenderer.invoke('db:addQuotationCustomWarranty', data),
+  updateQuotationCustomWarranty: (id: string, updates: { text?: string }) =>
+    ipcRenderer.invoke('db:updateQuotationCustomWarranty', id, updates),
+  deleteQuotationCustomWarranty: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationCustomWarranty', id),
+  reorderQuotationCustomWarranties: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationCustomWarranties', ids),
 
   getQuotationDeductibles: (qId: string) => ipcRenderer.invoke('db:getQuotationDeductibles', qId),
   addQuotationDeductible: (data: any) => ipcRenderer.invoke('db:addQuotationDeductible', data),
-  updateQuotationDeductible: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationDeductible', id, updates),
+  updateQuotationDeductible: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotationDeductible', id, updates),
   deleteQuotationDeductible: (id: string) => ipcRenderer.invoke('db:deleteQuotationDeductible', id),
-  reorderQuotationDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderQuotationDeductibles', orderedIds),
+  reorderQuotationDeductibles: (orderedIds: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationDeductibles', orderedIds),
 
-  getQuotationTextDeductibles: (qId: string) => ipcRenderer.invoke('db:getQuotationTextDeductibles', qId),
-  addQuotationTextDeductible: (data: any) => ipcRenderer.invoke('db:addQuotationTextDeductible', data),
-  updateQuotationTextDeductible: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationTextDeductible', id, updates),
-  deleteQuotationTextDeductible: (id: string) => ipcRenderer.invoke('db:deleteQuotationTextDeductible', id),
-  reorderQuotationTextDeductibles: (orderedIds: string[]) => ipcRenderer.invoke('db:reorderQuotationTextDeductibles', orderedIds),
+  getQuotationTextDeductibles: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationTextDeductibles', qId),
+  addQuotationTextDeductible: (data: any) =>
+    ipcRenderer.invoke('db:addQuotationTextDeductible', data),
+  updateQuotationTextDeductible: (id: string, updates: { text?: string }) =>
+    ipcRenderer.invoke('db:updateQuotationTextDeductible', id, updates),
+  deleteQuotationTextDeductible: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationTextDeductible', id),
+  reorderQuotationTextDeductibles: (orderedIds: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationTextDeductibles', orderedIds),
 
   getQuotationExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationExclusions', qId),
-  setQuotationExclusions: (qId: string, items: any[]) => ipcRenderer.invoke('db:setQuotationExclusions', qId, items),
-  addQuotationExclusion: (qId: string, piExclusionId: string, altId?: string | null) => ipcRenderer.invoke('db:addQuotationExclusion', qId, piExclusionId, altId),
+  setQuotationExclusions: (qId: string, items: any[]) =>
+    ipcRenderer.invoke('db:setQuotationExclusions', qId, items),
+  addQuotationExclusion: (qId: string, piExclusionId: string, altId?: string | null) =>
+    ipcRenderer.invoke('db:addQuotationExclusion', qId, piExclusionId, altId),
   deleteQuotationExclusion: (id: string) => ipcRenderer.invoke('db:deleteQuotationExclusion', id),
-  reorderQuotationExclusions: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationExclusions', ids),
-  getQuotationCustomExclusions: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomExclusions', qId),
-  addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomExclusion', data),
-  updateQuotationCustomExclusion: (id: string, updates: { text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomExclusion', id, updates),
-  deleteQuotationCustomExclusion: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomExclusion', id),
-  reorderQuotationCustomExclusions: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomExclusions', ids),
+  reorderQuotationExclusions: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationExclusions', ids),
+  getQuotationCustomExclusions: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationCustomExclusions', qId),
+  addQuotationCustomExclusion: (data: { quotationId: string; text: string; order?: number }) =>
+    ipcRenderer.invoke('db:addQuotationCustomExclusion', data),
+  updateQuotationCustomExclusion: (id: string, updates: { text?: string }) =>
+    ipcRenderer.invoke('db:updateQuotationCustomExclusion', id, updates),
+  deleteQuotationCustomExclusion: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationCustomExclusion', id),
+  reorderQuotationCustomExclusions: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationCustomExclusions', ids),
 
-  updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) => ipcRenderer.invoke('db:updateQuotationItemVesselScope', table, id, vesselScope),
+  updateQuotationItemVesselScope: (table: string, id: string, vesselScope: string[] | null) =>
+    ipcRenderer.invoke('db:updateQuotationItemVesselScope', table, id, vesselScope),
 
-  getQuotationCustomSections: (qId: string) => ipcRenderer.invoke('db:getQuotationCustomSections', qId),
-  addQuotationCustomSection: (data: { quotationId: string; title: string; text?: string; order?: number }) => ipcRenderer.invoke('db:addQuotationCustomSection', data),
-  updateQuotationCustomSection: (id: string, updates: { title?: string; text?: string }) => ipcRenderer.invoke('db:updateQuotationCustomSection', id, updates),
-  deleteQuotationCustomSection: (id: string) => ipcRenderer.invoke('db:deleteQuotationCustomSection', id),
-  reorderQuotationCustomSections: (ids: string[]) => ipcRenderer.invoke('db:reorderQuotationCustomSections', ids),
+  getQuotationCustomSections: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationCustomSections', qId),
+  addQuotationCustomSection: (data: {
+    quotationId: string
+    title: string
+    text?: string
+    order?: number
+  }) => ipcRenderer.invoke('db:addQuotationCustomSection', data),
+  updateQuotationCustomSection: (id: string, updates: { title?: string; text?: string }) =>
+    ipcRenderer.invoke('db:updateQuotationCustomSection', id, updates),
+  deleteQuotationCustomSection: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationCustomSection', id),
+  reorderQuotationCustomSections: (ids: string[]) =>
+    ipcRenderer.invoke('db:reorderQuotationCustomSections', ids),
   piGetSectionOrderDefaults: () => ipcRenderer.invoke('pi:getSectionOrderDefaults'),
-  piSetSectionOrderDefaults: (order: string[]) => ipcRenderer.invoke('pi:setSectionOrderDefaults', order),
-  piGetSectionOrderDefaultsByType: (typeCode: string) => ipcRenderer.invoke('pi:getSectionOrderDefaultsByType', typeCode),
-  piSetSectionOrderDefaultsByType: (typeCode: string, order: string[]) => ipcRenderer.invoke('pi:setSectionOrderDefaultsByType', typeCode, order),
+  piSetSectionOrderDefaults: (order: string[]) =>
+    ipcRenderer.invoke('pi:setSectionOrderDefaults', order),
+  piGetSectionOrderDefaultsByType: (typeCode: string) =>
+    ipcRenderer.invoke('pi:getSectionOrderDefaultsByType', typeCode),
+  piSetSectionOrderDefaultsByType: (typeCode: string, order: string[]) =>
+    ipcRenderer.invoke('pi:setSectionOrderDefaultsByType', typeCode, order),
 
-  getQuotationExcludedCountries: (qId: string) => ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
-  setQuotationExcludedCountries: (qId: string, countries: any[]) => ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),
+  getQuotationExcludedCountries: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationExcludedCountries', qId),
+  setQuotationExcludedCountries: (qId: string, countries: any[]) =>
+    ipcRenderer.invoke('db:setQuotationExcludedCountries', qId, countries),
 
   // Trading per-vessel intros
   tradingGetIntros: (qId: string) => ipcRenderer.invoke('trading:getIntros', qId),
   tradingAddIntro: (data: any) => ipcRenderer.invoke('trading:addIntro', data),
-  tradingUpdateIntro: (id: string, updates: any) => ipcRenderer.invoke('trading:updateIntro', id, updates),
+  tradingUpdateIntro: (id: string, updates: any) =>
+    ipcRenderer.invoke('trading:updateIntro', id, updates),
   tradingDeleteIntro: (id: string) => ipcRenderer.invoke('trading:deleteIntro', id),
 
   getPISubjectivities: () => ipcRenderer.invoke('db:getPISubjectivities'),
   addPISubjectivity: (data: any) => ipcRenderer.invoke('db:addPISubjectivity', data),
-  updatePISubjectivity: (id: string, data: any) => ipcRenderer.invoke('db:updatePISubjectivity', id, data),
+  updatePISubjectivity: (id: string, data: any) =>
+    ipcRenderer.invoke('db:updatePISubjectivity', id, data),
   deletePISubjectivity: (id: string) => ipcRenderer.invoke('db:deletePISubjectivity', id),
   reorderPISubjectivities: (ids: string[]) => ipcRenderer.invoke('db:reorderPISubjectivities', ids),
 
-  getQuotationSubjectivities: (qId: string) => ipcRenderer.invoke('db:getQuotationSubjectivities', qId),
+  getQuotationSubjectivities: (qId: string) =>
+    ipcRenderer.invoke('db:getQuotationSubjectivities', qId),
   addQuotationSubjectivity: (data: any) => ipcRenderer.invoke('db:addQuotationSubjectivity', data),
-  updateQuotationSubjectivity: (id: string, data: any) => ipcRenderer.invoke('db:updateQuotationSubjectivity', id, data),
-  deleteQuotationSubjectivity: (id: string) => ipcRenderer.invoke('db:deleteQuotationSubjectivity', id),
+  updateQuotationSubjectivity: (id: string, data: any) =>
+    ipcRenderer.invoke('db:updateQuotationSubjectivity', id, data),
+  deleteQuotationSubjectivity: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationSubjectivity', id),
 
   getQuotationInstalments: (qId: string) => ipcRenderer.invoke('db:getQuotationInstalments', qId),
-  setQuotationInstalments: (qId: string, instalments: any[]) => ipcRenderer.invoke('db:setQuotationInstalments', qId, instalments),
+  setQuotationInstalments: (qId: string, instalments: any[]) =>
+    ipcRenderer.invoke('db:setQuotationInstalments', qId, instalments),
 
   getQuotationInformation: (qId: string) => ipcRenderer.invoke('db:getQuotationInformation', qId),
   addQuotationInformation: (data: any) => ipcRenderer.invoke('db:addQuotationInformation', data),
-  deleteQuotationInformation: (id: string) => ipcRenderer.invoke('db:deleteQuotationInformation', id),
+  deleteQuotationInformation: (id: string) =>
+    ipcRenderer.invoke('db:deleteQuotationInformation', id),
 
   getQuotationNotes: (qId: string) => ipcRenderer.invoke('db:getQuotationNotes', qId),
   addQuotationNote: (data: any) => ipcRenderer.invoke('db:addQuotationNote', data),
-  updateQuotationNote: (id: string, updates: any) => ipcRenderer.invoke('db:updateQuotationNote', id, updates),
+  updateQuotationNote: (id: string, updates: any) =>
+    ipcRenderer.invoke('db:updateQuotationNote', id, updates),
   deleteQuotationNote: (id: string) => ipcRenderer.invoke('db:deleteQuotationNote', id),
-
-
 
   // File Path Remap
   vesselGetFilePaths: (vesselId: string) => ipcRenderer.invoke('vessel:getFilePaths', vesselId),
-  vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => ipcRenderer.invoke('vessel:remapFilePaths', remaps),
+  vesselRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) =>
+    ipcRenderer.invoke('vessel:remapFilePaths', remaps),
   entityGetFilePaths: (entityId: string) => ipcRenderer.invoke('entity:getFilePaths', entityId),
-  entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) => ipcRenderer.invoke('entity:remapFilePaths', remaps),
+  entityRemapFilePaths: (remaps: { source: string; id: string; newPath: string }[]) =>
+    ipcRenderer.invoke('entity:remapFilePaths', remaps),
   dialogOpenFolder: () => ipcRenderer.invoke('dialog:openFolder'),
   dialogLocateFile: () => ipcRenderer.invoke('dialog:locateFile'),
-  shellShowItemInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
+  shellShowItemInFolder: (filePath: string) =>
+    ipcRenderer.invoke('shell:showItemInFolder', filePath),
   warBreachSave: (record: any) => ipcRenderer.invoke('warBreach:save', record),
   warBreachGetAll: () => ipcRenderer.invoke('warBreach:getAll'),
   warBreachDelete: (id: string) => ipcRenderer.invoke('warBreach:delete', id),
@@ -814,8 +1209,10 @@ const api = {
 
   // Analytics
   analyticsGetPresets: () => ipcRenderer.invoke('analytics:getPresets'),
-  analyticsAddPreset: (name: string, filters: any) => ipcRenderer.invoke('analytics:addPreset', name, filters),
-  analyticsUpdatePreset: (id: string, name: string, filters: any) => ipcRenderer.invoke('analytics:updatePreset', id, name, filters),
+  analyticsAddPreset: (name: string, filters: any) =>
+    ipcRenderer.invoke('analytics:addPreset', name, filters),
+  analyticsUpdatePreset: (id: string, name: string, filters: any) =>
+    ipcRenderer.invoke('analytics:updatePreset', id, name, filters),
   analyticsDeletePreset: (id: string) => ipcRenderer.invoke('analytics:deletePreset', id),
   analyticsGetData: (filters: any) => ipcRenderer.invoke('analytics:getData', filters),
 
@@ -834,47 +1231,69 @@ const api = {
   reportSettingsGet: () => ipcRenderer.invoke('reportSettings:get'),
   reportSettingsSet: (settings: any) => ipcRenderer.invoke('reportSettings:set', settings),
   getUserSectionAccess: () => ipcRenderer.invoke('settings:getUserSectionAccess'),
-  setUserSectionAccess: (sectionIds: string[]) => ipcRenderer.invoke('settings:setUserSectionAccess', sectionIds),
+  setUserSectionAccess: (sectionIds: string[]) =>
+    ipcRenderer.invoke('settings:setUserSectionAccess', sectionIds),
 
   // Email Templates
   emailGetTemplates: (category?: string) => ipcRenderer.invoke('email:getTemplates', category),
   emailAddTemplate: (template: any) => ipcRenderer.invoke('email:addTemplate', template),
-  emailUpdateTemplate: (id: string, updates: any) => ipcRenderer.invoke('email:updateTemplate', id, updates),
+  emailUpdateTemplate: (id: string, updates: any) =>
+    ipcRenderer.invoke('email:updateTemplate', id, updates),
   emailDeleteTemplate: (id: string) => ipcRenderer.invoke('email:deleteTemplate', id),
-  emailReorderTemplates: (orderedIds: string[]) => ipcRenderer.invoke('email:reorderTemplates', orderedIds),
+  emailReorderTemplates: (orderedIds: string[]) =>
+    ipcRenderer.invoke('email:reorderTemplates', orderedIds),
 
   // Workflow Steps & Transitions
   workflowGetSteps: () => ipcRenderer.invoke('workflow:getSteps'),
   workflowAddStep: (step: any) => ipcRenderer.invoke('workflow:addStep', step),
-  workflowUpdateStep: (id: string, updates: any) => ipcRenderer.invoke('workflow:updateStep', id, updates),
+  workflowUpdateStep: (id: string, updates: any) =>
+    ipcRenderer.invoke('workflow:updateStep', id, updates),
   workflowDeleteStep: (id: string) => ipcRenderer.invoke('workflow:deleteStep', id),
-  workflowReorderSteps: (orderedIds: string[]) => ipcRenderer.invoke('workflow:reorderSteps', orderedIds),
+  workflowReorderSteps: (orderedIds: string[]) =>
+    ipcRenderer.invoke('workflow:reorderSteps', orderedIds),
   workflowGetTransitions: () => ipcRenderer.invoke('workflow:getTransitions'),
   workflowAddTransition: (t: any) => ipcRenderer.invoke('workflow:addTransition', t),
-  workflowUpdateTransition: (id: string, updates: any) => ipcRenderer.invoke('workflow:updateTransition', id, updates),
+  workflowUpdateTransition: (id: string, updates: any) =>
+    ipcRenderer.invoke('workflow:updateTransition', id, updates),
   workflowDeleteTransition: (id: string) => ipcRenderer.invoke('workflow:deleteTransition', id),
-  workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) => ipcRenderer.invoke('workflow:moveQuotation', quotationId, toStepId, comment),
-  workflowAssignQuotationNumber: (quotationId: string) => ipcRenderer.invoke('workflow:assignQuotationNumber', quotationId),
-  workflowGetQuotationLog: (quotationId: string) => ipcRenderer.invoke('workflow:getQuotationLog', quotationId),
-  workflowGetReachableSteps: (quotationId: string) => ipcRenderer.invoke('workflow:getReachableSteps', quotationId),
+  workflowMoveQuotation: (quotationId: string, toStepId: string, comment?: string) =>
+    ipcRenderer.invoke('workflow:moveQuotation', quotationId, toStepId, comment),
+  workflowAssignQuotationNumber: (quotationId: string) =>
+    ipcRenderer.invoke('workflow:assignQuotationNumber', quotationId),
+  workflowGetQuotationLog: (quotationId: string) =>
+    ipcRenderer.invoke('workflow:getQuotationLog', quotationId),
+  workflowGetReachableSteps: (quotationId: string) =>
+    ipcRenderer.invoke('workflow:getReachableSteps', quotationId),
 
   // Survey Warranty Templates (Quotation Settings)
   surveyWarrantyTemplateGetAll: () => ipcRenderer.invoke('surveyWarrantyTemplate:getAll'),
-  surveyWarrantyTemplateAdd: (text: string, title?: string) => ipcRenderer.invoke('surveyWarrantyTemplate:add', text, title),
-  surveyWarrantyTemplateUpdate: (id: string, text: string, title?: string) => ipcRenderer.invoke('surveyWarrantyTemplate:update', id, text, title),
-  surveyWarrantyTemplateDelete: (id: string) => ipcRenderer.invoke('surveyWarrantyTemplate:delete', id),
-  surveyWarrantyTemplateReorder: (ids: string[]) => ipcRenderer.invoke('surveyWarrantyTemplate:reorder', ids),
+  surveyWarrantyTemplateAdd: (text: string, title?: string) =>
+    ipcRenderer.invoke('surveyWarrantyTemplate:add', text, title),
+  surveyWarrantyTemplateUpdate: (id: string, text: string, title?: string) =>
+    ipcRenderer.invoke('surveyWarrantyTemplate:update', id, text, title),
+  surveyWarrantyTemplateDelete: (id: string) =>
+    ipcRenderer.invoke('surveyWarrantyTemplate:delete', id),
+  surveyWarrantyTemplateReorder: (ids: string[]) =>
+    ipcRenderer.invoke('surveyWarrantyTemplate:reorder', ids),
 
   surveyWarrantyTemplateSetGetAll: () => ipcRenderer.invoke('surveyWarrantyTemplateSet:getAll'),
-  surveyWarrantyTemplateSetAdd: (name: string, templateIds: string[]) => ipcRenderer.invoke('surveyWarrantyTemplateSet:add', name, templateIds),
-  surveyWarrantyTemplateSetUpdate: (id: string, name: string, templateIds: string[]) => ipcRenderer.invoke('surveyWarrantyTemplateSet:update', id, name, templateIds),
-  surveyWarrantyTemplateSetDelete: (id: string) => ipcRenderer.invoke('surveyWarrantyTemplateSet:delete', id),
+  surveyWarrantyTemplateSetAdd: (name: string, templateIds: string[]) =>
+    ipcRenderer.invoke('surveyWarrantyTemplateSet:add', name, templateIds),
+  surveyWarrantyTemplateSetUpdate: (id: string, name: string, templateIds: string[]) =>
+    ipcRenderer.invoke('surveyWarrantyTemplateSet:update', id, name, templateIds),
+  surveyWarrantyTemplateSetDelete: (id: string) =>
+    ipcRenderer.invoke('surveyWarrantyTemplateSet:delete', id),
 
-  quotationSurveyWarrantyGetAll: (quotationId: string) => ipcRenderer.invoke('quotationSurveyWarranty:getAll', quotationId),
-  quotationSurveyWarrantySet: (quotationId: string, items: any[]) => ipcRenderer.invoke('quotationSurveyWarranty:set', quotationId, items),
-  quotationSurveyWarrantyAdd: (data: any) => ipcRenderer.invoke('quotationSurveyWarranty:add', data),
-  quotationSurveyWarrantyUpdate: (id: string, data: any) => ipcRenderer.invoke('quotationSurveyWarranty:update', id, data),
-  quotationSurveyWarrantyDelete: (id: string) => ipcRenderer.invoke('quotationSurveyWarranty:delete', id),
+  quotationSurveyWarrantyGetAll: (quotationId: string) =>
+    ipcRenderer.invoke('quotationSurveyWarranty:getAll', quotationId),
+  quotationSurveyWarrantySet: (quotationId: string, items: any[]) =>
+    ipcRenderer.invoke('quotationSurveyWarranty:set', quotationId, items),
+  quotationSurveyWarrantyAdd: (data: any) =>
+    ipcRenderer.invoke('quotationSurveyWarranty:add', data),
+  quotationSurveyWarrantyUpdate: (id: string, data: any) =>
+    ipcRenderer.invoke('quotationSurveyWarranty:update', id, data),
+  quotationSurveyWarrantyDelete: (id: string) =>
+    ipcRenderer.invoke('quotationSurveyWarranty:delete', id),
 
   // Database Backup & Restore
   dbBackup: () => ipcRenderer.invoke('db:backup'),
@@ -884,83 +1303,116 @@ const api = {
   // Banks
   bankGetAll: () => ipcRenderer.invoke('bank:getAll'),
   bankAdd: (name: string, details: string) => ipcRenderer.invoke('bank:add', name, details),
-  bankUpdate: (id: string, data: { name: string; details: string }) => ipcRenderer.invoke('bank:update', id, data),
+  bankUpdate: (id: string, data: { name: string; details: string }) =>
+    ipcRenderer.invoke('bank:update', id, data),
   bankDelete: (id: string) => ipcRenderer.invoke('bank:delete', id),
   bankReorder: (ids: string[]) => ipcRenderer.invoke('bank:reorder', ids),
 
   // Commission defaults & overrides
   commissionGetDefaults: () => ipcRenderer.invoke('commission:getDefaults'),
-  commissionSetDefault: (policyTypeId: string, commissionPercent: number) => ipcRenderer.invoke('commission:setDefault', policyTypeId, commissionPercent),
-  commissionGetOverrides: (entityId?: string) => ipcRenderer.invoke('commission:getOverrides', entityId || null),
-  commissionSetOverride: (entityId: string, policyTypeId: string, commissionPercent: number) => ipcRenderer.invoke('commission:setOverride', entityId, policyTypeId, commissionPercent),
-  commissionDeleteOverride: (entityId: string, policyTypeId: string) => ipcRenderer.invoke('commission:deleteOverride', entityId, policyTypeId),
-  commissionResolve: (entityId: string | null, policyTypeId: string) => ipcRenderer.invoke('commission:resolve', entityId, policyTypeId),
+  commissionSetDefault: (policyTypeId: string, commissionPercent: number) =>
+    ipcRenderer.invoke('commission:setDefault', policyTypeId, commissionPercent),
+  commissionGetOverrides: (entityId?: string) =>
+    ipcRenderer.invoke('commission:getOverrides', entityId || null),
+  commissionSetOverride: (entityId: string, policyTypeId: string, commissionPercent: number) =>
+    ipcRenderer.invoke('commission:setOverride', entityId, policyTypeId, commissionPercent),
+  commissionDeleteOverride: (entityId: string, policyTypeId: string) =>
+    ipcRenderer.invoke('commission:deleteOverride', entityId, policyTypeId),
+  commissionResolve: (entityId: string | null, policyTypeId: string) =>
+    ipcRenderer.invoke('commission:resolve', entityId, policyTypeId),
 
   // Policy document methods
   policyGetById: (id: string) => ipcRenderer.invoke('policy:getById', id),
   policyGetInstalments: (policyId: string) => ipcRenderer.invoke('policy:getInstalments', policyId),
   policyGetAddresses: (policyId: string) => ipcRenderer.invoke('policy:getAddresses', policyId),
-  policyGetConvertedVesselIds: (quotationId: string) => ipcRenderer.invoke('policy:getConvertedVesselIds', quotationId),
+  policyGetConvertedVesselIds: (quotationId: string) =>
+    ipcRenderer.invoke('policy:getConvertedVesselIds', quotationId),
   policyGetBlueCards: (policyId: string) => ipcRenderer.invoke('policy:getBlueCards', policyId),
-  policyGetRevisions: (policyNumber: string) => ipcRenderer.invoke('policy:getRevisions', policyNumber),
+  policyGetRevisions: (policyNumber: string) =>
+    ipcRenderer.invoke('policy:getRevisions', policyNumber),
   policyAddBlueCard: (data: any) => ipcRenderer.invoke('policy:addBlueCard', data),
-  policyUpdateBlueCard: (id: string, data: any) => ipcRenderer.invoke('policy:updateBlueCard', id, data),
+  policyUpdateBlueCard: (id: string, data: any) =>
+    ipcRenderer.invoke('policy:updateBlueCard', id, data),
   policySupersedeBlueCard: (id: string) => ipcRenderer.invoke('policy:supersedeBlueCard', id),
   policyUpdate: (id: string, fields: any) => ipcRenderer.invoke('policy:update', id, fields),
-  policySetInstalments: (policyId: string, instalments: any[]) => ipcRenderer.invoke('policy:setInstalments', policyId, instalments),
-  policySetAddresses: (policyId: string, addresses: any[]) => ipcRenderer.invoke('policy:setAddresses', policyId, addresses),
+  policySetInstalments: (policyId: string, instalments: any[]) =>
+    ipcRenderer.invoke('policy:setInstalments', policyId, instalments),
+  policySetAddresses: (policyId: string, addresses: any[]) =>
+    ipcRenderer.invoke('policy:setAddresses', policyId, addresses),
   policyCreateRevision: (policyId: string) => ipcRenderer.invoke('policy:createRevision', policyId),
   policyDelete: (id: string) => ipcRenderer.invoke('policy:delete', id),
-  policyConvertFromQuotation: (quotationId: string, options: any) => ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
-  policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => ipcRenderer.invoke('policy:findActiveForVessel', vesselId, quotationTypeCode),
+  policyConvertFromQuotation: (quotationId: string, options: any) =>
+    ipcRenderer.invoke('policy:convertFromQuotation', quotationId, options),
+  policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) =>
+    ipcRenderer.invoke('policy:findActiveForVessel', vesselId, quotationTypeCode),
   policyRenew: (policyId: string) => ipcRenderer.invoke('policy:renew', policyId),
-  policyRenewFleet: (vesselIds: string[], quotationTypeCode: string) => ipcRenderer.invoke('policy:renewFleet', vesselIds, quotationTypeCode),
+  policyRenewFleet: (vesselIds: string[], quotationTypeCode: string) =>
+    ipcRenderer.invoke('policy:renewFleet', vesselIds, quotationTypeCode),
   policySign: (policyId: string) => ipcRenderer.invoke('policy:sign', policyId),
   policyGetSignature: (policyId: string) => ipcRenderer.invoke('policy:getSignature', policyId),
-  policyGetExportFile: (policyId: string, docKey: string) => ipcRenderer.invoke('policy:getExportFile', policyId, docKey),
-  policySaveExportFile: (policyId: string, docKey: string, fileName: string, data: Uint8Array) => ipcRenderer.invoke('policy:saveExportFile', policyId, docKey, fileName, data),
+  policyGetExportFile: (policyId: string, docKey: string) =>
+    ipcRenderer.invoke('policy:getExportFile', policyId, docKey),
+  policySaveExportFile: (policyId: string, docKey: string, fileName: string, data: Uint8Array) =>
+    ipcRenderer.invoke('policy:saveExportFile', policyId, docKey, fileName, data),
 
   // Policy Endorsements
   endorsementList: (policyDocId: string) => ipcRenderer.invoke('endorsement:list', policyDocId),
   endorsementGet: (id: string) => ipcRenderer.invoke('endorsement:get', id),
-  endorsementNextNumber: (policyDocId: string) => ipcRenderer.invoke('endorsement:nextNumber', policyDocId),
+  endorsementNextNumber: (policyDocId: string) =>
+    ipcRenderer.invoke('endorsement:nextNumber', policyDocId),
   endorsementCreate: (data: any) => ipcRenderer.invoke('endorsement:create', data),
-  endorsementUpdate: (id: string, updates: any) => ipcRenderer.invoke('endorsement:update', id, updates),
+  endorsementUpdate: (id: string, updates: any) =>
+    ipcRenderer.invoke('endorsement:update', id, updates),
   endorsementDelete: (id: string) => ipcRenderer.invoke('endorsement:delete', id),
-  endorsementGetSections: (endorsementId: string) => ipcRenderer.invoke('endorsement:getSections', endorsementId),
-  endorsementSetSections: (endorsementId: string, sections: any[]) => ipcRenderer.invoke('endorsement:setSections', endorsementId, sections),
-  endorsementGetInstalments: (endorsementId: string) => ipcRenderer.invoke('endorsement:getInstalments', endorsementId),
-  endorsementSetInstalments: (endorsementId: string, instalments: any[]) => ipcRenderer.invoke('endorsement:setInstalments', endorsementId, instalments),
+  endorsementGetSections: (endorsementId: string) =>
+    ipcRenderer.invoke('endorsement:getSections', endorsementId),
+  endorsementSetSections: (endorsementId: string, sections: any[]) =>
+    ipcRenderer.invoke('endorsement:setSections', endorsementId, sections),
+  endorsementGetInstalments: (endorsementId: string) =>
+    ipcRenderer.invoke('endorsement:getInstalments', endorsementId),
+  endorsementSetInstalments: (endorsementId: string, instalments: any[]) =>
+    ipcRenderer.invoke('endorsement:setInstalments', endorsementId, instalments),
   endorsementCount: (policyDocId: string) => ipcRenderer.invoke('endorsement:count', policyDocId),
   endorsementSign: (id: string) => ipcRenderer.invoke('endorsement:sign', id),
   endorsementGetTriggerFields: () => ipcRenderer.invoke('endorsement:getTriggerFields'),
-  endorsementSetTriggerFields: (fields: any[]) => ipcRenderer.invoke('endorsement:setTriggerFields', fields),
+  endorsementSetTriggerFields: (fields: any[]) =>
+    ipcRenderer.invoke('endorsement:setTriggerFields', fields),
   endorsementGetTemplates: () => ipcRenderer.invoke('endorsement:getTemplates'),
   endorsementAddTemplate: (data: any) => ipcRenderer.invoke('endorsement:addTemplate', data),
-  endorsementUpdateTemplate: (id: string, updates: any) => ipcRenderer.invoke('endorsement:updateTemplate', id, updates),
+  endorsementUpdateTemplate: (id: string, updates: any) =>
+    ipcRenderer.invoke('endorsement:updateTemplate', id, updates),
   endorsementDeleteTemplate: (id: string) => ipcRenderer.invoke('endorsement:deleteTemplate', id),
-  endorsementReorderTemplates: (ids: string[]) => ipcRenderer.invoke('endorsement:reorderTemplates', ids),
-  endorsementCancelPolicy: (policyDocId: string, options: any) => ipcRenderer.invoke('endorsement:cancelPolicy', policyDocId, options),
+  endorsementReorderTemplates: (ids: string[]) =>
+    ipcRenderer.invoke('endorsement:reorderTemplates', ids),
+  endorsementCancelPolicy: (policyDocId: string, options: any) =>
+    ipcRenderer.invoke('endorsement:cancelPolicy', policyDocId, options),
 
   // Signatures
   signatureGet: () => ipcRenderer.invoke('signature:get'),
   signatureGetForUser: (userId: string) => ipcRenderer.invoke('signature:getForUser', userId),
-  signatureUpload: (imageData: number[], fileName: string) => ipcRenderer.invoke('signature:upload', imageData, fileName),
-  signatureUploadForUser: (userId: string, filePath: string) => ipcRenderer.invoke('signature:uploadForUser', userId, filePath),
+  signatureUpload: (imageData: number[], fileName: string) =>
+    ipcRenderer.invoke('signature:upload', imageData, fileName),
+  signatureUploadForUser: (userId: string, filePath: string) =>
+    ipcRenderer.invoke('signature:uploadForUser', userId, filePath),
   signatureDelete: () => ipcRenderer.invoke('signature:delete'),
   signatureDeleteForUser: (userId: string) => ipcRenderer.invoke('signature:deleteForUser', userId),
   signatureGetAll: () => ipcRenderer.invoke('signature:getAll'),
 
   // Notification Groups
   notifGroupGetAll: () => ipcRenderer.invoke('notifGroup:getAll'),
-  notifGroupAdd: (name: string, description?: string) => ipcRenderer.invoke('notifGroup:add', name, description),
-  notifGroupUpdate: (id: string, name: string, description?: string) => ipcRenderer.invoke('notifGroup:update', id, name, description),
+  notifGroupAdd: (name: string, description?: string) =>
+    ipcRenderer.invoke('notifGroup:add', name, description),
+  notifGroupUpdate: (id: string, name: string, description?: string) =>
+    ipcRenderer.invoke('notifGroup:update', id, name, description),
   notifGroupDelete: (id: string) => ipcRenderer.invoke('notifGroup:delete', id),
   notifGroupReorder: (ids: string[]) => ipcRenderer.invoke('notifGroup:reorder', ids),
   notifGroupGetMembers: (groupId: string) => ipcRenderer.invoke('notifGroup:getMembers', groupId),
-  notifGroupSetMembers: (groupId: string, userIds: string[]) => ipcRenderer.invoke('notifGroup:setMembers', groupId, userIds),
-  notifGroupGetSubscriptions: (groupId: string) => ipcRenderer.invoke('notifGroup:getSubscriptions', groupId),
-  notifGroupSetSubscriptions: (groupId: string, eventTypes: string[]) => ipcRenderer.invoke('notifGroup:setSubscriptions', groupId, eventTypes),
+  notifGroupSetMembers: (groupId: string, userIds: string[]) =>
+    ipcRenderer.invoke('notifGroup:setMembers', groupId, userIds),
+  notifGroupGetSubscriptions: (groupId: string) =>
+    ipcRenderer.invoke('notifGroup:getSubscriptions', groupId),
+  notifGroupSetSubscriptions: (groupId: string, eventTypes: string[]) =>
+    ipcRenderer.invoke('notifGroup:setSubscriptions', groupId, eventTypes),
 
   // Daily Alerts
   dailyAlertsRunNow: () => ipcRenderer.invoke('dailyAlerts:runNow'),
@@ -979,34 +1431,44 @@ const api = {
 
   // Column Preferences
   columnPrefsGet: (pageKey: string) => ipcRenderer.invoke('columnPrefs:get', pageKey),
-  columnPrefsSet: (pageKey: string, columnIds: string[]) => ipcRenderer.invoke('columnPrefs:set', pageKey, columnIds),
+  columnPrefsSet: (pageKey: string, columnIds: string[]) =>
+    ipcRenderer.invoke('columnPrefs:set', pageKey, columnIds),
 
   // Bulk Operations
-  bulkAssignFleet: (vesselIds: string[], fleetId: string) => ipcRenderer.invoke('bulk:assignFleet', vesselIds, fleetId),
-  bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) => ipcRenderer.invoke('bulk:setVesselStatus', vesselIds, isActive),
+  bulkAssignFleet: (vesselIds: string[], fleetId: string) =>
+    ipcRenderer.invoke('bulk:assignFleet', vesselIds, fleetId),
+  bulkSetVesselStatus: (vesselIds: string[], isActive: boolean) =>
+    ipcRenderer.invoke('bulk:setVesselStatus', vesselIds, isActive),
   bulkDeleteEntities: (entityIds: string[]) => ipcRenderer.invoke('bulk:deleteEntities', entityIds),
 
   // Report Builder
   reportBuilderGetSaved: () => ipcRenderer.invoke('reports:getSaved'),
   reportBuilderSave: (data: any) => ipcRenderer.invoke('reports:save', data),
   reportBuilderDelete: (id: string) => ipcRenderer.invoke('reports:delete', id),
-  reportBuilderRun: (dataSource: string, config: any) => ipcRenderer.invoke('reports:run', dataSource, config),
+  reportBuilderRun: (dataSource: string, config: any) =>
+    ipcRenderer.invoke('reports:run', dataSource, config),
 
   // Document Templates
-  fileSaveDocx: (data: number[], defaultName: string) => ipcRenderer.invoke('file:saveDocx', data, defaultName),
+  fileSaveDocx: (data: number[], defaultName: string) =>
+    ipcRenderer.invoke('file:saveDocx', data, defaultName),
   docTemplateGetAll: (category?: string) => ipcRenderer.invoke('docTemplate:getAll', category),
   docTemplateGetById: (id: string) => ipcRenderer.invoke('docTemplate:getById', id),
   docTemplateAdd: (data: any) => ipcRenderer.invoke('docTemplate:add', data),
   docTemplateUpdate: (id: string, data: any) => ipcRenderer.invoke('docTemplate:update', id, data),
-  docTemplateReplaceFile: (id: string, data: any) => ipcRenderer.invoke('docTemplate:replaceFile', id, data),
+  docTemplateReplaceFile: (id: string, data: any) =>
+    ipcRenderer.invoke('docTemplate:replaceFile', id, data),
   docTemplateDelete: (id: string) => ipcRenderer.invoke('docTemplate:delete', id),
   docTemplateReorder: (ids: string[]) => ipcRenderer.invoke('docTemplate:reorder', ids),
-  docTemplateGenerate: (templateId: string, context: { vesselId?: string; policyId?: string; entityId?: string }) => ipcRenderer.invoke('docTemplate:generate', templateId, context),
+  docTemplateGenerate: (
+    templateId: string,
+    context: { vesselId?: string; policyId?: string; entityId?: string }
+  ) => ipcRenderer.invoke('docTemplate:generate', templateId, context),
 
   // Custom Validation Rules
   validationRulesGetAll: () => ipcRenderer.invoke('validationRules:getAll'),
   validationRulesAdd: (rule: any) => ipcRenderer.invoke('validationRules:add', rule),
-  validationRulesUpdate: (id: string, updates: any) => ipcRenderer.invoke('validationRules:update', id, updates),
+  validationRulesUpdate: (id: string, updates: any) =>
+    ipcRenderer.invoke('validationRules:update', id, updates),
   validationRulesDelete: (id: string) => ipcRenderer.invoke('validationRules:delete', id),
   validationRulesReorder: (ids: string[]) => ipcRenderer.invoke('validationRules:reorder', ids),
   validationRulesRun: () => ipcRenderer.invoke('validationRules:run'),
@@ -1016,7 +1478,8 @@ const api = {
 
   // Recent Items
   recentItemsGet: () => ipcRenderer.invoke('recent:get'),
-  recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) => ipcRenderer.invoke('recent:add', itemType, itemId, itemLabel, itemSublabel),
+  recentItemsAdd: (itemType: string, itemId: string, itemLabel: string, itemSublabel?: string) =>
+    ipcRenderer.invoke('recent:add', itemType, itemId, itemLabel, itemSublabel),
 
   // T&C Templates
   tcGetTemplate: (typeCode: string) => ipcRenderer.invoke('tc:getTemplate', typeCode),
@@ -1025,31 +1488,62 @@ const api = {
   tcListByType: (typeCode: string) => ipcRenderer.invoke('tc:listByType', typeCode),
   tcGetById: (id: string) => ipcRenderer.invoke('tc:getById', id),
   tcGetFileById: (id: string) => ipcRenderer.invoke('tc:getFileById', id),
-  tcCreate: (data: { typeCode: string; name: string; kind: 'html' | 'docx'; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null; makeDefault?: boolean }) => ipcRenderer.invoke('tc:create', data),
-  tcUpdate: (id: string, updates: { name?: string; contentHtml?: string | null; fileData?: number[] | null; fileName?: string | null }) => ipcRenderer.invoke('tc:update', id, updates),
+  tcCreate: (data: {
+    typeCode: string
+    name: string
+    kind: 'html' | 'docx'
+    contentHtml?: string | null
+    fileData?: number[] | null
+    fileName?: string | null
+    makeDefault?: boolean
+  }) => ipcRenderer.invoke('tc:create', data),
+  tcUpdate: (
+    id: string,
+    updates: {
+      name?: string
+      contentHtml?: string | null
+      fileData?: number[] | null
+      fileName?: string | null
+    }
+  ) => ipcRenderer.invoke('tc:update', id, updates),
   tcSetDefault: (id: string) => ipcRenderer.invoke('tc:setDefault', id),
   tcDeleteById: (id: string) => ipcRenderer.invoke('tc:deleteById', id),
-  convertDocxBufferToPdf: (data: { docxData: number[]; fileName?: string }) => ipcRenderer.invoke('convert:docxBufferToPdf', data),
+  convertDocxBufferToPdf: (data: { docxData: number[]; fileName?: string }) =>
+    ipcRenderer.invoke('convert:docxBufferToPdf', data),
 
   // File Manager
   fileManagerGetRoot: () => ipcRenderer.invoke('fileManager:getRoot'),
   fileManagerSetRoot: (rootPath: string) => ipcRenderer.invoke('fileManager:setRoot', rootPath),
-  fileManagerReadDirectory: (dirPath: string) => ipcRenderer.invoke('fileManager:readDirectory', dirPath),
-  fileManagerReadTree: (dirPath: string, depth?: number) => ipcRenderer.invoke('fileManager:readTree', dirPath, depth),
-  fileManagerMoveFolder: (sourcePath: string, destParentPath: string) => ipcRenderer.invoke('fileManager:moveFolder', sourcePath, destParentPath),
-  fileManagerRenameFolder: (folderPath: string, newName: string) => ipcRenderer.invoke('fileManager:renameFolder', folderPath, newName),
-  fileManagerCreateFolder: (parentPath: string, name: string) => ipcRenderer.invoke('fileManager:createFolder', parentPath, name),
+  fileManagerReadDirectory: (dirPath: string) =>
+    ipcRenderer.invoke('fileManager:readDirectory', dirPath),
+  fileManagerReadTree: (dirPath: string, depth?: number) =>
+    ipcRenderer.invoke('fileManager:readTree', dirPath, depth),
+  fileManagerMoveFolder: (sourcePath: string, destParentPath: string) =>
+    ipcRenderer.invoke('fileManager:moveFolder', sourcePath, destParentPath),
+  fileManagerRenameFolder: (folderPath: string, newName: string) =>
+    ipcRenderer.invoke('fileManager:renameFolder', folderPath, newName),
+  fileManagerCreateFolder: (parentPath: string, name: string) =>
+    ipcRenderer.invoke('fileManager:createFolder', parentPath, name),
   fileManagerExists: (filePath: string) => ipcRenderer.invoke('fileManager:exists', filePath),
   fileManagerHealthCheck: () => ipcRenderer.invoke('fileManager:healthCheck'),
-  fileManagerOpenInExplorer: (filePath: string) => ipcRenderer.invoke('fileManager:openInExplorer', filePath),
+  fileManagerOpenInExplorer: (filePath: string) =>
+    ipcRenderer.invoke('fileManager:openInExplorer', filePath),
   fileManagerOpenFile: (filePath: string) => ipcRenderer.invoke('fileManager:openFile', filePath),
 
   // DOCX-to-PDF Conversion
   convertDocxToPdf: (docxPath: string) => ipcRenderer.invoke('convert:docxToPdf', docxPath),
   convertCountPdfPages: (pdfPath: string) => ipcRenderer.invoke('convert:countPdfPages', pdfPath),
-  convertMergePdfs: (pdfPaths: string[], outputPath: string) => ipcRenderer.invoke('convert:mergePdfs', pdfPaths, outputPath),
-  convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) => ipcRenderer.invoke('convert:setDocxPageStart', data),
-  convertBuildPolicyWithTC: (data: { policyDocxData: number[]; tcTypeCode: string; filePrefix: string; policyNumber?: string; policyTypeTitle?: string }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data),
+  convertMergePdfs: (pdfPaths: string[], outputPath: string) =>
+    ipcRenderer.invoke('convert:mergePdfs', pdfPaths, outputPath),
+  convertSetDocxPageStart: (data: { fileData: number[]; startPage: number }) =>
+    ipcRenderer.invoke('convert:setDocxPageStart', data),
+  convertBuildPolicyWithTC: (data: {
+    policyDocxData: number[]
+    tcTypeCode: string
+    filePrefix: string
+    policyNumber?: string
+    policyTypeTitle?: string
+  }) => ipcRenderer.invoke('convert:buildPolicyWithTC', data)
 }
 
 // Expose curated API to renderer via context bridge

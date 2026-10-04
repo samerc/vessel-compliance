@@ -21,20 +21,26 @@ interface TabsProps<K extends string> {
 export function Tabs<K extends string>({ items, value, onChange, trailing, style }: TabsProps<K>) {
   return (
     <div className="tabs" role="tablist" style={style}>
-      {items.filter(i => !i.hidden).map(i => (
-        <button
-          key={i.key}
-          role="tab"
-          aria-selected={value === i.key}
-          className={`tab${value === i.key ? ' active' : ''}`}
-          onClick={() => onChange(i.key)}
-        >
-          {i.icon}
-          {i.label}
-          {i.count !== undefined && <span className="tab-count">{i.count}</span>}
-        </button>
-      ))}
-      {trailing && <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>{trailing}</div>}
+      {items
+        .filter((i) => !i.hidden)
+        .map((i) => (
+          <button
+            key={i.key}
+            role="tab"
+            aria-selected={value === i.key}
+            className={`tab${value === i.key ? ' active' : ''}`}
+            onClick={() => onChange(i.key)}
+          >
+            {i.icon}
+            {i.label}
+            {i.count !== undefined && <span className="tab-count">{i.count}</span>}
+          </button>
+        ))}
+      {trailing && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {trailing}
+        </div>
+      )}
     </div>
   )
 }
@@ -49,18 +55,20 @@ interface SegmentedProps<K extends string> {
 export function SegmentedControl<K extends string>({ items, value, onChange }: SegmentedProps<K>) {
   return (
     <div className="segmented" role="tablist">
-      {items.filter(i => !i.hidden).map(i => (
-        <button
-          key={i.key}
-          role="tab"
-          aria-selected={value === i.key}
-          className={value === i.key ? 'active' : ''}
-          onClick={() => onChange(i.key)}
-        >
-          {i.icon}
-          {i.label}
-        </button>
-      ))}
+      {items
+        .filter((i) => !i.hidden)
+        .map((i) => (
+          <button
+            key={i.key}
+            role="tab"
+            aria-selected={value === i.key}
+            className={value === i.key ? 'active' : ''}
+            onClick={() => onChange(i.key)}
+          >
+            {i.icon}
+            {i.label}
+          </button>
+        ))}
     </div>
   )
 }

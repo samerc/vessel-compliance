@@ -24,8 +24,13 @@ if (app.isPackaged) {
     // A hot-update built for an OLDER app version must not override a newer full installer
     // (it would run old code against the new Electron and node_modules)
     const olderThanInstalled = (v: unknown): boolean => {
-      const a = String(v || '0').split('.').map(n => parseInt(n, 10) || 0)
-      const b = app.getVersion().split('.').map(n => parseInt(n, 10) || 0)
+      const a = String(v || '0')
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0)
+      const b = app
+        .getVersion()
+        .split('.')
+        .map((n) => parseInt(n, 10) || 0)
       for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0)
       return false
     }
@@ -33,7 +38,8 @@ if (app.isPackaged) {
     if (existsSync(hotApp) && existsSync(hotVersion)) {
       // Validate the version file is readable JSON
       const info = JSON.parse(readFileSync(hotVersion, 'utf-8'))
-      if (olderThanInstalled(info.version)) throw new Error('hot-update cache is older than the installed app')
+      if (olderThanInstalled(info.version))
+        throw new Error('hot-update cache is older than the installed app')
 
       // Ensure externalized modules (mysql2) resolve from the ASAR node_modules
       const asarNodeModules = join(app.getAppPath(), 'node_modules')
@@ -65,15 +71,26 @@ try {
     const fs = require('fs')
     const userData = app.getPath('userData')
     let info: any = {}
-    try { info = JSON.parse(fs.readFileSync(join(HOT_UPDATE_DIR, 'version.json'), 'utf-8')) } catch { /* unknown build */ }
-    fs.writeFileSync(join(userData, 'hot-update-blocked.json'), JSON.stringify({
-      buildNumber: info.buildNumber ?? null, version: info.version ?? null,
-      at: new Date().toISOString(), error: String((err as Error)?.message || err).slice(0, 500)
-    }))
+    try {
+      info = JSON.parse(fs.readFileSync(join(HOT_UPDATE_DIR, 'version.json'), 'utf-8'))
+    } catch {
+      /* unknown build */
+    }
+    fs.writeFileSync(
+      join(userData, 'hot-update-blocked.json'),
+      JSON.stringify({
+        buildNumber: info.buildNumber ?? null,
+        version: info.version ?? null,
+        at: new Date().toISOString(),
+        error: String((err as Error)?.message || err).slice(0, 500)
+      })
+    )
     const brokenDir = `${HOT_UPDATE_DIR}-broken`
     fs.rmSync(brokenDir, { recursive: true, force: true })
     fs.renameSync(HOT_UPDATE_DIR, brokenDir)
-  } catch { /* ignore — fallback still proceeds */ }
+  } catch {
+    /* ignore — fallback still proceeds */
+  }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require(bundledEntry)
 }

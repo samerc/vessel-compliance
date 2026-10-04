@@ -4,13 +4,19 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
 import { PageHeader, EmptyState } from './ui'
-import {
-  exportReceiptDocx, ordinal, formatReceiptAmount
-} from '../services/ReceiptExportService'
+import { exportReceiptDocx, ordinal, formatReceiptAmount } from '../services/ReceiptExportService'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Receipt as ReceiptIcon, Plus, FileDown, Trash2, Pencil, Search, X, Settings, Ship
+  Receipt as ReceiptIcon,
+  Plus,
+  FileDown,
+  Trash2,
+  Pencil,
+  Search,
+  X,
+  Settings,
+  Ship
 } from 'lucide-react'
 import { formatDate } from '../utils/dateUtils'
 import { StrMoneyInput } from './quotation-tabs/shared'
@@ -32,11 +38,16 @@ interface ReceiptManagerProps {
   embedded?: boolean
 }
 
-interface FormPolicy { policyDocId: string | null; policyNumber: string; typeName?: string; instalments: number[] }
+interface FormPolicy {
+  policyDocId: string | null
+  policyNumber: string
+  typeName?: string
+  instalments: number[]
+}
 
 // Parse "1 & 2", "1,2", "1 2" → [1, 2] (unique, sorted, positive)
 function parseInstalments(value: string): number[] {
-  const nums = (value.match(/\d+/g) || []).map(n => parseInt(n, 10)).filter(n => n > 0)
+  const nums = (value.match(/\d+/g) || []).map((n) => parseInt(n, 10)).filter((n) => n > 0)
   return Array.from(new Set(nums)).sort((a, b) => a - b)
 }
 
@@ -44,11 +55,16 @@ function parseInstalments(value: string): number[] {
 function instalmentPhrase(nums: number[], ord: (n: number) => string): string {
   const list = nums.length ? nums : [1]
   const ords = list.map(ord)
-  const joined = ords.length === 1 ? ords[0] : `${ords.slice(0, -1).join(', ')} & ${ords[ords.length - 1]}`
+  const joined =
+    ords.length === 1 ? ords[0] : `${ords.slice(0, -1).join(', ')} & ${ords[ords.length - 1]}`
   return `${joined} installment${list.length > 1 ? 's' : ''}`
 }
 
-export default function ReceiptManager({ vesselId, vesselName, embedded = false }: ReceiptManagerProps) {
+export default function ReceiptManager({
+  vesselId,
+  vesselName,
+  embedded = false
+}: ReceiptManagerProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
@@ -68,7 +84,9 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
   const loadReceipts = useCallback(async () => {
     setLoading(true)
     try {
-      const data = vesselId ? await window.api.receiptListByVessel(vesselId) : await window.api.receiptList()
+      const data = vesselId
+        ? await window.api.receiptListByVessel(vesselId)
+        : await window.api.receiptList()
       setReceipts(Array.isArray(data) ? data : [])
     } catch (e: any) {
       showError(e?.message || 'Failed to load receipts')
@@ -77,16 +95,19 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
     }
   }, [vesselId, showError])
 
-  useEffect(() => { loadReceipts() }, [loadReceipts])
+  useEffect(() => {
+    loadReceipts()
+  }, [loadReceipts])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return receipts
-    return receipts.filter(r =>
-      r.receiptNumber.toLowerCase().includes(q) ||
-      (r.vesselName || '').toLowerCase().includes(q) ||
-      (r.payerName || '').toLowerCase().includes(q) ||
-      (r.coversText || '').toLowerCase().includes(q)
+    return receipts.filter(
+      (r) =>
+        r.receiptNumber.toLowerCase().includes(q) ||
+        (r.vesselName || '').toLowerCase().includes(q) ||
+        (r.payerName || '').toLowerCase().includes(q) ||
+        (r.coversText || '').toLowerCase().includes(q)
     )
   }, [receipts, search])
 
@@ -112,7 +133,10 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
     }
   }
 
-  const openCreate = () => { setEditing(null); setShowModal(true) }
+  const openCreate = () => {
+    setEditing(null)
+    setShowModal(true)
+  }
   const openEdit = async (r: Receipt) => {
     try {
       const full = await window.api.receiptGet(r.id)
@@ -123,8 +147,21 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
     }
   }
 
-  const th: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--glass-border-color)', whiteSpace: 'nowrap' }
-  const td: React.CSSProperties = { padding: '10px 12px', fontSize: '0.85rem', borderBottom: '1px solid var(--glass-border-color)' }
+  const th: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '10px 12px',
+    fontSize: '0.72rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: 'var(--text-secondary)',
+    borderBottom: '1px solid var(--glass-border-color)',
+    whiteSpace: 'nowrap'
+  }
+  const td: React.CSSProperties = {
+    padding: '10px 12px',
+    fontSize: '0.85rem',
+    borderBottom: '1px solid var(--glass-border-color)'
+  }
 
   return (
     <div className={embedded ? undefined : 'fade-in page'}>
@@ -133,33 +170,67 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
           icon={<ReceiptIcon size={26} />}
           title="Receipts"
           subtitle="Payment receipts issued against vessel policies"
-          actions={<>
-            {canManage && <button className="btn-secondary" onClick={() => setShowSettings(true)}>
-              <Settings size={16} /> Settings
-            </button>}
-            <button className="btn-primary" onClick={openCreate}>
-              <Plus size={16} /> New Receipt
-            </button>
-          </>}
+          actions={
+            <>
+              {canManage && (
+                <button className="btn-secondary" onClick={() => setShowSettings(true)}>
+                  <Settings size={16} /> Settings
+                </button>
+              )}
+              <button className="btn-primary" onClick={openCreate}>
+                <Plus size={16} /> New Receipt
+              </button>
+            </>
+          }
         />
       )}
 
       {embedded && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{receipts.length} receipt{receipts.length === 1 ? '' : 's'}</div>
-          <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px'
+          }}
+        >
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            {receipts.length} receipt{receipts.length === 1 ? '' : 's'}
+          </div>
+          <button
+            className="btn-primary"
+            onClick={openCreate}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
             <Plus size={16} /> New Receipt
           </button>
         </div>
       )}
 
       <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '16px' }}>
-        <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+        <Search
+          size={16}
+          style={{
+            position: 'absolute',
+            left: '10px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--text-secondary)'
+          }}
+        />
         <input
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Search number, vessel, payer..."
-          style={{ width: '100%', padding: '9px 12px 9px 34px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+          style={{
+            width: '100%',
+            padding: '9px 12px 9px 34px',
+            borderRadius: '8px',
+            border: '1px solid var(--input-border)',
+            background: 'var(--input-bg)',
+            color: 'var(--text-primary)',
+            fontSize: '0.85rem'
+          }}
         />
       </div>
 
@@ -179,36 +250,82 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
             </thead>
             <tbody>
               {loading ? (
-                <tr><td style={td} colSpan={vesselId ? 6 : 7}>Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td style={{ ...td, textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }} colSpan={vesselId ? 6 : 7}>
-                  <EmptyState
-                    compact
-                    icon={<ReceiptIcon size={34} />}
-                    title={search ? 'No receipts match your search' : 'No receipts yet'}
-                    text={search ? undefined : 'Issue a receipt when a premium payment comes in; it can be exported to Word.'}
-                    action={search
-                      ? <button className="btn-secondary btn-sm" onClick={() => setSearch('')}>Clear search</button>
-                      : <button className="btn-primary btn-sm" onClick={openCreate}><Plus size={14} /> New Receipt</button>}
-                  />
-                </td></tr>
-              ) : filtered.map(r => (
-                <tr key={r.id}>
-                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 600 }}>{r.receiptNumber}</td>
-                  <td style={td}>{formatDate(r.receiptDate) || r.receiptDate}</td>
-                  {!vesselId && <td style={td}>{r.vesselName || '—'}</td>}
-                  <td style={td}>{r.payerName}</td>
-                  <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.78rem' }}>
-                    {(r.policies && r.policies.length > 0 ? r.policies.map(p => p.policyNumber).join(' & ') : (r.coversText || '—'))}
-                  </td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{formatReceiptAmount(r.amount, r.currency)}</td>
-                  <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button title="Export DOCX" onClick={() => handleExport(r)} style={iconBtn}><FileDown size={16} /></button>
-                    <button title="Edit" onClick={() => openEdit(r)} style={iconBtn}><Pencil size={16} /></button>
-                    {canManage && <button title="Delete" onClick={() => handleDelete(r)} style={{ ...iconBtn, color: 'var(--danger)' }}><Trash2 size={16} /></button>}
+                <tr>
+                  <td style={td} colSpan={vesselId ? 6 : 7}>
+                    Loading…
                   </td>
                 </tr>
-              ))}
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td
+                    style={{
+                      ...td,
+                      textAlign: 'center',
+                      padding: '40px',
+                      color: 'var(--text-secondary)'
+                    }}
+                    colSpan={vesselId ? 6 : 7}
+                  >
+                    <EmptyState
+                      compact
+                      icon={<ReceiptIcon size={34} />}
+                      title={search ? 'No receipts match your search' : 'No receipts yet'}
+                      text={
+                        search
+                          ? undefined
+                          : 'Issue a receipt when a premium payment comes in; it can be exported to Word.'
+                      }
+                      action={
+                        search ? (
+                          <button className="btn-secondary btn-sm" onClick={() => setSearch('')}>
+                            Clear search
+                          </button>
+                        ) : (
+                          <button className="btn-primary btn-sm" onClick={openCreate}>
+                            <Plus size={14} /> New Receipt
+                          </button>
+                        )
+                      }
+                    />
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ ...td, fontFamily: 'monospace', fontWeight: 600 }}>
+                      {r.receiptNumber}
+                    </td>
+                    <td style={td}>{formatDate(r.receiptDate) || r.receiptDate}</td>
+                    {!vesselId && <td style={td}>{r.vesselName || '—'}</td>}
+                    <td style={td}>{r.payerName}</td>
+                    <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                      {r.policies && r.policies.length > 0
+                        ? r.policies.map((p) => p.policyNumber).join(' & ')
+                        : r.coversText || '—'}
+                    </td>
+                    <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>
+                      {formatReceiptAmount(r.amount, r.currency)}
+                    </td>
+                    <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button title="Export DOCX" onClick={() => handleExport(r)} style={iconBtn}>
+                        <FileDown size={16} />
+                      </button>
+                      <button title="Edit" onClick={() => openEdit(r)} style={iconBtn}>
+                        <Pencil size={16} />
+                      </button>
+                      {canManage && (
+                        <button
+                          title="Delete"
+                          onClick={() => handleDelete(r)}
+                          style={{ ...iconBtn, color: 'var(--danger)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -222,21 +339,37 @@ export default function ReceiptManager({ vesselId, vesselName, embedded = false 
           lockedVesselId={vesselId}
           lockedVesselName={vesselName}
           onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); loadReceipts() }}
+          onSaved={() => {
+            setShowModal(false)
+            loadReceipts()
+          }}
         />
       )}
 
-      {showSettings && (
-        <SettingsModal modalBg={modalBg} onClose={() => setShowSettings(false)} />
-      )}
+      {showSettings && <SettingsModal modalBg={modalBg} onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
 
-const iconBtn: React.CSSProperties = { background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 6px', verticalAlign: 'middle' }
+const iconBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  color: 'var(--text-secondary)',
+  padding: '4px 6px',
+  verticalAlign: 'middle'
+}
 
 // ── Create / Edit modal ──────────────────────────────────────────────────
-function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselName, onClose, onSaved }: {
+function ReceiptModal({
+  isLight,
+  modalBg,
+  editing,
+  lockedVesselId,
+  lockedVesselName,
+  onClose,
+  onSaved
+}: {
   isLight: boolean
   modalBg: string
   editing: Receipt | null
@@ -261,12 +394,22 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const [vName, setVName] = useState<string>(editing?.vesselName ?? lockedVesselName ?? '')
   const [payerName, setPayerName] = useState(editing?.payerName ?? '')
   const [payerEntityId, setPayerEntityId] = useState<string | null>(editing?.payerEntityId ?? null)
-  const [amount, setAmount] = useState<string>(editing?.amount != null ? String(editing.amount) : '')
+  const [amount, setAmount] = useState<string>(
+    editing?.amount != null ? String(editing.amount) : ''
+  )
   const [currency, setCurrency] = useState(editing?.currency ?? 'USD')
-  const [selectedPolicies, setSelectedPolicies] = useState<FormPolicy[]>(editing?.policies?.map(p => ({ policyDocId: p.policyDocId ?? null, policyNumber: p.policyNumber, instalments: [editing.instalmentNumber || 1] })) ?? [])
+  const [selectedPolicies, setSelectedPolicies] = useState<FormPolicy[]>(
+    editing?.policies?.map((p) => ({
+      policyDocId: p.policyDocId ?? null,
+      policyNumber: p.policyNumber,
+      instalments: [editing.instalmentNumber || 1]
+    })) ?? []
+  )
   const [policySearch, setPolicySearch] = useState('')
   const [freeCovers, setFreeCovers] = useState('')
-  const [payerMode, setPayerMode] = useState<'select' | 'other'>(editing && !editing.payerEntityId ? 'other' : 'select')
+  const [payerMode, setPayerMode] = useState<'select' | 'other'>(
+    editing && !editing.payerEntityId ? 'other' : 'select'
+  )
   const [receiptDate, setReceiptDate] = useState(editing?.receiptDate || today)
   const [numberPreview, setNumberPreview] = useState(editing?.receiptNumber || '')
   const [numberOverride, setNumberOverride] = useState(!!editing)
@@ -276,33 +419,43 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   const [wordsOverride, setWordsOverride] = useState<string | null>(() => {
     const saved = editing?.amountWords ?? null
     if (saved == null || editing?.amount == null) return saved
-    return saved.trim() === numberToWords(Number(editing.amount), editing.currency ?? 'USD').trim() ? null : saved
+    return saved.trim() === numberToWords(Number(editing.amount), editing.currency ?? 'USD').trim()
+      ? null
+      : saved
   })
   const [city, setCity] = useState(editing?.city || 'BEIRUT')
 
   // Load vessels + next number + settings once
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       try {
         const vs = await window.api.getVessels()
         setVessels(Array.isArray(vs) ? vs : [])
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       try {
         const ents = await window.api.getEntities()
         const map: Record<string, string> = {}
-        for (const e of (Array.isArray(ents) ? ents : [])) map[e.id] = e.name
+        for (const e of Array.isArray(ents) ? ents : []) map[e.id] = e.name
         setEntityMap(map)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!editing) {
         try {
           const y = new Date(receiptDate).getFullYear()
           const nn = await window.api.receiptNextNumber(y)
           setNumberPreview(nn.number)
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         try {
           const st = await window.api.receiptGetSettings()
           if (st?.city) setCity(st.city)
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,49 +464,83 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   // Refresh number preview when the year changes (auto-number only)
   useEffect(() => {
     if (editing || numberOverride) return
-    (async () => {
+    ;(async () => {
       try {
         const y = new Date(receiptDate).getFullYear()
         const nn = await window.api.receiptNextNumber(y)
         setNumberPreview(nn.number)
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptDate])
 
   // Load assureds + policies when the vessel changes
   useEffect(() => {
-    if (!vId) { setAssureds([]); setPolicies([]); return }
-    (async () => {
+    if (!vId) {
+      setAssureds([])
+      setPolicies([])
+      return
+    }
+    ;(async () => {
       try {
         const as = await window.api.getVesselAssureds(vId)
         setAssureds(Array.isArray(as) ? as : [])
-      } catch { setAssureds([]) }
+      } catch {
+        setAssureds([])
+      }
       const merged: PolicyLite[] = []
       const seen = new Set<string>()
       try {
         const all = await window.api.getPoliciesList()
         for (const p of (Array.isArray(all) ? all : []).filter((p: any) => p.vesselId === vId)) {
           if (!p.policyNumber) continue
-          merged.push({ id: p.id, policyNumber: p.policyNumber, vesselId: p.vesselId, typeName: p.quotationTypeName || p.policyTypeName, status: p.status, source: 'issued' })
+          merged.push({
+            id: p.id,
+            policyNumber: p.policyNumber,
+            vesselId: p.vesselId,
+            typeName: p.quotationTypeName || p.policyTypeName,
+            status: p.status,
+            source: 'issued'
+          })
           seen.add(p.policyNumber)
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       try {
         const dyn = await window.api.getVesselDynamicPolicies(vId)
-        for (const p of (Array.isArray(dyn) ? dyn : [])) {
+        for (const p of Array.isArray(dyn) ? dyn : []) {
           if (!p.policyNumber || seen.has(p.policyNumber)) continue
-          merged.push({ id: p.id, policyNumber: p.policyNumber, vesselId: p.vesselId || vId, typeName: p.policyTypeName, status: p.status, source: 'dynamic' })
+          merged.push({
+            id: p.id,
+            policyNumber: p.policyNumber,
+            vesselId: p.vesselId || vId,
+            typeName: p.policyTypeName,
+            status: p.status,
+            source: 'dynamic'
+          })
           seen.add(p.policyNumber)
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       setPolicies(merged)
       // Backfill type names on already-selected policies (e.g. when editing an existing receipt)
-      setSelectedPolicies(prev => prev.map(sp => {
-        if (sp.typeName) return sp
-        const m = merged.find(mp => mp.policyNumber === sp.policyNumber)
-        return m ? { ...sp, typeName: m.typeName, policyDocId: sp.policyDocId ?? (m.source === 'issued' ? m.id : null) } : sp
-      }))
+      setSelectedPolicies((prev) =>
+        prev.map((sp) => {
+          if (sp.typeName) return sp
+          const m = merged.find((mp) => mp.policyNumber === sp.policyNumber)
+          return m
+            ? {
+                ...sp,
+                typeName: m.typeName,
+                policyDocId: sp.policyDocId ?? (m.source === 'issued' ? m.id : null)
+              }
+            : sp
+        })
+      )
     })()
   }, [vId])
 
@@ -369,16 +556,30 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
 
   const setPolicyInstalments = (policyNumber: string, value: string) => {
     const nums = parseInstalments(value)
-    setSelectedPolicies(prev => prev.map(sp => sp.policyNumber === policyNumber ? { ...sp, instalments: nums } : sp))
+    setSelectedPolicies((prev) =>
+      prev.map((sp) => (sp.policyNumber === policyNumber ? { ...sp, instalments: nums } : sp))
+    )
   }
 
   const togglePolicy = async (p: PolicyLite) => {
-    const exists = selectedPolicies.some(sp => sp.policyDocId === p.id || sp.policyNumber === p.policyNumber)
+    const exists = selectedPolicies.some(
+      (sp) => sp.policyDocId === p.id || sp.policyNumber === p.policyNumber
+    )
     let next: FormPolicy[]
     if (exists) {
-      next = selectedPolicies.filter(sp => sp.policyDocId !== p.id && sp.policyNumber !== p.policyNumber)
+      next = selectedPolicies.filter(
+        (sp) => sp.policyDocId !== p.id && sp.policyNumber !== p.policyNumber
+      )
     } else {
-      next = [...selectedPolicies, { policyDocId: p.source === 'issued' ? p.id : null, policyNumber: p.policyNumber, typeName: p.typeName, instalments: [defaultInst] }]
+      next = [
+        ...selectedPolicies,
+        {
+          policyDocId: p.source === 'issued' ? p.id : null,
+          policyNumber: p.policyNumber,
+          typeName: p.typeName,
+          instalments: [defaultInst]
+        }
+      ]
     }
     setSelectedPolicies(next)
     // Auto-suggest amount from a single converted (issued) policy's instalment schedule
@@ -386,9 +587,13 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
       try {
         const inst = await window.api.policyGetInstalments(p.id)
         const num = defaultInst
-        const row = (Array.isArray(inst) ? inst : []).find((i: any) => Number(i.instalmentNumber) === num) || (Array.isArray(inst) ? inst[num - 1] : null)
+        const row =
+          (Array.isArray(inst) ? inst : []).find((i: any) => Number(i.instalmentNumber) === num) ||
+          (Array.isArray(inst) ? inst[num - 1] : null)
         if (row && row.premiumAmount != null) setAmount(String(Number(row.premiumAmount)))
-      } catch { /* no schedule */ }
+      } catch {
+        /* no schedule */
+      }
     }
   }
 
@@ -398,23 +603,30 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
   // Merge selected policies + any free-typed covers into the working receipt for auto-text
   const workingPolicies = useMemo(() => {
     const list = [...selectedPolicies]
-    freeCovers.split(/[,&]/).map(s => s.trim()).filter(Boolean).forEach(pn => {
-      if (!list.some(p => p.policyNumber === pn)) list.push({ policyDocId: null, policyNumber: pn, instalments: [defaultInst] })
-    })
+    freeCovers
+      .split(/[,&]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((pn) => {
+        if (!list.some((p) => p.policyNumber === pn))
+          list.push({ policyDocId: null, policyNumber: pn, instalments: [defaultInst] })
+      })
     return list
   }, [selectedPolicies, freeCovers, defaultInst])
 
   // Split description: one clause per policy on its own line, joined with a trailing "and".
   const autoBeing = useMemo(() => {
     const clauses = workingPolicies
-      .filter(p => p.policyNumber)
-      .map(p => {
+      .filter((p) => p.policyNumber)
+      .map((p) => {
         const typ = p.typeName ? `${p.typeName} ` : ''
         return `${instalmentPhrase(p.instalments, ordinal)} of ${typ}cover ${p.policyNumber}`
       })
     if (clauses.length === 0) return vName ? `Settlement Re: M/V “${vName}”` : 'Settlement'
     // Each policy on its own line; "and" trails every line except the last.
-    const lines = clauses.map((c, i) => `${i === 0 ? 'Settlement ' : ''}${c}${i < clauses.length - 1 ? ' and' : ''}`)
+    const lines = clauses.map(
+      (c, i) => `${i === 0 ? 'Settlement ' : ''}${c}${i < clauses.length - 1 ? ' and' : ''}`
+    )
     let s = lines.join('\n')
     if (vName) s += ` Re: M/V “${vName}”`
     return s
@@ -429,13 +641,26 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     const q = vesselSearch.trim().toLowerCase()
     const sorted = [...vessels].sort((a, b) => a.name.localeCompare(b.name))
     if (!q) return sorted.slice(0, 100)
-    return sorted.filter(v => v.name.toLowerCase().includes(q) || (v.imoNumber || '').toLowerCase().includes(q)).slice(0, 100)
+    return sorted
+      .filter(
+        (v) => v.name.toLowerCase().includes(q) || (v.imoNumber || '').toLowerCase().includes(q)
+      )
+      .slice(0, 100)
   }, [vessels, vesselSearch])
 
   const handleSave = async () => {
-    if (!vName.trim()) { showError('Please select or enter a vessel'); return }
-    if (!payerName.trim()) { showError('Please enter who the payment is received from'); return }
-    if (amountNum <= 0) { showError('Please enter an amount'); return }
+    if (!vName.trim()) {
+      showError('Please select or enter a vessel')
+      return
+    }
+    if (!payerName.trim()) {
+      showError('Please enter who the payment is received from')
+      return
+    }
+    if (amountNum <= 0) {
+      showError('Please enter an amount')
+      return
+    }
     setSaving(true)
     const payload = {
       vesselId: vId,
@@ -445,13 +670,17 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
       amount: amountNum,
       currency,
       instalmentNumber: instNum,
-      coversText: workingPolicies.map(p => p.policyNumber).join(' & ') || null,
+      coversText: workingPolicies.map((p) => p.policyNumber).join(' & ') || null,
       beingText: beingValue,
       amountWords: wordsValue,
       city,
       receiptDate,
-      receiptNumber: numberOverride ? numberPreview : (editing ? editing.receiptNumber : undefined),
-      policies: workingPolicies.map((p, i) => ({ policyDocId: p.policyDocId, policyNumber: p.policyNumber, orderIndex: i }))
+      receiptNumber: numberOverride ? numberPreview : editing ? editing.receiptNumber : undefined,
+      policies: workingPolicies.map((p, i) => ({
+        policyDocId: p.policyDocId,
+        policyNumber: p.policyNumber,
+        orderIndex: i
+      }))
     }
     try {
       if (editing) {
@@ -469,17 +698,42 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
     }
   }
 
-  const label: React.CSSProperties = { display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }
-  const input: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }
+  const label: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.72rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: 'var(--text-secondary)',
+    marginBottom: '6px',
+    fontWeight: 600
+  }
+  const input: React.CSSProperties = {
+    width: '100%',
+    padding: '9px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--input-border)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-primary)',
+    fontSize: '0.85rem'
+  }
 
   return (
     <div style={overlay} onMouseDown={onClose}>
-      <div style={{ ...modalWrap, background: modalBg }} onMouseDown={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+      <div style={{ ...modalWrap, background: modalBg }} onMouseDown={(e) => e.stopPropagation()}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '18px'
+          }}
+        >
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ReceiptIcon size={22} /> {editing ? 'Edit Receipt' : 'New Receipt'}
           </h2>
-          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}><X size={20} /></button>
+          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}>
+            <X size={20} />
+          </button>
         </div>
 
         <div style={{ display: 'grid', gap: '16px' }}>
@@ -488,17 +742,41 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
             <div>
               <label style={label}>Receipt Number</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input style={{ ...input, fontFamily: 'monospace', opacity: numberOverride ? 1 : 0.7 }} value={numberPreview} disabled={!numberOverride} onChange={e => setNumberPreview(e.target.value)} />
+                <input
+                  style={{ ...input, fontFamily: 'monospace', opacity: numberOverride ? 1 : 0.7 }}
+                  value={numberPreview}
+                  disabled={!numberOverride}
+                  onChange={(e) => setNumberPreview(e.target.value)}
+                />
                 {!editing && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    <input type="checkbox" checked={numberOverride} onChange={e => setNumberOverride(e.target.checked)} /> edit
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={numberOverride}
+                      onChange={(e) => setNumberOverride(e.target.checked)}
+                    />{' '}
+                    edit
                   </label>
                 )}
               </div>
             </div>
             <div>
               <label style={label}>Date</label>
-              <input type="date" style={input} value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
+              <input
+                type="date"
+                style={input}
+                value={receiptDate}
+                onChange={(e) => setReceiptDate(e.target.value)}
+              />
             </div>
           </div>
 
@@ -510,29 +788,100 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
             ) : (
               <>
                 <div style={{ position: 'relative' }}>
-                  <Ship size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <Ship
+                    size={15}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-secondary)'
+                    }}
+                  />
                   <input
                     style={{ ...input, paddingLeft: '32px' }}
                     placeholder="Search vessel by name or IMO…"
                     value={vesselDropOpen ? vesselSearch : vName}
-                    onFocus={() => { setVesselDropOpen(true); setVesselSearch('') }}
-                    onChange={e => { setVesselSearch(e.target.value); setVesselDropOpen(true) }}
+                    onFocus={() => {
+                      setVesselDropOpen(true)
+                      setVesselSearch('')
+                    }}
+                    onChange={(e) => {
+                      setVesselSearch(e.target.value)
+                      setVesselDropOpen(true)
+                    }}
                     onBlur={() => setTimeout(() => setVesselDropOpen(false), 150)}
                   />
                 </div>
                 {vesselDropOpen && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: '4px', maxHeight: '240px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--input-border)', background: modalBg, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 50,
+                      marginTop: '4px',
+                      maxHeight: '240px',
+                      overflowY: 'auto',
+                      borderRadius: '8px',
+                      border: '1px solid var(--input-border)',
+                      background: modalBg,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                    }}
+                  >
                     {filteredVessels.length === 0 ? (
-                      <div style={{ padding: '10px 14px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No vessels found</div>
-                    ) : filteredVessels.map(v => (
-                      <div key={v.id} onMouseDown={() => selectVessel(v)}
-                        style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', gap: '8px', borderBottom: '1px solid var(--glass-border-color)' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <span>{v.name}{!v.isActive && <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}> (inactive)</span>}</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontFamily: 'monospace' }}>{v.imoNumber || ''}</span>
+                      <div
+                        style={{
+                          padding: '10px 14px',
+                          fontSize: '0.82rem',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        No vessels found
                       </div>
-                    ))}
+                    ) : (
+                      filteredVessels.map((v) => (
+                        <div
+                          key={v.id}
+                          onMouseDown={() => selectVessel(v)}
+                          style={{
+                            padding: '8px 14px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            borderBottom: '1px solid var(--glass-border-color)'
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = isLight
+                              ? 'rgba(0,0,0,0.04)'
+                              : 'rgba(255,255,255,0.06)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <span>
+                            {v.name}
+                            {!v.isActive && (
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                                {' '}
+                                (inactive)
+                              </span>
+                            )}
+                          </span>
+                          <span
+                            style={{
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.75rem',
+                              fontFamily: 'monospace'
+                            }}
+                          >
+                            {v.imoNumber || ''}
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </>
@@ -543,12 +892,21 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
             <div>
               <label style={label}>Amount</label>
-              <StrMoneyInput value={amount} onChange={s => setAmount(s)} placeholder="0.00" style={input} />
+              <StrMoneyInput
+                value={amount}
+                onChange={(s) => setAmount(s)}
+                placeholder="0.00"
+                style={input}
+              />
             </div>
             <div>
               <label style={label}>Currency</label>
-              <select style={input} value={currency} onChange={e => setCurrency(e.target.value)}>
-                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+              <select style={input} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -560,51 +918,92 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
               <input
                 style={{ ...input, marginBottom: '8px' }}
                 value={policySearch}
-                onChange={e => setPolicySearch(e.target.value)}
+                onChange={(e) => setPolicySearch(e.target.value)}
                 placeholder="Search policies by number or type…"
               />
             )}
             {vId && policies.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                 {policies
-                  .filter(p => {
+                  .filter((p) => {
                     const q = policySearch.trim().toLowerCase()
                     if (!q) return true
-                    return p.policyNumber.toLowerCase().includes(q) || (p.typeName || '').toLowerCase().includes(q)
-                  })
-                  .map(p => {
-                    const on = selectedPolicies.some(sp => sp.policyNumber === p.policyNumber)
                     return (
-                      <button key={p.id} onClick={() => togglePolicy(p)} style={{
-                        padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'monospace',
-                        border: on ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                        background: on ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
-                        color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                      }}>
-                        {p.policyNumber}{p.typeName ? ` · ${p.typeName}` : ''}{p.source === 'dynamic' ? ' ·' : ''}
+                      p.policyNumber.toLowerCase().includes(q) ||
+                      (p.typeName || '').toLowerCase().includes(q)
+                    )
+                  })
+                  .map((p) => {
+                    const on = selectedPolicies.some((sp) => sp.policyNumber === p.policyNumber)
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => togglePolicy(p)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          fontFamily: 'monospace',
+                          border: on
+                            ? '1.5px solid var(--accent-primary)'
+                            : '1px solid var(--input-border)',
+                          background: on ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
+                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                        }}
+                      >
+                        {p.policyNumber}
+                        {p.typeName ? ` · ${p.typeName}` : ''}
+                        {p.source === 'dynamic' ? ' ·' : ''}
                       </button>
                     )
                   })}
               </div>
             ) : (
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                {vId ? 'No policies on file for this vessel — type policy numbers below.' : 'Select a vessel to list its policies.'}
+              <div
+                style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}
+              >
+                {vId
+                  ? 'No policies on file for this vessel — type policy numbers below.'
+                  : 'Select a vessel to list its policies.'}
               </div>
             )}
-            <input style={{ ...input, fontFamily: 'monospace' }} value={freeCovers} onChange={e => setFreeCovers(e.target.value)} placeholder="Or type policy numbers, separated by & or comma (e.g. H26209901 & P26209902)" />
+            <input
+              style={{ ...input, fontFamily: 'monospace' }}
+              value={freeCovers}
+              onChange={(e) => setFreeCovers(e.target.value)}
+              placeholder="Or type policy numbers, separated by & or comma (e.g. H26209901 & P26209902)"
+            />
 
             {/* Per-policy instalment (split descriptions) — accepts multiple, e.g. 1 & 2 */}
             {selectedPolicies.length > 0 && (
               <div style={{ marginTop: '10px', display: 'grid', gap: '6px' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Instalment(s) per policy — description is split</div>
-                {selectedPolicies.map(sp => (
-                  <div key={sp.policyNumber} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>{sp.policyNumber}{sp.typeName ? ` · ${sp.typeName}` : ''}</span>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>Instalment(s)</span>
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em'
+                  }}
+                >
+                  Instalment(s) per policy — description is split
+                </div>
+                {selectedPolicies.map((sp) => (
+                  <div
+                    key={sp.policyNumber}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+                  >
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>
+                      {sp.policyNumber}
+                      {sp.typeName ? ` · ${sp.typeName}` : ''}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                      Instalment(s)
+                    </span>
                     <input
                       type="text"
                       defaultValue={sp.instalments.join(' & ')}
-                      onChange={e => setPolicyInstalments(sp.policyNumber, e.target.value)}
+                      onChange={(e) => setPolicyInstalments(sp.policyNumber, e.target.value)}
                       placeholder="e.g. 1 & 2"
                       title="One or more instalment numbers, e.g. 1 & 2"
                       style={{ ...input, width: '110px', padding: '6px 8px' }}
@@ -620,8 +1019,8 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
             <label style={label}>Received From</label>
             <select
               style={input}
-              value={payerMode === 'other' ? '__other__' : (payerEntityId || '')}
-              onChange={e => {
+              value={payerMode === 'other' ? '__other__' : payerEntityId || ''}
+              onChange={(e) => {
                 const val = e.target.value
                 if (val === '__other__') {
                   setPayerMode('other')
@@ -629,22 +1028,38 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
                   setPayerName('')
                 } else {
                   setPayerMode('select')
-                  const a = assureds.find(x => x.entityId === val)
-                  const name = a ? (entityMap[a.entityId] || '') : ''
+                  const a = assureds.find((x) => x.entityId === val)
+                  const name = a ? entityMap[a.entityId] || '' : ''
                   setPayerEntityId(val || null)
                   setPayerName(name)
                 }
               }}
             >
-              <option value="" disabled>{assureds.length > 0 ? 'Select payer…' : 'No assureds — choose Other'}</option>
-              {assureds.map(a => {
+              <option value="" disabled>
+                {assureds.length > 0 ? 'Select payer…' : 'No assureds — choose Other'}
+              </option>
+              {assureds.map((a) => {
                 const name = entityMap[a.entityId] || a.entityId
-                return <option key={a.id} value={a.entityId}>{name}{a.role ? ` (${a.role})` : ''}</option>
+                return (
+                  <option key={a.id} value={a.entityId}>
+                    {name}
+                    {a.role ? ` (${a.role})` : ''}
+                  </option>
+                )
               })}
               <option value="__other__">Other…</option>
             </select>
             {payerMode === 'other' && (
-              <input style={{ ...input, marginTop: '8px' }} value={payerName} onChange={e => { setPayerName(e.target.value); setPayerEntityId(null) }} placeholder="Type payer name" autoFocus />
+              <input
+                style={{ ...input, marginTop: '8px' }}
+                value={payerName}
+                onChange={(e) => {
+                  setPayerName(e.target.value)
+                  setPayerEntityId(null)
+                }}
+                placeholder="Type payer name"
+                autoFocus
+              />
             )}
           </div>
 
@@ -652,22 +1067,52 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
           <div>
             <label style={label}>The Sum Of (amount in words)</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <input style={input} value={wordsValue} onChange={e => setWordsOverride(e.target.value)} />
-              {wordsOverride != null && <button className="btn-secondary" style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }} onClick={() => setWordsOverride(null)}>Auto</button>}
+              <input
+                style={input}
+                value={wordsValue}
+                onChange={(e) => setWordsOverride(e.target.value)}
+              />
+              {wordsOverride != null && (
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
+                  onClick={() => setWordsOverride(null)}
+                >
+                  Auto
+                </button>
+              )}
             </div>
           </div>
           <div>
             <label style={label}>Being</label>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <textarea style={{ ...input, minHeight: '58px', resize: 'vertical' }} value={beingValue} onChange={e => setBeingOverride(e.target.value)} />
-              {beingOverride != null && <button className="btn-secondary" style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }} onClick={() => setBeingOverride(null)}>Auto</button>}
+              <textarea
+                style={{ ...input, minHeight: '58px', resize: 'vertical' }}
+                value={beingValue}
+                onChange={(e) => setBeingOverride(e.target.value)}
+              />
+              {beingOverride != null && (
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
+                  onClick={() => setBeingOverride(null)}
+                >
+                  Auto
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}>
-          <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save Changes' : 'Create Receipt')}</button>
+        <div
+          style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}
+        >
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Receipt'}
+          </button>
         </div>
       </div>
     </div>
@@ -682,19 +1127,24 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       try {
         const st = await window.api.receiptGetSettings()
         setNextSerial(String(st?.nextSerial ?? 1))
         setCity(st?.city || 'BEIRUT')
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })()
   }, [])
 
   const save = async () => {
     setSaving(true)
     try {
-      await window.api.receiptSetSettings({ nextSerial: parseInt(nextSerial, 10) || 1, city: city || 'BEIRUT' })
+      await window.api.receiptSetSettings({
+        nextSerial: parseInt(nextSerial, 10) || 1,
+        city: city || 'BEIRUT'
+      })
       showSuccess('Receipt settings saved')
       onClose()
     } catch (e: any) {
@@ -704,35 +1154,102 @@ function SettingsModal({ modalBg, onClose }: { modalBg: string; onClose: () => v
     }
   }
 
-  const label: React.CSSProperties = { display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }
-  const input: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontSize: '0.85rem' }
+  const label: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.72rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: 'var(--text-secondary)',
+    marginBottom: '6px',
+    fontWeight: 600
+  }
+  const input: React.CSSProperties = {
+    width: '100%',
+    padding: '9px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--input-border)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-primary)',
+    fontSize: '0.85rem'
+  }
 
   return (
     <div style={overlay} onMouseDown={onClose}>
-      <div style={{ ...modalWrap, background: modalBg, maxWidth: '420px' }} onMouseDown={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-          <h2 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px' }}><Settings size={20} /> Receipt Settings</h2>
-          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}><X size={20} /></button>
+      <div
+        style={{ ...modalWrap, background: modalBg, maxWidth: '420px' }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '18px'
+          }}
+        >
+          <h2 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Settings size={20} /> Receipt Settings
+          </h2>
+          <button title="Close" aria-label="Close" onClick={onClose} style={iconBtn}>
+            <X size={20} />
+          </button>
         </div>
         <div style={{ display: 'grid', gap: '16px' }}>
           <div>
             <label style={label}>Next Receipt Number</label>
-            <input style={input} type="number" min={1} value={nextSerial} onChange={e => setNextSerial(e.target.value)} />
-            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '6px' }}>The running serial used for the next auto-numbered receipt (H&lt;n&gt;/year). It never resets by year.</p>
+            <input
+              style={input}
+              type="number"
+              min={1}
+              value={nextSerial}
+              onChange={(e) => setNextSerial(e.target.value)}
+            />
+            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+              The running serial used for the next auto-numbered receipt (H&lt;n&gt;/year). It never
+              resets by year.
+            </p>
           </div>
           <div>
             <label style={label}>City (on receipt date line)</label>
-            <input style={input} value={city} onChange={e => setCity(e.target.value)} placeholder="BEIRUT" />
+            <input
+              style={input}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="BEIRUT"
+            />
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}>
-          <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        <div
+          style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}
+        >
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '40px 20px', overflowY: 'auto' }
-const modalWrap: React.CSSProperties = { borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '640px', border: '1px solid var(--glass-border-color)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }
+const overlay: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.5)',
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'center',
+  zIndex: 1000,
+  padding: '40px 20px',
+  overflowY: 'auto'
+}
+const modalWrap: React.CSSProperties = {
+  borderRadius: '14px',
+  padding: '24px',
+  width: '100%',
+  maxWidth: '640px',
+  border: '1px solid var(--glass-border-color)',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+}

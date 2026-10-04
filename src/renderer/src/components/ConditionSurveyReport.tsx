@@ -96,7 +96,9 @@ export default function ConditionSurveyReport() {
     return warranties.map((w) => {
       const due = calcDueDate(w)
       const dueISO = due ? due.toISOString().split('T')[0] : null
-      const monthKey = due ? `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}` : NO_DATE_KEY
+      const monthKey = due
+        ? `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`
+        : NO_DATE_KEY
       const monthLabel = due
         ? due.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
         : NO_DATE_LABEL
@@ -105,7 +107,8 @@ export default function ConditionSurveyReport() {
       // "Survey Done" depends on the survey's open defects: >0 open = still carried out,
       // 0 open = all defects closed = survey done.
       const carriedOut =
-        w.surveyDate || (w.status === 'completed' || w.status === 'survey_done' ? w.completedAt || null : null)
+        w.surveyDate ||
+        (w.status === 'completed' || w.status === 'survey_done' ? w.completedAt || null : null)
       const hasSurvey = !!w.surveyDate
       const surveyClosed = (w.surveyOpenDefects ?? 0) === 0
       let status: DisplayStatus
@@ -152,7 +155,8 @@ export default function ConditionSurveyReport() {
   const groups = useMemo(() => {
     const map = new Map<string, { key: string; label: string; rows: ReportRow[] }>()
     for (const row of displayRows) {
-      if (!map.has(row.monthKey)) map.set(row.monthKey, { key: row.monthKey, label: row.monthLabel, rows: [] })
+      if (!map.has(row.monthKey))
+        map.set(row.monthKey, { key: row.monthKey, label: row.monthLabel, rows: [] })
       map.get(row.monthKey)!.rows.push(row)
     }
     const arr = Array.from(map.values())
@@ -160,7 +164,9 @@ export default function ConditionSurveyReport() {
     // within each month, sort by due date then vessel
     for (const g of arr) {
       g.rows.sort(
-        (a, b) => (a.dueDate || '').localeCompare(b.dueDate || '') || a.vesselName.localeCompare(b.vesselName)
+        (a, b) =>
+          (a.dueDate || '').localeCompare(b.dueDate || '') ||
+          a.vesselName.localeCompare(b.vesselName)
       )
     }
     return arr
@@ -173,7 +179,8 @@ export default function ConditionSurveyReport() {
     return { total: displayRows.length, surveyDone, carriedOut, pending }
   }, [displayRows])
 
-  const dueCell = (row: ReportRow) => (row.dueDate ? fmtDate(row.dueDate) : row.deadlineText || 'No due date')
+  const dueCell = (row: ReportRow) =>
+    row.dueDate ? fmtDate(row.dueDate) : row.deadlineText || 'No due date'
 
   const exportExcel = () => {
     if (displayRows.length === 0) return
@@ -279,12 +286,19 @@ export default function ConditionSurveyReport() {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(7.5)
         doc.setTextColor(160, 185, 210)
-        doc.text(`${g.rows.length} survey${g.rows.length !== 1 ? 's' : ''}`, pw - margin - 2, y + 6, {
-          align: 'right'
-        })
+        doc.text(
+          `${g.rows.length} survey${g.rows.length !== 1 ? 's' : ''}`,
+          pw - margin - 2,
+          y + 6,
+          {
+            align: 'right'
+          }
+        )
         y += 11
 
-        const head = [['Vessel', 'IMO', 'Policy', 'Warranty', 'Due Date', 'Carried Out', 'Surveyor', 'Status']]
+        const head = [
+          ['Vessel', 'IMO', 'Policy', 'Warranty', 'Due Date', 'Carried Out', 'Surveyor', 'Status']
+        ]
         const body = g.rows.map((r) => [
           r.vesselName,
           r.imo,
@@ -301,8 +315,18 @@ export default function ConditionSurveyReport() {
           head,
           body,
           margin: { left: margin, right: margin },
-          styles: { fontSize: 7, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, textColor: [40, 40, 40], overflow: 'linebreak' },
-          headStyles: { fillColor: [235, 240, 248], textColor: [60, 70, 90], fontStyle: 'bold', fontSize: 6.8 },
+          styles: {
+            fontSize: 7,
+            cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+            textColor: [40, 40, 40],
+            overflow: 'linebreak'
+          },
+          headStyles: {
+            fillColor: [235, 240, 248],
+            textColor: [60, 70, 90],
+            fontStyle: 'bold',
+            fontSize: 6.8
+          },
           alternateRowStyles: { fillColor: [250, 251, 254] },
           columnStyles: {
             0: { cellWidth: 40, fontStyle: 'bold' },
@@ -347,7 +371,9 @@ export default function ConditionSurveyReport() {
 
   if (loading)
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        Loading...
+      </div>
     )
 
   return (
@@ -374,8 +400,11 @@ export default function ConditionSurveyReport() {
                 fontSize: '0.82rem',
                 cursor: 'pointer',
                 border:
-                  statusFilter === f.key ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                background: statusFilter === f.key ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                  statusFilter === f.key
+                    ? '2px solid var(--accent-primary)'
+                    : '1px solid var(--glass-border-color)',
+                background:
+                  statusFilter === f.key ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                 color: statusFilter === f.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: statusFilter === f.key ? 600 : 400
               }}
@@ -408,7 +437,13 @@ export default function ConditionSurveyReport() {
             onClick={exportExcel}
             disabled={displayRows.length === 0}
             className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              padding: '7px 14px'
+            }}
           >
             <Download size={14} /> Excel
           </button>
@@ -416,14 +451,28 @@ export default function ConditionSurveyReport() {
             onClick={exportPdf}
             disabled={displayRows.length === 0}
             className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              padding: '7px 14px'
+            }}
           >
             <FileText size={14} /> PDF
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: '16px',
+          fontSize: '0.82rem',
+          color: 'var(--text-secondary)',
+          marginBottom: '14px'
+        }}
+      >
         <span>
           <strong style={{ color: 'var(--text-primary)' }}>{stats.total}</strong> survey warranties
         </span>
@@ -474,7 +523,9 @@ export default function ConditionSurveyReport() {
                       colSpan={8}
                       style={{
                         padding: '8px 12px',
-                        background: isLight ? 'rgba(0,150,200,0.07)' : 'rgba(var(--accent-primary-rgb), 0.05)',
+                        background: isLight
+                          ? 'rgba(0,150,200,0.07)'
+                          : 'rgba(var(--accent-primary-rgb), 0.05)',
                         borderTop: '1px solid var(--table-border)',
                         borderBottom: '1px solid var(--table-border)',
                         fontWeight: 700,
@@ -484,15 +535,30 @@ export default function ConditionSurveyReport() {
                       }}
                     >
                       {g.label.toUpperCase()}
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '8px' }}>
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontWeight: 400,
+                          marginLeft: '8px'
+                        }}
+                      >
                         · {g.rows.length}
                       </span>
                     </td>
                   </tr>
                   {g.rows.map((r, ri) => (
-                    <tr key={`${g.key}-${ri}`} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                      <td style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }}>{r.vesselName}</td>
-                      <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.imo}</td>
+                    <tr
+                      key={`${g.key}-${ri}`}
+                      style={{ borderBottom: '1px solid var(--table-border)' }}
+                    >
+                      <td style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }}>
+                        {r.vesselName}
+                      </td>
+                      <td
+                        style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}
+                      >
+                        {r.imo}
+                      </td>
                       <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.policyType}</td>
                       <td style={{ ...tdStyle, fontSize: '0.8rem' }}>{r.description}</td>
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
@@ -505,7 +571,11 @@ export default function ConditionSurveyReport() {
                         )}
                       </td>
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(r.surveyDate)}</td>
-                      <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.surveyor}</td>
+                      <td
+                        style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}
+                      >
+                        {r.surveyor}
+                      </td>
                       <td style={tdStyle}>
                         <span
                           style={{

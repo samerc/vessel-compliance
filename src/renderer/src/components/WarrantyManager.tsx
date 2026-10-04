@@ -1,6 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, ChevronDown, Bell, Check, X, AlertTriangle, Clock, FileWarning, ClipboardCheck, Link2 } from 'lucide-react'
-import { SurveyWarranty, SurveyWarrantyReminder, VesselDynamicPolicy, WarrantyStatus, ConditionSurvey, Surveyor } from '../../../shared/types'
+import {
+  Plus,
+  ChevronDown,
+  Bell,
+  Check,
+  X,
+  AlertTriangle,
+  Clock,
+  FileWarning,
+  ClipboardCheck,
+  Link2
+} from 'lucide-react'
+import {
+  SurveyWarranty,
+  SurveyWarrantyReminder,
+  VesselDynamicPolicy,
+  WarrantyStatus,
+  ConditionSurvey,
+  Surveyor
+} from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
@@ -40,8 +58,11 @@ function daysRemaining(deadlineDate: Date): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-
-export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: WarrantyManagerProps) {
+export default function WarrantyManager({
+  vesselId,
+  dynamicPolicies,
+  isLight
+}: WarrantyManagerProps) {
   const { user, hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
   const { showSuccess, showError } = useToast()
@@ -102,7 +123,9 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     loadWarranties()
   }, [vesselId])
 
-  const [linkedSurveyCounts, setLinkedSurveyCounts] = useState<Record<string, { open: number; closed: number }>>({})
+  const [linkedSurveyCounts, setLinkedSurveyCounts] = useState<
+    Record<string, { open: number; closed: number }>
+  >({})
 
   const loadWarranties = async () => {
     try {
@@ -118,7 +141,9 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             const open = defects.filter((d: any) => d.status === 'OPEN').length
             const closed = defects.filter((d: any) => d.status !== 'OPEN').length
             counts[w.id] = { open, closed }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
       setLinkedSurveyCounts(counts)
@@ -130,8 +155,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const loadReminders = async (warrantyId: string) => {
     try {
       const data = await window.api.surveyWarrantyGetReminders(warrantyId)
-      setReminders(prev => ({ ...prev, [warrantyId]: Array.isArray(data) ? data : [] }))
-    } catch { /* ignore */ }
+      setReminders((prev) => ({ ...prev, [warrantyId]: Array.isArray(data) ? data : [] }))
+    } catch {
+      /* ignore */
+    }
   }
 
   const toggleExpand = async (id: string) => {
@@ -145,10 +172,11 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   // ── Helpers ──────────────────────────────────────────────────────
   const getPolicyInceptionDate = (policyId: string): string => {
-    const policy = dynamicPolicies.find(p => p.id === policyId)
-    const val = policy?.values?.find(v =>
-      v.characteristicName?.toLowerCase().includes('inception date') ||
-      v.characteristicName?.toLowerCase().includes('start date')
+    const policy = dynamicPolicies.find((p) => p.id === policyId)
+    const val = policy?.values?.find(
+      (v) =>
+        v.characteristicName?.toLowerCase().includes('inception date') ||
+        v.characteristicName?.toLowerCase().includes('start date')
     )
     return val?.valueDate || new Date().toISOString().split('T')[0]
   }
@@ -157,7 +185,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   // code (e.g. P2620 / H2520) and keep the rest. P26209438 -> SUR9438, and it
   // extends naturally when serials reach 5 digits (P262010000 -> SUR10000).
   const deriveSurReference = (policyId: string): string => {
-    const policy = dynamicPolicies.find(p => p.id === policyId)
+    const policy = dynamicPolicies.find((p) => p.id === policyId)
     const num = (policy as any)?.policyNumber as string | undefined
     if (!num) return ''
     const serial = num.trim().replace(/^[A-Za-z]\d{4}/, '')
@@ -179,7 +207,9 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     setFormDeadlineEvent('')
     const firstPolicyId = dynamicPolicies[0]?.id || ''
     setFormPolicyId(firstPolicyId)
-    setFormInceptionDate(firstPolicyId ? getPolicyInceptionDate(firstPolicyId) : new Date().toISOString().split('T')[0])
+    setFormInceptionDate(
+      firstPolicyId ? getPolicyInceptionDate(firstPolicyId) : new Date().toISOString().split('T')[0]
+    )
     setFormNotes('')
     setFormReference(deriveSurReference(firstPolicyId))
     setFormStatus('pending')
@@ -218,10 +248,22 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   }
 
   const saveWarrantyNow = async () => {
-    if (!formDescription.trim()) { showError('Description is required'); return }
-    if (!formInceptionDate) { showError('Inception date is required'); return }
-    if (formDeadlineType === 'days' && !formDeadlineDays) { showError('Deadline days is required'); return }
-    if (formDeadlineType === 'event' && !formDeadlineEvent.trim()) { showError('Deadline event is required'); return }
+    if (!formDescription.trim()) {
+      showError('Description is required')
+      return
+    }
+    if (!formInceptionDate) {
+      showError('Inception date is required')
+      return
+    }
+    if (formDeadlineType === 'days' && !formDeadlineDays) {
+      showError('Deadline days is required')
+      return
+    }
+    if (formDeadlineType === 'event' && !formDeadlineEvent.trim()) {
+      showError('Deadline event is required')
+      return
+    }
 
     try {
       const payload = {
@@ -237,7 +279,12 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       }
 
       if (editingWarranty) {
-        ok(await window.api.surveyWarrantyUpdate(editingWarranty.id, { ...payload, status: formStatus }))
+        ok(
+          await window.api.surveyWarrantyUpdate(editingWarranty.id, {
+            ...payload,
+            status: formStatus
+          })
+        )
         showSuccess('Warranty updated')
       } else {
         await window.api.surveyWarrantyCreate(payload)
@@ -278,15 +325,23 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       const safeTypes = Array.isArray(types) ? types : []
       setSurveyTypesList(safeTypes)
       // Default the type to a "warranty" survey type if one exists, else the first
-      const warrantyType = safeTypes.find(t => /warranty/i.test(t.name))
+      const warrantyType = safeTypes.find((t) => /warranty/i.test(t.name))
       setConvertType(warrantyType?.name || safeTypes[0]?.name || 'Warranty Survey')
-    } catch { /* keep defaults */ }
+    } catch {
+      /* keep defaults */
+    }
   }
 
   const handleConfirmConvert = async () => {
     if (!convertWarranty) return
-    if (!convertSurveyorId) { showError('Please choose a surveyor'); return }
-    if (!convertDate) { showError('Survey date is required'); return }
+    if (!convertSurveyorId) {
+      showError('Please choose a surveyor')
+      return
+    }
+    if (!convertDate) {
+      showError('Survey date is required')
+      return
+    }
     setConvertSaving(true)
     try {
       const newSurvey = await window.api.addConditionSurvey({
@@ -298,10 +353,12 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         notes: undefined,
         createdBy: user?.username || 'System'
       })
-      ok(await window.api.surveyWarrantyUpdate(convertWarranty.id, {
-        conditionSurveyId: newSurvey.id,
-        status: 'survey_done'
-      }))
+      ok(
+        await window.api.surveyWarrantyUpdate(convertWarranty.id, {
+          conditionSurveyId: newSurvey.id,
+          status: 'survey_done'
+        })
+      )
       showSuccess('Survey created and linked to warranty')
       setConvertWarranty(null)
       loadWarranties()
@@ -324,7 +381,8 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       ])
       setAvailableSurveys(Array.isArray(surveys) ? surveys : [])
       const map: Record<string, string> = {}
-      for (const s of (Array.isArray(surveyors) ? surveyors : []) as Surveyor[]) map[s.id] = s.companyName
+      for (const s of (Array.isArray(surveyors) ? surveyors : []) as Surveyor[])
+        map[s.id] = s.companyName
       setSurveyorMap(map)
     } catch (err: any) {
       showError(err.message || 'Failed to load surveys')
@@ -336,10 +394,12 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const handleLinkSurvey = async (surveyId: string) => {
     if (!linkWarranty) return
     try {
-      ok(await window.api.surveyWarrantyUpdate(linkWarranty.id, {
-        conditionSurveyId: surveyId,
-        status: 'survey_done'
-      }))
+      ok(
+        await window.api.surveyWarrantyUpdate(linkWarranty.id, {
+          conditionSurveyId: surveyId,
+          status: 'survey_done'
+        })
+      )
       showSuccess('Survey linked to warranty')
       setLinkWarranty(null)
       loadWarranties()
@@ -352,7 +412,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   const handleComplete = async () => {
     if (!completeWarrantyId) return
     try {
-      const warranty = warranties.find(w => w.id === completeWarrantyId)
+      const warranty = warranties.find((w) => w.id === completeWarrantyId)
       if (warranty?.conditionSurveyId) {
         await window.api.surveyWarrantyCompleteWithSurvey(
           completeWarrantyId,
@@ -361,11 +421,13 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         )
         showSuccess('Warranty and linked survey completed')
       } else {
-        ok(await window.api.surveyWarrantyUpdate(completeWarrantyId, {
-          status: 'completed',
-          completionNotes: completeNotes.trim() || null,
-          completedAt: new Date().toISOString()
-        }))
+        ok(
+          await window.api.surveyWarrantyUpdate(completeWarrantyId, {
+            status: 'completed',
+            completionNotes: completeNotes.trim() || null,
+            completedAt: new Date().toISOString()
+          })
+        )
         showSuccess('Warranty completed')
       }
       setCompleteWarrantyId(null)
@@ -378,7 +440,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   // ── Waive ────────────────────────────────────────────────────────
   const handleWaive = async () => {
-    if (!waiveWarrantyId || !waiveReason.trim()) { showError('Waiver reason is required'); return }
+    if (!waiveWarrantyId || !waiveReason.trim()) {
+      showError('Waiver reason is required')
+      return
+    }
     try {
       await window.api.surveyWarrantyWaive(waiveWarrantyId, waiveReason.trim())
       showSuccess('Warranty waived')
@@ -401,7 +466,10 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   }
 
   const handleLogReminder = async () => {
-    if (!reminderWarrantyId || !reminderSentAt) { showError('Sent date is required'); return }
+    if (!reminderWarrantyId || !reminderSentAt) {
+      showError('Sent date is required')
+      return
+    }
     const wid = reminderWarrantyId
     try {
       const result = await window.api.surveyWarrantyLogReminder({
@@ -414,7 +482,8 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         loggedBy: user?.id || null
       })
       if (result && typeof result === 'object' && (result as any).error) {
-        showError((result as any).message || 'Failed to log reminder'); return
+        showError((result as any).message || 'Failed to log reminder')
+        return
       }
       showSuccess('Reminder logged')
       setReminderWarrantyId(null)
@@ -444,9 +513,11 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
   for (const w of warranties) {
     if (w.policyId) {
       if (!grouped.has(w.policyId)) {
-        const policy = dynamicPolicies.find(p => p.id === w.policyId)
+        const policy = dynamicPolicies.find((p) => p.id === w.policyId)
         grouped.set(w.policyId, {
-          label: policy ? `${policy.policyTypeName}${policy.policyNumber ? ` #${policy.policyNumber}` : ''}` : w.policyTypeName || 'Policy',
+          label: policy
+            ? `${policy.policyTypeName}${policy.policyNumber ? ` #${policy.policyNumber}` : ''}`
+            : w.policyTypeName || 'Policy',
           items: []
         })
       }
@@ -458,22 +529,42 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   // ── Styles ───────────────────────────────────────────────────────
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem',
-    border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)'
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    fontSize: '0.85rem',
+    border: '1px solid var(--input-border)',
+    background: 'var(--input-bg)',
+    color: 'var(--text-primary)'
   }
   const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block'
+    fontSize: '0.75rem',
+    color: 'var(--text-secondary)',
+    marginBottom: '4px',
+    display: 'block'
   }
   const modalBg: React.CSSProperties = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', zIndex: 1100
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1100
   }
   const modalCard: React.CSSProperties = {
-    background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px',
-    padding: '24px', width: '480px', maxWidth: '92vw',
-    border: '1px solid var(--glass-border-color)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-    maxHeight: '85vh', overflowY: 'auto'
+    background: isLight ? '#ffffff' : '#1a1d28',
+    borderRadius: '16px',
+    padding: '24px',
+    width: '480px',
+    maxWidth: '92vw',
+    border: '1px solid var(--glass-border-color)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+    maxHeight: '85vh',
+    overflowY: 'auto'
   }
 
   const renderWarrantyCard = (w: SurveyWarranty) => {
@@ -494,11 +585,20 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           <Clock size={12} style={{ flexShrink: 0 }} />
           <span>Due {deadlineDateStr}</span>
           {isActive && (
-            <span style={{
-              padding: '1px 7px', borderRadius: '8px', fontWeight: '700', fontSize: '0.72rem',
-              background: isOverdue ? 'rgba(255,77,77,0.15)' : urgentSoon ? 'rgba(255,165,0,0.15)' : 'rgba(0,200,100,0.10)',
-              color: isOverdue ? 'var(--danger)' : urgentSoon ? '#e6a800' : '#00c864'
-            }}>
+            <span
+              style={{
+                padding: '1px 7px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                fontSize: '0.72rem',
+                background: isOverdue
+                  ? 'rgba(255,77,77,0.15)'
+                  : urgentSoon
+                    ? 'rgba(255,165,0,0.15)'
+                    : 'rgba(0,200,100,0.10)',
+                color: isOverdue ? 'var(--danger)' : urgentSoon ? '#e6a800' : '#00c864'
+              }}
+            >
               {isOverdue ? `${Math.abs(remaining)}d overdue` : `${remaining}d left`}
             </span>
           )}
@@ -506,7 +606,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       )
     } else if (w.deadlineType === 'event' && w.deadlineEvent) {
       deadlineInfo = (
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span
+          style={{
+            fontSize: '0.78rem',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
           <AlertTriangle size={12} />
           {w.deadlineEvent}
         </span>
@@ -516,67 +624,149 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
     const reminderList = reminders[w.id]
 
     return (
-      <div key={w.id} className="glass-card" style={{ padding: 0, overflow: 'hidden', marginBottom: '8px' }}>
+      <div
+        key={w.id}
+        className="glass-card"
+        style={{ padding: 0, overflow: 'hidden', marginBottom: '8px' }}
+      >
         {/* Header row — matches policy card style */}
         <div
           onClick={() => toggleExpand(w.id)}
           style={{
-            display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
-            cursor: 'pointer', userSelect: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 16px',
+            cursor: 'pointer',
+            userSelect: 'none',
             background: isExpanded ? 'rgba(var(--accent-primary-rgb), 0.03)' : 'transparent'
           }}
         >
-          <ChevronDown size={16} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform 0.2s', color: 'var(--text-secondary)', flexShrink: 0 }} />
+          <ChevronDown
+            size={16}
+            style={{
+              transform: isExpanded ? 'none' : 'rotate(-90deg)',
+              transition: 'transform 0.2s',
+              color: 'var(--text-secondary)',
+              flexShrink: 0
+            }}
+          />
           <span style={{ fontWeight: '600', fontSize: '0.9rem', flex: 1 }}>{w.description}</span>
           {w.reference && (
-            <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', padding: '2px 8px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>{w.reference}</span>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontFamily: 'monospace',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              {w.reference}
+            </span>
           )}
           {w.policyTypeName && (
-            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{w.policyTypeName}</span>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                color: 'var(--accent-primary)'
+              }}
+            >
+              {w.policyTypeName}
+            </span>
           )}
           {/* Status badge */}
-          <span style={{
-            padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '600',
-            textTransform: 'uppercase',
-            background: sc.bg, color: sc.color
-          }}>{STATUS_LABELS[w.status]}</span>
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: '10px',
+              fontSize: '0.7rem',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              background: sc.bg,
+              color: sc.color
+            }}
+          >
+            {STATUS_LABELS[w.status]}
+          </span>
           {/* Reminder count */}
           {(w.reminderCount ?? 0) > 0 && (
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: '3px',
-              fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '2px 7px',
-              borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)'
-            }}>
-              <Bell size={11} />{w.reminderCount}
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px',
+                fontSize: '0.72rem',
+                color: 'var(--text-secondary)',
+                padding: '2px 7px',
+                borderRadius: '8px',
+                background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)'
+              }}
+            >
+              <Bell size={11} />
+              {w.reminderCount}
             </span>
           )}
         </div>
 
         {/* Sub-info row */}
         {(deadlineInfo || w.inceptionDate || w.conditionSurveyId) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px 10px 42px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '0 16px 10px 42px',
+              color: 'var(--text-secondary)',
+              flexWrap: 'wrap'
+            }}
+          >
             {deadlineInfo}
             {w.inceptionDate && (
-              <span style={{ fontSize: '0.78rem' }}>Inception: {formatDateOrDash(w.inceptionDate)}</span>
+              <span style={{ fontSize: '0.78rem' }}>
+                Inception: {formatDateOrDash(w.inceptionDate)}
+              </span>
             )}
             {w.nextReminderDate && isActive && (
-              <span style={{ fontSize: '0.78rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  color: '#e6a800',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
                 <Bell size={11} /> Next: {formatDateOrDash(w.nextReminderDate)}
               </span>
             )}
-            {w.conditionSurveyId && (() => {
-              const lsc = linkedSurveyCounts[w.id]
-              const total = lsc ? lsc.open + lsc.closed : 0
-              return (
-                <span style={{
-                  display: 'flex', alignItems: 'center', gap: '3px',
-                  fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
-                  borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)'
-                }}>
-                  <Link2 size={11} /> Survey{lsc && total > 0 ? ` — ${lsc.closed}/${total} closed` : ''}
-                </span>
-              )
-            })()}
+            {w.conditionSurveyId &&
+              (() => {
+                const lsc = linkedSurveyCounts[w.id]
+                const total = lsc ? lsc.open + lsc.closed : 0
+                return (
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '1px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    <Link2 size={11} /> Survey
+                    {lsc && total > 0 ? ` — ${lsc.closed}/${total} closed` : ''}
+                  </span>
+                )
+              })()}
           </div>
         )}
 
@@ -584,83 +774,185 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
         {isExpanded && (
           <div style={{ borderTop: '1px solid var(--table-border)', padding: '0 16px 16px' }}>
             {/* Info grid — matches policy card value grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '8px', paddingTop: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                gap: '8px',
+                paddingTop: '12px'
+              }}
+            >
               {w.deadlineType === 'days' && w.deadlineDays && (
                 <div style={{ fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Deadline</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                    Deadline
+                  </span>
                   <div style={{ fontWeight: '500' }}>{w.deadlineDays} days from inception</div>
                 </div>
               )}
               {w.deadlineType === 'event' && w.deadlineEvent && (
                 <div style={{ fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Deadline Event</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                    Deadline Event
+                  </span>
                   <div style={{ fontWeight: '500' }}>{w.deadlineEvent}</div>
                 </div>
               )}
               {w.inceptionDate && (
                 <div style={{ fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Inception Date</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                    Inception Date
+                  </span>
                   <div style={{ fontWeight: '500' }}>{formatDateOrDash(w.inceptionDate)}</div>
                 </div>
               )}
               {w.completedAt && (
                 <div style={{ fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Completed</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                    Completed
+                  </span>
                   <div style={{ fontWeight: '500' }}>{formatDateOrDash(w.completedAt)}</div>
                 </div>
               )}
             </div>
             {w.notes && (
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '12px' }}>
+              <p
+                style={{
+                  fontSize: '0.82rem',
+                  color: 'var(--text-secondary)',
+                  fontStyle: 'italic',
+                  marginBottom: '12px'
+                }}
+              >
                 {w.notes}
               </p>
             )}
             {w.waiverReason && (
-              <div style={{ fontSize: '0.82rem', marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(128,128,128,0.08)', color: 'var(--text-secondary)' }}>
+              <div
+                style={{
+                  fontSize: '0.82rem',
+                  marginBottom: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(128,128,128,0.08)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
                 <strong>Waiver reason:</strong> {w.waiverReason}
               </div>
             )}
             {w.completionNotes && (
-              <div style={{ fontSize: '0.82rem', marginBottom: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,200,100,0.07)', color: 'var(--text-primary)' }}>
+              <div
+                style={{
+                  fontSize: '0.82rem',
+                  marginBottom: '12px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(0,200,100,0.07)',
+                  color: 'var(--text-primary)'
+                }}
+              >
                 <strong>Completion notes:</strong> {w.completionNotes}
               </div>
             )}
 
             {/* Reminder history */}
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  fontWeight: '600',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}
+              >
                 Reminder History
               </div>
               {!reminderList ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Loading…</div>
               ) : reminderList.length === 0 ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No reminders logged yet.</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  No reminders logged yet.
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {reminderList.map(r => (
-                    <div key={r.id} style={{
-                      padding: '8px 10px', borderRadius: '8px',
-                      background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
-                      fontSize: '0.8rem'
-                    }}>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>Sent:</span>
+                  {reminderList.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '10px',
+                          alignItems: 'center',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                          Sent:
+                        </span>
                         <span style={{ fontWeight: '700' }}>{formatDateOrDash(r.sentAt)}</span>
-                        <span style={{ padding: '1px 6px', borderRadius: '6px', fontSize: '0.7rem', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff', textTransform: 'uppercase' }}>
+                        <span
+                          style={{
+                            padding: '1px 6px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: '#00aaff',
+                            textTransform: 'uppercase'
+                          }}
+                        >
                           {r.channel}
                         </span>
                         {r.reference && (
-                          <span style={{ padding: '1px 7px', borderRadius: '6px', fontSize: '0.7rem', background: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)', color: 'var(--text-primary)', fontFamily: 'monospace', fontWeight: '600' }}>
+                          <span
+                            style={{
+                              padding: '1px 7px',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              background: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)',
+                              color: 'var(--text-primary)',
+                              fontFamily: 'monospace',
+                              fontWeight: '600'
+                            }}
+                          >
                             Ref: {r.reference}
                           </span>
                         )}
                         {r.nextReminderDate && (
-                          <span style={{ fontSize: '0.75rem', color: '#e6a800', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}>
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              color: '#e6a800',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              marginLeft: 'auto'
+                            }}
+                          >
                             <Bell size={11} /> Next: {formatDateOrDash(r.nextReminderDate)}
                           </span>
                         )}
                       </div>
-                      {r.notes && <div style={{ marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{r.notes}</div>}
+                      {r.notes && (
+                        <div
+                          style={{
+                            marginTop: '4px',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.78rem'
+                          }}
+                        >
+                          {r.notes}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -673,7 +965,13 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => openReminderModal(w.id)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                 >
                   <Bell size={13} /> Log Reminder
                 </button>
@@ -682,7 +980,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => openConvertModal(w)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(var(--accent-primary-rgb), 0.35)' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: 'var(--accent-primary)',
+                    borderColor: 'rgba(var(--accent-primary-rgb), 0.35)'
+                  }}
                 >
                   <ClipboardCheck size={13} /> Convert to Survey
                 </button>
@@ -691,7 +997,15 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => openLinkModal(w)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a7dff', borderColor: 'rgba(138,125,255,0.35)' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#8a7dff',
+                    borderColor: 'rgba(138,125,255,0.35)'
+                  }}
                 >
                   <Link2 size={13} /> Link to Survey
                 </button>
@@ -700,16 +1014,35 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => handleMarkSurveyDone(w)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aaff', borderColor: 'rgba(var(--accent-primary-rgb), 0.35)' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#00aaff',
+                    borderColor: 'rgba(var(--accent-primary-rgb), 0.35)'
+                  }}
                 >
                   <Check size={13} /> Survey Carried Out
                 </button>
               )}
               {canManage && w.status === 'survey_done' && (
                 <button
-                  onClick={() => { setCompleteWarrantyId(w.id); setCompleteNotes('') }}
+                  onClick={() => {
+                    setCompleteWarrantyId(w.id)
+                    setCompleteNotes('')
+                  }}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00c864', borderColor: 'rgba(0,200,100,0.35)' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#00c864',
+                    borderColor: 'rgba(0,200,100,0.35)'
+                  }}
                 >
                   <Check size={13} /> Mark Complete
                 </button>
@@ -725,9 +1058,17 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               )}
               {canManage && isActive && (
                 <button
-                  onClick={() => { setWaiveWarrantyId(w.id); setWaiveReason('') }}
+                  onClick={() => {
+                    setWaiveWarrantyId(w.id)
+                    setWaiveReason('')
+                  }}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', color: '#e6a800', borderColor: 'rgba(230,168,0,0.35)' }}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    color: '#e6a800',
+                    borderColor: 'rgba(230,168,0,0.35)'
+                  }}
                 >
                   Waive
                 </button>
@@ -736,9 +1077,13 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => handleDelete(w.id)}
                   style={{
-                    fontSize: '0.78rem', padding: '4px 12px', cursor: 'pointer',
-                    background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.35)',
-                    color: 'var(--danger)', borderRadius: '8px'
+                    fontSize: '0.78rem',
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                    background: 'rgba(255,77,77,0.12)',
+                    border: '1px solid rgba(255,77,77,0.35)',
+                    color: 'var(--danger)',
+                    borderRadius: '8px'
                   }}
                 >
                   Delete
@@ -753,34 +1098,69 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
   const renderGroup = (label: string, items: SurveyWarranty[]) => (
     <div key={label} style={{ marginBottom: '20px' }}>
-      <div style={{
-        fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em',
-        color: 'var(--text-secondary)', marginBottom: '8px', paddingLeft: '2px'
-      }}>
+      <div
+        style={{
+          fontSize: '0.75rem',
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: 'var(--text-secondary)',
+          marginBottom: '8px',
+          paddingLeft: '2px'
+        }}
+      >
         {label}
       </div>
-      {items.map(w => renderWarrantyCard(w))}
+      {items.map((w) => renderWarrantyCard(w))}
     </div>
   )
 
   return (
     <div style={{ marginTop: '24px' }}>
       {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <FileWarning size={16} style={{ color: 'var(--accent-primary)' }} />
           <span style={{ fontWeight: '700', fontSize: '0.95rem' }}>Survey Warranties</span>
-          {warranties.filter(w => w.status === 'pending' || w.status === 'survey_done').length > 0 && (
-            <span style={{
-              padding: '1px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700',
-              background: 'rgba(255,165,0,0.15)', color: '#e6a800'
-            }}>
-              {warranties.filter(w => w.status === 'pending' || w.status === 'survey_done').length} active
+          {warranties.filter((w) => w.status === 'pending' || w.status === 'survey_done').length >
+            0 && (
+            <span
+              style={{
+                padding: '1px 8px',
+                borderRadius: '10px',
+                fontSize: '0.7rem',
+                fontWeight: '700',
+                background: 'rgba(255,165,0,0.15)',
+                color: '#e6a800'
+              }}
+            >
+              {
+                warranties.filter((w) => w.status === 'pending' || w.status === 'survey_done')
+                  .length
+              }{' '}
+              active
             </span>
           )}
         </div>
         {canManage && (
-          <button onClick={openAddModal} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={openAddModal}
+            className="btn-secondary"
+            style={{
+              fontSize: '0.8rem',
+              padding: '4px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
             <Plus size={14} /> Add Warranty
           </button>
         )}
@@ -788,7 +1168,14 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
 
       {/* Content */}
       {warranties.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px 24px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '32px 24px',
+            color: 'var(--text-secondary)',
+            fontSize: '0.85rem'
+          }}
+        >
           No survey warranties added yet.
         </div>
       ) : (
@@ -801,39 +1188,84 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Add/Edit Modal ─────────────────────────────────────── */}
       {showAddModal && (
         <div style={modalBg}>
-          <div style={modalCard} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>{editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}</h3>
-              <button title="Cancel" aria-label="Cancel" onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '20px'
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                {editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}
+              </h3>
+              <button
+                title="Cancel"
+                aria-label="Cancel"
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={labelStyle}>Description *</label>
-                <input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="e.g. Follow-up condition survey" style={inputStyle} autoFocus />
+                <input
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="e.g. Follow-up condition survey"
+                  style={inputStyle}
+                  autoFocus
+                />
               </div>
               <div>
                 <label style={labelStyle}>Linked Policy</label>
-                <select value={formPolicyId} onChange={e => handlePolicyChange(e.target.value)} style={inputStyle}>
+                <select
+                  value={formPolicyId}
+                  onChange={(e) => handlePolicyChange(e.target.value)}
+                  style={inputStyle}
+                >
                   <option value="">— None —</option>
-                  {dynamicPolicies.map(p => (
+                  {dynamicPolicies.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.policyTypeName}{p.policyNumber ? ` #${p.policyNumber}` : ''}
+                      {p.policyTypeName}
+                      {p.policyNumber ? ` #${p.policyNumber}` : ''}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(auto from policy)</span></label>
-                <input value={formReference} onChange={e => setFormReference(e.target.value)} placeholder="e.g. SUR9438" style={inputStyle} />
+                <label style={labelStyle}>
+                  Reference{' '}
+                  <span style={{ fontWeight: 400, opacity: 0.6 }}>(auto from policy)</span>
+                </label>
+                <input
+                  value={formReference}
+                  onChange={(e) => setFormReference(e.target.value)}
+                  placeholder="e.g. SUR9438"
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Inception Date *</label>
-                <input type="date" value={formInceptionDate} onChange={e => setFormInceptionDate(e.target.value)} style={inputStyle} />
+                <input
+                  type="date"
+                  value={formInceptionDate}
+                  onChange={(e) => setFormInceptionDate(e.target.value)}
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Deadline Type *</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {(['days', 'event'] as const).map(t => (
+                  {(['days', 'event'] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => setFormDeadlineType(t)}
@@ -848,32 +1280,68 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
               {formDeadlineType === 'days' ? (
                 <div>
                   <label style={labelStyle}>Deadline (days from inception) *</label>
-                  <input type="number" min="1" value={formDeadlineDays} onChange={e => setFormDeadlineDays(e.target.value)} placeholder="e.g. 30" style={inputStyle} />
+                  <input
+                    type="number"
+                    min="1"
+                    value={formDeadlineDays}
+                    onChange={(e) => setFormDeadlineDays(e.target.value)}
+                    placeholder="e.g. 30"
+                    style={inputStyle}
+                  />
                 </div>
               ) : (
                 <div>
                   <label style={labelStyle}>Deadline Event *</label>
-                  <input value={formDeadlineEvent} onChange={e => setFormDeadlineEvent(e.target.value)} placeholder="e.g. Prior to sailing" style={inputStyle} />
+                  <input
+                    value={formDeadlineEvent}
+                    onChange={(e) => setFormDeadlineEvent(e.target.value)}
+                    placeholder="e.g. Prior to sailing"
+                    style={inputStyle}
+                  />
                 </div>
               )}
               {editingWarranty && (
                 <div>
                   <label style={labelStyle}>Status</label>
-                  <select value={formStatus} onChange={e => setFormStatus(e.target.value as WarrantyStatus)} style={inputStyle}>
-                    {(['pending', 'survey_done', 'completed', 'waived'] as WarrantyStatus[]).map(s => (
-                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                    ))}
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as WarrantyStatus)}
+                    style={inputStyle}
+                  >
+                    {(['pending', 'survey_done', 'completed', 'waived'] as WarrantyStatus[]).map(
+                      (s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABELS[s]}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
               )}
               <div>
                 <label style={labelStyle}>Notes</label>
-                <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} placeholder="Optional context for follow-up" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                <textarea
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  placeholder="Optional context for follow-up"
+                  rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-              <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleSaveWarranty} disabled={savingWarranty} className="btn-primary">{editingWarranty ? 'Save Changes' : 'Add Warranty'}</button>
+            <div
+              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
+            >
+              <button onClick={() => setShowAddModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveWarranty}
+                disabled={savingWarranty}
+                className="btn-primary"
+              >
+                {editingWarranty ? 'Save Changes' : 'Add Warranty'}
+              </button>
             </div>
           </div>
         </div>
@@ -882,10 +1350,29 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Convert to Survey Modal ───────────────────────────── */}
       {convertWarranty && (
         <div style={modalBg}>
-          <div style={{ ...modalCard, width: '440px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div style={{ ...modalCard, width: '440px' }} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '6px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Convert to Survey</h3>
-              <button title="Close" aria-label="Close" onClick={() => setConvertWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setConvertWarranty(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               Creates a new condition survey and links it to “{convertWarranty.description}”.
@@ -893,40 +1380,80 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={labelStyle}>Surveyor *</label>
-                <select value={convertSurveyorId} onChange={e => setConvertSurveyorId(e.target.value)} style={inputStyle} autoFocus>
+                <select
+                  value={convertSurveyorId}
+                  onChange={(e) => setConvertSurveyorId(e.target.value)}
+                  style={inputStyle}
+                  autoFocus
+                >
                   <option value="">— Select a surveyor —</option>
-                  {surveyorsList.map(s => (
-                    <option key={s.id} value={s.id}>{s.companyName}{s.country ? ` (${s.country})` : ''}</option>
+                  {surveyorsList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.companyName}
+                      {s.country ? ` (${s.country})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label style={labelStyle}>Survey Date *</label>
-                <input type="date" value={convertDate} onChange={e => setConvertDate(e.target.value)} style={inputStyle} />
+                <input
+                  type="date"
+                  value={convertDate}
+                  onChange={(e) => setConvertDate(e.target.value)}
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Survey Type</label>
                 {surveyTypesList.length > 0 ? (
-                  <select value={convertType} onChange={e => setConvertType(e.target.value)} style={inputStyle}>
-                    {!surveyTypesList.some(t => t.name === convertType) && convertType && (
+                  <select
+                    value={convertType}
+                    onChange={(e) => setConvertType(e.target.value)}
+                    style={inputStyle}
+                  >
+                    {!surveyTypesList.some((t) => t.name === convertType) && convertType && (
                       <option value={convertType}>{convertType}</option>
                     )}
-                    {surveyTypesList.map(t => (
-                      <option key={t.id} value={t.name}>{t.name}</option>
+                    {surveyTypesList.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
                     ))}
                   </select>
                 ) : (
-                  <input value={convertType} onChange={e => setConvertType(e.target.value)} style={inputStyle} />
+                  <input
+                    value={convertType}
+                    onChange={(e) => setConvertType(e.target.value)}
+                    style={inputStyle}
+                  />
                 )}
               </div>
               <div>
-                <label style={labelStyle}>Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(from warranty)</span></label>
-                <input value={convertReference} onChange={e => setConvertReference(e.target.value)} placeholder="e.g. SUR9438" style={inputStyle} />
+                <label style={labelStyle}>
+                  Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(from warranty)</span>
+                </label>
+                <input
+                  value={convertReference}
+                  onChange={(e) => setConvertReference(e.target.value)}
+                  placeholder="e.g. SUR9438"
+                  style={inputStyle}
+                />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-              <button onClick={() => setConvertWarranty(null)} className="btn-secondary">Cancel</button>
-              <button onClick={handleConfirmConvert} disabled={convertSaving} className="btn-primary">{convertSaving ? 'Creating…' : 'Create & Link'}</button>
+            <div
+              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
+            >
+              <button onClick={() => setConvertWarranty(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmConvert}
+                disabled={convertSaving}
+                className="btn-primary"
+              >
+                {convertSaving ? 'Creating…' : 'Create & Link'}
+              </button>
             </div>
           </div>
         </div>
@@ -935,40 +1462,95 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Log Reminder Modal ────────────────────────────────── */}
       {reminderWarrantyId && (
         <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '20px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
-              <button title="Close" aria-label="Close" onClick={() => setReminderWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setReminderWarrantyId(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={labelStyle}>Sent On *</label>
-                <input type="date" value={reminderSentAt} onChange={e => setReminderSentAt(e.target.value)} style={inputStyle} autoFocus />
+                <input
+                  type="date"
+                  value={reminderSentAt}
+                  onChange={(e) => setReminderSentAt(e.target.value)}
+                  style={inputStyle}
+                  autoFocus
+                />
               </div>
               <div>
                 <label style={labelStyle}>Channel</label>
-                <select value={reminderChannel} onChange={e => setReminderChannel(e.target.value as any)} style={inputStyle}>
+                <select
+                  value={reminderChannel}
+                  onChange={(e) => setReminderChannel(e.target.value as any)}
+                  style={inputStyle}
+                >
                   <option value="email">Email</option>
                   <option value="phone">Phone</option>
                   <option value="other">Other</option>
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(e.g. email subject / survey ref)</span></label>
-                <input value={reminderReference} onChange={e => setReminderReference(e.target.value)} placeholder="Optional — helps locate the email later" style={inputStyle} />
+                <label style={labelStyle}>
+                  Reference{' '}
+                  <span style={{ fontWeight: 400, opacity: 0.6 }}>
+                    (e.g. email subject / survey ref)
+                  </span>
+                </label>
+                <input
+                  value={reminderReference}
+                  onChange={(e) => setReminderReference(e.target.value)}
+                  placeholder="Optional — helps locate the email later"
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Notes</label>
-                <input value={reminderNotes} onChange={e => setReminderNotes(e.target.value)} placeholder="Optional" style={inputStyle} />
+                <input
+                  value={reminderNotes}
+                  onChange={(e) => setReminderNotes(e.target.value)}
+                  placeholder="Optional"
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Next Reminder Date</label>
-                <input type="date" value={reminderNextDate} onChange={e => setReminderNextDate(e.target.value)} style={inputStyle} />
+                <input
+                  type="date"
+                  value={reminderNextDate}
+                  onChange={(e) => setReminderNextDate(e.target.value)}
+                  style={inputStyle}
+                />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-              <button onClick={() => setReminderWarrantyId(null)} className="btn-secondary">Cancel</button>
-              <button onClick={handleLogReminder} className="btn-primary">Log Reminder</button>
+            <div
+              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
+            >
+              <button onClick={() => setReminderWarrantyId(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleLogReminder} className="btn-primary">
+                Log Reminder
+              </button>
             </div>
           </div>
         </div>
@@ -977,28 +1559,60 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Waive Modal ───────────────────────────────────────── */}
       {waiveWarrantyId && (
         <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '20px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
-              <button title="Close" aria-label="Close" onClick={() => setWaiveWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setWaiveWarrantyId(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div>
               <label style={labelStyle}>Waiver Reason *</label>
               <textarea
-                value={waiveReason} onChange={e => setWaiveReason(e.target.value)}
-                placeholder="Explain why this warranty is being waived…" rows={4}
-                style={{ ...inputStyle, resize: 'vertical' }} autoFocus
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                placeholder="Explain why this warranty is being waived…"
+                rows={4}
+                style={{ ...inputStyle, resize: 'vertical' }}
+                autoFocus
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-              <button onClick={() => setWaiveWarrantyId(null)} className="btn-secondary">Cancel</button>
+            <div
+              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
+            >
+              <button onClick={() => setWaiveWarrantyId(null)} className="btn-secondary">
+                Cancel
+              </button>
               <button
                 onClick={handleWaive}
                 disabled={!waiveReason.trim()}
                 style={{
-                  background: 'rgba(255,165,0,0.15)', border: '1px solid rgba(255,165,0,0.35)',
-                  color: '#e6a800', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer',
-                  fontWeight: '600', fontSize: '0.85rem', opacity: waiveReason.trim() ? 1 : 0.5
+                  background: 'rgba(255,165,0,0.15)',
+                  border: '1px solid rgba(255,165,0,0.35)',
+                  color: '#e6a800',
+                  borderRadius: '8px',
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.85rem',
+                  opacity: waiveReason.trim() ? 1 : 0.5
                 }}
               >
                 Waive Warranty
@@ -1011,27 +1625,58 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Complete Modal ────────────────────────────────────── */}
       {completeWarrantyId && (
         <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '20px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
-              <button title="Close" aria-label="Close" onClick={() => setCompleteWarrantyId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setCompleteWarrantyId(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div>
               <label style={labelStyle}>Completion Notes (optional)</label>
               <textarea
-                value={completeNotes} onChange={e => setCompleteNotes(e.target.value)}
-                placeholder="Any notes on completion…" rows={3}
-                style={{ ...inputStyle, resize: 'vertical' }} autoFocus
+                value={completeNotes}
+                onChange={(e) => setCompleteNotes(e.target.value)}
+                placeholder="Any notes on completion…"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
+                autoFocus
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-              <button onClick={() => setCompleteWarrantyId(null)} className="btn-secondary">Cancel</button>
+            <div
+              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
+            >
+              <button onClick={() => setCompleteWarrantyId(null)} className="btn-secondary">
+                Cancel
+              </button>
               <button
                 onClick={handleComplete}
                 style={{
-                  background: 'rgba(0,200,100,0.15)', border: '1px solid rgba(0,200,100,0.35)',
-                  color: '#00c864', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer',
-                  fontWeight: '600', fontSize: '0.85rem'
+                  background: 'rgba(0,200,100,0.15)',
+                  border: '1px solid rgba(0,200,100,0.35)',
+                  color: '#00c864',
+                  borderRadius: '8px',
+                  padding: '6px 16px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.85rem'
                 }}
               >
                 Mark Complete
@@ -1044,74 +1689,163 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
       {/* ── Link to Survey Modal ──────────────────────────────── */}
       {linkWarranty && (
         <div style={modalBg}>
-          <div style={{ ...modalCard, width: '560px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div
+            style={{
+              ...modalCard,
+              width: '560px',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '6px'
+              }}
+            >
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Link to Survey</h3>
-              <button title="Close" aria-label="Close" onClick={() => setLinkWarranty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setLinkWarranty(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Pick an existing survey on file for this vessel to link to: <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>
+              Pick an existing survey on file for this vessel to link to:{' '}
+              <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>
             </p>
             <input
               type="text"
               value={linkSearch}
-              onChange={e => setLinkSearch(e.target.value)}
+              onChange={(e) => setLinkSearch(e.target.value)}
               placeholder="Search by type, reference, surveyor…"
               style={{ ...inputStyle, marginBottom: '12px' }}
             />
             <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
               {linkLoading ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading surveys…</div>
-              ) : (() => {
-                const q = linkSearch.trim().toLowerCase()
-                const filtered = availableSurveys.filter(s => {
-                  if (!q) return true
-                  const surveyor = (surveyorMap[s.surveyorId] || '').toLowerCase()
-                  return (
-                    (s.surveyType || '').toLowerCase().includes(q) ||
-                    (s.reference || '').toLowerCase().includes(q) ||
-                    surveyor.includes(q) ||
-                    (s.surveyDate || '').includes(q)
-                  )
-                })
-                if (availableSurveys.length === 0) {
-                  return (
-                    <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      No condition surveys recorded for this vessel.<br />Use “Convert to Survey” to create one.
-                    </div>
-                  )
-                }
-                if (filtered.length === 0) {
-                  return <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No surveys match your search.</div>
-                }
-                return filtered.map(s => (
-                  <div
-                    key={s.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                      padding: '10px 12px', marginBottom: '8px', borderRadius: '8px',
-                      border: '1px solid var(--glass-border-color)',
-                      background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)'
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {formatDateShort(s.surveyDate)} · {s.surveyType || 'Survey'}
+                <div
+                  style={{
+                    padding: '30px',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Loading surveys…
+                </div>
+              ) : (
+                (() => {
+                  const q = linkSearch.trim().toLowerCase()
+                  const filtered = availableSurveys.filter((s) => {
+                    if (!q) return true
+                    const surveyor = (surveyorMap[s.surveyorId] || '').toLowerCase()
+                    return (
+                      (s.surveyType || '').toLowerCase().includes(q) ||
+                      (s.reference || '').toLowerCase().includes(q) ||
+                      surveyor.includes(q) ||
+                      (s.surveyDate || '').includes(q)
+                    )
+                  })
+                  if (availableSurveys.length === 0) {
+                    return (
+                      <div
+                        style={{
+                          padding: '30px',
+                          textAlign: 'center',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        No condition surveys recorded for this vessel.
+                        <br />
+                        Use “Convert to Survey” to create one.
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {surveyorMap[s.surveyorId] || 'Unknown surveyor'}{s.reference ? ` — ${s.reference}` : ''}
+                    )
+                  }
+                  if (filtered.length === 0) {
+                    return (
+                      <div
+                        style={{
+                          padding: '30px',
+                          textAlign: 'center',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        No surveys match your search.
                       </div>
-                    </div>
-                    <button
-                      onClick={() => handleLinkSurvey(s.id)}
-                      className="btn-secondary"
-                      style={{ fontSize: '0.78rem', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: '4px', color: '#8a7dff', borderColor: 'rgba(138,125,255,0.35)', flexShrink: 0 }}
+                    )
+                  }
+                  return filtered.map((s) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        marginBottom: '8px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--glass-border-color)',
+                        background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)'
+                      }}
                     >
-                      <Link2 size={13} /> Link
-                    </button>
-                  </div>
-                ))
-              })()}
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)'
+                          }}
+                        >
+                          {formatDateShort(s.surveyDate)} · {s.surveyType || 'Survey'}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-secondary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {surveyorMap[s.surveyorId] || 'Unknown surveyor'}
+                          {s.reference ? ` — ${s.reference}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleLinkSurvey(s.id)}
+                        className="btn-secondary"
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '5px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          color: '#8a7dff',
+                          borderColor: 'rgba(138,125,255,0.35)',
+                          flexShrink: 0
+                        }}
+                      >
+                        <Link2 size={13} /> Link
+                      </button>
+                    </div>
+                  ))
+                })()
+              )}
             </div>
           </div>
         </div>

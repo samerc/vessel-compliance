@@ -20,7 +20,7 @@ const C: Record<string, RGB> = {
   amberBg: [255, 246, 224],
   orange: [200, 55, 0],
   red: [186, 0, 0],
-  redBg: [255, 230, 230],
+  redBg: [255, 230, 230]
 }
 
 const W = 210
@@ -47,11 +47,7 @@ function docStatus(hasFile: boolean, expiry: string | null | undefined): string 
 }
 
 // ── Page chrome ──────────────────────────────────────────────────────────────
-function drawPageHeader(
-  doc: jsPDF,
-  companyName: string,
-  primary: RGB,
-) {
+function drawPageHeader(doc: jsPDF, companyName: string, primary: RGB) {
   doc.setFillColor(...C.navy)
   doc.rect(0, 0, W, 14, 'F')
   doc.setFillColor(...C.accent)
@@ -72,12 +68,7 @@ function drawPageHeader(
   doc.text('CONFIDENTIAL', W - MARGIN, 9, { align: 'right' })
 }
 
-function drawPageFooter(
-  doc: jsPDF,
-  pageNum: number,
-  total: number,
-  companyName: string,
-) {
+function drawPageFooter(doc: jsPDF, pageNum: number, total: number, companyName: string) {
   const H = doc.internal.pageSize.getHeight()
   doc.setDrawColor(...C.bgMid)
   doc.setLineWidth(0.3)
@@ -103,22 +94,18 @@ function drawSectionLabel(doc: jsPDF, y: number, text: string) {
 export async function exportCustomerPortfolioPDF(
   customerId: string,
   customerName: string,
-  customerType: string | null,
+  customerType: string | null
 ): Promise<void> {
   // Gather all data up front
-  const [
-    vesselsRaw,
-    docTypesRaw,
-    allVesselDocsRaw,
-    flagStatesRaw,
-    entitiesRaw,
-  ] = await Promise.all([
-    window.api.getVessels(),
-    window.api.getDocumentTypes(),
-    window.api.getVesselDocuments(),
-    window.api.getFlagStates(),
-    window.api.getEntities(),
-  ])
+  const [vesselsRaw, docTypesRaw, allVesselDocsRaw, flagStatesRaw, entitiesRaw] = await Promise.all(
+    [
+      window.api.getVessels(),
+      window.api.getDocumentTypes(),
+      window.api.getVesselDocuments(),
+      window.api.getFlagStates(),
+      window.api.getEntities()
+    ]
+  )
 
   const vessels = Array.isArray(vesselsRaw) ? vesselsRaw : []
   const docTypes = Array.isArray(docTypesRaw) ? docTypesRaw : []
@@ -126,16 +113,14 @@ export async function exportCustomerPortfolioPDF(
   const flagStates = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
   const entities = Array.isArray(entitiesRaw) ? entitiesRaw : []
 
-  const customerVessels = vessels.filter(
-    (v: any) => v.isActive && v.customerId === customerId,
-  )
+  const customerVessels = vessels.filter((v: any) => v.isActive && v.customerId === customerId)
   if (customerVessels.length === 0) return
 
   // Batch-fetch custom doc types, policies, and warranties per vessel
   const [customDocResults, policyResults, warrantyResults] = await Promise.all([
     Promise.all(customerVessels.map((v: any) => window.api.getVesselCustomDocTypes(v.id))),
     Promise.all(customerVessels.map((v: any) => window.api.getVesselDynamicPolicies(v.id))),
-    Promise.all(customerVessels.map((v: any) => window.api.surveyWarrantyGetByVessel(v.id))),
+    Promise.all(customerVessels.map((v: any) => window.api.surveyWarrantyGetByVessel(v.id)))
   ])
 
   const allCustomDocTypes = customDocResults.filter(Array.isArray).flat()
@@ -182,7 +167,7 @@ export async function exportCustomerPortfolioPDF(
       ...(customTypes as any[]).map((t: any) => {
         const d = vesselDocs.find((v: any) => v.documentTypeId === t.id)
         return { required: true, doc: d }
-      }),
+      })
     ].filter((t) => t.required)
 
     let compliant = 0
@@ -221,7 +206,11 @@ export async function exportCustomerPortfolioPDF(
       imo: vessel.imoNumber || '',
       flag: fs ? `${(fs as any).name}` : '—',
       type: vessel.vesselType || '—',
-      built: vessel.builtYear ? (vessel.rebuiltYear ? `${vessel.builtYear}/${vessel.rebuiltYear}` : String(vessel.builtYear)) : '—',
+      built: vessel.builtYear
+        ? vessel.rebuiltYear
+          ? `${vessel.builtYear}/${vessel.rebuiltYear}`
+          : String(vessel.builtYear)
+        : '—',
       grt: vessel.grossTonnage ? String(vessel.grossTonnage) : '—',
       policyTypeNames: ptNames,
       compliant,
@@ -229,7 +218,7 @@ export async function exportCustomerPortfolioPDF(
       expiringSoon: expiringSoonCount,
       expired: expiredCount,
       totalRequired: reqCount,
-      pct,
+      pct
     })
   }
 
@@ -257,7 +246,7 @@ export async function exportCustomerPortfolioPDF(
         description: w.description,
         deadlineInfo: deadline || '—',
         status: w.status === 'survey_done' ? 'Survey Done' : 'Pending',
-        policyType: w.policyTypeName || '—',
+        policyType: w.policyTypeName || '—'
       })
     }
   }
@@ -288,7 +277,7 @@ export async function exportCustomerPortfolioPDF(
   doc.text(
     `${typeLabel ? typeLabel + ' Client' : 'Customer'}  ·  ${customerVessels.length} vessel${customerVessels.length !== 1 ? 's' : ''}`,
     MARGIN,
-    y + 15,
+    y + 15
   )
 
   doc.setFontSize(8.5)
@@ -314,10 +303,8 @@ export async function exportCustomerPortfolioPDF(
   y += 28
 
   // ── Compliance overview cards ──────────────────────────────────────────────
-  const overallPct =
-    totalRequired > 0 ? Math.round((totalCompliant / totalRequired) * 100) : 100
-  const rateColor: RGB =
-    overallPct === 100 ? C.green : overallPct >= 70 ? C.amber : C.red
+  const overallPct = totalRequired > 0 ? Math.round((totalCompliant / totalRequired) * 100) : 100
+  const rateColor: RGB = overallPct === 100 ? C.green : overallPct >= 70 ? C.amber : C.red
 
   const statCards: { label: string; value: string; color: RGB; bg: RGB }[] = [
     { label: 'COMPLIANT', value: String(totalCompliant), color: C.green, bg: C.greenBg },
@@ -325,11 +312,11 @@ export async function exportCustomerPortfolioPDF(
       label: 'EXPIRING SOON',
       value: String(totalExpiringSoon),
       color: C.amber,
-      bg: C.amberBg,
+      bg: C.amberBg
     },
     { label: 'EXPIRED', value: String(totalExpired), color: C.orange, bg: [255, 237, 229] },
     { label: 'MISSING', value: String(totalMissing), color: C.red, bg: C.redBg },
-    { label: 'COMPLIANCE', value: `${overallPct}%`, color: rateColor, bg: C.bgLight },
+    { label: 'COMPLIANCE', value: `${overallPct}%`, color: rateColor, bg: C.bgLight }
   ]
 
   const cardW = (W - MARGIN * 2 - 12) / 5
@@ -353,8 +340,7 @@ export async function exportCustomerPortfolioPDF(
   y += 8
 
   const vesselBody = vesselRows.map((v) => {
-    const pctColor: RGB =
-      v.pct === 100 ? C.green : v.missing > 0 ? C.red : C.amber
+    const pctColor: RGB = v.pct === 100 ? C.green : v.missing > 0 ? C.red : C.amber
     return [
       v.name,
       v.imo,
@@ -363,7 +349,7 @@ export async function exportCustomerPortfolioPDF(
       v.built,
       v.grt,
       v.policyTypeNames.join(', ') || '—',
-      { content: `${v.pct}%`, styles: { textColor: pctColor, fontStyle: 'bold' as const } },
+      { content: `${v.pct}%`, styles: { textColor: pctColor, fontStyle: 'bold' as const } }
     ]
   })
 
@@ -378,7 +364,7 @@ export async function exportCustomerPortfolioPDF(
       textColor: C.white,
       fontSize: 7.5,
       fontStyle: 'bold',
-      cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 2 },
+      cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 2 }
     },
     columnStyles: {
       0: { cellWidth: 36, fontStyle: 'bold' },
@@ -388,7 +374,7 @@ export async function exportCustomerPortfolioPDF(
       4: { cellWidth: 14, halign: 'center' },
       5: { cellWidth: 18, halign: 'right' },
       6: { cellWidth: 40 },
-      7: { cellWidth: 12, halign: 'center' },
+      7: { cellWidth: 12, halign: 'center' }
     },
     styles: {
       fontSize: 8,
@@ -396,12 +382,12 @@ export async function exportCustomerPortfolioPDF(
       lineColor: C.bgMid as any,
       lineWidth: 0.25,
       overflow: 'linebreak',
-      textColor: C.textPri,
+      textColor: C.textPri
     },
     alternateRowStyles: { fillColor: C.bgLight as any },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
-    },
+    }
   })
 
   y = (doc as any).lastAutoTable.finalY + 8
@@ -424,7 +410,7 @@ export async function exportCustomerPortfolioPDF(
     const coverageBody = coverageEntries.map(([name, count]) => [
       name,
       `${count} / ${customerVessels.length}`,
-      `${Math.round((count / customerVessels.length) * 100)}%`,
+      `${Math.round((count / customerVessels.length) * 100)}%`
     ])
 
     autoTable(doc, {
@@ -438,24 +424,24 @@ export async function exportCustomerPortfolioPDF(
         textColor: C.white,
         fontSize: 7.5,
         fontStyle: 'bold',
-        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 },
+        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 }
       },
       columnStyles: {
         0: { cellWidth: 80, fontStyle: 'bold' },
         1: { cellWidth: 50, halign: 'center' },
-        2: { cellWidth: 50, halign: 'center' },
+        2: { cellWidth: 50, halign: 'center' }
       },
       styles: {
         fontSize: 8.5,
         cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
         lineColor: C.bgMid as any,
         lineWidth: 0.25,
-        textColor: C.textPri,
+        textColor: C.textPri
       },
       alternateRowStyles: { fillColor: C.bgLight as any },
       didDrawPage: (data) => {
         if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
-      },
+      }
     })
     y = (doc as any).lastAutoTable.finalY + 8
   } else {
@@ -477,25 +463,27 @@ export async function exportCustomerPortfolioPDF(
   y += 8
 
   const complianceBody = vesselRows.map((v) => {
-    const pctColor: RGB =
-      v.pct === 100 ? C.green : v.missing > 0 ? C.red : C.amber
+    const pctColor: RGB = v.pct === 100 ? C.green : v.missing > 0 ? C.red : C.amber
     return [
       v.name,
       String(v.totalRequired),
       { content: String(v.compliant), styles: { textColor: C.green } },
       {
         content: String(v.missing),
-        styles: { textColor: v.missing > 0 ? C.red : C.textSec, fontStyle: v.missing > 0 ? 'bold' as const : 'normal' as const },
+        styles: {
+          textColor: v.missing > 0 ? C.red : C.textSec,
+          fontStyle: v.missing > 0 ? ('bold' as const) : ('normal' as const)
+        }
       },
       {
         content: String(v.expired),
-        styles: { textColor: v.expired > 0 ? C.orange : C.textSec },
+        styles: { textColor: v.expired > 0 ? C.orange : C.textSec }
       },
       {
         content: String(v.expiringSoon),
-        styles: { textColor: v.expiringSoon > 0 ? C.amber : C.textSec },
+        styles: { textColor: v.expiringSoon > 0 ? C.amber : C.textSec }
       },
-      { content: `${v.pct}%`, styles: { textColor: pctColor, fontStyle: 'bold' as const } },
+      { content: `${v.pct}%`, styles: { textColor: pctColor, fontStyle: 'bold' as const } }
     ]
   })
 
@@ -510,7 +498,7 @@ export async function exportCustomerPortfolioPDF(
       textColor: C.white,
       fontSize: 7.5,
       fontStyle: 'bold',
-      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 },
+      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 }
     },
     columnStyles: {
       0: { cellWidth: 48, fontStyle: 'bold' },
@@ -519,19 +507,19 @@ export async function exportCustomerPortfolioPDF(
       3: { cellWidth: 22, halign: 'center' },
       4: { cellWidth: 22, halign: 'center' },
       5: { cellWidth: 22, halign: 'center' },
-      6: { cellWidth: 22, halign: 'center' },
+      6: { cellWidth: 22, halign: 'center' }
     },
     styles: {
       fontSize: 8,
       cellPadding: { top: 4, bottom: 4, left: 4, right: 3 },
       lineColor: C.bgMid as any,
       lineWidth: 0.25,
-      textColor: C.textPri,
+      textColor: C.textPri
     },
     alternateRowStyles: { fillColor: C.bgLight as any },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
-    },
+    }
   })
 
   y = (doc as any).lastAutoTable.finalY + 8
@@ -556,9 +544,9 @@ export async function exportCustomerPortfolioPDF(
         content: w.status,
         styles: {
           textColor: w.status === 'Pending' ? C.amber : C.accent,
-          fontStyle: 'bold' as const,
-        },
-      },
+          fontStyle: 'bold' as const
+        }
+      }
     ])
 
     autoTable(doc, {
@@ -572,14 +560,14 @@ export async function exportCustomerPortfolioPDF(
         textColor: C.white,
         fontSize: 7.5,
         fontStyle: 'bold',
-        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 },
+        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 3 }
       },
       columnStyles: {
         0: { cellWidth: 34, fontStyle: 'bold' },
         1: { cellWidth: 60 },
         2: { cellWidth: 30 },
         3: { cellWidth: 36 },
-        4: { cellWidth: 22, halign: 'center' },
+        4: { cellWidth: 22, halign: 'center' }
       },
       styles: {
         fontSize: 8,
@@ -587,12 +575,12 @@ export async function exportCustomerPortfolioPDF(
         lineColor: C.bgMid as any,
         lineWidth: 0.25,
         overflow: 'linebreak',
-        textColor: C.textPri,
+        textColor: C.textPri
       },
       alternateRowStyles: { fillColor: C.bgLight as any },
       didDrawPage: (data) => {
         if (data.pageNumber > 1) drawPageHeader(doc, s.companyName, primary)
-      },
+      }
     })
   }
 

@@ -193,8 +193,8 @@ export const PERMISSION_CATEGORIES = [
       { key: 'vessels:create', label: 'Create vessels' },
       { key: 'vessels:edit', label: 'Edit vessels' },
       { key: 'vessels:delete', label: 'Delete vessels' },
-      { key: 'vessels:activate', label: 'Activate / deactivate vessels' },
-    ],
+      { key: 'vessels:activate', label: 'Activate / deactivate vessels' }
+    ]
   },
   {
     key: 'entities',
@@ -205,8 +205,8 @@ export const PERMISSION_CATEGORIES = [
       { key: 'entities:edit', label: 'Edit entities' },
       { key: 'entities:delete', label: 'Delete entities' },
       { key: 'entities:addresses', label: 'Manage addresses' },
-      { key: 'assureds:manage', label: 'Manage vessel assured roles' },
-    ],
+      { key: 'assureds:manage', label: 'Manage vessel assured roles' }
+    ]
   },
   {
     key: 'documents',
@@ -214,8 +214,8 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'documents:view', label: 'View documents' },
       { key: 'documents:upload', label: 'Upload documents' },
-      { key: 'documents:delete', label: 'Delete documents' },
-    ],
+      { key: 'documents:delete', label: 'Delete documents' }
+    ]
   },
   {
     key: 'quotations',
@@ -227,9 +227,12 @@ export const PERMISSION_CATEGORIES = [
       { key: 'quotations:delete', label: 'Delete quotations' },
       { key: 'quotations:export', label: 'Export quotations (PDF / DOCX)' },
       { key: 'quotations:approve', label: 'Approve quotations' },
-      { key: 'quotations:settings', label: 'Manage quotation settings (conditions, warranties, deductibles, etc.)' },
-      { key: 'quotations:bulkDelete', label: 'Bulk delete quotations' },
-    ],
+      {
+        key: 'quotations:settings',
+        label: 'Manage quotation settings (conditions, warranties, deductibles, etc.)'
+      },
+      { key: 'quotations:bulkDelete', label: 'Bulk delete quotations' }
+    ]
   },
   {
     key: 'policies',
@@ -237,8 +240,8 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'policies:view', label: 'View policies' },
       { key: 'policies:manage', label: 'Create / edit / delete policies' },
-      { key: 'policies:sign', label: 'Sign policies' },
-    ],
+      { key: 'policies:sign', label: 'Sign policies' }
+    ]
   },
   {
     key: 'surveys',
@@ -246,8 +249,8 @@ export const PERMISSION_CATEGORIES = [
     permissions: [
       { key: 'surveys:view', label: 'View surveys' },
       { key: 'surveys:manage', label: 'Create / edit / delete surveys' },
-      { key: 'surveys:defects', label: 'Manage defects' },
-    ],
+      { key: 'surveys:defects', label: 'Manage defects' }
+    ]
   },
   {
     key: 'compliance',
@@ -256,16 +259,16 @@ export const PERMISSION_CATEGORIES = [
       { key: 'compliance:view', label: 'View compliance alerts' },
       { key: 'compliance:run', label: 'Run compliance checks' },
       { key: 'compliance:review', label: 'Review sanctions results' },
-      { key: 'sanctions:search', label: 'Search sanctions' },
-    ],
+      { key: 'sanctions:search', label: 'Search sanctions' }
+    ]
   },
   {
     key: 'reports',
     label: 'Reports',
     permissions: [
       { key: 'reports:view', label: 'View reports' },
-      { key: 'reports:export', label: 'Export reports' },
-    ],
+      { key: 'reports:export', label: 'Export reports' }
+    ]
   },
   {
     key: 'fleet',
@@ -278,24 +281,24 @@ export const PERMISSION_CATEGORIES = [
       { key: 'analytics:presets', label: 'Save / delete analytics presets' },
       { key: 'renewals:view', label: 'View renewals' },
       { key: 'renewals:manage', label: 'Manage renewal statuses' },
-      { key: 'renewals:notes', label: 'Add/delete renewal notes' },
-    ],
+      { key: 'renewals:notes', label: 'Add/delete renewal notes' }
+    ]
   },
   {
     key: 'email',
     label: 'Email Templates',
     permissions: [
       { key: 'email:view', label: 'View email templates' },
-      { key: 'email:manage', label: 'Create / edit / delete email templates' },
-    ],
+      { key: 'email:manage', label: 'Create / edit / delete email templates' }
+    ]
   },
   {
     key: 'fileManager',
     label: 'File Manager',
     permissions: [
       { key: 'fileManager:view', label: 'View file manager' },
-      { key: 'fileManager:manage', label: 'Move / rename files and folders' },
-    ],
+      { key: 'fileManager:manage', label: 'Move / rename files and folders' }
+    ]
   },
   {
     key: 'admin',
@@ -306,12 +309,14 @@ export const PERMISSION_CATEGORIES = [
       { key: 'admin:settings', label: 'System settings (doc types, roles, survey types, etc.)' },
       { key: 'admin:database', label: 'Database configuration' },
       { key: 'admin:backup', label: 'Backup & restore database' },
-      { key: 'admin:activityLog', label: 'View activity log' },
-    ],
-  },
+      { key: 'admin:activityLog', label: 'View activity log' }
+    ]
+  }
 ] as const
 
-export const ALL_PERMISSION_KEYS: string[] = PERMISSION_CATEGORIES.flatMap(c => c.permissions.map(p => p.key))
+export const ALL_PERMISSION_KEYS: string[] = PERMISSION_CATEGORIES.flatMap((c) =>
+  c.permissions.map((p) => p.key)
+)
 
 export interface UserGroup {
   id: string
@@ -1311,13 +1316,17 @@ export const NOTIFICATION_EVENT_TYPES = [
   { key: 'document_missing', label: 'Missing Documents', category: 'Compliance' },
   { key: 'compliance_match', label: 'Sanctions Screening Matches', category: 'Compliance' },
   { key: 'quotation_workflow', label: 'Quotation Workflow Changes', category: 'Quotations' },
-  { key: 'quotation_approval_needed', label: 'Quotation Approval Requests', category: 'Quotations' },
+  {
+    key: 'quotation_approval_needed',
+    label: 'Quotation Approval Requests',
+    category: 'Quotations'
+  },
   { key: 'policy_created', label: 'Policy Conversions', category: 'Policies' },
   { key: 'policy_renewed', label: 'Policy Renewals', category: 'Policies' },
   { key: 'policy_expiring', label: 'Policy Expiry Warnings', category: 'Policies' },
   { key: 'blue_card_expiring', label: 'Blue Card Expiry', category: 'Policies' },
   { key: 'vessel_status_change', label: 'Vessel Status Changes', category: 'Vessels' },
-  { key: 'entity_change', label: 'Entity Changes', category: 'Entities' },
+  { key: 'entity_change', label: 'Entity Changes', category: 'Entities' }
 ] as const
 
 export interface PISectionTexts {
@@ -1645,7 +1654,7 @@ export const TEMPLATE_CATEGORIES = [
   'vessel',
   'entity',
   'certificate',
-  'email',
+  'email'
 ] as const
 
 export const TEMPLATE_PLACEHOLDERS = [
@@ -1675,7 +1684,7 @@ export const TEMPLATE_PLACEHOLDERS = [
   // General
   { key: '{{companyName}}', label: 'Company Name', category: 'General' },
   { key: '{{today}}', label: "Today's Date", category: 'General' },
-  { key: '{{userName}}', label: 'Current User', category: 'General' },
+  { key: '{{userName}}', label: 'Current User', category: 'General' }
 ] as const
 
 // ---- Policy Endorsements ----
@@ -1742,7 +1751,7 @@ export const ENDORSEMENT_PRESET_SECTIONS = [
   { key: 'conditions', title: 'Conditions' },
   { key: 'warranties', title: 'Warranties' },
   { key: 'deductibles', title: 'Deductibles' },
-  { key: 'general', title: 'General' },
+  { key: 'general', title: 'General' }
 ] as const
 
 // Sanctions Report Check — ad-hoc named screening report saved for audit
@@ -1823,8 +1832,17 @@ export interface ReceiptSettings {
 }
 
 // SIC letter import (scanned letters read by OCR)
-export interface SicOcrBox { x0: number; y0: number; x1: number; y1: number }
-export interface SicOcrLine { text: string; bbox: SicOcrBox; words: { text: string; bbox: SicOcrBox }[] }
+export interface SicOcrBox {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+export interface SicOcrLine {
+  text: string
+  bbox: SicOcrBox
+  words: { text: string; bbox: SicOcrBox }[]
+}
 export interface SicLetterPage {
   pageCount: number
   page: number

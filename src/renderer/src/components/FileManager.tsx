@@ -18,7 +18,7 @@ import {
   FileSpreadsheet,
   Activity,
   CheckCircle,
-  XCircle,
+  XCircle
 } from 'lucide-react'
 import { FileNode } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
@@ -79,7 +79,7 @@ function TreeNode({
   onSelect,
   onToggle,
   onContextMenu,
-  isLight,
+  isLight
 }: TreeNodeProps) {
   if (!node.isDirectory) return null
   const isExpanded = expandedPaths.has(node.path)
@@ -102,7 +102,7 @@ function TreeNode({
           userSelect: 'none',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          textOverflow: 'ellipsis'
         }}
         onClick={() => onSelect(node.path)}
         onContextMenu={(e) => onContextMenu(e, node.path)}
@@ -129,7 +129,7 @@ function TreeNode({
         <span
           style={{
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            textOverflow: 'ellipsis'
           }}
         >
           {node.name}
@@ -189,7 +189,8 @@ export default function FileManager() {
   const [newFolderModal, setNewFolderModal] = useState<string | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [healthCheckResults, setHealthCheckResults] = useState<
-    { table: string; id: string; column: string; path: string; label: string; exists: boolean }[] | null
+    | { table: string; id: string; column: string; path: string; label: string; exists: boolean }[]
+    | null
   >(null)
   const [showSettings, setShowSettings] = useState(false)
   const [newRootInput, setNewRootInput] = useState('')
@@ -235,7 +236,7 @@ export default function FileManager() {
         setLoading(false)
       }
     },
-    [rootPath, showError],
+    [rootPath, showError]
   )
 
   const loadContents = useCallback(
@@ -248,7 +249,7 @@ export default function FileManager() {
         setContents([])
       }
     },
-    [showError],
+    [showError]
   )
 
   // Initial load
@@ -273,7 +274,7 @@ export default function FileManager() {
       setSelectedPath(path)
       await loadContents(path)
     },
-    [loadContents],
+    [loadContents]
   )
 
   const handleToggleExpand = useCallback((path: string) => {
@@ -297,7 +298,7 @@ export default function FileManager() {
       e.stopPropagation()
       setContextMenu({ x: e.clientX, y: e.clientY, path, isDir })
     },
-    [],
+    []
   )
 
   // Close context menu on any click
@@ -340,7 +341,9 @@ export default function FileManager() {
         showError('Rename failed: ' + ((result as any).message || 'Unknown error'))
         return
       }
-      showSuccess(`Renamed. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
+      showSuccess(
+        `Renamed. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`
+      )
       setRenameModal(null)
       await loadTree()
       if (selectedPath === renameModal.path || selectedPath?.startsWith(renameModal.path + '\\')) {
@@ -363,7 +366,9 @@ export default function FileManager() {
         showError('Move failed: ' + ((result as any).message || 'Unknown error'))
         return
       }
-      showSuccess(`Moved. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`)
+      showSuccess(
+        `Moved. ${result.remapped || 0} file link${result.remapped !== 1 ? 's' : ''} remapped.`
+      )
       setMoveModal(null)
       setMoveDestination(null)
       await loadTree()
@@ -379,7 +384,16 @@ export default function FileManager() {
     } catch (err: any) {
       showError('Move failed: ' + (err?.message || err))
     }
-  }, [moveModal, moveDestination, loadTree, selectedPath, rootPath, loadContents, showSuccess, showError])
+  }, [
+    moveModal,
+    moveDestination,
+    loadTree,
+    selectedPath,
+    rootPath,
+    loadContents,
+    showSuccess,
+    showError
+  ])
 
   const handleCreateFolder = useCallback(async () => {
     if (!newFolderModal) return
@@ -419,7 +433,7 @@ export default function FileManager() {
         showError('Failed to open: ' + (err?.message || err))
       }
     },
-    [showError],
+    [showError]
   )
 
   const handleOpenFile = useCallback(
@@ -430,7 +444,7 @@ export default function FileManager() {
         showError('Failed to open file: ' + (err?.message || err))
       }
     },
-    [showError],
+    [showError]
   )
 
   const handleSaveRoot = useCallback(async () => {
@@ -480,7 +494,7 @@ export default function FileManager() {
         await handleOpenFile(item.path)
       }
     },
-    [loadContents, handleOpenFile],
+    [loadContents, handleOpenFile]
   )
 
   // -------------------------------------------------------------------------
@@ -536,7 +550,7 @@ export default function FileManager() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 1000
   }
 
   const modalBox: React.CSSProperties = {
@@ -547,7 +561,7 @@ export default function FileManager() {
     maxWidth: 560,
     width: '90%',
     border: 'var(--glass-border)',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
   }
 
   const modalTitle: React.CSSProperties = {
@@ -557,7 +571,7 @@ export default function FileManager() {
     marginBottom: 16,
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 8
   }
 
   const inputStyle: React.CSSProperties = {
@@ -569,7 +583,7 @@ export default function FileManager() {
     color: 'var(--text-primary)',
     fontSize: '0.9rem',
     outline: 'none',
-    boxSizing: 'border-box',
+    boxSizing: 'border-box'
   }
 
   // -------------------------------------------------------------------------
@@ -588,7 +602,7 @@ export default function FileManager() {
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            marginBottom: 24,
+            marginBottom: 24
           }}
         >
           <div
@@ -599,7 +613,7 @@ export default function FileManager() {
               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'center'
             }}
           >
             <HardDrive size={22} color="#fff" />
@@ -619,7 +633,7 @@ export default function FileManager() {
           style={{
             padding: 40,
             textAlign: 'center',
-            maxWidth: 500,
+            maxWidth: 500
           }}
         >
           <HardDrive size={48} style={{ color: 'var(--text-secondary)', marginBottom: 16 }} />
@@ -627,7 +641,7 @@ export default function FileManager() {
             style={{
               color: 'var(--text-primary)',
               marginBottom: 8,
-              fontSize: '1.1rem',
+              fontSize: '1.1rem'
             }}
           >
             Configure Your Document Root
@@ -637,11 +651,11 @@ export default function FileManager() {
               color: 'var(--text-secondary)',
               fontSize: '0.9rem',
               marginBottom: 24,
-              lineHeight: 1.5,
+              lineHeight: 1.5
             }}
           >
-            Select the root folder where your vessel documents are stored. This will be the top-level
-            folder displayed in the file manager.
+            Select the root folder where your vessel documents are stored. This will be the
+            top-level folder displayed in the file manager.
           </p>
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -683,7 +697,7 @@ export default function FileManager() {
   function MoveTreeNode({
     node,
     depth,
-    sourcePath,
+    sourcePath
   }: {
     node: FileNode
     depth: number
@@ -710,7 +724,7 @@ export default function FileManager() {
             background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
             opacity: isSelf || isChild ? 0.4 : 1,
             fontSize: '0.83rem',
-            color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+            color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)'
           }}
           onClick={() => {
             if (!isSelf && !isChild) setMoveDestination(node.path)
@@ -758,7 +772,7 @@ export default function FileManager() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 20,
+          marginBottom: 20
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -770,7 +784,7 @@ export default function FileManager() {
               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'center'
             }}
           >
             <HardDrive size={22} color="#fff" />
@@ -816,7 +830,7 @@ export default function FileManager() {
           gap: 16,
           flex: 1,
           minHeight: 0,
-          overflow: 'hidden',
+          overflow: 'hidden'
         }}
       >
         {/* Tree panel (left) */}
@@ -828,7 +842,7 @@ export default function FileManager() {
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            background: isLight ? '#f4f6fb' : '#14172a',
+            background: isLight ? '#f4f6fb' : '#14172a'
           }}
         >
           <div
@@ -842,7 +856,7 @@ export default function FileManager() {
               letterSpacing: '0.05em',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 6
             }}
           >
             <Folder size={14} />
@@ -853,7 +867,7 @@ export default function FileManager() {
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
-              padding: '6px 4px',
+              padding: '6px 4px'
             }}
           >
             {loading && !tree ? (
@@ -862,7 +876,7 @@ export default function FileManager() {
                   padding: 20,
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.85rem',
+                  fontSize: '0.85rem'
                 }}
               >
                 <RefreshCw
@@ -893,7 +907,7 @@ export default function FileManager() {
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflow: 'hidden'
           }}
         >
           {/* Breadcrumb */}
@@ -905,7 +919,7 @@ export default function FileManager() {
               alignItems: 'center',
               gap: 4,
               fontSize: '0.85rem',
-              flexWrap: 'wrap',
+              flexWrap: 'wrap'
             }}
           >
             {getBreadcrumbs().map((crumb, i, arr) => (
@@ -913,9 +927,8 @@ export default function FileManager() {
                 <span
                   style={{
                     cursor: 'pointer',
-                    color:
-                      i === arr.length - 1 ? 'var(--text-primary)' : 'var(--accent-primary)',
-                    fontWeight: i === arr.length - 1 ? 600 : 400,
+                    color: i === arr.length - 1 ? 'var(--text-primary)' : 'var(--accent-primary)',
+                    fontWeight: i === arr.length - 1 ? 600 : 400
                   }}
                   onClick={() => handleSelectFolder(crumb.fullPath)}
                 >
@@ -936,7 +949,7 @@ export default function FileManager() {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              flexWrap: 'wrap',
+              flexWrap: 'wrap'
             }}
           >
             <button
@@ -962,7 +975,9 @@ export default function FileManager() {
               <ExternalLink size={14} />
               Open in Explorer
             </button>
-            <button title="Refresh" aria-label="Refresh"
+            <button
+              title="Refresh"
+              aria-label="Refresh"
               className="btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px' }}
               onClick={handleRefresh}
@@ -981,7 +996,7 @@ export default function FileManager() {
                   left: 10,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--text-secondary)',
+                  color: 'var(--text-secondary)'
                 }}
               />
               <input
@@ -994,7 +1009,7 @@ export default function FileManager() {
                   width: 180,
                   paddingLeft: 30,
                   padding: '5px 12px 5px 30px',
-                  fontSize: '0.83rem',
+                  fontSize: '0.83rem'
                 }}
               />
             </div>
@@ -1017,7 +1032,7 @@ export default function FileManager() {
                 letterSpacing: '0.06em',
                 position: 'sticky',
                 top: 0,
-                zIndex: 1,
+                zIndex: 1
               }}
             >
               <span>Name</span>
@@ -1032,24 +1047,34 @@ export default function FileManager() {
                   padding: 56,
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.9rem',
+                  fontSize: '0.9rem'
                 }}
               >
                 <Folder
                   size={44}
                   style={{ color: 'var(--text-secondary)', opacity: 0.3, marginBottom: 16 }}
                 />
-                <div style={{ fontWeight: 500 }}>{search ? 'No matching items' : 'This folder is empty'}</div>
+                <div style={{ fontWeight: 500 }}>
+                  {search ? 'No matching items' : 'This folder is empty'}
+                </div>
                 <div style={{ fontSize: '0.8rem', marginTop: 6, opacity: 0.7 }}>
-                  {search ? 'Try a different search term' : 'Create a new folder or add files via Explorer'}
+                  {search
+                    ? 'Try a different search term'
+                    : 'Create a new folder or add files via Explorer'}
                 </div>
               </div>
             ) : (
               filteredContents.map((item, idx) => {
                 const btnStyle = (color: string) => ({
-                  background: 'none' as const, border: 'none' as const, cursor: 'pointer' as const,
-                  color, padding: '6px 8px', borderRadius: 6, display: 'flex' as const, alignItems: 'center' as const,
-                  transition: 'background 0.12s',
+                  background: 'none' as const,
+                  border: 'none' as const,
+                  cursor: 'pointer' as const,
+                  color,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  display: 'flex' as const,
+                  alignItems: 'center' as const,
+                  transition: 'background 0.12s'
                 })
                 return (
                   <div
@@ -1063,77 +1088,164 @@ export default function FileManager() {
                       fontSize: '0.88rem',
                       color: 'var(--text-primary)',
                       transition: 'background 0.12s',
-                      background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'),
+                      background:
+                        idx % 2 === 0
+                          ? 'transparent'
+                          : isLight
+                            ? 'rgba(0,0,0,0.015)'
+                            : 'rgba(255,255,255,0.015)',
                       alignItems: 'center',
-                      minHeight: 48,
+                      minHeight: 48
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')
+                      (e.currentTarget.style.background = isLight
+                        ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                        : 'rgba(var(--accent-primary-rgb), 0.06)')
                     }
-                    onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'))}
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background =
+                        idx % 2 === 0
+                          ? 'transparent'
+                          : isLight
+                            ? 'rgba(0,0,0,0.015)'
+                            : 'rgba(255,255,255,0.015)')
+                    }
                     onDoubleClick={() => handleDoubleClickItem(item)}
                     onContextMenu={(e) => handleContentsContextMenu(e, item.path, item.isDirectory)}
                   >
                     {/* Name + icon */}
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
-                      <span style={{
-                        width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)')
-                      }}>
+                    <span
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}
+                    >
+                      <span
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          background: item.isDirectory
+                            ? 'rgba(255,176,32,0.12)'
+                            : isLight
+                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                              : 'rgba(var(--accent-primary-rgb), 0.08)'
+                        }}
+                      >
                         {item.isDirectory ? (
                           <Folder size={18} style={{ color: '#ffb020' }} />
                         ) : (
                           getFileIcon(item.name)
                         )}
                       </span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: item.isDirectory ? 600 : 400 }}>
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontWeight: item.isDirectory ? 600 : 400
+                        }}
+                      >
                         {item.name}
                       </span>
                     </span>
 
                     {/* Size */}
-                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                    <span
+                      style={{
+                        textAlign: 'right',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.8rem'
+                      }}
+                    >
                       {!item.isDirectory && item.size != null ? formatSize(item.size) : '—'}
                     </span>
 
                     {/* Modified */}
-                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                    <span
+                      style={{
+                        textAlign: 'right',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.8rem'
+                      }}
+                    >
                       {formatDate(item.modified)}
                     </span>
 
                     {/* Action buttons */}
-                    <span style={{ display: 'flex', gap: 2, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                    <span
+                      style={{ display: 'flex', gap: 2, justifyContent: 'center' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {!item.isDirectory ? (
-                        <button onClick={() => handleOpenFile(item.path)} title="Open file"
+                        <button
+                          onClick={() => handleOpenFile(item.path)}
+                          title="Open file"
                           style={btnStyle('var(--accent-primary)')}
-                          onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = isLight
+                              ? 'rgba(var(--accent-primary-rgb), 0.12)'
+                              : 'rgba(var(--accent-primary-rgb), 0.12)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                        >
                           <ExternalLink size={15} />
                         </button>
                       ) : (
-                        <button onClick={() => handleSelectFolder(item.path)} title="Open folder"
+                        <button
+                          onClick={() => handleSelectFolder(item.path)}
+                          title="Open folder"
                           style={btnStyle('#ffb020')}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,176,32,0.12)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = 'rgba(255,176,32,0.12)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                        >
                           <FolderOpen size={15} />
                         </button>
                       )}
-                      <button onClick={() => { setRenameModal({ path: item.path, name: item.name }) }} title="Rename"
+                      <button
+                        onClick={() => {
+                          setRenameModal({ path: item.path, name: item.name })
+                        }}
+                        title="Rename"
                         style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = isLight
+                            ? 'rgba(0,0,0,0.06)'
+                            : 'rgba(255,255,255,0.08)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      >
                         <Edit3 size={15} />
                       </button>
-                      <button onClick={() => { setMoveModal({ sourcePath: item.path }) }} title="Move"
+                      <button
+                        onClick={() => {
+                          setMoveModal({ sourcePath: item.path })
+                        }}
+                        title="Move"
                         style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = isLight
+                            ? 'rgba(0,0,0,0.06)'
+                            : 'rgba(255,255,255,0.08)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      >
                         <Move size={15} />
                       </button>
-                      <button onClick={() => handleOpenInExplorer(item.path)} title="Show in Explorer"
+                      <button
+                        onClick={() => handleOpenInExplorer(item.path)}
+                        title="Show in Explorer"
                         style={btnStyle('var(--text-secondary)')}
-                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = isLight
+                            ? 'rgba(0,0,0,0.06)'
+                            : 'rgba(255,255,255,0.08)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      >
                         <HardDrive size={15} />
                       </button>
                     </span>
@@ -1152,7 +1264,7 @@ export default function FileManager() {
               color: 'var(--text-secondary)',
               display: 'flex',
               gap: 16,
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
             }}
           >
             <span>
@@ -1182,7 +1294,7 @@ export default function FileManager() {
             zIndex: 2000,
             minWidth: 180,
             padding: '4px 0',
-            fontSize: '0.87rem',
+            fontSize: '0.87rem'
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1195,11 +1307,9 @@ export default function FileManager() {
                   gap: 8,
                   padding: '8px 14px',
                   cursor: 'pointer',
-                  color: 'var(--text-primary)',
+                  color: 'var(--text-primary)'
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = 'var(--bg-card-hover)')
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
                   setRenameModal({ path: contextMenu.path, name: baseName(contextMenu.path) })
@@ -1215,11 +1325,9 @@ export default function FileManager() {
                   gap: 8,
                   padding: '8px 14px',
                   cursor: 'pointer',
-                  color: 'var(--text-primary)',
+                  color: 'var(--text-primary)'
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = 'var(--bg-card-hover)')
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
                   setMoveModal({ sourcePath: contextMenu.path })
@@ -1236,11 +1344,9 @@ export default function FileManager() {
                   gap: 8,
                   padding: '8px 14px',
                   cursor: 'pointer',
-                  color: 'var(--text-primary)',
+                  color: 'var(--text-primary)'
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = 'var(--bg-card-hover)')
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => {
                   setNewFolderModal(contextMenu.path)
@@ -1259,11 +1365,9 @@ export default function FileManager() {
               gap: 8,
               padding: '8px 14px',
               cursor: 'pointer',
-              color: 'var(--text-primary)',
+              color: 'var(--text-primary)'
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = 'var(--bg-card-hover)')
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             onClick={() => {
               handleOpenInExplorer(contextMenu.path)
@@ -1287,7 +1391,7 @@ export default function FileManager() {
               style={{
                 color: 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                margin: '0 0 12px',
+                margin: '0 0 12px'
               }}
             >
               Enter a new name for <strong>{renameModal.name}</strong>
@@ -1308,7 +1412,7 @@ export default function FileManager() {
                 color: 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 margin: '8px 0 0',
-                fontStyle: 'italic',
+                fontStyle: 'italic'
               }}
             >
               Any file links pointing to this folder will be automatically updated.
@@ -1318,7 +1422,7 @@ export default function FileManager() {
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: 8,
-                marginTop: 20,
+                marginTop: 20
               }}
             >
               <button className="btn-secondary" onClick={() => setRenameModal(null)}>
@@ -1335,10 +1439,7 @@ export default function FileManager() {
       {/* ======================== Move Modal ======================== */}
       {moveModal && (
         <div style={modalBackdrop}>
-          <div
-            style={{ ...modalBox, maxWidth: 520 }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div style={{ ...modalBox, maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div style={modalTitle}>
               <Move size={18} style={{ color: 'var(--accent-primary)' }} />
               Move Folder
@@ -1347,7 +1448,7 @@ export default function FileManager() {
               style={{
                 color: 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                margin: '0 0 12px',
+                margin: '0 0 12px'
               }}
             >
               Moving <strong>{baseName(moveModal.sourcePath)}</strong>. Select a destination folder:
@@ -1360,7 +1461,7 @@ export default function FileManager() {
                 maxHeight: 300,
                 overflowY: 'auto',
                 padding: '6px 4px',
-                background: 'var(--input-bg)',
+                background: 'var(--input-bg)'
               }}
             >
               {tree ? (
@@ -1370,7 +1471,7 @@ export default function FileManager() {
                   style={{
                     padding: 16,
                     textAlign: 'center',
-                    color: 'var(--text-secondary)',
+                    color: 'var(--text-secondary)'
                   }}
                 >
                   Loading tree...
@@ -1387,7 +1488,7 @@ export default function FileManager() {
                   background: 'rgba(var(--accent-primary-rgb), 0.08)',
                   border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                   fontSize: '0.83rem',
-                  color: 'var(--text-primary)',
+                  color: 'var(--text-primary)'
                 }}
               >
                 <strong>Destination:</strong> {moveDestination}
@@ -1399,7 +1500,7 @@ export default function FileManager() {
                 color: 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 margin: '8px 0 0',
-                fontStyle: 'italic',
+                fontStyle: 'italic'
               }}
             >
               File links under this folder will be automatically remapped.
@@ -1410,17 +1511,13 @@ export default function FileManager() {
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: 8,
-                marginTop: 20,
+                marginTop: 20
               }}
             >
               <button className="btn-secondary" onClick={() => setMoveModal(null)}>
                 Cancel
               </button>
-              <button
-                className="btn-primary"
-                onClick={handleMove}
-                disabled={!moveDestination}
-              >
+              <button className="btn-primary" onClick={handleMove} disabled={!moveDestination}>
                 Move
               </button>
             </div>
@@ -1440,7 +1537,7 @@ export default function FileManager() {
               style={{
                 color: 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                margin: '0 0 12px',
+                margin: '0 0 12px'
               }}
             >
               Create a new folder in <strong>{baseName(newFolderModal)}</strong>
@@ -1463,7 +1560,7 @@ export default function FileManager() {
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: 8,
-                marginTop: 20,
+                marginTop: 20
               }}
             >
               <button className="btn-secondary" onClick={() => setNewFolderModal(null)}>
@@ -1485,7 +1582,13 @@ export default function FileManager() {
       {healthCheckResults && (
         <div style={modalBackdrop} onClick={() => setHealthCheckResults(null)}>
           <div
-            style={{ ...modalBox, maxWidth: 640, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            style={{
+              ...modalBox,
+              maxWidth: 640,
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={modalTitle}>
@@ -1498,7 +1601,7 @@ export default function FileManager() {
               style={{
                 display: 'flex',
                 gap: 12,
-                marginBottom: 16,
+                marginBottom: 16
               }}
             >
               <div
@@ -1508,12 +1611,10 @@ export default function FileManager() {
                   borderRadius: 8,
                   background: 'rgba(0,255,136,0.08)',
                   border: '1px solid rgba(0,255,136,0.2)',
-                  textAlign: 'center',
+                  textAlign: 'center'
                 }}
               >
-                <div
-                  style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--success)' }}
-                >
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--success)' }}>
                   {healthOk}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>OK</div>
@@ -1523,26 +1624,21 @@ export default function FileManager() {
                   flex: 1,
                   padding: '10px 14px',
                   borderRadius: 8,
-                  background:
-                    healthBroken > 0
-                      ? 'rgba(255,77,77,0.08)'
-                      : 'rgba(0,255,136,0.08)',
+                  background: healthBroken > 0 ? 'rgba(255,77,77,0.08)' : 'rgba(0,255,136,0.08)',
                   border: `1px solid ${healthBroken > 0 ? 'rgba(255,77,77,0.2)' : 'rgba(0,255,136,0.2)'}`,
-                  textAlign: 'center',
+                  textAlign: 'center'
                 }}
               >
                 <div
                   style={{
                     fontSize: '1.3rem',
                     fontWeight: 700,
-                    color: healthBroken > 0 ? 'var(--danger)' : 'var(--success)',
+                    color: healthBroken > 0 ? 'var(--danger)' : 'var(--success)'
                   }}
                 >
                   {healthBroken}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  Broken
-                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Broken</div>
               </div>
               <div
                 style={{
@@ -1551,12 +1647,10 @@ export default function FileManager() {
                   borderRadius: 8,
                   background: 'var(--bg-card)',
                   border: 'var(--glass-border)',
-                  textAlign: 'center',
+                  textAlign: 'center'
                 }}
               >
-                <div
-                  style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}
-                >
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {healthTotal}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total</div>
@@ -1570,7 +1664,7 @@ export default function FileManager() {
                 overflowY: 'auto',
                 border: '1px solid var(--input-border)',
                 borderRadius: 8,
-                background: 'var(--input-bg)',
+                background: 'var(--input-bg)'
               }}
             >
               {healthTotal === 0 ? (
@@ -1578,7 +1672,7 @@ export default function FileManager() {
                   style={{
                     padding: 24,
                     textAlign: 'center',
-                    color: 'var(--text-secondary)',
+                    color: 'var(--text-secondary)'
                   }}
                 >
                   No file links found in the database.
@@ -1596,7 +1690,7 @@ export default function FileManager() {
                         i < healthCheckResults.length - 1
                           ? '1px solid var(--table-border)'
                           : 'none',
-                      fontSize: '0.83rem',
+                      fontSize: '0.83rem'
                     }}
                   >
                     {r.exists ? (
@@ -1610,7 +1704,7 @@ export default function FileManager() {
                           color: 'var(--text-primary)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          whiteSpace: 'nowrap'
                         }}
                         title={r.path}
                       >
@@ -1622,7 +1716,7 @@ export default function FileManager() {
                           color: 'var(--text-secondary)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          whiteSpace: 'nowrap'
                         }}
                         title={r.path}
                       >
@@ -1634,12 +1728,10 @@ export default function FileManager() {
                         fontSize: '0.72rem',
                         padding: '2px 6px',
                         borderRadius: 4,
-                        background: r.exists
-                          ? 'rgba(0,255,136,0.1)'
-                          : 'rgba(255,77,77,0.1)',
+                        background: r.exists ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
                         color: r.exists ? 'var(--success)' : 'var(--danger)',
                         fontWeight: 600,
-                        flexShrink: 0,
+                        flexShrink: 0
                       }}
                     >
                       {r.exists ? 'OK' : 'MISSING'}
@@ -1653,7 +1745,7 @@ export default function FileManager() {
               style={{
                 display: 'flex',
                 justifyContent: 'flex-end',
-                marginTop: 16,
+                marginTop: 16
               }}
             >
               <button className="btn-secondary" onClick={() => setHealthCheckResults(null)}>
@@ -1676,11 +1768,11 @@ export default function FileManager() {
               style={{
                 color: 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                margin: '0 0 16px',
+                margin: '0 0 16px'
               }}
             >
-              Configure the root document folder. All files and folders will be displayed
-              relative to this path.
+              Configure the root document folder. All files and folders will be displayed relative
+              to this path.
             </p>
 
             <label
@@ -1691,7 +1783,7 @@ export default function FileManager() {
                 color: 'var(--text-secondary)',
                 marginBottom: 6,
                 textTransform: 'uppercase',
-                letterSpacing: '0.04em',
+                letterSpacing: '0.04em'
               }}
             >
               Root Folder Path
@@ -1716,7 +1808,7 @@ export default function FileManager() {
                 style={{
                   color: 'var(--text-secondary)',
                   fontSize: '0.8rem',
-                  margin: '8px 0 0',
+                  margin: '8px 0 0'
                 }}
               >
                 Current: <code style={{ color: 'var(--accent-primary)' }}>{rootPath}</code>
@@ -1728,7 +1820,7 @@ export default function FileManager() {
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: 8,
-                marginTop: 24,
+                marginTop: 24
               }}
             >
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>

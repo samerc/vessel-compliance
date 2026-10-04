@@ -469,13 +469,25 @@ async function loadQuotationTypeOptions(): Promise<{ value: string; label: strin
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const DATE_FIELDS = new Set([
-  'createdAt', 'quotationDate', 'endDate', 'inceptionDate', 'expiryDate',
-  'receivedDate', 'exportedAt', 'surveyDate', 'deadlineDate'
+  'createdAt',
+  'quotationDate',
+  'endDate',
+  'inceptionDate',
+  'expiryDate',
+  'receivedDate',
+  'exportedAt',
+  'surveyDate',
+  'deadlineDate'
 ])
 
 const NUMBER_FIELDS = new Set([
-  'premiumAmount', 'grossTonnage', 'premium', 'exchangeRate',
-  'defectCount', 'openDefects', 'revisionNumber'
+  'premiumAmount',
+  'grossTonnage',
+  'premium',
+  'exchangeRate',
+  'defectCount',
+  'openDefects',
+  'revisionNumber'
 ])
 
 function formatCellValue(value: any, colKey: string): string {
@@ -565,7 +577,9 @@ export default function ReportBuilder() {
 
   // Chart view
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table')
-  const [chartMetric, setChartMetric] = useState<'count' | 'sumPremium' | 'avgPremium' | 'sumDefects'>('count')
+  const [chartMetric, setChartMetric] = useState<
+    'count' | 'sumPremium' | 'avgPremium' | 'sumDefects'
+  >('count')
 
   // Collapsible sections
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
@@ -1439,8 +1453,7 @@ export default function ReportBuilder() {
                       fontWeight: '600',
                       border: 'none',
                       cursor: 'pointer',
-                      background:
-                        viewMode === 'table' ? 'var(--accent-primary)' : 'transparent',
+                      background: viewMode === 'table' ? 'var(--accent-primary)' : 'transparent',
                       color: viewMode === 'table' ? '#fff' : 'var(--text-secondary)'
                     }}
                   >
@@ -1455,8 +1468,7 @@ export default function ReportBuilder() {
                       border: 'none',
                       borderLeft: '1px solid var(--input-border)',
                       cursor: 'pointer',
-                      background:
-                        viewMode === 'chart' ? 'var(--accent-primary)' : 'transparent',
+                      background: viewMode === 'chart' ? 'var(--accent-primary)' : 'transparent',
                       color: viewMode === 'chart' ? '#fff' : 'var(--text-secondary)'
                     }}
                   >
@@ -1574,8 +1586,8 @@ export default function ReportBuilder() {
                   }}
                 >
                   {sourceDef.groupBy.find((g) => g.key === groupBy)?.label || groupBy} -{' '}
-                  {(CHART_METRICS[dataSource] || []).find((m) => m.value === chartMetric)
-                    ?.label || 'Count'}
+                  {(CHART_METRICS[dataSource] || []).find((m) => m.value === chartMetric)?.label ||
+                    'Count'}
                 </h4>
                 {chartData.map((item) => (
                   <div
@@ -1688,8 +1700,8 @@ export default function ReportBuilder() {
                   >
                     <span>
                       Showing {(currentPage - 1) * ROWS_PER_PAGE + 1}-
-                      {Math.min(currentPage * ROWS_PER_PAGE, results.length)} of{' '}
-                      {results.length} results
+                      {Math.min(currentPage * ROWS_PER_PAGE, results.length)} of {results.length}{' '}
+                      results
                     </span>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       <button
@@ -1708,7 +1720,9 @@ export default function ReportBuilder() {
                       >
                         <ChevronLeft size={14} />
                       </button>
-                      <span style={{ padding: '0 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      <span
+                        style={{ padding: '0 8px', fontWeight: 600, color: 'var(--text-primary)' }}
+                      >
                         {currentPage} / {totalPages}
                       </span>
                       <button
@@ -1810,7 +1824,9 @@ export default function ReportBuilder() {
               <h3 style={{ fontSize: '1.1rem', fontWeight: '600', margin: 0 }}>
                 {editingReportId ? 'Update Report' : 'Save Report'}
               </h3>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setSaveModalOpen(false)}
                 style={{
                   background: 'none',
@@ -1969,15 +1985,27 @@ function ResultsTable({
                 let bg = 'rgba(0,255,136,0.1)'
                 let fg = isLight ? '#008c46' : '#00ff88'
                 if (n < 0) {
-                  bg = 'rgba(255,77,77,0.1)'; fg = 'var(--danger)'
+                  bg = 'rgba(255,77,77,0.1)'
+                  fg = 'var(--danger)'
                 } else if (n < 30) {
-                  bg = 'rgba(255,160,0,0.1)'; fg = isLight ? '#b45309' : '#ffaa00'
+                  bg = 'rgba(255,160,0,0.1)'
+                  fg = isLight ? '#b45309' : '#ffaa00'
                 } else if (n < 60) {
-                  bg = 'rgba(255,204,0,0.1)'; fg = isLight ? '#92700c' : '#ffcc00'
+                  bg = 'rgba(255,204,0,0.1)'
+                  fg = isLight ? '#92700c' : '#ffcc00'
                 }
                 return (
                   <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600', background: bg, color: fg }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        background: bg,
+                        color: fg
+                      }}
+                    >
                       {n < 0 ? `${Math.abs(n)}d overdue` : `${n}d`}
                     </span>
                   </td>
@@ -1988,11 +2016,16 @@ function ResultsTable({
                 const linked = val === 'Linked'
                 return (
                   <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600',
-                      background: linked ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
-                      color: linked ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
-                    }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        background: linked ? 'rgba(0,255,136,0.1)' : 'rgba(255,77,77,0.1)',
+                        color: linked ? (isLight ? '#008c46' : '#00ff88') : 'var(--danger)'
+                      }}
+                    >
                       {val || ''}
                     </span>
                   </td>
@@ -2003,11 +2036,22 @@ function ResultsTable({
                 const mandatory = val === 'Mandatory'
                 return (
                   <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600',
-                      background: mandatory ? 'rgba(255,160,0,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)',
-                      color: mandatory ? (isLight ? '#b45309' : '#ffaa00') : 'var(--accent-primary)'
-                    }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: '600',
+                        background: mandatory
+                          ? 'rgba(255,160,0,0.1)'
+                          : 'rgba(var(--accent-primary-rgb), 0.1)',
+                        color: mandatory
+                          ? isLight
+                            ? '#b45309'
+                            : '#ffaa00'
+                          : 'var(--accent-primary)'
+                      }}
+                    >
                       {val || ''}
                     </span>
                   </td>
@@ -2054,9 +2098,13 @@ function ResultsTable({
                                 : 'rgba(var(--accent-primary-rgb), 0.1)',
                         color:
                           val === 'active' || val === 'Closed' || val === 'completed'
-                            ? isLight ? '#008c46' : '#00ff88'
+                            ? isLight
+                              ? '#008c46'
+                              : '#00ff88'
                             : val === 'draft' || val === 'pending' || val === 'Open'
-                              ? isLight ? '#b45309' : '#ffcc00'
+                              ? isLight
+                                ? '#b45309'
+                                : '#ffcc00'
                               : val === 'inactive' || val === 'cancelled' || val === 'superseded'
                                 ? 'var(--danger)'
                                 : 'var(--accent-primary)'

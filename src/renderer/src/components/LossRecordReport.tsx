@@ -22,7 +22,7 @@ interface LossClaim {
   claimId: string
   dateOfLoss: string
   policyId: string
-  damageType: string  // col H — same for all payments in this claim
+  damageType: string // col H — same for all payments in this claim
   payments: LossPayment[]
   totalPaid: number
   totalReserves: number
@@ -68,21 +68,25 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
   // Row 0 is the header; skip it and filter out empty rows (vessel = col B = index 1)
-  const dataRows = rows.slice(1).filter(r => String(r[1] || '').trim() !== '')
+  const dataRows = rows.slice(1).filter((r) => String(r[1] || '').trim() !== '')
 
   // col indices (0-based):
   // 0=label(ignore), 1=vessel, 2=dateOfLoss, 3=claimId, 4=policyId,
   // 5=GWP(ignore), 6=UWY, 7=damageType, 8=details,
   // 9=paidTo(ignore), 10=paidDate, 11=paidAmount, 12=reserves, 13=totalIncurred
 
-  const uwyMap = new Map<number, Map<string, { policyId: string; claims: Map<string, LossClaim> }>>()
+  const uwyMap = new Map<
+    number,
+    Map<string, { policyId: string; claims: Map<string, LossClaim> }>
+  >()
 
   for (const row of dataRows) {
     const vesselName = String(row[1] || '').trim()
     if (!vesselName) continue
 
     const rawDate = row[2]
-    const dateOfLoss = typeof rawDate === 'number' ? excelSerialToDate(rawDate) : String(rawDate || '').trim()
+    const dateOfLoss =
+      typeof rawDate === 'number' ? excelSerialToDate(rawDate) : String(rawDate || '').trim()
     const claimId = String(row[3] || '').trim()
     const policyId = String(row[4] || '').trim()
     const uwy = Number(row[6]) || 0
@@ -91,7 +95,10 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
     const paymentType = String(row[8] || '').trim()
 
     const rawPaidDate = row[10]
-    const paidDate = typeof rawPaidDate === 'number' ? excelSerialToDate(rawPaidDate) : String(rawPaidDate || '').trim()
+    const paidDate =
+      typeof rawPaidDate === 'number'
+        ? excelSerialToDate(rawPaidDate)
+        : String(rawPaidDate || '').trim()
     const paidAmount = Number(row[11]) || 0
     const reserves = Number(row[12]) || 0
     const totalIncurred = Number(row[13]) || 0
@@ -104,8 +111,14 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
 
     if (!vesselData.claims.has(claimId)) {
       vesselData.claims.set(claimId, {
-        claimId, dateOfLoss, policyId, damageType,
-        payments: [], totalPaid: 0, totalReserves: 0, totalIncurred: 0
+        claimId,
+        dateOfLoss,
+        policyId,
+        damageType,
+        payments: [],
+        totalPaid: 0,
+        totalReserves: 0,
+        totalIncurred: 0
       })
     }
 
@@ -118,7 +131,9 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
 
   const result: LossUWY[] = []
   for (const [year, vesselMap] of [...uwyMap.entries()].sort((a, b) => a[0] - b[0])) {
-    let uwyTotalPaid = 0, uwyTotalReserves = 0, uwyTotalIncurred = 0
+    let uwyTotalPaid = 0,
+      uwyTotalReserves = 0,
+      uwyTotalIncurred = 0
     const vessels: LossVessel[] = []
 
     for (const [vesselName, { policyId, claims }] of vesselMap.entries()) {
@@ -126,13 +141,26 @@ function parseExcel(buffer: ArrayBuffer): LossUWY[] {
       const vPaid = claimList.reduce((s, c) => s + c.totalPaid, 0)
       const vRes = claimList.reduce((s, c) => s + c.totalReserves, 0)
       const vInc = claimList.reduce((s, c) => s + c.totalIncurred, 0)
-      vessels.push({ vesselName, policyId, claims: claimList, totalPaid: vPaid, totalReserves: vRes, totalIncurred: vInc })
+      vessels.push({
+        vesselName,
+        policyId,
+        claims: claimList,
+        totalPaid: vPaid,
+        totalReserves: vRes,
+        totalIncurred: vInc
+      })
       uwyTotalPaid += vPaid
       uwyTotalReserves += vRes
       uwyTotalIncurred += vInc
     }
 
-    result.push({ year, vessels, totalPaid: uwyTotalPaid, totalReserves: uwyTotalReserves, totalIncurred: uwyTotalIncurred })
+    result.push({
+      year,
+      vessels,
+      totalPaid: uwyTotalPaid,
+      totalReserves: uwyTotalReserves,
+      totalIncurred: uwyTotalIncurred
+    })
   }
 
   return result
@@ -152,7 +180,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   const vesselText: [number, number, number] = [
     Math.round(primary[0] * 0.4),
     Math.round(primary[1] * 0.4),
-    Math.round(primary[2] * 0.4),
+    Math.round(primary[2] * 0.4)
   ]
   const claimBg = tintColor(primary, 0.95)
   const vesselTotalBg = tintColor(primary, 0.7)
@@ -201,32 +229,87 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
     : { claimId: 22, date: 22, dmg: 44, payType: 36, paid: 28, total: 30 }
 
   const headRow = showRes
-    ? ['Claim #', 'Date of Loss', 'Damage Type', 'Payment Type', `Paid (${cur})`, `Reserves (${cur})`, `Total Incurred (${cur})`]
-    : ['Claim #', 'Date of Loss', 'Damage Type', 'Payment Type', `Paid (${cur})`, `Total Incurred (${cur})`]
+    ? [
+        'Claim #',
+        'Date of Loss',
+        'Damage Type',
+        'Payment Type',
+        `Paid (${cur})`,
+        `Reserves (${cur})`,
+        `Total Incurred (${cur})`
+      ]
+    : [
+        'Claim #',
+        'Date of Loss',
+        'Damage Type',
+        'Payment Type',
+        `Paid (${cur})`,
+        `Total Incurred (${cur})`
+      ]
 
   const R: any = { halign: 'right' }
 
   const S = {
-    uwyHeader: { fillColor: primary, textColor: [255, 255, 255] as [number,number,number], fontStyle: 'bold' as const, fontSize: 10 },
-    vesselHeader: { fillColor: vesselBg, textColor: vesselText, fontStyle: 'bold' as const, fontSize: 9 },
-    claimTotal: { fillColor: claimBg, textColor: [40, 40, 40] as [number,number,number], fontStyle: 'italic' as const, fontSize: 9 },
-    vesselTotal: { fillColor: vesselTotalBg, textColor: vesselText, fontStyle: 'bold' as const, fontSize: 9 },
-    uwyTotal: { fillColor: primary, textColor: [255, 255, 255] as [number,number,number], fontStyle: 'bold' as const, fontSize: 9 },
-    grandTotal: { fillColor: [15, 18, 24] as [number,number,number], textColor: [255, 255, 255] as [number,number,number], fontStyle: 'bold' as const, fontSize: 9 },
+    uwyHeader: {
+      fillColor: primary,
+      textColor: [255, 255, 255] as [number, number, number],
+      fontStyle: 'bold' as const,
+      fontSize: 10
+    },
+    vesselHeader: {
+      fillColor: vesselBg,
+      textColor: vesselText,
+      fontStyle: 'bold' as const,
+      fontSize: 9
+    },
+    claimTotal: {
+      fillColor: claimBg,
+      textColor: [40, 40, 40] as [number, number, number],
+      fontStyle: 'italic' as const,
+      fontSize: 9
+    },
+    vesselTotal: {
+      fillColor: vesselTotalBg,
+      textColor: vesselText,
+      fontStyle: 'bold' as const,
+      fontSize: 9
+    },
+    uwyTotal: {
+      fillColor: primary,
+      textColor: [255, 255, 255] as [number, number, number],
+      fontStyle: 'bold' as const,
+      fontSize: 9
+    },
+    grandTotal: {
+      fillColor: [15, 18, 24] as [number, number, number],
+      textColor: [255, 255, 255] as [number, number, number],
+      fontStyle: 'bold' as const,
+      fontSize: 9
+    }
   }
 
   // ── Build table body ─────────────────────────────────────────────────────
   const bodyRows: any[][] = []
-  let grandPaid = 0, grandReserves = 0, grandIncurred = 0
+  let grandPaid = 0,
+    grandReserves = 0,
+    grandIncurred = 0
 
   const fmtCur = (v: number) =>
     `${cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$'}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   for (const uwy of data) {
-    bodyRows.push([{ content: `UNDERWRITING YEAR ${uwy.year}`, colSpan: colCount, styles: S.uwyHeader }])
+    bodyRows.push([
+      { content: `UNDERWRITING YEAR ${uwy.year}`, colSpan: colCount, styles: S.uwyHeader }
+    ])
 
     for (const vessel of uwy.vessels) {
-      bodyRows.push([{ content: `${vessel.vesselName}   ·   Policy: ${vessel.policyId}`, colSpan: colCount, styles: S.vesselHeader }])
+      bodyRows.push([
+        {
+          content: `${vessel.vesselName}   ·   Policy: ${vessel.policyId}`,
+          colSpan: colCount,
+          styles: S.vesselHeader
+        }
+      ])
 
       for (const claim of vessel.claims) {
         const multi = claim.payments.length > 1
@@ -242,14 +325,22 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
               p.paymentType,
               { content: fmtCur(p.paidAmount), styles: R },
               { content: fmtCur(p.reserves), styles: R },
-              { content: fmtCur(p.totalIncurred), styles: R },
+              { content: fmtCur(p.totalIncurred), styles: R }
             ])
           }
           if (multi && opts.showClaimSubtotals) {
-            bodyRows.push(['', '', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
+            bodyRows.push([
+              '',
+              '',
+              {
+                content: `Claim ${claim.claimId} Total`,
+                colSpan: 2,
+                styles: { ...S.claimTotal, halign: 'right' as const }
+              },
               { content: fmtCur(claim.totalPaid), styles: { ...S.claimTotal, ...R } },
               { content: fmtCur(claim.totalReserves), styles: { ...S.claimTotal, ...R } },
-              { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }])
+              { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }
+            ])
           }
         } else {
           for (let i = 0; i < claim.payments.length; i++) {
@@ -260,13 +351,21 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
               i === 0 ? claim.damageType : '',
               p.paymentType,
               { content: fmtCur(p.paidAmount), styles: R },
-              { content: fmtCur(p.totalIncurred), styles: R },
+              { content: fmtCur(p.totalIncurred), styles: R }
             ])
           }
           if (multi && opts.showClaimSubtotals) {
-            bodyRows.push(['', '', { content: `Claim ${claim.claimId} Total`, colSpan: 2, styles: { ...S.claimTotal, halign: 'right' as const } },
+            bodyRows.push([
+              '',
+              '',
+              {
+                content: `Claim ${claim.claimId} Total`,
+                colSpan: 2,
+                styles: { ...S.claimTotal, halign: 'right' as const }
+              },
               { content: fmtCur(claim.totalPaid), styles: { ...S.claimTotal, ...R } },
-              { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }])
+              { content: fmtCur(claim.totalIncurred), styles: { ...S.claimTotal, ...R } }
+            ])
           }
         }
       }
@@ -275,18 +374,28 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
       // With res: span 4 cols, then paid, res, total
       // Without res: span 4 cols, then paid, total
       bodyRows.push([
-        { content: `${vessel.vesselName} Total`, colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.vesselTotal, halign: 'right' as const } },
+        {
+          content: `${vessel.vesselName} Total`,
+          colSpan: colCount - (showRes ? 3 : 2),
+          styles: { ...S.vesselTotal, halign: 'right' as const }
+        },
         { content: fmtCur(vessel.totalPaid), styles: { ...S.vesselTotal, ...R } },
-        ...(showRes ? [{ content: fmtCur(vessel.totalReserves), styles: { ...S.vesselTotal, ...R } }] : []),
-        { content: fmtCur(vessel.totalIncurred), styles: { ...S.vesselTotal, ...R } },
+        ...(showRes
+          ? [{ content: fmtCur(vessel.totalReserves), styles: { ...S.vesselTotal, ...R } }]
+          : []),
+        { content: fmtCur(vessel.totalIncurred), styles: { ...S.vesselTotal, ...R } }
       ])
     }
 
     bodyRows.push([
-      { content: `Underwriting Year ${uwy.year} Total`, colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.uwyTotal, halign: 'right' as const } },
+      {
+        content: `Underwriting Year ${uwy.year} Total`,
+        colSpan: colCount - (showRes ? 3 : 2),
+        styles: { ...S.uwyTotal, halign: 'right' as const }
+      },
       { content: fmtCur(uwy.totalPaid), styles: { ...S.uwyTotal, ...R } },
       ...(showRes ? [{ content: fmtCur(uwy.totalReserves), styles: { ...S.uwyTotal, ...R } }] : []),
-      { content: fmtCur(uwy.totalIncurred), styles: { ...S.uwyTotal, ...R } },
+      { content: fmtCur(uwy.totalIncurred), styles: { ...S.uwyTotal, ...R } }
     ])
 
     grandPaid += uwy.totalPaid
@@ -295,10 +404,14 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
   }
 
   bodyRows.push([
-    { content: 'Grand Total', colSpan: colCount - (showRes ? 3 : 2), styles: { ...S.grandTotal, halign: 'right' as const } },
+    {
+      content: 'Grand Total',
+      colSpan: colCount - (showRes ? 3 : 2),
+      styles: { ...S.grandTotal, halign: 'right' as const }
+    },
     { content: fmtCur(grandPaid), styles: { ...S.grandTotal, ...R } },
     ...(showRes ? [{ content: fmtCur(grandReserves), styles: { ...S.grandTotal, ...R } }] : []),
-    { content: fmtCur(grandIncurred), styles: { ...S.grandTotal, ...R } },
+    { content: fmtCur(grandIncurred), styles: { ...S.grandTotal, ...R } }
   ])
 
   // ── Render table ─────────────────────────────────────────────────────────
@@ -314,7 +427,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
         3: { cellWidth: w.payType },
         4: { cellWidth: w.paid, ...numCol },
         5: { cellWidth: w.res, ...numCol },
-        6: { cellWidth: w.total, ...numCol },
+        6: { cellWidth: w.total, ...numCol }
       }
     : {
         0: { cellWidth: w.claimId, halign: 'center' },
@@ -322,7 +435,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
         2: { cellWidth: w.dmg },
         3: { cellWidth: w.payType },
         4: { cellWidth: w.paid, ...numCol },
-        5: { cellWidth: w.total, ...numCol },
+        5: { cellWidth: w.total, ...numCol }
       }
 
   autoTable(doc, {
@@ -337,7 +450,7 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
       fontSize: 7.5,
       fontStyle: 'bold',
       cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
-      lineColor: primary,
+      lineColor: primary
     },
     columnStyles,
     styles: {
@@ -346,9 +459,9 @@ function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts) {
       lineColor: [210, 215, 220],
       lineWidth: 0.3,
       textColor: [20, 20, 20],
-      overflow: 'linebreak',
+      overflow: 'linebreak'
     },
-    alternateRowStyles: { fillColor: [250, 251, 252] },
+    alternateRowStyles: { fillColor: [250, 251, 252] }
   })
 
   // ── Page footers ─────────────────────────────────────────────────────────
@@ -444,12 +557,14 @@ export default function LossRecordReport() {
   }
 
   // Summary stats derived from parsed data
-  const stats = data ? {
-    uwyCount: data.length,
-    vesselCount: data.reduce((s, u) => s + u.vessels.length, 0),
-    claimCount: data.reduce((s, u) => u.vessels.reduce((sv, v) => sv + v.claims.length, s), 0),
-    totalIncurred: data.reduce((s, u) => s + u.totalIncurred, 0),
-  } : null
+  const stats = data
+    ? {
+        uwyCount: data.length,
+        vesselCount: data.reduce((s, u) => s + u.vessels.length, 0),
+        claimCount: data.reduce((s, u) => u.vessels.reduce((sv, v) => sv + v.claims.length, s), 0),
+        totalIncurred: data.reduce((s, u) => s + u.totalIncurred, 0)
+      }
+    : null
 
   const border = isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)'
 
@@ -458,7 +573,10 @@ export default function LossRecordReport() {
       {/* Upload zone */}
       {!data ? (
         <div
-          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragging(true)
+          }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
@@ -469,13 +587,26 @@ export default function LossRecordReport() {
             textAlign: 'center',
             cursor: 'pointer',
             background: dragging
-              ? (isLight ? 'rgba(26,115,232,0.05)' : 'rgba(var(--accent-primary-rgb), 0.04)')
+              ? isLight
+                ? 'rgba(26,115,232,0.05)'
+                : 'rgba(var(--accent-primary-rgb), 0.04)'
               : 'var(--bg-card)',
-            transition: 'var(--transition)',
+            transition: 'var(--transition)'
           }}
         >
-          <Upload size={48} color="var(--accent-primary)" style={{ marginBottom: '16px', opacity: 0.7 }} />
-          <p style={{ fontSize: '1.05rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <Upload
+            size={48}
+            color="var(--accent-primary)"
+            style={{ marginBottom: '16px', opacity: 0.7 }}
+          />
+          <p
+            style={{
+              fontSize: '1.05rem',
+              fontWeight: '600',
+              color: 'var(--text-primary)',
+              marginBottom: '8px'
+            }}
+          >
             Drop your Excel file here
           </p>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
@@ -496,12 +627,38 @@ export default function LossRecordReport() {
         /* Loaded state */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* File info bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', background: 'var(--bg-card)', borderRadius: '10px', border }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 18px',
+              background: 'var(--bg-card)',
+              borderRadius: '10px',
+              border
+            }}
+          >
             <FileText size={20} color="var(--accent-primary)" />
-            <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.9rem', flex: 1 }}>{fileName}</span>
+            <span
+              style={{
+                fontWeight: '600',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                flex: 1
+              }}
+            >
+              {fileName}
+            </span>
             <button
               onClick={clearData}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: '4px' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                padding: '4px'
+              }}
               title="Remove file"
             >
               <X size={16} />
@@ -515,40 +672,162 @@ export default function LossRecordReport() {
                 { label: 'Underwriting Years', value: stats.uwyCount },
                 { label: 'Vessels', value: stats.vesselCount },
                 { label: 'Claims', value: stats.claimCount },
-                { label: 'Total Incurred (USD)', value: fmt(stats.totalIncurred) },
-              ].map(s => (
-                <div key={s.label} style={{ padding: '16px 20px', background: 'var(--bg-card)', borderRadius: '10px', border }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>{s.label}</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>{s.value}</div>
+                { label: 'Total Incurred (USD)', value: fmt(stats.totalIncurred) }
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{
+                    padding: '16px 20px',
+                    background: 'var(--bg-card)',
+                    borderRadius: '10px',
+                    border
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}
+                  >
+                    {s.label}
+                  </div>
+                  <div
+                    style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}
+                  >
+                    {s.value}
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
           {/* UWY breakdown preview */}
-          <div style={{ background: 'var(--bg-card)', borderRadius: '12px', border, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--table-border)', fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: '12px',
+              border,
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid var(--table-border)',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                color: 'var(--text-primary)'
+              }}
+            >
               Preview
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--table-header-bg)' }}>
-                  {['UWY', 'Vessel', 'Policy', 'Claims', 'Total Paid (USD)', 'Reserves (USD)', 'Total Incurred (USD)'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)', textAlign: h.includes('(USD)') ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                  {[
+                    'UWY',
+                    'Vessel',
+                    'Policy',
+                    'Claims',
+                    'Total Paid (USD)',
+                    'Reserves (USD)',
+                    'Total Incurred (USD)'
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: '10px 14px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        color: 'var(--text-secondary)',
+                        textAlign: h.includes('(USD)') ? 'right' : 'left',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {data.flatMap(uwy =>
+                {data.flatMap((uwy) =>
                   uwy.vessels.map((v, vi) => (
-                    <tr key={`${uwy.year}-${v.vesselName}`} style={{ borderTop: '1px solid var(--table-border)' }}>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{vi === 0 ? uwy.year : ''}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{v.vesselName}</td>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem', fontFamily: 'monospace' }}>{v.policyId}</td>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{v.claims.length}</td>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}>{fmt(v.totalPaid)}</td>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}>{fmt(v.totalReserves)}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.85rem', textAlign: 'right' }}>{fmt(v.totalIncurred)}</td>
+                    <tr
+                      key={`${uwy.year}-${v.vesselName}`}
+                      style={{ borderTop: '1px solid var(--table-border)' }}
+                    >
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        {vi === 0 ? uwy.year : ''}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          fontWeight: '600',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        {v.vesselName}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.82rem',
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        {v.policyId}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        {v.claims.length}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          textAlign: 'right'
+                        }}
+                      >
+                        {fmt(v.totalPaid)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          textAlign: 'right'
+                        }}
+                      >
+                        {fmt(v.totalReserves)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          fontWeight: '600',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          textAlign: 'right'
+                        }}
+                      >
+                        {fmt(v.totalIncurred)}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -557,25 +836,73 @@ export default function LossRecordReport() {
           </div>
 
           {/* Report options */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '14px 18px', background: 'var(--bg-card)', borderRadius: '10px', border, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '24px',
+              padding: '14px 18px',
+              background: 'var(--bg-card)',
+              borderRadius: '10px',
+              border,
+              flexWrap: 'wrap'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: '500' }}>Currency</label>
+              <label
+                style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: '500' }}
+              >
+                Currency
+              </label>
               <select
                 value={currency}
-                onChange={e => setCurrency(e.target.value)}
-                style={{ padding: '5px 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                onChange={(e) => setCurrency(e.target.value)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--input-border)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem'
+                }}
               >
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
                 <option value="GBP">GBP</option>
               </select>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-              <input type="checkbox" checked={showReserves} onChange={e => setShowReserves(e.target.checked)} />
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showReserves}
+                onChange={(e) => setShowReserves(e.target.checked)}
+              />
               Show Reserves column
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-              <input type="checkbox" checked={showClaimSubtotals} onChange={e => setShowClaimSubtotals(e.target.checked)} />
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showClaimSubtotals}
+                onChange={(e) => setShowClaimSubtotals(e.target.checked)}
+              />
               Show claim subtotals
             </label>
           </div>
@@ -586,7 +913,13 @@ export default function LossRecordReport() {
               onClick={handleExport}
               disabled={exporting}
               className="btn-primary"
-              style={{ padding: '10px 28px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{
+                padding: '10px 28px',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
             >
               <FileText size={16} />
               {exporting ? 'Generating PDF...' : 'Export PDF Report'}
@@ -597,7 +930,19 @@ export default function LossRecordReport() {
 
       {/* Error */}
       {error && (
-        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderRadius: '8px', background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)' }}>
+        <div
+          style={{
+            marginTop: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: 'rgba(255,77,77,0.1)',
+            border: '1px solid rgba(255,77,77,0.3)',
+            color: 'var(--danger)'
+          }}
+        >
           <AlertCircle size={16} />
           <span style={{ fontSize: '0.88rem' }}>{error}</span>
         </div>

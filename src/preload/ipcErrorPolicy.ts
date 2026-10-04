@@ -11,7 +11,8 @@
 // returned value for .error themselves; they keep the old contract so that existing handling
 // (custom messages, fallbacks) is unchanged. New mutation channels throw by default.
 
-const MUTATION_RE = /^(add|create|update|delete|remove|set|save|move|rename|upload|close|reopen|mark|merge|import|approve|sign|clone|duplicate|renew|restore|permanentlyDelete|bulk|toggle|reorder|assign|release|lock|unlock|forceUnlock|convert|supersede|issue|apply|clear|record|write|edit|insert|replace|reset|transition|send|link|unlink|purge|archive|cancel|revise|swap|heartbeat|freeze|decide|upsert|strip|remap|migrate|copy|complete|waive|forcePasswordReset|sync|reimport|cleanup|logReminder)/
+const MUTATION_RE =
+  /^(add|create|update|delete|remove|set|save|move|rename|upload|close|reopen|mark|merge|import|approve|sign|clone|duplicate|renew|restore|permanentlyDelete|bulk|toggle|reorder|assign|release|lock|unlock|forceUnlock|convert|supersede|issue|apply|clear|record|write|edit|insert|replace|reset|transition|send|link|unlink|purge|archive|cancel|revise|swap|heartbeat|freeze|decide|upsert|strip|remap|migrate|copy|complete|waive|forcePasswordReset|sync|reimport|cleanup|logReminder)/
 
 export const LEGACY_ERROR_VALUE_CHANNELS: ReadonlySet<string> = new Set([
   'analytics:addPreset',

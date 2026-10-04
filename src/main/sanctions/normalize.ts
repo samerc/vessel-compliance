@@ -13,7 +13,10 @@ export function extractText(value: any): string {
   if (!value) return ''
   if (typeof value === 'string') return value
   if (Array.isArray(value)) {
-    return value.map(v => extractText(v)).filter(Boolean).join(' ')
+    return value
+      .map((v) => extractText(v))
+      .filter(Boolean)
+      .join(' ')
   }
   if (typeof value === 'object') {
     if (value._) return value._
@@ -49,7 +52,8 @@ export function normalizeEntityType(type: any): string {
   if (typeStr.includes('individual') || typeStr.includes('person')) return 'individual'
   if (typeStr.includes('vessel') || typeStr.includes('ship')) return 'vessel'
   if (typeStr.includes('aircraft')) return 'aircraft'
-  if (typeStr.includes('entity') || typeStr.includes('organization') || typeStr.includes('company')) return 'entity'
+  if (typeStr.includes('entity') || typeStr.includes('organization') || typeStr.includes('company'))
+    return 'entity'
   return 'unknown'
 }
 

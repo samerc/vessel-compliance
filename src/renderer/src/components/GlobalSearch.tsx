@@ -1,10 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Search, Ship, Building2, FileText, FileCheck, X, Loader2, ArrowRight, Zap, Compass } from 'lucide-react'
+import {
+  Search,
+  Ship,
+  Building2,
+  FileText,
+  FileCheck,
+  X,
+  Loader2,
+  ArrowRight,
+  Zap,
+  Compass
+} from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { Feature, NavTarget, searchFeatures } from '../features'
 
 // Shown when the box is empty (those the user can use)
-const SUGGESTED = ['new-quotation', 'new-vessel', 'new-entity', 'compliance-docs', 'renewals', 'sanctions-search', 'report-builder', 'features']
+const SUGGESTED = [
+  'new-quotation',
+  'new-vessel',
+  'new-entity',
+  'compliance-docs',
+  'renewals',
+  'sanctions-search',
+  'report-builder',
+  'features'
+]
 
 interface GlobalSearchProps {
   isOpen: boolean
@@ -41,7 +61,13 @@ interface FlatItem {
   extra?: any
 }
 
-export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [], onFeature }: GlobalSearchProps) {
+export default function GlobalSearch({
+  isOpen,
+  onClose,
+  onNavigate,
+  features = [],
+  onFeature
+}: GlobalSearchProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const [query, setQuery] = useState('')
@@ -55,13 +81,20 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
   // Matching pages / actions: suggestions when empty, ranked matches while typing
   const featureMatches = useMemo<Feature[]>(() => {
     if (!onFeature) return []
-    if (!query.trim()) return SUGGESTED.map(id => features.find(f => f.id === id)).filter((f): f is Feature => !!f)
+    if (!query.trim())
+      return SUGGESTED.map((id) => features.find((f) => f.id === id)).filter(
+        (f): f is Feature => !!f
+      )
     return searchFeatures(features, query).slice(0, 6)
   }, [features, query, onFeature])
 
   // Flatten results into ordered list for keyboard navigation
   const flatItems = useMemo<FlatItem[]>(() => {
-    const items: FlatItem[] = featureMatches.map(f => ({ category: 'feature' as const, id: f.id, extra: f }))
+    const items: FlatItem[] = featureMatches.map((f) => ({
+      category: 'feature' as const,
+      id: f.id,
+      extra: f
+    }))
     if (!results) return items
     for (const v of results.vessels) items.push({ category: 'vessel', id: v.id })
     for (const e of results.entities) items.push({ category: 'entity', id: e.id })
@@ -161,7 +194,9 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
 
   const modalBg = isLight ? '#ffffff' : '#1a1d28'
   const borderColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
-  const accentBg = isLight ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
+  const accentBg = isLight
+    ? 'rgba(var(--accent-primary-rgb), 0.1)'
+    : 'rgba(var(--accent-primary-rgb), 0.1)'
 
   let flatIdx = -1
 
@@ -185,7 +220,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
             color: 'var(--text-secondary)',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '6px'
           }}
         >
           {icon}
@@ -209,7 +244,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
     borderRadius: '6px',
     margin: '0 8px',
     transition: 'background 0.1s',
-    background: idx === highlightIndex ? accentBg : 'transparent',
+    background: idx === highlightIndex ? accentBg : 'transparent'
   })
 
   const hasResults =
@@ -234,7 +269,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
         justifyContent: 'center',
         paddingTop: '12vh',
         background: 'rgba(0,0,0,0.5)',
-        animation: 'modalFadeIn 0.15s ease',
+        animation: 'modalFadeIn 0.15s ease'
       }}
     >
       <div
@@ -247,7 +282,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
           boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'hidden'
         }}
         onKeyDown={handleKeyDown}
       >
@@ -258,13 +293,17 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
             alignItems: 'center',
             gap: '10px',
             padding: '14px 16px',
-            borderBottom: `1px solid ${borderColor}`,
+            borderBottom: `1px solid ${borderColor}`
           }}
         >
           {loading ? (
             <Loader2
               size={18}
-              style={{ color: 'var(--accent-primary)', animation: 'spin 1s linear infinite', flexShrink: 0 }}
+              style={{
+                color: 'var(--accent-primary)',
+                animation: 'spin 1s linear infinite',
+                flexShrink: 0
+              }}
             />
           ) : (
             <Search size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
@@ -281,11 +320,13 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
               border: 'none',
               outline: 'none',
               fontSize: '1rem',
-              color: 'var(--text-primary)',
+              color: 'var(--text-primary)'
             }}
           />
           {query && (
-            <button title="Close" aria-label="Close"
+            <button
+              title="Close"
+              aria-label="Close"
               onClick={() => {
                 setQuery('')
                 setResults(null)
@@ -298,7 +339,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                 color: 'var(--text-secondary)',
                 padding: '2px',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'center'
               }}
             >
               <X size={16} />
@@ -312,7 +353,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
               background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
               color: 'var(--text-secondary)',
               border: `1px solid ${borderColor}`,
-              flexShrink: 0,
+              flexShrink: 0
             }}
           >
             ESC
@@ -321,35 +362,53 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
 
         {/* Results */}
         <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-          {featureMatches.length > 0 && renderCategory(
-            query.trim() ? 'Pages & actions' : 'Suggested',
-            <Compass size={12} />,
-            featureMatches,
-            'features',
-            (f: Feature, idx) => (
-              <div
-                key={f.id}
-                data-idx={idx}
-                style={itemStyle(idx)}
-                onMouseEnter={() => setHighlightIndex(idx)}
-                onClick={() => {
-                  onFeature?.(f.target)
-                  onClose()
-                }}
-              >
-                {f.kind === 'action'
-                  ? <Zap size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-                  : <ArrowRight size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{f.title}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {f.description}
+          {featureMatches.length > 0 &&
+            renderCategory(
+              query.trim() ? 'Pages & actions' : 'Suggested',
+              <Compass size={12} />,
+              featureMatches,
+              'features',
+              (f: Feature, idx) => (
+                <div
+                  key={f.id}
+                  data-idx={idx}
+                  style={itemStyle(idx)}
+                  onMouseEnter={() => setHighlightIndex(idx)}
+                  onClick={() => {
+                    onFeature?.(f.target)
+                    onClose()
+                  }}
+                >
+                  {f.kind === 'action' ? (
+                    <Zap size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                  ) : (
+                    <ArrowRight
+                      size={16}
+                      style={{ color: 'var(--accent-primary)', flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{f.title}</div>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {f.description}
+                    </div>
                   </div>
+                  <span
+                    style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', flexShrink: 0 }}
+                  >
+                    {f.area}
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{f.area}</span>
-              </div>
-            )
-          )}
+              )
+            )}
 
           {!results && query.trim().length < 2 && (
             <div
@@ -357,7 +416,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                 padding: featureMatches.length ? '10px 16px 6px' : '32px 16px',
                 textAlign: 'center',
                 color: 'var(--text-secondary)',
-                fontSize: '0.78rem',
+                fontSize: '0.78rem'
               }}
             >
               Type at least 2 letters to also search vessels, entities, quotations and policies
@@ -370,7 +429,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                 padding: '32px 16px',
                 textAlign: 'center',
                 color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
+                fontSize: '0.85rem'
               }}
             >
               No results found for &apos;{query}&apos;
@@ -395,10 +454,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                       onClose()
                     }}
                   >
-                    <Ship
-                      size={16}
-                      style={{ color: 'var(--accent-primary)', flexShrink: 0 }}
-                    />
+                    <Ship size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
@@ -407,7 +463,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          opacity: v.isActive ? 1 : 0.5,
+                          opacity: v.isActive ? 1 : 0.5
                         }}
                       >
                         {v.name}
@@ -417,7 +473,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                               fontSize: '0.65rem',
                               marginLeft: '6px',
                               color: 'var(--text-secondary)',
-                              fontWeight: 400,
+                              fontWeight: 400
                             }}
                           >
                             (Inactive)
@@ -448,10 +504,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                       onClose()
                     }}
                   >
-                    <Building2
-                      size={16}
-                      style={{ color: '#6464ff', flexShrink: 0 }}
-                    />
+                    <Building2 size={16} style={{ color: '#6464ff', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
@@ -459,7 +512,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                           fontSize: '0.88rem',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          textOverflow: 'ellipsis'
                         }}
                       >
                         {e.name}
@@ -488,10 +541,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                       onClose()
                     }}
                   >
-                    <FileText
-                      size={16}
-                      style={{ color: '#ff64c8', flexShrink: 0 }}
-                    />
+                    <FileText size={16} style={{ color: '#ff64c8', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
@@ -499,7 +549,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                           fontSize: '0.88rem',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          textOverflow: 'ellipsis'
                         }}
                       >
                         {q.referenceNumber}
@@ -525,14 +575,15 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                     style={itemStyle(idx)}
                     onMouseEnter={() => setHighlightIndex(idx)}
                     onClick={() => {
-                      onNavigate(p.source === 'vessel_policy' ? 'vessel_policy' : 'policy', p.source === 'vessel_policy' ? p.vesselId : p.id, p)
+                      onNavigate(
+                        p.source === 'vessel_policy' ? 'vessel_policy' : 'policy',
+                        p.source === 'vessel_policy' ? p.vesselId : p.id,
+                        p
+                      )
                       onClose()
                     }}
                   >
-                    <FileCheck
-                      size={16}
-                      style={{ color: '#44cc88', flexShrink: 0 }}
-                    />
+                    <FileCheck size={16} style={{ color: '#44cc88', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
@@ -540,7 +591,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
                           fontSize: '0.88rem',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          textOverflow: 'ellipsis'
                         }}
                       >
                         {p.policyNumber || 'No Number'}
@@ -568,23 +619,47 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate, features = [
               color: 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: '12px'
             }}
           >
             <span>
-              <kbd style={{ padding: '1px 4px', borderRadius: '3px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', border: `1px solid ${borderColor}`, fontSize: '0.65rem' }}>
+              <kbd
+                style={{
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  border: `1px solid ${borderColor}`,
+                  fontSize: '0.65rem'
+                }}
+              >
                 &#8593;&#8595;
               </kbd>{' '}
               to navigate
             </span>
             <span>
-              <kbd style={{ padding: '1px 4px', borderRadius: '3px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', border: `1px solid ${borderColor}`, fontSize: '0.65rem' }}>
+              <kbd
+                style={{
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  border: `1px solid ${borderColor}`,
+                  fontSize: '0.65rem'
+                }}
+              >
                 Enter
               </kbd>{' '}
               to select
             </span>
             <span>
-              <kbd style={{ padding: '1px 4px', borderRadius: '3px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', border: `1px solid ${borderColor}`, fontSize: '0.65rem' }}>
+              <kbd
+                style={{
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  border: `1px solid ${borderColor}`,
+                  fontSize: '0.65rem'
+                }}
+              >
                 Esc
               </kbd>{' '}
               to close

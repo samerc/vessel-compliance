@@ -11,10 +11,15 @@ interface VesselScopeChipsProps {
  * Shows nothing when < 2 vessels. Shows compact chip row otherwise.
  * NULL scope = all vessels. Array = specific vessel IDs.
  */
-export default function VesselScopeChips({ vessels, vesselScope, onChange }: VesselScopeChipsProps) {
+export default function VesselScopeChips({
+  vessels,
+  vesselScope,
+  onChange
+}: VesselScopeChipsProps) {
   if (vessels.length < 2) return null
 
-  const allSelected = !vesselScope || vesselScope.length === 0 || vesselScope.length === vessels.length
+  const allSelected =
+    !vesselScope || vesselScope.length === 0 || vesselScope.length === vessels.length
 
   const toggle = (vesselId: string) => {
     if (allSelected) {
@@ -24,7 +29,7 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
     }
     const current = vesselScope || []
     if (current.includes(vesselId)) {
-      const next = current.filter(id => id !== vesselId)
+      const next = current.filter((id) => id !== vesselId)
       // If nothing left or all selected, reset to null (all)
       onChange(next.length === 0 || next.length === vessels.length ? null : next)
     } else {
@@ -38,7 +43,17 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
   const isChecked = (vesselId: string) => allSelected || (vesselScope || []).includes(vesselId)
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 3, marginBottom: 2, paddingLeft: 30 }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        flexWrap: 'wrap',
+        marginTop: 3,
+        marginBottom: 2,
+        paddingLeft: 30
+      }}
+    >
       <button
         type="button"
         onClick={selectAll}
@@ -55,7 +70,7 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
       >
         All
       </button>
-      {vessels.map(v => {
+      {vessels.map((v) => {
         const checked = isChecked(v.id)
         return (
           <button
@@ -67,7 +82,8 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
               padding: '1px 6px',
               borderRadius: 3,
               border: `1px solid ${checked && !allSelected ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-              background: checked && !allSelected ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'transparent',
+              background:
+                checked && !allSelected ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'transparent',
               color: checked && !allSelected ? 'var(--accent-primary)' : 'var(--text-secondary)',
               cursor: 'pointer',
               lineHeight: '1.4',

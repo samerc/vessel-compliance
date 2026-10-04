@@ -68,7 +68,10 @@ interface PolicyDetailProps {
   policyId: string
   onBack: () => void
   onNavigateToVessel?: (vesselId: string) => void
-  onNavigateToQuotation?: (quotationId: string, policyContext?: { policyId: string; policyNumber: string }) => void
+  onNavigateToQuotation?: (
+    quotationId: string,
+    policyContext?: { policyId: string; policyNumber: string }
+  ) => void
   onNavigateToPolicy?: (policyId: string) => void
 }
 
@@ -167,7 +170,7 @@ type CardType = (typeof CARD_TYPES)[number]
 const CARD_TYPE_LABELS: Record<string, string> = {
   BBC: 'Bunker Oil',
   WRC: 'Wreck Removal',
-  'MLC4.2': 'Shipowners\' Liability',
+  'MLC4.2': "Shipowners' Liability",
   'MLC2.5.2': 'Repatriation'
 }
 
@@ -218,7 +221,13 @@ function formatPeriod(date?: string, time?: string): string {
   return formatted
 }
 
-export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onNavigateToQuotation, onNavigateToPolicy }: PolicyDetailProps) {
+export default function PolicyDetail({
+  policyId,
+  onBack,
+  onNavigateToVessel,
+  onNavigateToQuotation,
+  onNavigateToPolicy
+}: PolicyDetailProps) {
   const [policy, setPolicy] = useState<PolicyRecord | null>(null)
   const [instalments, setInstalments] = useState<Instalment[]>([])
   const [addresses, setAddresses] = useState<PolicyAddress[]>([])
@@ -235,7 +244,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [declarationFields, setDeclarationFields] = useState<DeclarationFields | null>(null)
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
-  const [confirmation, setConfirmation] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void; isDangerous?: boolean }>({ show: false, title: '', message: '', onConfirm: () => {} })
+  const [confirmation, setConfirmation] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    isDangerous?: boolean
+  }>({ show: false, title: '', message: '', onConfirm: () => {} })
   const [, setRenewing] = useState(false)
   const [signing, setSigning] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -258,14 +273,26 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [editPremium, setEditPremium] = useState<number>(0)
   const [editCommission, setEditCommission] = useState<number>(0)
   const [editBankId, setEditBankId] = useState('')
-  const [editInstalments, setEditInstalments] = useState<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]>([])
-  const [editAddresses, setEditAddresses] = useState<{ entityId: string; entityName: string; role: string; addressText: string }[]>([])
+  const [editInstalments, setEditInstalments] = useState<
+    {
+      instalmentNumber: number
+      dueDate: string
+      premiumAmount: number
+      commissionAmount: number
+      isNonRefundable: boolean
+    }[]
+  >([])
+  const [editAddresses, setEditAddresses] = useState<
+    { entityId: string; entityName: string; role: string; addressText: string }[]
+  >([])
   const [editCancelReplace, setEditCancelReplace] = useState(false)
   const [editCancelReplaceText, setEditCancelReplaceText] = useState('')
   const [editHideBroker, setEditHideBroker] = useState(false)
 
   // Supplementary data for editing
-  const [banks, setBanks] = useState<{ id: string; name: string; details: string; order: number }[]>([])
+  const [banks, setBanks] = useState<
+    { id: string; name: string; details: string; order: number }[]
+  >([])
 
   // Coverage tab state
   const [quotationData, setQuotationData] = useState<any>(null)
@@ -288,7 +315,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [bcReissueSource, setBcReissueSource] = useState<BlueCard | null>(null)
   // Inline "add flag state" from the blue card addressed-to selector
   const [bcAddingFlag, setBcAddingFlag] = useState(false)
-  const [newFlagForm, setNewFlagForm] = useState({ name: '', iso3: '', ratBunker: false, ratWreck: false, authName: '', authAddr: '' })
+  const [newFlagForm, setNewFlagForm] = useState({
+    name: '',
+    iso3: '',
+    ratBunker: false,
+    ratWreck: false,
+    authName: '',
+    authAddr: ''
+  })
   const [bcSaving, setBcSaving] = useState(false)
   const [bcForm, setBcForm] = useState<BlueCardFormData>({
     cardType: 'BBC',
@@ -307,7 +341,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
   const [flagPorts, setFlagPorts] = useState<FlagStatePort[]>([])
   const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
-  const [assuredEntities, setAssuredEntities] = useState<Array<{ id: string; name: string; address?: string }>>([])
+  const [assuredEntities, setAssuredEntities] = useState<
+    Array<{ id: string; name: string; address?: string }>
+  >([])
 
   const { showError, showSuccess } = useToast()
   const { hasPermission, user } = useAuth()
@@ -348,9 +384,17 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   // Track recent item view when policy loads
   useEffect(() => {
     if (!policy) return
-    window.api.recentItemsAdd('policy', policyId, policy.policyNumber || 'Policy', policy.vesselName || undefined).then(() => {
-      window.dispatchEvent(new Event('recent-item-added'))
-    }).catch(() => {})
+    window.api
+      .recentItemsAdd(
+        'policy',
+        policyId,
+        policy.policyNumber || 'Policy',
+        policy.vesselName || undefined
+      )
+      .then(() => {
+        window.dispatchEvent(new Event('recent-item-added'))
+      })
+      .catch(() => {})
   }, [policy?.id])
 
   // Load supplementary data for blue card management + editing
@@ -415,19 +459,23 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     setEditPremium(policy.premiumAmount || 0)
     setEditCommission(policy.commissionPercent || 0)
     setEditBankId(policy.bankId || '')
-    setEditInstalments(instalments.map(inst => ({
-      instalmentNumber: inst.instalmentNumber,
-      dueDate: inst.dueDate || '',
-      premiumAmount: inst.premiumAmount || 0,
-      commissionAmount: inst.commissionAmount || 0,
-      isNonRefundable: inst.isNonRefundable
-    })))
-    setEditAddresses(addresses.map(addr => ({
-      entityId: addr.entityId || '',
-      entityName: addr.entityName || '',
-      role: addr.role || '',
-      addressText: addr.addressText || ''
-    })))
+    setEditInstalments(
+      instalments.map((inst) => ({
+        instalmentNumber: inst.instalmentNumber,
+        dueDate: inst.dueDate || '',
+        premiumAmount: inst.premiumAmount || 0,
+        commissionAmount: inst.commissionAmount || 0,
+        isNonRefundable: inst.isNonRefundable
+      }))
+    )
+    setEditAddresses(
+      addresses.map((addr) => ({
+        entityId: addr.entityId || '',
+        entityName: addr.entityName || '',
+        role: addr.role || '',
+        addressText: addr.addressText || ''
+      }))
+    )
     setEditCancelReplace(!!policy.cancelReplaceText)
     setEditCancelReplaceText(policy.cancelReplaceText || '')
     setEditHideBroker(!!(policy as any).hideBroker)
@@ -440,36 +488,41 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy) return
     setSaving(true)
     try {
-      ok(await window.api.policyUpdate(policyId, {
-        inceptionDate: editInception,
-        inceptionTime: editInceptionTime,
-        expiryDate: editExpiry,
-        expiryTime: editExpiryTime,
-        timezone: editTimezone,
-        premiumAmount: editPremium,
-        commissionPercent: editCommission || null,
-        bankId: editBankId || null,
-        cancelReplaceText: editCancelReplace ? editCancelReplaceText : null,
-        hideBroker: editHideBroker,
-        // Editing invalidates the frozen export snapshot so the next export re-freezes
-        // with the change (exports are otherwise identical on re-export).
-        exportSnapshot: null
-      }))
+      ok(
+        await window.api.policyUpdate(policyId, {
+          inceptionDate: editInception,
+          inceptionTime: editInceptionTime,
+          expiryDate: editExpiry,
+          expiryTime: editExpiryTime,
+          timezone: editTimezone,
+          premiumAmount: editPremium,
+          commissionPercent: editCommission || null,
+          bankId: editBankId || null,
+          cancelReplaceText: editCancelReplace ? editCancelReplaceText : null,
+          hideBroker: editHideBroker,
+          // Editing invalidates the frozen export snapshot so the next export re-freezes
+          // with the change (exports are otherwise identical on re-export).
+          exportSnapshot: null
+        })
+      )
       await window.api.policySetInstalments(policyId, editInstalments)
-      await window.api.policySetAddresses(policyId, editAddresses.map(a => ({
-        entityId: a.entityId,
-        entityName: a.entityName,
-        role: a.role,
-        addressText: a.addressText
-      })))
+      await window.api.policySetAddresses(
+        policyId,
+        editAddresses.map((a) => ({
+          entityId: a.entityId,
+          entityName: a.entityName,
+          role: a.role,
+          addressText: a.addressText
+        }))
+      )
       // Sync addresses to entity_addresses so they are available system-wide
       for (const addr of editAddresses) {
         if (addr.entityId && addr.addressText && addr.addressText.trim()) {
           try {
             const existing = await window.api.getEntityAddresses(addr.entityId)
-            const alreadyExists = Array.isArray(existing) && existing.some(
-              (ea: any) => ea.addressLine1?.trim() === addr.addressText?.trim()
-            )
+            const alreadyExists =
+              Array.isArray(existing) &&
+              existing.some((ea: any) => ea.addressLine1?.trim() === addr.addressText?.trim())
             if (!alreadyExists) {
               await window.api.addEntityAddress({
                 entityId: addr.entityId,
@@ -497,9 +550,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     setConfirmation({
       show: true,
       title: 'Create Revision?',
-      message: 'Create a new revision of this policy? The current version will be marked as superseded.',
+      message:
+        'Create a new revision of this policy? The current version will be marked as superseded.',
       onConfirm: async () => {
-        setConfirmation(prev => ({ ...prev, show: false }))
+        setConfirmation((prev) => ({ ...prev, show: false }))
         try {
           const newId = await window.api.policyCreateRevision(policyId)
           if (newId && typeof newId === 'string') {
@@ -522,8 +576,25 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     if (!policy?.quotationId) return
     setCoverageLoading(true)
     try {
-      const [q, warranties, customWarranties, deductibles, exclusions, clauses, subjectivities, allWarranties, , allExclusionsMaster, allClausesMaster, allSubjectivitiesMaster,
-        hullConditions, hullAdditionalConditions, hullClauses, allHullConditions, hullAlternatives, customExclusions
+      const [
+        q,
+        warranties,
+        customWarranties,
+        deductibles,
+        exclusions,
+        clauses,
+        subjectivities,
+        allWarranties,
+        ,
+        allExclusionsMaster,
+        allClausesMaster,
+        allSubjectivitiesMaster,
+        hullConditions,
+        hullAdditionalConditions,
+        hullClauses,
+        allHullConditions,
+        hullAlternatives,
+        customExclusions
       ] = await Promise.all([
         window.api.getQuotation(policy.quotationId),
         window.api.getQuotationWarranties(policy.quotationId),
@@ -546,7 +617,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       ])
       setQuotationData(q)
       // Resolve warranty names from master list
-      const masterWarrantyMap = new Map((Array.isArray(allWarranties) ? allWarranties : []).map((w: any) => [w.id, w]))
+      const masterWarrantyMap = new Map(
+        (Array.isArray(allWarranties) ? allWarranties : []).map((w: any) => [w.id, w])
+      )
       const resolvedWarranties = (Array.isArray(warranties) ? warranties : []).map((w: any) => {
         const master = masterWarrantyMap.get(w.piWarrantyId)
         return { ...w, text: master?.text || master?.name || '', name: master?.name || '' }
@@ -554,20 +627,28 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       setCoverageWarranties(resolvedWarranties)
       setCoverageCustomWarranties(Array.isArray(customWarranties) ? customWarranties : [])
       // Resolve deductible text — deductibles have title+description directly
-      setCoverageDeductibles((Array.isArray(deductibles) ? deductibles : []).map((d: any) => {
-        const parts = [d.title, d.description].filter(Boolean)
-        let text = parts.join(' — ')
-        if (d.amount) text += ` ${d.currency || 'USD'} ${Number(d.amount).toLocaleString()}`
-        return { ...d, text: text || 'Deductible' }
-      }))
+      setCoverageDeductibles(
+        (Array.isArray(deductibles) ? deductibles : []).map((d: any) => {
+          const parts = [d.title, d.description].filter(Boolean)
+          let text = parts.join(' — ')
+          if (d.amount) text += ` ${d.currency || 'USD'} ${Number(d.amount).toLocaleString()}`
+          return { ...d, text: text || 'Deductible' }
+        })
+      )
       // Resolve exclusion text — exclusions have customText or reference master
-      const masterExclMap = new Map((Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map((e: any) => [e.id, e]))
-      setCoverageExclusions((Array.isArray(exclusions) ? exclusions : []).map((e: any) => {
-        const master = masterExclMap.get(e.piExclusionId)
-        return { ...e, text: e.customText || master?.text || e.text || '' }
-      }))
+      const masterExclMap = new Map(
+        (Array.isArray(allExclusionsMaster) ? allExclusionsMaster : []).map((e: any) => [e.id, e])
+      )
+      setCoverageExclusions(
+        (Array.isArray(exclusions) ? exclusions : []).map((e: any) => {
+          const master = masterExclMap.get(e.piExclusionId)
+          return { ...e, text: e.customText || master?.text || e.text || '' }
+        })
+      )
       // Resolve clause names — clauses reference master pi_clauses with name+code
-      const masterClauseMap = new Map((Array.isArray(allClausesMaster) ? allClausesMaster : []).map((c: any) => [c.id, c]))
+      const masterClauseMap = new Map(
+        (Array.isArray(allClausesMaster) ? allClausesMaster : []).map((c: any) => [c.id, c])
+      )
       // Deduplicate clauses by piClauseId
       const seenClauseIds = new Set<string>()
       const dedupedClauses = (Array.isArray(clauses) ? clauses : []).filter((c: any) => {
@@ -575,10 +656,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         seenClauseIds.add(c.piClauseId)
         return true
       })
-      setCoverageClauses(dedupedClauses.map((c: any) => {
-        const master = masterClauseMap.get(c.piClauseId)
-        return { ...c, text: master?.name || master?.text || c.text || '', code: master?.code || '' }
-      }))
+      setCoverageClauses(
+        dedupedClauses.map((c: any) => {
+          const master = masterClauseMap.get(c.piClauseId)
+          return {
+            ...c,
+            text: master?.name || master?.text || c.text || '',
+            code: master?.code || ''
+          }
+        })
+      )
       // For Hull: add hull conditions as clauses if P&I clauses are empty
       const typeCode = q?.quotationTypeCode || policy.quotationTypeCode
       if ((typeCode === 'H' || typeCode === 'W') && dedupedClauses.length === 0) {
@@ -589,22 +676,36 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         const safeHullAddl = Array.isArray(hullAdditionalConditions) ? hullAdditionalConditions : []
         const selectedAltId = policy.selectedAlternativeId
         // Get selected alt's clause
-        const selectedAlt = selectedAltId ? safeHullAlts.find((a: any) => a.id === selectedAltId) : safeHullAlts[0]
-        const selectedClause = selectedAlt ? safeHullClauses.find((c: any) => c.id === selectedAlt.hullClauseId) : null
+        const selectedAlt = selectedAltId
+          ? safeHullAlts.find((a: any) => a.id === selectedAltId)
+          : safeHullAlts[0]
+        const selectedClause = selectedAlt
+          ? safeHullClauses.find((c: any) => c.id === selectedAlt.hullClauseId)
+          : null
         // Filter conditions to selected alt
         const filteredConds = selectedAltId
           ? safeHullConds.filter((c: any) => c.alternativeId === selectedAltId || !c.alternativeId)
           : safeHullConds
         // Dedup
         const seenHull = new Map<string, any>()
-        for (const c of filteredConds.filter((x: any) => x.alternativeId)) seenHull.set(c.hullConditionId, c)
-        for (const c of filteredConds.filter((x: any) => !x.alternativeId)) { if (!seenHull.has(c.hullConditionId)) seenHull.set(c.hullConditionId, c) }
+        for (const c of filteredConds.filter((x: any) => x.alternativeId))
+          seenHull.set(c.hullConditionId, c)
+        for (const c of filteredConds.filter((x: any) => !x.alternativeId)) {
+          if (!seenHull.has(c.hullConditionId)) seenHull.set(c.hullConditionId, c)
+        }
         const hullClauseItems = Array.from(seenHull.values()).map((qc: any) => {
           const def = safeAllHullConds.find((c: any) => c.id === qc.hullConditionId)
-          return { text: `Cl. ${def?.conditionNumber || '?'} — ${qc.textOverride || def?.text || ''}`, code: `Cl. ${def?.conditionNumber || '?'}` }
+          return {
+            text: `Cl. ${def?.conditionNumber || '?'} — ${qc.textOverride || def?.text || ''}`,
+            code: `Cl. ${def?.conditionNumber || '?'}`
+          }
         })
         // Add clause description as first item
-        if (selectedClause) hullClauseItems.unshift({ text: selectedClause.description || selectedClause.name, code: '' })
+        if (selectedClause)
+          hullClauseItems.unshift({
+            text: selectedClause.description || selectedClause.name,
+            code: ''
+          })
         // Add additional conditions
         for (const qa of safeHullAddl) {
           const text = qa.textOverride || (qa as any).text || ''
@@ -615,23 +716,37 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       // For Hull/War: add custom exclusions to exclusions
       const safeCustomExcl = Array.isArray(customExclusions) ? customExclusions : []
       if (safeCustomExcl.length > 0) {
-        setCoverageExclusions(prev => [...prev, ...safeCustomExcl.map((e: any) => ({ text: e.text || '' }))])
+        setCoverageExclusions((prev) => [
+          ...prev,
+          ...safeCustomExcl.map((e: any) => ({ text: e.text || '' }))
+        ])
       }
       // Resolve subjectivity text
-      const masterSubjMap = new Map((Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [s.id, s]))
-      setCoverageSubjectivities((Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
-        const master = masterSubjMap.get(s.piSubjectivityId)
-        return { ...s, text: master?.text || s.text || '' }
-      }))
+      const masterSubjMap = new Map(
+        (Array.isArray(allSubjectivitiesMaster) ? allSubjectivitiesMaster : []).map((s: any) => [
+          s.id,
+          s
+        ])
+      )
+      setCoverageSubjectivities(
+        (Array.isArray(subjectivities) ? subjectivities : []).map((s: any) => {
+          const master = masterSubjMap.get(s.piSubjectivityId)
+          return { ...s, text: master?.text || s.text || '' }
+        })
+      )
       // Load custom sections and LOL options
       try {
         const [cs, lol] = await Promise.all([
           window.api.getQuotationCustomSections(policy.quotationId),
-          policy.quotationTypeCode === 'P' || q?.quotationTypeCode === 'P' ? window.api.lolGetOptions(policy.quotationId) : Promise.resolve([])
+          policy.quotationTypeCode === 'P' || q?.quotationTypeCode === 'P'
+            ? window.api.lolGetOptions(policy.quotationId)
+            : Promise.resolve([])
         ])
         setCoverageCustomSections(Array.isArray(cs) ? cs : [])
         setCoverageLolOptions(Array.isArray(lol) ? lol : [])
-      } catch { /* non-critical */ }
+      } catch {
+        /* non-critical */
+      }
     } catch {
       // Non-critical
     } finally {
@@ -647,7 +762,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   }, [isEditing, activeTab, quotationData, coverageLoading, loadCoverageData])
 
   // Recalculate instalment amounts when premium or commission change
-  const recalcInstalments = (newPremium: number, newCommission: number, currentInstalments: typeof editInstalments): typeof editInstalments => {
+  const recalcInstalments = (
+    newPremium: number,
+    newCommission: number,
+    currentInstalments: typeof editInstalments
+  ): typeof editInstalments => {
     if (currentInstalments.length === 0) return currentInstalments
     // Rounding remainder goes into the 1st instalment so the instalments add up to the premium
     // (exports print the instalment sum)
@@ -663,28 +782,36 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   // Add instalment row
   const addInstalment = (): void => {
     const next = editInstalments.length + 1
-    setEditInstalments(prev => [...prev, {
-      instalmentNumber: next,
-      dueDate: '',
-      premiumAmount: 0,
-      commissionAmount: 0,
-      isNonRefundable: false
-    }])
+    setEditInstalments((prev) => [
+      ...prev,
+      {
+        instalmentNumber: next,
+        dueDate: '',
+        premiumAmount: 0,
+        commissionAmount: 0,
+        isNonRefundable: false
+      }
+    ])
   }
 
   // Remove instalment row
   const removeInstalment = (idx: number): void => {
-    setEditInstalments(prev => prev.filter((_, i) => i !== idx).map((inst, i) => ({ ...inst, instalmentNumber: i + 1 })))
+    setEditInstalments((prev) =>
+      prev.filter((_, i) => i !== idx).map((inst, i) => ({ ...inst, instalmentNumber: i + 1 }))
+    )
   }
 
   // Add address row
   const addAddress = (): void => {
-    setEditAddresses(prev => [...prev, { entityId: '', entityName: '', role: '', addressText: '' }])
+    setEditAddresses((prev) => [
+      ...prev,
+      { entityId: '', entityName: '', role: '', addressText: '' }
+    ])
   }
 
   // Remove address row
   const removeAddress = (idx: number): void => {
-    setEditAddresses(prev => prev.filter((_, i) => i !== idx))
+    setEditAddresses((prev) => prev.filter((_, i) => i !== idx))
   }
 
   // Group blue cards by type
@@ -745,7 +872,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     newExpiry: string
   ): { on: boolean; text: string } => {
     const overlaps =
-      !!source.expiryDate && !!newInception &&
+      !!source.expiryDate &&
+      !!newInception &&
       new Date(newInception) < new Date(source.expiryDate) &&
       (!newExpiry || !source.inceptionDate || new Date(source.inceptionDate) < new Date(newExpiry))
     return {
@@ -776,14 +904,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       return
     }
     try {
-      const created = ok(await window.api.addFlagState({
-        name: newFlagForm.name.trim(),
-        iso3Code: newFlagForm.iso3.trim().toUpperCase(),
-        ratifiedBunker: newFlagForm.ratBunker,
-        ratifiedWreck: newFlagForm.ratWreck,
-        authorityName: newFlagForm.authName.trim() || null,
-        authorityAddress: newFlagForm.authAddr.trim() || null
-      } as any))
+      const created = ok(
+        await window.api.addFlagState({
+          name: newFlagForm.name.trim(),
+          iso3Code: newFlagForm.iso3.trim().toUpperCase(),
+          ratifiedBunker: newFlagForm.ratBunker,
+          ratifiedWreck: newFlagForm.ratWreck,
+          authorityName: newFlagForm.authName.trim() || null,
+          authorityAddress: newFlagForm.authAddr.trim() || null
+        } as any)
+      )
       setFlagStates((prev) => [...prev, created])
       setBcForm((f) => ({
         ...f,
@@ -792,7 +922,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         addressedToAddress: created.authorityAddress || ''
       }))
       setBcAddingFlag(false)
-      setNewFlagForm({ name: '', iso3: '', ratBunker: false, ratWreck: false, authName: '', authAddr: '' })
+      setNewFlagForm({
+        name: '',
+        iso3: '',
+        ratBunker: false,
+        ratWreck: false,
+        authName: '',
+        authAddr: ''
+      })
       showSuccess('Flag state added')
     } catch (err: any) {
       showError(err.message || 'Failed to add flag state')
@@ -803,12 +940,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const openIssueModal = (preselectedType?: CardType): void => {
     const ct = preselectedType || 'BBC'
     const defaultPort =
-      flagPorts.length === 1
-        ? flagPorts[0].name
-        : flagPorts.find((p) => p.isDefault)?.name || ''
+      flagPorts.length === 1 ? flagPorts[0].name : flagPorts.find((p) => p.isDefault)?.name || ''
     const fs = vesselFlagState
-    const isRatified =
-      ct === 'BBC' ? fs?.ratifiedBunker : ct === 'WRC' ? fs?.ratifiedWreck : false
+    const isRatified = ct === 'BBC' ? fs?.ratifiedBunker : ct === 'WRC' ? fs?.ratifiedWreck : false
 
     setBcForm({
       cardType: ct,
@@ -919,15 +1053,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   // Handle card type change in form
   const handleCardTypeChange = (ct: CardType): void => {
     const fs = vesselFlagState
-    const isRatified =
-      ct === 'BBC' ? fs?.ratifiedBunker : ct === 'WRC' ? fs?.ratifiedWreck : false
+    const isRatified = ct === 'BBC' ? fs?.ratifiedBunker : ct === 'WRC' ? fs?.ratifiedWreck : false
     setBcForm((f) => ({
       ...f,
       cardType: ct,
       addressedToFlagId: isRatified && fs ? fs.id : f.addressedToFlagId,
       addressedToName: isRatified && fs ? fs.authorityName || '' : f.addressedToName,
-      addressedToAddress:
-        isRatified && fs ? fs.authorityAddress || '' : f.addressedToAddress
+      addressedToAddress: isRatified && fs ? fs.authorityAddress || '' : f.addressedToAddress
     }))
   }
 
@@ -939,7 +1071,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     }
     // BBC/WRC must be addressed to a ratified flag state authority — block otherwise.
     if (needsAddressedTo(bcForm.cardType) && !bcForm.addressedToFlagId) {
-      showError('Select the flag state authority this certificate is addressed to (add one if it is not listed)')
+      showError(
+        'Select the flag state authority this certificate is addressed to (add one if it is not listed)'
+      )
       return
     }
     setBcSaving(true)
@@ -982,17 +1116,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           const existingOfType = blueCards.filter((bc) => bc.cardType === bcForm.cardType)
           if (existingOfType.length > 0) {
             const maxRev = Math.max(...existingOfType.map((bc) => bc.revisionNumber))
-            cardNumber =
-              (policy?.policyNumber || '') + '-' + (maxRev + 2) + '/' + bcForm.cardType
+            cardNumber = (policy?.policyNumber || '') + '-' + (maxRev + 2) + '/' + bcForm.cardType
           } else {
             cardNumber = (policy?.policyNumber || '') + '/' + bcForm.cardType
           }
         }
 
         const revisionNumber =
-          bcModalMode === 'reissue' && bcReissueSource
-            ? bcReissueSource.revisionNumber + 1
-            : 0
+          bcModalMode === 'reissue' && bcReissueSource ? bcReissueSource.revisionNumber + 1 : 0
 
         await window.api.policyAddBlueCard({
           policyId,
@@ -1012,12 +1143,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           addressedToAddress: bcForm.addressedToAddress || null,
           cancelReplaceText: bcForm.cancelReplace ? bcForm.cancelReplaceText : null
         })
-        showSuccess(
-          bcModalMode === 'reissue' ? 'Blue card reissued' : 'Blue card issued'
-        )
+        showSuccess(bcModalMode === 'reissue' ? 'Blue card reissued' : 'Blue card issued')
       }
       // Blue card changes invalidate the frozen snapshot so exports re-freeze with them
-      try { await window.api.policyUpdate(policyId, { exportSnapshot: null }) } catch { /* non-critical */ }
+      try {
+        await window.api.policyUpdate(policyId, { exportSnapshot: null })
+      } catch {
+        /* non-critical */
+      }
       setBcModalOpen(false)
       // Reload blue cards
       const bc = await window.api.policyGetBlueCards(policyId)
@@ -1151,10 +1284,18 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
     gap: '8px'
   }
   const actionItemStyle: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-    padding: '8px 12px', border: 'none', borderRadius: '6px',
-    background: 'transparent', color: 'var(--text-primary)',
-    cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left'
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    padding: '8px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    background: 'transparent',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    textAlign: 'left'
   }
 
   if (loading) {
@@ -1190,7 +1331,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   const handleSignPolicy = async () => {
     setSigning(true)
     try {
-      const result = await window.api.policySign(policyId) as any
+      const result = (await window.api.policySign(policyId)) as any
       if (result?.error) {
         showError(result.message || 'Failed to sign policy')
       } else {
@@ -1286,9 +1427,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           <ArrowLeft size={18} />
         </button>
         <div style={{ flex: 1 }}>
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1
               style={{
                 fontSize: '1.75rem',
@@ -1299,7 +1438,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               }}
             >
               <FileCheck size={26} />
-              {policy.policyNumber || 'Untitled Policy'}{policy.revisionNumber > 0 ? `-R${policy.revisionNumber}` : ''}
+              {policy.policyNumber || 'Untitled Policy'}
+              {policy.revisionNumber > 0 ? `-R${policy.revisionNumber}` : ''}
             </h1>
             {(policy.policyNumber || '').startsWith('POL-DRAFT-') && (
               <span
@@ -1375,39 +1515,45 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {/* Edit Policy — primary action (only before first export) */}
-          {!isEditing && hasPermission('policies:manage') && policy.status === 'active' && !policy.exportedAt && (
-            <button
-              className="btn-primary"
-              style={{ ...headerBtnStyle }}
-              onClick={enterEditMode}
-              title="Edit Policy"
-            >
-              <Edit3 size={16} /> Edit Policy
-            </button>
-          )}
+          {!isEditing &&
+            hasPermission('policies:manage') &&
+            policy.status === 'active' &&
+            !policy.exportedAt && (
+              <button
+                className="btn-primary"
+                style={{ ...headerBtnStyle }}
+                onClick={enterEditMode}
+                title="Edit Policy"
+              >
+                <Edit3 size={16} /> Edit Policy
+              </button>
+            )}
 
           {/* Sign Policy button — only for users with policies:sign AND policy not yet signed */}
-          {!isEditing && hasPermission('policies:sign') && policy.status === 'active' && !policy.signedBy && (
-            <button
-              className="btn-secondary"
-              style={{ ...headerBtnStyle }}
-              disabled={signing}
-              onClick={() => {
-                setConfirmation({
-                  show: true,
-                  title: 'Sign Policy',
-                  message: `Sign this policy as ${user?.username || 'current user'}? This action cannot be undone.`,
-                  onConfirm: async () => {
-                    setConfirmation(prev => ({ ...prev, show: false }))
-                    handleSignPolicy()
-                  }
-                })
-              }}
-              title="Sign Policy"
-            >
-              <PenTool size={16} /> {signing ? 'Signing...' : 'Sign'}
-            </button>
-          )}
+          {!isEditing &&
+            hasPermission('policies:sign') &&
+            policy.status === 'active' &&
+            !policy.signedBy && (
+              <button
+                className="btn-secondary"
+                style={{ ...headerBtnStyle }}
+                disabled={signing}
+                onClick={() => {
+                  setConfirmation({
+                    show: true,
+                    title: 'Sign Policy',
+                    message: `Sign this policy as ${user?.username || 'current user'}? This action cannot be undone.`,
+                    onConfirm: async () => {
+                      setConfirmation((prev) => ({ ...prev, show: false }))
+                      handleSignPolicy()
+                    }
+                  })
+                }}
+                title="Sign Policy"
+              >
+                <PenTool size={16} /> {signing ? 'Signing...' : 'Sign'}
+              </button>
+            )}
 
           {/* Signed badge */}
           {policy.signedBy && (
@@ -1487,127 +1633,247 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             >
               <MoreHorizontal size={16} /> Actions
             </button>
-            {showActionsMenu && createPortal(
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setShowActionsMenu(false)} />
-                <div style={{
-                  position: 'fixed',
-                  top: (actionsMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
-                  right: window.innerWidth - (actionsMenuRef.current?.getBoundingClientRect().right || 0),
-                  zIndex: 9999,
-                  background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
-                  borderRadius: '10px', padding: '6px', minWidth: '220px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                }}>
-                  {/* Revision & Renew */}
-                  {hasPermission('policies:manage') && policy.status === 'active' && (
-                    <button onClick={() => { setShowActionsMenu(false); handleCreateRevision() }} style={actionItemStyle} className="hover-effect">
-                      <Copy size={15} /> New Revision
-                    </button>
-                  )}
-                  {hasPermission('quotations:create') && policy.status === 'active' && (
-                    <button onClick={() => {
-                      setShowActionsMenu(false)
-                      setConfirmation({
-                        show: true, title: 'Create Renewal Quotation?',
-                        message: 'Create a new quotation pre-filled from this policy? The period will be advanced by one year.',
-                        onConfirm: async () => {
-                          setConfirmation(prev => ({ ...prev, show: false }))
-                          setRenewing(true)
-                          try {
-                            const result = ok(await window.api.policyRenew(policyId))
-                            if (result?.quotationId) { showSuccess('Renewal quotation created'); onNavigateToQuotation?.(result.quotationId) }
-                            else showError('Failed to create renewal')
-                          } catch (err: any) { showError(err.message || 'Failed') }
-                          finally { setRenewing(false) }
-                        }
-                      })
-                    }} style={{ ...actionItemStyle, color: isLight ? '#008844' : '#00c864' }} className="hover-effect">
-                      <RefreshCw size={15} /> Renew
-                    </button>
-                  )}
-
-                  {hasPermission('policies:manage') && policy.status === 'active' && (
-                    <button onClick={() => { setShowActionsMenu(false); setShowCancelModal(true) }}
-                      style={{ ...actionItemStyle, color: 'var(--danger)' }} className="hover-effect">
-                      <X size={15} /> Cancel Policy
-                    </button>
-                  )}
-
-                  {hasPermission('reports:export') && (
-                    <>
-                      <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
-
-                      {/* Other exports (Export All / Export Policy are header buttons) */}
-                      <button onClick={() => { setShowActionsMenu(false); handleExportPdfTC() }} disabled={exportingPdfTC} style={actionItemStyle} className="hover-effect">
-                        <FileCheck size={15} /> {exportingPdfTC ? 'Converting...' : 'Export Policy (PDF + T&C)'}
-                      </button>
-                      <button onClick={() => { setShowActionsMenu(false); handleExportDA() }} disabled={exportingDA} style={actionItemStyle} className="hover-effect">
-                        <Download size={15} /> Export Debit Advice
-                      </button>
-                      {commissionAmount != null && commissionAmount > 0 && (
-                        <button onClick={() => { setShowActionsMenu(false); handleExportCA() }} disabled={exportingCA} style={actionItemStyle} className="hover-effect">
-                          <Download size={15} /> Export Credit Advice
-                        </button>
-                      )}
-                      {policy.quotationTypeCode === 'W' && (
-                        <button onClick={async () => {
+            {showActionsMenu &&
+              createPortal(
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+                    onClick={() => setShowActionsMenu(false)}
+                  />
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: (actionsMenuRef.current?.getBoundingClientRect().bottom || 0) + 4,
+                      right:
+                        window.innerWidth -
+                        (actionsMenuRef.current?.getBoundingClientRect().right || 0),
+                      zIndex: 9999,
+                      background: isLight ? '#ffffff' : '#1a1d28',
+                      border: '1px solid var(--glass-border-color)',
+                      borderRadius: '10px',
+                      padding: '6px',
+                      minWidth: '220px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                    }}
+                  >
+                    {/* Revision & Renew */}
+                    {hasPermission('policies:manage') && policy.status === 'active' && (
+                      <button
+                        onClick={() => {
                           setShowActionsMenu(false)
-                          try {
-                            const fields = await loadDeclarationFields(policyId)
-                            setDeclarationFields(fields)
-                            setShowDeclarationModal(true)
-                          } catch (err: any) { showError(err.message || 'Failed to load declaration') }
-                        }} style={actionItemStyle} className="hover-effect">
-                          <Download size={15} /> Export Declaration
-                        </button>
-                      )}
-                      {isPIType && blueCards.filter(bc => bc.status === 'active').length > 0 && (
-                        <>
-                          <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
-                          <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Blue Cards</div>
-                          {blueCards.filter(bc => bc.status === 'active').map(bc => (
-                            <button key={bc.id} onClick={async () => {
-                              setShowActionsMenu(false); setExportingBC(true)
-                              try { await handleExportSingleBC(bc); showSuccess(`${bc.cardType} exported`) }
-                              catch (err: any) { showError(err.message || 'Export failed') }
-                              finally { setExportingBC(false) }
-                            }} style={actionItemStyle} className="hover-effect">
-                              <Download size={15} /> {bc.cardNumber || bc.cardType}
-                            </button>
-                          ))}
-                        </>
-                      )}
-
-                      <div style={{ height: '1px', background: 'var(--glass-border-color)', margin: '4px 0' }} />
-
-                      <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: 'var(--accent-primary)' }} className="hover-effect">
-                        <FileSpreadsheet size={15} /> Export to QuickBooks
+                          handleCreateRevision()
+                        }}
+                        style={actionItemStyle}
+                        className="hover-effect"
+                      >
+                        <Copy size={15} /> New Revision
                       </button>
-                    </>
-                  )}
-                </div>
-              </>,
-              document.body
-            )}
+                    )}
+                    {hasPermission('quotations:create') && policy.status === 'active' && (
+                      <button
+                        onClick={() => {
+                          setShowActionsMenu(false)
+                          setConfirmation({
+                            show: true,
+                            title: 'Create Renewal Quotation?',
+                            message:
+                              'Create a new quotation pre-filled from this policy? The period will be advanced by one year.',
+                            onConfirm: async () => {
+                              setConfirmation((prev) => ({ ...prev, show: false }))
+                              setRenewing(true)
+                              try {
+                                const result = ok(await window.api.policyRenew(policyId))
+                                if (result?.quotationId) {
+                                  showSuccess('Renewal quotation created')
+                                  onNavigateToQuotation?.(result.quotationId)
+                                } else showError('Failed to create renewal')
+                              } catch (err: any) {
+                                showError(err.message || 'Failed')
+                              } finally {
+                                setRenewing(false)
+                              }
+                            }
+                          })
+                        }}
+                        style={{ ...actionItemStyle, color: isLight ? '#008844' : '#00c864' }}
+                        className="hover-effect"
+                      >
+                        <RefreshCw size={15} /> Renew
+                      </button>
+                    )}
+
+                    {hasPermission('policies:manage') && policy.status === 'active' && (
+                      <button
+                        onClick={() => {
+                          setShowActionsMenu(false)
+                          setShowCancelModal(true)
+                        }}
+                        style={{ ...actionItemStyle, color: 'var(--danger)' }}
+                        className="hover-effect"
+                      >
+                        <X size={15} /> Cancel Policy
+                      </button>
+                    )}
+
+                    {hasPermission('reports:export') && (
+                      <>
+                        <div
+                          style={{
+                            height: '1px',
+                            background: 'var(--glass-border-color)',
+                            margin: '4px 0'
+                          }}
+                        />
+
+                        {/* Other exports (Export All / Export Policy are header buttons) */}
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false)
+                            handleExportPdfTC()
+                          }}
+                          disabled={exportingPdfTC}
+                          style={actionItemStyle}
+                          className="hover-effect"
+                        >
+                          <FileCheck size={15} />{' '}
+                          {exportingPdfTC ? 'Converting...' : 'Export Policy (PDF + T&C)'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false)
+                            handleExportDA()
+                          }}
+                          disabled={exportingDA}
+                          style={actionItemStyle}
+                          className="hover-effect"
+                        >
+                          <Download size={15} /> Export Debit Advice
+                        </button>
+                        {commissionAmount != null && commissionAmount > 0 && (
+                          <button
+                            onClick={() => {
+                              setShowActionsMenu(false)
+                              handleExportCA()
+                            }}
+                            disabled={exportingCA}
+                            style={actionItemStyle}
+                            className="hover-effect"
+                          >
+                            <Download size={15} /> Export Credit Advice
+                          </button>
+                        )}
+                        {policy.quotationTypeCode === 'W' && (
+                          <button
+                            onClick={async () => {
+                              setShowActionsMenu(false)
+                              try {
+                                const fields = await loadDeclarationFields(policyId)
+                                setDeclarationFields(fields)
+                                setShowDeclarationModal(true)
+                              } catch (err: any) {
+                                showError(err.message || 'Failed to load declaration')
+                              }
+                            }}
+                            style={actionItemStyle}
+                            className="hover-effect"
+                          >
+                            <Download size={15} /> Export Declaration
+                          </button>
+                        )}
+                        {isPIType &&
+                          blueCards.filter((bc) => bc.status === 'active').length > 0 && (
+                            <>
+                              <div
+                                style={{
+                                  height: '1px',
+                                  background: 'var(--glass-border-color)',
+                                  margin: '4px 0'
+                                }}
+                              />
+                              <div
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  color: 'var(--text-secondary)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px'
+                                }}
+                              >
+                                Blue Cards
+                              </div>
+                              {blueCards
+                                .filter((bc) => bc.status === 'active')
+                                .map((bc) => (
+                                  <button
+                                    key={bc.id}
+                                    onClick={async () => {
+                                      setShowActionsMenu(false)
+                                      setExportingBC(true)
+                                      try {
+                                        await handleExportSingleBC(bc)
+                                        showSuccess(`${bc.cardType} exported`)
+                                      } catch (err: any) {
+                                        showError(err.message || 'Export failed')
+                                      } finally {
+                                        setExportingBC(false)
+                                      }
+                                    }}
+                                    style={actionItemStyle}
+                                    className="hover-effect"
+                                  >
+                                    <Download size={15} /> {bc.cardNumber || bc.cardType}
+                                  </button>
+                                ))}
+                            </>
+                          )}
+
+                        <div
+                          style={{
+                            height: '1px',
+                            background: 'var(--glass-border-color)',
+                            margin: '4px 0'
+                          }}
+                        />
+
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false)
+                            handleExportQuickBooks()
+                          }}
+                          disabled={exportingQB}
+                          style={{ ...actionItemStyle, color: 'var(--accent-primary)' }}
+                          className="hover-effect"
+                        >
+                          <FileSpreadsheet size={15} /> Export to QuickBooks
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>,
+                document.body
+              )}
           </div>
           {hasPermission('policies:manage') && (
             <button
-              onClick={() => setConfirmation({
-                show: true,
-                title: 'Delete Policy?',
-                message: `Delete policy ${policy.policyNumber}? This cannot be undone.`,
-                isDangerous: true,
-                onConfirm: async () => {
-                  setConfirmation(prev => ({ ...prev, show: false }))
-                  try {
-                    await window.api.policyDelete(policyId)
-                    showSuccess('Policy deleted')
-                    onBack()
-                  } catch (err: any) {
-                    showError(err.message || 'Failed to delete')
+              onClick={() =>
+                setConfirmation({
+                  show: true,
+                  title: 'Delete Policy?',
+                  message: `Delete policy ${policy.policyNumber}? This cannot be undone.`,
+                  isDangerous: true,
+                  onConfirm: async () => {
+                    setConfirmation((prev) => ({ ...prev, show: false }))
+                    try {
+                      await window.api.policyDelete(policyId)
+                      showSuccess('Policy deleted')
+                      onBack()
+                    } catch (err: any) {
+                      showError(err.message || 'Failed to delete')
+                    }
                   }
-                }
-              })}
+                })
+              }
               className="btn-secondary"
               style={{
                 background: 'rgba(255, 77, 77, 0.12)',
@@ -1631,19 +1897,23 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       {isEditing && (
         <>
           {/* Tab bar */}
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            marginBottom: '20px',
-            borderBottom: '1px solid var(--glass-border-color)',
-            paddingBottom: '0'
-          }}>
-            {([
-              { key: 'overview', label: 'Overview', icon: <Ship size={15} /> },
-              { key: 'insured', label: 'Insured', icon: <Users size={15} /> },
-              { key: 'premium', label: 'Premium', icon: <DollarSign size={15} /> },
-              { key: 'coverage', label: 'Coverage', icon: <Shield size={15} /> }
-            ] as { key: EditTab; label: string; icon: React.ReactNode }[]).map(tab => (
+          <div
+            style={{
+              display: 'flex',
+              gap: '4px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--glass-border-color)',
+              paddingBottom: '0'
+            }}
+          >
+            {(
+              [
+                { key: 'overview', label: 'Overview', icon: <Ship size={15} /> },
+                { key: 'insured', label: 'Insured', icon: <Users size={15} /> },
+                { key: 'premium', label: 'Premium', icon: <DollarSign size={15} /> },
+                { key: 'coverage', label: 'Coverage', icon: <Shield size={15} /> }
+              ] as { key: EditTab; label: string; icon: React.ReactNode }[]
+            ).map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -1656,7 +1926,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   gap: '6px',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: activeTab === tab.key ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                  borderBottom:
+                    activeTab === tab.key
+                      ? '2px solid var(--accent-primary)'
+                      : '2px solid transparent',
                   color: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
@@ -1677,26 +1950,80 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
 
               {/* Vessel info (read-only) */}
-              <div style={{ marginBottom: '20px', padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{policy.vesselName || '-'}</span>
-                  {policy.imoNumber && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>IMO {policy.imoNumber}</span>}
+              <div
+                style={{
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--glass-border-color)'
+                }}
+              >
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                    {policy.vesselName || '-'}
+                  </span>
+                  {policy.imoNumber && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      IMO {policy.imoNumber}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  {[policy.vesselType, policy.flagStateName, policy.builtYear ? (policy.rebuiltYear ? `Built ${policy.builtYear} / Rebuilt ${policy.rebuiltYear}` : `Built ${policy.builtYear}`) : null, policy.grossTonnage ? `GT ${Number(policy.grossTonnage).toLocaleString()}` : null].filter(Boolean).join(' | ')}
+                  {[
+                    policy.vesselType,
+                    policy.flagStateName,
+                    policy.builtYear
+                      ? policy.rebuiltYear
+                        ? `Built ${policy.builtYear} / Rebuilt ${policy.rebuiltYear}`
+                        : `Built ${policy.builtYear}`
+                      : null,
+                    policy.grossTonnage
+                      ? `GT ${Number(policy.grossTonnage).toLocaleString()}`
+                      : null
+                  ]
+                    .filter(Boolean)
+                    .join(' | ')}
                 </div>
-                {policy.customerName && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Customer: {policy.customerName}</div>}
+                {policy.customerName && (
+                  <div
+                    style={{
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '4px'
+                    }}
+                  >
+                    Customer: {policy.customerName}
+                  </div>
+                )}
               </div>
 
               {/* Editable period */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '14px',
+                  marginBottom: '16px'
+                }}
+              >
                 <div>
                   <label style={labelStyle}>Inception Date</label>
                   <input
                     type="date"
                     value={editInception}
-                    onChange={e => setEditInception(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                    onChange={(e) => setEditInception(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
                   />
                 </div>
                 <div>
@@ -1704,8 +2031,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   <input
                     type="time"
                     value={editInceptionTime}
-                    onChange={e => setEditInceptionTime(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                    onChange={(e) => setEditInceptionTime(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
                   />
                 </div>
                 <div>
@@ -1713,8 +2048,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   <input
                     type="date"
                     value={editExpiry}
-                    onChange={e => setEditExpiry(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                    onChange={(e) => setEditExpiry(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
                   />
                 </div>
                 <div>
@@ -1722,8 +2065,16 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   <input
                     type="time"
                     value={editExpiryTime}
-                    onChange={e => setEditExpiryTime(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                    onChange={(e) => setEditExpiryTime(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
                   />
                 </div>
               </div>
@@ -1732,11 +2083,21 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <label style={labelStyle}>Timezone</label>
                 <select
                   value={editTimezone}
-                  onChange={e => setEditTimezone(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  onChange={(e) => setEditTimezone(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--input-border)',
+                    background: isLight ? '#fff' : '#23263a',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem'
+                  }}
                 >
-                  {DEFAULT_TIMEZONE_OPTIONS.map(tz => (
-                    <option key={tz} value={tz}>{tz}</option>
+                  {DEFAULT_TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
                   ))}
                   {editTimezone && !DEFAULT_TIMEZONE_OPTIONS.includes(editTimezone) && (
                     <option value={editTimezone}>{editTimezone}</option>
@@ -1745,35 +2106,89 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
 
               {/* Cancel & Replace */}
-              <div style={{
-                padding: '12px',
-                borderRadius: '8px',
-                background: editCancelReplace ? (isLight ? 'rgba(255, 176, 32, 0.06)' : 'rgba(255, 176, 32, 0.08)') : 'transparent',
-                border: editCancelReplace ? '1px solid rgba(255, 176, 32, 0.2)' : '1px solid transparent'
-              }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
-                  <input type="checkbox" checked={editCancelReplace} onChange={e => setEditCancelReplace(e.target.checked)} />
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: editCancelReplace
+                    ? isLight
+                      ? 'rgba(255, 176, 32, 0.06)'
+                      : 'rgba(255, 176, 32, 0.08)'
+                    : 'transparent',
+                  border: editCancelReplace
+                    ? '1px solid rgba(255, 176, 32, 0.2)'
+                    : '1px solid transparent'
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={editCancelReplace}
+                    onChange={(e) => setEditCancelReplace(e.target.checked)}
+                  />
                   Cancel & Replace
                 </label>
                 {editCancelReplace && (
                   <textarea
                     placeholder="Cancel & replace text..."
                     value={editCancelReplaceText}
-                    onChange={e => setEditCancelReplaceText(e.target.value)}
+                    onChange={(e) => setEditCancelReplaceText(e.target.value)}
                     rows={2}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', marginTop: '8px' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem',
+                      resize: 'vertical',
+                      marginTop: '8px'
+                    }}
                   />
                 )}
               </div>
 
               {/* Broker mention */}
-              <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid transparent' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
-                  <input type="checkbox" checked={editHideBroker} onChange={e => setEditHideBroker(e.target.checked)} />
+              <div
+                style={{ padding: '12px', borderRadius: '8px', border: '1px solid transparent' }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={editHideBroker}
+                    onChange={(e) => setEditHideBroker(e.target.checked)}
+                  />
                   Do not mention broker on documents
                 </label>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', marginLeft: '24px' }}>
-                  Hides the “c/o {'{broker}'}” line on the policy and debit advice. The credit advice always shows the broker (it is the broker’s document).
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    marginTop: '4px',
+                    marginLeft: '24px'
+                  }}
+                >
+                  Hides the “c/o {'{broker}'}” line on the policy and debit advice. The credit
+                  advice always shows the broker (it is the broker’s document).
                 </div>
               </div>
             </div>
@@ -1787,7 +2202,15 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <span style={cardTitleStyle}>Addresses</span>
                 <button
                   className="btn-secondary"
-                  style={{ marginLeft: 'auto', padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '4px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                   onClick={addAddress}
                 >
                   <Plus size={13} /> Add Address
@@ -1795,35 +2218,87 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
 
               {editAddresses.length === 0 && (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                <div
+                  style={{
+                    padding: '24px',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}
+                >
                   No addresses. Click "Add Address" to add one.
                 </div>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {editAddresses.map((addr, idx) => (
-                  <div key={idx} style={{ padding: '14px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)', position: 'relative' }}>
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '8px',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--glass-border-color)',
+                      position: 'relative'
+                    }}
+                  >
                     <button
                       onClick={() => removeAddress(idx)}
-                      style={{ position: 'absolute', top: '8px', right: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--danger)',
+                        padding: '2px'
+                      }}
                       title="Remove address"
                     >
                       <X size={16} />
                     </button>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '10px',
+                        marginBottom: '10px'
+                      }}
+                    >
                       <div>
                         <label style={labelStyle}>Entity</label>
                         <select
                           value={addr.entityId || ''}
-                          onChange={e => {
-                            const ent = assuredEntities.find(en => en.id === e.target.value)
-                            setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, entityId: e.target.value, entityName: ent?.name || a.entityName } : a))
+                          onChange={(e) => {
+                            const ent = assuredEntities.find((en) => en.id === e.target.value)
+                            setEditAddresses((prev) =>
+                              prev.map((a, i) =>
+                                i === idx
+                                  ? {
+                                      ...a,
+                                      entityId: e.target.value,
+                                      entityName: ent?.name || a.entityName
+                                    }
+                                  : a
+                              )
+                            )
                           }}
-                          style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--input-border)',
+                            background: isLight ? '#fff' : '#23263a',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem'
+                          }}
                         >
                           <option value="">Select entity...</option>
-                          {assuredEntities.map(ent => (
-                            <option key={ent.id} value={ent.id}>{ent.name}</option>
+                          {assuredEntities.map((ent) => (
+                            <option key={ent.id} value={ent.id}>
+                              {ent.name}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -1832,9 +2307,21 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         <input
                           type="text"
                           value={addr.role}
-                          onChange={e => setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, role: e.target.value } : a))}
+                          onChange={(e) =>
+                            setEditAddresses((prev) =>
+                              prev.map((a, i) => (i === idx ? { ...a, role: e.target.value } : a))
+                            )
+                          }
                           placeholder="e.g. Assured, Owner..."
-                          style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--input-border)',
+                            background: isLight ? '#fff' : '#23263a',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem'
+                          }}
                         />
                       </div>
                     </div>
@@ -1842,10 +2329,25 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       <label style={labelStyle}>Address</label>
                       <textarea
                         value={addr.addressText}
-                        onChange={e => setEditAddresses(prev => prev.map((a, i) => i === idx ? { ...a, addressText: e.target.value } : a))}
+                        onChange={(e) =>
+                          setEditAddresses((prev) =>
+                            prev.map((a, i) =>
+                              i === idx ? { ...a, addressText: e.target.value } : a
+                            )
+                          )
+                        }
                         placeholder="Full address..."
                         rows={2}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: isLight ? '#fff' : '#23263a',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          resize: 'vertical'
+                        }}
                       />
                     </div>
                   </div>
@@ -1862,33 +2364,74 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 <span style={cardTitleStyle}>Financial Details</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: '14px',
+                  marginBottom: '20px'
+                }}
+              >
                 <div>
                   <label style={labelStyle}>Premium Amount</label>
-                  <MoneyInput value={editPremium} onChange={v => {
+                  <MoneyInput
+                    value={editPremium}
+                    onChange={(v) => {
                       const val = v || 0
                       setEditPremium(val)
-                      setEditInstalments(prev => recalcInstalments(val, editCommission, prev))
-                    }} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                      setEditInstalments((prev) => recalcInstalments(val, editCommission, prev))
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
+                  />
                 </div>
                 <div>
                   <label style={labelStyle}>Commission %</label>
-                  <MoneyInput value={editCommission} onChange={v => {
+                  <MoneyInput
+                    value={editCommission}
+                    onChange={(v) => {
                       const val = v || 0
                       setEditCommission(val)
-                      setEditInstalments(prev => recalcInstalments(editPremium, val, prev))
-                    }} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }} />
+                      setEditInstalments((prev) => recalcInstalments(editPremium, val, prev))
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
+                  />
                 </div>
                 <div>
                   <label style={labelStyle}>Bank</label>
                   <select
                     value={editBankId}
-                    onChange={e => setEditBankId(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                    onChange={(e) => setEditBankId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem'
+                    }}
                   >
                     <option value="">No bank selected</option>
-                    {banks.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
+                    {banks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1896,16 +2439,36 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
               {/* Instalments */}
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '10px'
+                  }}
+                >
                   <span style={{ ...labelStyle, marginBottom: 0 }}>Instalments</span>
                   <button
                     className="btn-secondary"
-                    style={{ padding: '3px 10px', fontSize: '0.72rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
                     onClick={addInstalment}
                   >
                     <Plus size={12} /> Add
                   </button>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      fontStyle: 'italic'
+                    }}
+                  >
                     Changing premium recalculates instalment amounts
                   </span>
                 </div>
@@ -1924,29 +2487,107 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     </thead>
                     <tbody>
                       {editInstalments.map((inst, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--table-border)', background: idx % 2 === 0 ? 'transparent' : isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+                        <tr
+                          key={idx}
+                          style={{
+                            borderBottom: '1px solid var(--table-border)',
+                            background:
+                              idx % 2 === 0
+                                ? 'transparent'
+                                : isLight
+                                  ? 'rgba(0,0,0,0.02)'
+                                  : 'rgba(255,255,255,0.02)'
+                          }}
+                        >
                           <td style={tdStyle}>{inst.instalmentNumber}</td>
                           <td style={tdStyle}>
                             <input
                               type="date"
                               value={inst.dueDate}
-                              onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, dueDate: e.target.value } : r))}
-                              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                              onChange={(e) =>
+                                setEditInstalments((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, dueDate: e.target.value } : r
+                                  )
+                                )
+                              }
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#fff' : '#23263a',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.82rem'
+                              }}
                             />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <MoneyInput value={inst.premiumAmount} onChange={val => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, premiumAmount: val || 0 } : r))} style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }} />
+                            <MoneyInput
+                              value={inst.premiumAmount}
+                              onChange={(val) =>
+                                setEditInstalments((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, premiumAmount: val || 0 } : r
+                                  )
+                                )
+                              }
+                              style={{
+                                width: '120px',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#fff' : '#23263a',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.82rem',
+                                textAlign: 'right'
+                              }}
+                            />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <MoneyInput value={inst.commissionAmount} onChange={val => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, commissionAmount: val || 0 } : r))} style={{ width: '120px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textAlign: 'right' }} />
+                            <MoneyInput
+                              value={inst.commissionAmount}
+                              onChange={(val) =>
+                                setEditInstalments((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, commissionAmount: val || 0 } : r
+                                  )
+                                )
+                              }
+                              style={{
+                                width: '120px',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#fff' : '#23263a',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.82rem',
+                                textAlign: 'right'
+                              }}
+                            />
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            <input type="checkbox" checked={inst.isNonRefundable} onChange={e => setEditInstalments(prev => prev.map((r, i) => i === idx ? { ...r, isNonRefundable: e.target.checked } : r))} />
+                            <input
+                              type="checkbox"
+                              checked={inst.isNonRefundable}
+                              onChange={(e) =>
+                                setEditInstalments((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, isNonRefundable: e.target.checked } : r
+                                  )
+                                )
+                              }
+                            />
                           </td>
                           <td style={tdStyle}>
                             <button
                               onClick={() => removeInstalment(idx)}
-                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--danger)',
+                                padding: '2px'
+                              }}
                               title="Remove instalment"
                             >
                               <X size={14} />
@@ -1967,42 +2608,77 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               <div style={cardHeaderStyle}>
                 <Shield size={18} style={{ color: 'var(--accent-primary)' }} />
                 <span style={cardTitleStyle}>Coverage</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginLeft: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    fontStyle: 'italic',
+                    marginLeft: '8px'
+                  }}
+                >
                   Read-only — sourced from linked quotation
                 </span>
                 {onNavigateToQuotation && policy.quotationId && (
                   <button
                     className="btn-secondary"
-                    style={{ marginLeft: 'auto', padding: '5px 14px', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}
+                    style={{
+                      marginLeft: 'auto',
+                      padding: '5px 14px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
                     onClick={async () => {
                       try {
                         // Auto-create quotation revision and navigate to it
-                        const newRevision = await window.api.createQuotationRevision(policy.quotationId)
+                        const newRevision = await window.api.createQuotationRevision(
+                          policy.quotationId
+                        )
                         if (newRevision && !(newRevision as any).error) {
-                          const revId = typeof newRevision === 'string' ? newRevision : (newRevision.id || policy.quotationId)
+                          const revId =
+                            typeof newRevision === 'string'
+                              ? newRevision
+                              : newRevision.id || policy.quotationId
                           // Find the new alternative ID that corresponds to the selected one
                           let newSelectedAltId: string | null = null
                           if (policy.selectedAlternativeId) {
                             // Get old alternatives to find the hull_clause_id of the selected one
-                            const oldAlts = await window.api.hullGetQuotationAlternatives(policy.quotationId)
-                            const selectedOldAlt = Array.isArray(oldAlts) ? oldAlts.find((a: any) => a.id === policy.selectedAlternativeId) : null
+                            const oldAlts = await window.api.hullGetQuotationAlternatives(
+                              policy.quotationId
+                            )
+                            const selectedOldAlt = Array.isArray(oldAlts)
+                              ? oldAlts.find((a: any) => a.id === policy.selectedAlternativeId)
+                              : null
                             if (selectedOldAlt) {
                               // Get new alternatives and match by hull_clause_id
                               const newAlts = await window.api.hullGetQuotationAlternatives(revId)
-                              const matchingNewAlt = Array.isArray(newAlts) ? newAlts.find((a: any) => a.hullClauseId === selectedOldAlt.hullClauseId) : null
+                              const matchingNewAlt = Array.isArray(newAlts)
+                                ? newAlts.find(
+                                    (a: any) => a.hullClauseId === selectedOldAlt.hullClauseId
+                                  )
+                                : null
                               if (matchingNewAlt) {
                                 newSelectedAltId = matchingNewAlt.id
                                 // Strip the non-selected alternative using the NEW ID
-                                await window.api.stripNonSelectedAlternative(revId, matchingNewAlt.id)
+                                await window.api.stripNonSelectedAlternative(
+                                  revId,
+                                  matchingNewAlt.id
+                                )
                               }
                             }
                           }
                           // Update the policy to reference the new quotation revision + new alt ID
                           const updateFields: Record<string, any> = { quotationId: revId }
-                          if (newSelectedAltId) updateFields.selectedAlternativeId = newSelectedAltId
+                          if (newSelectedAltId)
+                            updateFields.selectedAlternativeId = newSelectedAltId
                           ok(await window.api.policyUpdate(policy.id, updateFields))
                           showSuccess('Quotation revision created. Navigating to editor...')
-                          onNavigateToQuotation(revId, { policyId: policy.id, policyNumber: policy.policyNumber || '' })
+                          onNavigateToQuotation(revId, {
+                            policyId: policy.id,
+                            policyNumber: policy.policyNumber || ''
+                          })
                         } else {
                           showError('Failed to create quotation revision')
                         }
@@ -2017,37 +2693,101 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
 
               {coverageLoading ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <Loader2 size={20} className="spinner" style={{ marginBottom: '8px' }} /> Loading coverage data...
+                <div
+                  style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                >
+                  <Loader2 size={20} className="spinner" style={{ marginBottom: '8px' }} /> Loading
+                  coverage data...
                 </div>
               ) : !quotationData ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                <div
+                  style={{
+                    padding: '24px',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}
+                >
                   No linked quotation data available
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {/* Warranties */}
                   {(coverageWarranties.length > 0 || coverageCustomWarranties.length > 0) && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.warranties ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, warranties: !prev.warranties }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.warranties ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({ ...prev, warranties: !prev.warranties }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.warranties ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.warranties ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Warranties</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageWarranties.length + coverageCustomWarranties.length}
                         </span>
                       </div>
                       {coverageExpanded.warranties && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageWarranties.map((w: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
                               {w.text || w.name || `Warranty ${i + 1}`}
                             </div>
                           ))}
                           {coverageCustomWarranties.map((cw: any, i: number) => (
-                            <div key={`cw-${i}`} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)', fontStyle: 'italic' }}>
+                            <div
+                              key={`cw-${i}`}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)',
+                                fontStyle: 'italic'
+                              }}
+                            >
                               {cw.text || `Custom Warranty ${i + 1}`}
                             </div>
                           ))}
@@ -2058,21 +2798,69 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Deductibles */}
                   {coverageDeductibles.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.deductibles ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, deductibles: !prev.deductibles }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.deductibles ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({
+                            ...prev,
+                            deductibles: !prev.deductibles
+                          }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.deductibles ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.deductibles ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Deductibles</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageDeductibles.length}
                         </span>
                       </div>
                       {coverageExpanded.deductibles && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageDeductibles.map((d: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
                               {d.text || d.name || `Deductible ${i + 1}`}
                             </div>
                           ))}
@@ -2083,21 +2871,66 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Exclusions */}
                   {coverageExclusions.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.exclusions ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, exclusions: !prev.exclusions }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.exclusions ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({ ...prev, exclusions: !prev.exclusions }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.exclusions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.exclusions ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Exclusions</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageExclusions.length}
                         </span>
                       </div>
                       {coverageExpanded.exclusions && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageExclusions.map((ex: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
                               {ex.text || ex.name || `Exclusion ${i + 1}`}
                             </div>
                           ))}
@@ -2108,21 +2941,68 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Clauses */}
                   {coverageClauses.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.clauses ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, clauses: !prev.clauses }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.clauses ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({ ...prev, clauses: !prev.clauses }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.clauses ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
-                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Conditions / Clauses</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.clauses ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                          Conditions / Clauses
+                        </span>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageClauses.length}
                         </span>
                       </div>
                       {coverageExpanded.clauses && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageClauses.map((c: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
                               {c.text || c.name || c.code || `Clause ${i + 1}`}
                             </div>
                           ))}
@@ -2133,21 +3013,69 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Subjectivities */}
                   {coverageSubjectivities.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.subjectivities ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, subjectivities: !prev.subjectivities }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.subjectivities ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({
+                            ...prev,
+                            subjectivities: !prev.subjectivities
+                          }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.subjectivities ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.subjectivities ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Subjectivities</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageSubjectivities.length}
                         </span>
                       </div>
                       {coverageExpanded.subjectivities && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageSubjectivities.map((s: any, i: number) => (
-                            <div key={i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
                               {s.text || s.name || `Subjectivity ${i + 1}`}
                             </div>
                           ))}
@@ -2158,25 +3086,98 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* LOL Alternatives */}
                   {coverageLolOptions.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.lolOptions ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, lolOptions: !prev.lolOptions }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.lolOptions ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({ ...prev, lolOptions: !prev.lolOptions }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.lolOptions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
-                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>LOL Alternatives</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.lolOptions ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                          LOL Alternatives
+                        </span>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageLolOptions.length}
                         </span>
                       </div>
                       {coverageExpanded.lolOptions && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}
+                        >
                           {coverageLolOptions.map((opt: any, i: number) => (
-                            <div key={opt.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 600 }}>{opt.label || `Alternative ${i + 1}`}</span>
-                              <span>{opt.currency || 'USD'} {Number(opt.amount || 0).toLocaleString()}</span>
-                              {opt.premiumAmount != null && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Premium: {Number(opt.premiumAmount).toLocaleString()}</span>}
-                              {policy.selectedLolOptionId === opt.id && <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: isLight ? '#166534' : '#86efac', fontWeight: 600 }}>Selected</span>}
+                            <div
+                              key={opt.id || i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)',
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'center'
+                              }}
+                            >
+                              <span style={{ fontWeight: 600 }}>
+                                {opt.label || `Alternative ${i + 1}`}
+                              </span>
+                              <span>
+                                {opt.currency || 'USD'} {Number(opt.amount || 0).toLocaleString()}
+                              </span>
+                              {opt.premiumAmount != null && (
+                                <span
+                                  style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+                                >
+                                  Premium: {Number(opt.premiumAmount).toLocaleString()}
+                                </span>
+                              )}
+                              {policy.selectedLolOptionId === opt.id && (
+                                <span
+                                  style={{
+                                    fontSize: '0.65rem',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(34,197,94,0.15)',
+                                    color: isLight ? '#166534' : '#86efac',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  Selected
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2186,23 +3187,87 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* Custom Sections */}
                   {coverageCustomSections.length > 0 && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border-color)' }}>
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: coverageExpanded.customSections ? '10px' : 0 }}
-                        onClick={() => setCoverageExpanded(prev => ({ ...prev, customSections: !prev.customSections }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          marginBottom: coverageExpanded.customSections ? '10px' : 0
+                        }}
+                        onClick={() =>
+                          setCoverageExpanded((prev) => ({
+                            ...prev,
+                            customSections: !prev.customSections
+                          }))
+                        }
                       >
-                        <ChevronRight size={16} style={{ transform: coverageExpanded.customSections ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
-                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Custom Sections</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            transform: coverageExpanded.customSections ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                          Custom Sections
+                        </span>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
                           {coverageCustomSections.length}
                         </span>
                       </div>
                       {coverageExpanded.customSections && (
-                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div
+                          style={{
+                            paddingLeft: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}
+                        >
                           {coverageCustomSections.map((cs: any, i: number) => (
-                            <div key={cs.id || i} style={{ fontSize: '0.82rem', color: 'var(--text-primary)', padding: '4px 0', borderBottom: '1px solid var(--glass-border-color)' }}>
-                              {cs.title && <div style={{ fontWeight: 600, marginBottom: '2px' }}>{cs.title}</div>}
-                              {cs.text && <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{cs.text}</div>}
+                            <div
+                              key={cs.id || i}
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-primary)',
+                                padding: '4px 0',
+                                borderBottom: '1px solid var(--glass-border-color)'
+                              }}
+                            >
+                              {cs.title && (
+                                <div style={{ fontWeight: 600, marginBottom: '2px' }}>
+                                  {cs.title}
+                                </div>
+                              )}
+                              {cs.text && (
+                                <div
+                                  style={{
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.78rem',
+                                    whiteSpace: 'pre-wrap'
+                                  }}
+                                >
+                                  {cs.text}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2212,40 +3277,86 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                   {/* War Excess Info */}
                   {quotationData?.warExcessEnabled && (
-                    <div style={{ padding: '12px 16px', borderRadius: '8px', background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)', border: '1px solid var(--glass-border-color)' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '8px' }}>War P&I Excess</div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {quotationData.warSection1Text && <div>Section 1: {quotationData.warSection1Text}</div>}
-                        {quotationData.warSection2Text && <div>Section 2: {quotationData.warSection2Text}</div>}
-                        {quotationData.warCombinedLimitText && <div style={{ marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{quotationData.warCombinedLimitText}</div>}
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(255,176,32,0.06)' : 'rgba(255,176,32,0.08)',
+                        border: '1px solid var(--glass-border-color)'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '8px' }}>
+                        War P&I Excess
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.82rem',
+                          color: 'var(--text-primary)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}
+                      >
+                        {quotationData.warSection1Text && (
+                          <div>Section 1: {quotationData.warSection1Text}</div>
+                        )}
+                        {quotationData.warSection2Text && (
+                          <div>Section 2: {quotationData.warSection2Text}</div>
+                        )}
+                        {quotationData.warCombinedLimitText && (
+                          <div
+                            style={{
+                              marginTop: '4px',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.78rem'
+                            }}
+                          >
+                            {quotationData.warCombinedLimitText}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {coverageWarranties.length === 0 && coverageCustomWarranties.length === 0 && coverageDeductibles.length === 0 && coverageExclusions.length === 0 && coverageClauses.length === 0 && coverageSubjectivities.length === 0 && coverageCustomSections.length === 0 && (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      No coverage items found in the linked quotation
-                    </div>
-                  )}
+                  {coverageWarranties.length === 0 &&
+                    coverageCustomWarranties.length === 0 &&
+                    coverageDeductibles.length === 0 &&
+                    coverageExclusions.length === 0 &&
+                    coverageClauses.length === 0 &&
+                    coverageSubjectivities.length === 0 &&
+                    coverageCustomSections.length === 0 && (
+                      <div
+                        style={{
+                          padding: '24px',
+                          textAlign: 'center',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        No coverage items found in the linked quotation
+                      </div>
+                    )}
                 </div>
               )}
             </div>
           )}
 
           {/* Sticky save/cancel footer */}
-          <div style={{
-            position: 'sticky',
-            bottom: 0,
-            padding: '14px 20px',
-            marginTop: '16px',
-            background: isLight ? '#ffffff' : '#1a1d28',
-            border: '1px solid var(--glass-border-color)',
-            borderRadius: '12px',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '10px',
-            zIndex: 10
-          }}>
+          <div
+            style={{
+              position: 'sticky',
+              bottom: 0,
+              padding: '14px 20px',
+              marginTop: '16px',
+              background: isLight ? '#ffffff' : '#1a1d28',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '12px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              zIndex: 10
+            }}
+          >
             <button
               className="btn-secondary"
               style={{ padding: '8px 20px', fontSize: '0.85rem' }}
@@ -2256,7 +3367,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             </button>
             <button
               className="btn-primary"
-              style={{ padding: '8px 24px', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                padding: '8px 24px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
               onClick={handleSavePolicy}
               disabled={saving}
             >
@@ -2270,1255 +3388,1415 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       {/* ─── READ-ONLY VIEW ─── */}
       {!isEditing && (
         <>
-      {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        {/* Overview Card */}
-        <div style={cardStyle}>
-          <div style={cardHeaderStyle}>
-            <Ship size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span style={cardTitleStyle}>Overview</span>
-          </div>
+          {/* Two-column layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Overview Card */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Ship size={18} style={{ color: 'var(--accent-primary)' }} />
+                <span style={cardTitleStyle}>Overview</span>
+              </div>
 
-          {/* Vessel */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={labelStyle}>Vessel</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={valueStyle}>{policy.vesselName || '-'}</span>
-              {policy.imoNumber && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  IMO {policy.imoNumber}
-                </span>
-              )}
-              {onNavigateToVessel && policy.vesselId && (
-                <button
-                  onClick={() => onNavigateToVessel(policy.vesselId)}
-                  className="btn-secondary"
-                  style={{
-                    padding: '3px 6px',
-                    fontSize: '0.72rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '3px'
-                  }}
-                  title="View vessel"
-                >
-                  <ExternalLink size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Vessel details grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              marginBottom: '16px'
-            }}
-          >
-            {policy.vesselType && (
-              <div>
-                <div style={labelStyle}>Type</div>
-                <div style={valueStyle}>{policy.vesselType}</div>
-              </div>
-            )}
-            {policy.flagStateName && (
-              <div>
-                <div style={labelStyle}>Flag</div>
-                <div style={valueStyle}>{policy.flagStateName}</div>
-              </div>
-            )}
-            {policy.builtYear && (
-              <div>
-                <div style={labelStyle}>Built</div>
-                <div style={valueStyle}>{policy.rebuiltYear ? `${policy.builtYear} / Rebuilt ${policy.rebuiltYear}` : policy.builtYear}</div>
-              </div>
-            )}
-            {policy.grossTonnage && (
-              <div>
-                <div style={labelStyle}>Gross Tonnage</div>
-                <div style={valueStyle}>{Number(policy.grossTonnage).toLocaleString()}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Customer */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={labelStyle}>Customer</div>
-            <div style={valueStyle}>
-              {policy.customerName || (
-                <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>-</span>
-              )}
-            </div>
-          </div>
-
-          {/* Period */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              marginBottom: '12px'
-            }}
-          >
-            <div>
-              <div style={labelStyle}>Inception</div>
-              <div style={valueStyle}>
-                {formatPeriod(policy.inceptionDate, policy.inceptionTime)}
-              </div>
-            </div>
-            <div>
-              <div style={labelStyle}>Expiry</div>
-              <div style={valueStyle}>
-                {formatPeriod(policy.expiryDate, policy.expiryTime)}
-              </div>
-            </div>
-          </div>
-
-          {policy.timezone && (
-            <div style={{ marginBottom: '12px' }}>
-              <div style={labelStyle}>Timezone</div>
-              <div style={valueStyle}>{policy.timezone}</div>
-            </div>
-          )}
-
-          {/* Source quotation */}
-          {policy.quotationId && (
-            <div>
-              <div style={labelStyle}>Source Quotation</div>
-              <div style={valueStyle}>
-                {onNavigateToQuotation ? (
-                  <span
-                    onClick={() => onNavigateToQuotation(policy.quotationId, { policyId: policy.id, policyNumber: policy.policyNumber })}
-                    style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
-                  >
-                    {policy.quotationReference || quotationData?.referenceNumber || policy.quotationId}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '0.85rem' }}>{policy.quotationReference || quotationData?.referenceNumber || policy.quotationId}</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Financial Card */}
-        <div style={cardStyle}>
-          <div style={cardHeaderStyle}>
-            <DollarSign size={18} style={{ color: '#00c864' }} />
-            <span style={cardTitleStyle}>Financial Details</span>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              marginBottom: '16px'
-            }}
-          >
-            <div>
-              <div style={labelStyle}>Premium</div>
-              <div style={{ ...valueStyle, fontWeight: 600 }}>
-                {formatAmount(policy.premiumAmount)}
-              </div>
-            </div>
-            {policy.perAnnumPremium != null && (
-              <div>
-                <div style={labelStyle}>Per Annum Premium</div>
-                <div style={{ ...valueStyle, fontWeight: 600 }}>
-                  {formatAmount(policy.perAnnumPremium)}
-                </div>
-              </div>
-            )}
-            {policy.commissionPercent != null && policy.commissionPercent > 0 && (
-              <div>
-                <div style={labelStyle}>Commission</div>
-                <div style={valueStyle}>
-                  {policy.commissionPercent}%
-                  {commissionAmount != null && (
-                    <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
-                      ({formatAmount(commissionAmount)})
+              {/* Vessel */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={labelStyle}>Vessel</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={valueStyle}>{policy.vesselName || '-'}</span>
+                  {policy.imoNumber && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      IMO {policy.imoNumber}
                     </span>
+                  )}
+                  {onNavigateToVessel && policy.vesselId && (
+                    <button
+                      onClick={() => onNavigateToVessel(policy.vesselId)}
+                      className="btn-secondary"
+                      style={{
+                        padding: '3px 6px',
+                        fontSize: '0.72rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}
+                      title="View vessel"
+                    >
+                      <ExternalLink size={12} />
+                    </button>
                   )}
                 </div>
               </div>
-            )}
-            {netPremium != null && (
-              <div>
-                <div style={labelStyle}>Net Premium</div>
-                <div style={{ ...valueStyle, fontWeight: 600, color: isLight ? '#047857' : '#34d399' }}>
-                  {formatAmount(netPremium)}
-                </div>
-              </div>
-            )}
-            {policy.bankName && (
-              <div>
-                <div style={labelStyle}>Bank</div>
-                <div style={valueStyle}>{policy.bankName}</div>
-              </div>
-            )}
-            {policy.proRata && (
-              <div>
-                <div style={labelStyle}>Pro Rata</div>
-                <div style={valueStyle}>Yes</div>
-              </div>
-            )}
-            {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
-              <div>
-                <div style={labelStyle}>Exchange Rate</div>
-                <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
-              </div>
-            )}
-          </div>
 
-          {/* Instalment table */}
-          {instalments.length > 0 && (
-            <div style={{ marginTop: '8px' }}>
-              <div style={{ ...labelStyle, marginBottom: '8px' }}>Instalments</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-                    <th style={thStyle}>#</th>
-                    <th style={thStyle}>Due Date</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Net</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {instalments.map((inst, idx) => (
-                    <tr
-                      key={inst.instalmentNumber}
-                      style={{
-                        borderBottom: '1px solid var(--table-border)',
-                        background:
-                          idx % 2 === 0
-                            ? 'transparent'
-                            : isLight
-                              ? 'rgba(0,0,0,0.02)'
-                              : 'rgba(255,255,255,0.02)'
-                      }}
-                    >
-                      <td style={tdStyle}>{inst.instalmentNumber}</td>
-                      <td style={tdStyle}>
-                        {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 500 }}>
-                        {formatAmount(inst.premiumAmount)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        {formatAmount(inst.commissionAmount)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', color: isLight ? '#047857' : '#34d399' }}>
-                        {formatAmount((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        {inst.isNonRefundable ? (
-                          <span
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontSize: '0.68rem',
-                              fontWeight: 600,
-                              background: 'rgba(255, 176, 32, 0.15)',
-                              color: '#ffb020'
-                            }}
-                          >
-                            NR
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {policy.premiumAmount == null && instalments.length === 0 && (
-            <div
-              style={{
-                padding: '24px',
-                textAlign: 'center',
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem'
-              }}
-            >
-              No financial data recorded
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Addresses Card */}
-      {addresses.length > 0 && (
-        <div style={cardStyle}>
-          <div style={cardHeaderStyle}>
-            <Users size={18} style={{ color: '#6464ff' }} />
-            <span style={cardTitleStyle}>Addresses</span>
-            <span
-              style={{
-                marginLeft: 'auto',
-                padding: '2px 10px',
-                borderRadius: '10px',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                background: 'rgba(100, 100, 255, 0.12)',
-                color: isLight ? '#4a4adf' : '#6464ff'
-              }}
-            >
-              {addresses.length}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {addresses.map((addr, idx) => (
+              {/* Vessel details grid */}
               <div
-                key={`${addr.entityId}-${idx}`}
                 style={{
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--glass-border-color)'
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '16px'
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '6px'
-                  }}
-                >
-                  <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                    {addr.entityName}
-                  </span>
-                  {addr.role && (
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.68rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      {addr.role}
-                    </span>
-                  )}
-                </div>
-                {addr.addressText && (
-                  <div
-                    style={{
-                      fontSize: '0.82rem',
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'pre-wrap',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '6px'
-                    }}
-                  >
-                    <MapPin size={13} style={{ marginTop: '2px', flexShrink: 0 }} />
-                    {addr.addressText}
+                {policy.vesselType && (
+                  <div>
+                    <div style={labelStyle}>Type</div>
+                    <div style={valueStyle}>{policy.vesselType}</div>
+                  </div>
+                )}
+                {policy.flagStateName && (
+                  <div>
+                    <div style={labelStyle}>Flag</div>
+                    <div style={valueStyle}>{policy.flagStateName}</div>
+                  </div>
+                )}
+                {policy.builtYear && (
+                  <div>
+                    <div style={labelStyle}>Built</div>
+                    <div style={valueStyle}>
+                      {policy.rebuiltYear
+                        ? `${policy.builtYear} / Rebuilt ${policy.rebuiltYear}`
+                        : policy.builtYear}
+                    </div>
+                  </div>
+                )}
+                {policy.grossTonnage && (
+                  <div>
+                    <div style={labelStyle}>Gross Tonnage</div>
+                    <div style={valueStyle}>{Number(policy.grossTonnage).toLocaleString()}</div>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Blue Cards Section */}
-      {isPIType && (
-        <div style={cardStyle}>
-          <div style={cardHeaderStyle}>
-            <CreditCard size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span style={cardTitleStyle}>Blue Cards</span>
-            {blueCards.length > 0 && (
-              <span
+              {/* Customer */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={labelStyle}>Customer</div>
+                <div style={valueStyle}>
+                  {policy.customerName || (
+                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>-</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Period */}
+              <div
                 style={{
-                  padding: '2px 10px',
-                  borderRadius: '10px',
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                  color: 'var(--accent-primary)'
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '12px'
                 }}
               >
-                {blueCards.length}
-              </span>
-            )}
-            <button
-              className="btn-primary"
-              style={{
-                marginLeft: 'auto',
-                padding: '5px 12px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-              onClick={() => openIssueModal()}
-                disabled={!hasPermission('policies:manage')}
-                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
-            >
-              <Plus size={14} /> Issue New
-            </button>
-          </div>
+                <div>
+                  <div style={labelStyle}>Inception</div>
+                  <div style={valueStyle}>
+                    {formatPeriod(policy.inceptionDate, policy.inceptionTime)}
+                  </div>
+                </div>
+                <div>
+                  <div style={labelStyle}>Expiry</div>
+                  <div style={valueStyle}>{formatPeriod(policy.expiryDate, policy.expiryTime)}</div>
+                </div>
+              </div>
 
-          {/* Card type groups */}
-          {CARD_TYPES.map((ct) => {
-            const cards = blueCardsByType[ct] || []
-            return (
-              <div key={ct} style={{ marginBottom: '16px' }}>
-                {/* Type header */}
+              {policy.timezone && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={labelStyle}>Timezone</div>
+                  <div style={valueStyle}>{policy.timezone}</div>
+                </div>
+              )}
+
+              {/* Source quotation */}
+              {policy.quotationId && (
+                <div>
+                  <div style={labelStyle}>Source Quotation</div>
+                  <div style={valueStyle}>
+                    {onNavigateToQuotation ? (
+                      <span
+                        onClick={() =>
+                          onNavigateToQuotation(policy.quotationId, {
+                            policyId: policy.id,
+                            policyNumber: policy.policyNumber
+                          })
+                        }
+                        style={{
+                          color: 'var(--accent)',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        {policy.quotationReference ||
+                          quotationData?.referenceNumber ||
+                          policy.quotationId}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.85rem' }}>
+                        {policy.quotationReference ||
+                          quotationData?.referenceNumber ||
+                          policy.quotationId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Financial Card */}
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <DollarSign size={18} style={{ color: '#00c864' }} />
+                <span style={cardTitleStyle}>Financial Details</span>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '16px'
+                }}
+              >
+                <div>
+                  <div style={labelStyle}>Premium</div>
+                  <div style={{ ...valueStyle, fontWeight: 600 }}>
+                    {formatAmount(policy.premiumAmount)}
+                  </div>
+                </div>
+                {policy.perAnnumPremium != null && (
+                  <div>
+                    <div style={labelStyle}>Per Annum Premium</div>
+                    <div style={{ ...valueStyle, fontWeight: 600 }}>
+                      {formatAmount(policy.perAnnumPremium)}
+                    </div>
+                  </div>
+                )}
+                {policy.commissionPercent != null && policy.commissionPercent > 0 && (
+                  <div>
+                    <div style={labelStyle}>Commission</div>
+                    <div style={valueStyle}>
+                      {policy.commissionPercent}%
+                      {commissionAmount != null && (
+                        <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>
+                          ({formatAmount(commissionAmount)})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {netPremium != null && (
+                  <div>
+                    <div style={labelStyle}>Net Premium</div>
+                    <div
+                      style={{
+                        ...valueStyle,
+                        fontWeight: 600,
+                        color: isLight ? '#047857' : '#34d399'
+                      }}
+                    >
+                      {formatAmount(netPremium)}
+                    </div>
+                  </div>
+                )}
+                {policy.bankName && (
+                  <div>
+                    <div style={labelStyle}>Bank</div>
+                    <div style={valueStyle}>{policy.bankName}</div>
+                  </div>
+                )}
+                {policy.proRata && (
+                  <div>
+                    <div style={labelStyle}>Pro Rata</div>
+                    <div style={valueStyle}>Yes</div>
+                  </div>
+                )}
+                {policy.exchangeRate != null && policy.exchangeRate !== 1 && (
+                  <div>
+                    <div style={labelStyle}>Exchange Rate</div>
+                    <div style={valueStyle}>{policy.exchangeRate.toFixed(6)}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Instalment table */}
+              {instalments.length > 0 && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ ...labelStyle, marginBottom: '8px' }}>Instalments</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
+                        <th style={thStyle}>#</th>
+                        <th style={thStyle}>Due Date</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Commission</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Net</th>
+                        <th style={{ ...thStyle, textAlign: 'center' }}>NR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {instalments.map((inst, idx) => (
+                        <tr
+                          key={inst.instalmentNumber}
+                          style={{
+                            borderBottom: '1px solid var(--table-border)',
+                            background:
+                              idx % 2 === 0
+                                ? 'transparent'
+                                : isLight
+                                  ? 'rgba(0,0,0,0.02)'
+                                  : 'rgba(255,255,255,0.02)'
+                          }}
+                        >
+                          <td style={tdStyle}>{inst.instalmentNumber}</td>
+                          <td style={tdStyle}>
+                            {inst.dueDate ? formatDateShort(inst.dueDate) : '-'}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 500 }}>
+                            {formatAmount(inst.premiumAmount)}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            {formatAmount(inst.commissionAmount)}
+                          </td>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              textAlign: 'right',
+                              color: isLight ? '#047857' : '#34d399'
+                            }}
+                          >
+                            {formatAmount((inst.premiumAmount || 0) - (inst.commissionAmount || 0))}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'center' }}>
+                            {inst.isNonRefundable ? (
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                  background: 'rgba(255, 176, 32, 0.15)',
+                                  color: '#ffb020'
+                                }}
+                              >
+                                NR
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {policy.premiumAmount == null && instalments.length === 0 && (
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '8px',
-                    padding: '6px 0'
+                    padding: '24px',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
                   }}
                 >
-                  <span
+                  No financial data recorded
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Addresses Card */}
+          {addresses.length > 0 && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <Users size={18} style={{ color: '#6464ff' }} />
+                <span style={cardTitleStyle}>Addresses</span>
+                <span
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '2px 10px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    background: 'rgba(100, 100, 255, 0.12)',
+                    color: isLight ? '#4a4adf' : '#6464ff'
+                  }}
+                >
+                  {addresses.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {addresses.map((addr, idx) => (
+                  <div
+                    key={`${addr.entityId}-${idx}`}
                     style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--accent-primary)',
-                      flexShrink: 0
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)'
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--glass-border-color)'
                     }}
                   >
-                    {ct}
-                  </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '6px'
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                        {addr.entityName}
+                      </span>
+                      {addr.role && (
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          {addr.role}
+                        </span>
+                      )}
+                    </div>
+                    {addr.addressText && (
+                      <div
+                        style={{
+                          fontSize: '0.82rem',
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'pre-wrap',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '6px'
+                        }}
+                      >
+                        <MapPin size={13} style={{ marginTop: '2px', flexShrink: 0 }} />
+                        {addr.addressText}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Blue Cards Section */}
+          {isPIType && (
+            <div style={cardStyle}>
+              <div style={cardHeaderStyle}>
+                <CreditCard size={18} style={{ color: 'var(--accent-primary)' }} />
+                <span style={cardTitleStyle}>Blue Cards</span>
+                {blueCards.length > 0 && (
                   <span
                     style={{
-                      fontSize: '0.78rem',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 400
+                      padding: '2px 10px',
+                      borderRadius: '10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                      color: 'var(--accent-primary)'
                     }}
                   >
-                    {CARD_TYPE_LABELS[ct] || ''}
+                    {blueCards.length}
                   </span>
-                  {cards.length === 0 && (
-                    <>
+                )}
+                <button
+                  className="btn-primary"
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '5px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  onClick={() => openIssueModal()}
+                  disabled={!hasPermission('policies:manage')}
+                  title={
+                    hasPermission('policies:manage')
+                      ? undefined
+                      : 'Requires the Manage Policies permission'
+                  }
+                >
+                  <Plus size={14} /> Issue New
+                </button>
+              </div>
+
+              {/* Card type groups */}
+              {CARD_TYPES.map((ct) => {
+                const cards = blueCardsByType[ct] || []
+                return (
+                  <div key={ct} style={{ marginBottom: '16px' }}>
+                    {/* Type header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '8px',
+                        padding: '6px 0'
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: 'var(--accent-primary)',
+                          flexShrink: 0
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        {ct}
+                      </span>
                       <span
                         style={{
                           fontSize: '0.78rem',
                           color: 'var(--text-secondary)',
-                          fontStyle: 'italic',
-                          marginLeft: '8px'
+                          fontWeight: 400
                         }}
                       >
-                        No cards issued
+                        {CARD_TYPE_LABELS[ct] || ''}
                       </span>
-                      <button
-                        className="btn-secondary"
-                        style={{
-                          padding: '3px 10px',
-                          fontSize: '0.72rem',
-                          marginLeft: '4px'
-                        }}
-                        onClick={() => openIssueModal(ct)}
-                disabled={!hasPermission('policies:manage')}
-                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
-                      >
-                        Issue
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Cards for this type */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '16px' }}>
-                  {cards.map((card) => {
-                    const isActive = card.status === 'active'
-                    const isSuperseded = card.status === 'superseded'
-                    return (
-                      <div
-                        key={card.id}
-                        style={{
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          background: isSuperseded
-                            ? isLight
-                              ? 'rgba(0,0,0,0.03)'
-                              : 'rgba(255,255,255,0.02)'
-                            : isLight
-                              ? 'rgba(var(--accent-primary-rgb), 0.04)'
-                              : 'rgba(var(--accent-primary-rgb), 0.06)',
-                          border: `1px solid ${
-                            isSuperseded
-                              ? 'var(--glass-border)'
-                              : isLight
-                                ? 'rgba(var(--accent-primary-rgb), 0.2)'
-                                : 'rgba(var(--accent-primary-rgb), 0.15)'
-                          }`,
-                          opacity: isSuperseded ? 0.65 : 1
-                        }}
-                      >
-                        {/* Card header row */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            marginBottom: '6px'
-                          }}
-                        >
+                      {cards.length === 0 && (
+                        <>
                           <span
                             style={{
-                              fontWeight: 600,
-                              fontSize: '0.88rem',
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {card.cardNumber || '-'}
-                          </span>
-                          {/* Status badge */}
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.68rem',
-                              fontWeight: 600,
-                              textTransform: 'uppercase',
-                              background: isActive
-                                ? 'rgba(0, 200, 100, 0.15)'
-                                : 'rgba(150, 150, 150, 0.15)',
-                              color: isActive ? '#00c864' : '#999'
-                            }}
-                          >
-                            {card.status}
-                          </span>
-                          {isActive && (
-                            <Check
-                              size={14}
-                              style={{ color: '#00c864' }}
-                            />
-                          )}
-                          {card.revisionNumber > 0 && (
-                            <span
-                              style={{
-                                fontSize: '0.68rem',
-                                color: 'var(--text-secondary)',
-                                fontWeight: 500
-                              }}
-                            >
-                              Rev. {card.revisionNumber}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Period */}
-                        <div
-                          style={{
-                            fontSize: '0.8rem',
-                            color: 'var(--text-secondary)',
-                            marginBottom: '4px'
-                          }}
-                        >
-                          Period:{' '}
-                          {card.inceptionDate ? formatDateShort(card.inceptionDate) : '?'}{' '}
-                          {'\u2192'}{' '}
-                          {card.expiryDate ? formatDateShort(card.expiryDate) : '?'}
-                          {card.issuedDate && (
-                            <span style={{ marginLeft: '12px' }}>
-                              Issued: {formatDateShort(card.issuedDate)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Owner */}
-                        {card.ownerName && (
-                          <div
-                            style={{
-                              fontSize: '0.8rem',
+                              fontSize: '0.78rem',
                               color: 'var(--text-secondary)',
-                              marginBottom: '2px'
-                            }}
-                          >
-                            Owner: {card.ownerName}
-                          </div>
-                        )}
-
-                        {/* Port */}
-                        {card.portOfRegistry && (
-                          <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--text-secondary)',
-                              marginBottom: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <MapPin size={12} />
-                            Port: {card.portOfRegistry}
-                          </div>
-                        )}
-
-                        {/* Cancel & Replace text */}
-                        {card.cancelReplaceText && (
-                          <div
-                            style={{
-                              fontSize: '0.75rem',
-                              color: isLight ? '#b07a10' : '#ffb020',
                               fontStyle: 'italic',
-                              marginTop: '4px'
+                              marginLeft: '8px'
                             }}
                           >
-                            {card.cancelReplaceText}
-                          </div>
-                        )}
-
-                        {/* Action buttons */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '6px',
-                            marginTop: '8px'
-                          }}
-                        >
+                            No cards issued
+                          </span>
                           <button
                             className="btn-secondary"
                             style={{
                               padding: '3px 10px',
                               fontSize: '0.72rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                              marginLeft: '4px'
                             }}
-                            onClick={() => handleExportSingleBC(card)}
+                            onClick={() => openIssueModal(ct)}
+                            disabled={!hasPermission('policies:manage')}
+                            title={
+                              hasPermission('policies:manage')
+                                ? undefined
+                                : 'Requires the Manage Policies permission'
+                            }
                           >
-                            <Download size={12} /> Export
+                            Issue
                           </button>
-                          {isActive && (
-                            <>
-                              <button
-                                className="btn-secondary"
-                                style={{
-                                  padding: '3px 10px',
-                                  fontSize: '0.72rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                onClick={() => openReissueModal(card)}
-                disabled={!hasPermission('policies:manage')}
-                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
-                              >
-                                <RefreshCw size={12} /> Reissue
-                              </button>
-                              <button
-                                className="btn-secondary"
-                                style={{
-                                  padding: '3px 10px',
-                                  fontSize: '0.72rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                onClick={() => openEditModal(card)}
-                disabled={!hasPermission('policies:manage')}
-                title={hasPermission('policies:manage') ? undefined : 'Requires the Manage Policies permission'}
-                              >
-                                <Edit3 size={12} /> Edit
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                        </>
+                      )}
+                    </div>
 
-      {/* Blue Card Issue/Reissue/Edit Modal */}
-      {bcModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setBcModalOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '560px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              border: '1px solid var(--glass-border-color)'
-            }}
-          >
-            {/* Modal header */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: '1.1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <CreditCard size={20} style={{ color: 'var(--accent-primary)' }} />
-                {bcModalMode === 'edit'
-                  ? 'Edit Blue Card'
-                  : bcModalMode === 'reissue'
-                    ? 'Reissue Blue Card'
-                    : 'Issue New Blue Card'}
-              </h3>
-              <button title="Close" aria-label="Close"
-                onClick={() => setBcModalOpen(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Card Type */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={labelStyle}>Card Type</label>
-              {bcModalMode === 'edit' || bcPreselectedType ? (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    background: 'rgba(var(--accent-primary-rgb), 0.08)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: 'var(--accent-primary)'
-                  }}
-                >
-                  {bcForm.cardType} — {CARD_TYPE_LABELS[bcForm.cardType]}
-                </div>
-              ) : (
-                <select
-                  value={bcForm.cardType}
-                  onChange={(e) => handleCardTypeChange(e.target.value as CardType)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  {CARD_TYPES.map((ct) => (
-                    <option key={ct} value={ct}>
-                      {ct} — {CARD_TYPE_LABELS[ct]}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div
-                style={{
-                  fontSize: '0.72rem',
-                  color: 'var(--text-secondary)',
-                  marginTop: '4px',
-                  fontStyle: 'italic'
-                }}
-              >
-                {CARD_TYPE_FULL_NAMES[bcForm.cardType]}
-              </div>
-            </div>
-
-            {/* Period */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
-                marginBottom: '14px'
-              }}
-            >
-              <div>
-                <label style={labelStyle}>Inception Date</label>
-                <input
-                  type="date"
-                  value={bcForm.inceptionDate}
-                  onChange={(e) => updateBcDate('inceptionDate', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Expiry Date</label>
-                <input
-                  type="date"
-                  value={bcForm.expiryDate}
-                  onChange={(e) => updateBcDate('expiryDate', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Owner */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={labelStyle}>Owner</label>
-              <select
-                value={bcForm.ownerEntityId || '__custom__'}
-                onChange={(e) => handleOwnerChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: isLight ? '#fff' : '#23263a',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  marginBottom: '8px'
-                }}
-              >
-                {ownerOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.name}
-                  </option>
-                ))}
-                <option value="__custom__">Custom...</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Owner name"
-                value={bcForm.ownerName}
-                onChange={(e) =>
-                  setBcForm((f) => ({ ...f, ownerName: e.target.value }))
-                }
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: isLight ? '#fff' : '#23263a',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  marginBottom: '8px'
-                }}
-              />
-              <textarea
-                placeholder="Owner address"
-                value={bcForm.ownerAddress}
-                onChange={(e) =>
-                  setBcForm((f) => ({ ...f, ownerAddress: e.target.value }))
-                }
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--input-border)',
-                  background: isLight ? '#fff' : '#23263a',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.85rem',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            {/* Port of Registry */}
-            <div style={{ marginBottom: '14px' }}>
-              <label style={labelStyle}>Port of Registry</label>
-              {flagPorts.length > 1 ? (
-                <select
-                  value={bcForm.portOfRegistry}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  <option value="">Select port...</option>
-                  {flagPorts.map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name}
-                      {p.isDefault ? ' (default)' : ''}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  placeholder={
-                    flagPorts.length === 1
-                      ? flagPorts[0].name
-                      : 'Enter port of registry...'
-                  }
-                  value={bcForm.portOfRegistry}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem'
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Addressed To (BBC/WRC only) */}
-            {needsAddressedTo(bcForm.cardType) && (
-              <div
-                style={{
-                  marginBottom: '14px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--glass-border-color)'
-                }}
-              >
-                <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>
-                  Addressed To (Flag State Authority)
-                </label>
-
-                {/* Ratification warning */}
-                {vesselFlagState &&
-                  ((bcForm.cardType === 'BBC' && !vesselFlagState.ratifiedBunker) ||
-                    (bcForm.cardType === 'WRC' && !vesselFlagState.ratifiedWreck)) && (
+                    {/* Cards for this type */}
                     <div
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        background: 'rgba(255, 176, 32, 0.12)',
-                        color: isLight ? '#b07a10' : '#ffb020',
-                        fontSize: '0.78rem',
-                        fontWeight: 500,
-                        marginBottom: '10px'
+                        flexDirection: 'column',
+                        gap: '8px',
+                        paddingLeft: '16px'
                       }}
                     >
-                      <AlertTriangle size={14} />
-                      {vesselFlagState.name} has not ratified the{' '}
-                      {bcForm.cardType === 'BBC' ? 'Bunkers Convention' : 'Wreck Removal Convention'}.
-                      Select a ratified flag state below.
-                    </div>
-                  )}
+                      {cards.map((card) => {
+                        const isActive = card.status === 'active'
+                        const isSuperseded = card.status === 'superseded'
+                        return (
+                          <div
+                            key={card.id}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              background: isSuperseded
+                                ? isLight
+                                  ? 'rgba(0,0,0,0.03)'
+                                  : 'rgba(255,255,255,0.02)'
+                                : isLight
+                                  ? 'rgba(var(--accent-primary-rgb), 0.04)'
+                                  : 'rgba(var(--accent-primary-rgb), 0.06)',
+                              border: `1px solid ${
+                                isSuperseded
+                                  ? 'var(--glass-border)'
+                                  : isLight
+                                    ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                                    : 'rgba(var(--accent-primary-rgb), 0.15)'
+                              }`,
+                              opacity: isSuperseded ? 0.65 : 1
+                            }}
+                          >
+                            {/* Card header row */}
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                marginBottom: '6px'
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  fontSize: '0.88rem',
+                                  color: 'var(--text-primary)'
+                                }}
+                              >
+                                {card.cardNumber || '-'}
+                              </span>
+                              {/* Status badge */}
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                  textTransform: 'uppercase',
+                                  background: isActive
+                                    ? 'rgba(0, 200, 100, 0.15)'
+                                    : 'rgba(150, 150, 150, 0.15)',
+                                  color: isActive ? '#00c864' : '#999'
+                                }}
+                              >
+                                {card.status}
+                              </span>
+                              {isActive && <Check size={14} style={{ color: '#00c864' }} />}
+                              {card.revisionNumber > 0 && (
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    color: 'var(--text-secondary)',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  Rev. {card.revisionNumber}
+                                </span>
+                              )}
+                            </div>
 
-                <select
-                  value={bcForm.addressedToFlagId}
-                  onChange={(e) => handleAddressedToFlagChange(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    marginBottom: '8px'
-                  }}
-                >
-                  <option value="">Select flag state...</option>
-                  {flagStates
-                    .filter((fs) =>
-                      bcForm.cardType === 'BBC' ? fs.ratifiedBunker : fs.ratifiedWreck
-                    )
-                    .map((fs) => (
-                      <option key={fs.id} value={fs.id}>
-                        {fs.name}
-                        {fs.authorityName ? ` — ${fs.authorityName}` : ''}
-                      </option>
-                    ))}
-                </select>
+                            {/* Period */}
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                                marginBottom: '4px'
+                              }}
+                            >
+                              Period:{' '}
+                              {card.inceptionDate ? formatDateShort(card.inceptionDate) : '?'}{' '}
+                              {'\u2192'} {card.expiryDate ? formatDateShort(card.expiryDate) : '?'}
+                              {card.issuedDate && (
+                                <span style={{ marginLeft: '12px' }}>
+                                  Issued: {formatDateShort(card.issuedDate)}
+                                </span>
+                              )}
+                            </div>
 
-                {/* Inline "add flag state" — when the ratified flag needed isn't listed */}
-                {!bcAddingFlag ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBcAddingFlag(true)
-                      setNewFlagForm({
-                        name: '', iso3: '',
-                        ratBunker: bcForm.cardType === 'BBC',
-                        ratWreck: bcForm.cardType === 'WRC',
-                        authName: '', authAddr: ''
-                      })
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                      color: 'var(--accent-primary)', fontSize: '0.78rem', fontWeight: 600
-                    }}
-                  >
-                    <Plus size={13} /> Flag state not listed? Add it
-                  </button>
-                ) : (
-                  <div
-                    style={{
-                      marginBottom: '10px', padding: '10px', borderRadius: '6px',
-                      border: '1px solid var(--input-border)',
-                      background: isLight ? '#fff' : '#20233a'
-                    }}
-                  >
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                      <input
-                        type="text" placeholder="Flag state name"
-                        value={newFlagForm.name}
-                        onChange={(e) => setNewFlagForm((f) => ({ ...f, name: e.target.value }))}
-                        style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem' }}
-                      />
-                      <input
-                        type="text" placeholder="ISO3 (e.g. PAN)" maxLength={3}
-                        value={newFlagForm.iso3}
-                        onChange={(e) => setNewFlagForm((f) => ({ ...f, iso3: e.target.value.toUpperCase() }))}
-                        style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', textTransform: 'uppercase' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '8px', fontSize: '0.8rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={newFlagForm.ratBunker} onChange={(e) => setNewFlagForm((f) => ({ ...f, ratBunker: e.target.checked }))} />
-                        Ratified Bunker
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={newFlagForm.ratWreck} onChange={(e) => setNewFlagForm((f) => ({ ...f, ratWreck: e.target.checked }))} />
-                        Ratified Wreck
-                      </label>
-                    </div>
-                    <input
-                      type="text" placeholder="Authority name"
-                      value={newFlagForm.authName}
-                      onChange={(e) => setNewFlagForm((f) => ({ ...f, authName: e.target.value }))}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', marginBottom: '8px', boxSizing: 'border-box' }}
-                    />
-                    <textarea
-                      placeholder="Authority address" rows={2}
-                      value={newFlagForm.authAddr}
-                      onChange={(e) => setNewFlagForm((f) => ({ ...f, authAddr: e.target.value }))}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: isLight ? '#fff' : '#23263a', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical', marginBottom: '8px', boxSizing: 'border-box' }}
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                      <button type="button" className="btn-secondary" onClick={() => setBcAddingFlag(false)} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Cancel</button>
-                      <button type="button" className="btn-primary" onClick={handleAddFlagInline} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>Add &amp; Select</button>
+                            {/* Owner */}
+                            {card.ownerName && (
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: 'var(--text-secondary)',
+                                  marginBottom: '2px'
+                                }}
+                              >
+                                Owner: {card.ownerName}
+                              </div>
+                            )}
+
+                            {/* Port */}
+                            {card.portOfRegistry && (
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: 'var(--text-secondary)',
+                                  marginBottom: '2px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <MapPin size={12} />
+                                Port: {card.portOfRegistry}
+                              </div>
+                            )}
+
+                            {/* Cancel & Replace text */}
+                            {card.cancelReplaceText && (
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: isLight ? '#b07a10' : '#ffb020',
+                                  fontStyle: 'italic',
+                                  marginTop: '4px'
+                                }}
+                              >
+                                {card.cancelReplaceText}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '6px',
+                                marginTop: '8px'
+                              }}
+                            >
+                              <button
+                                className="btn-secondary"
+                                style={{
+                                  padding: '3px 10px',
+                                  fontSize: '0.72rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                onClick={() => handleExportSingleBC(card)}
+                              >
+                                <Download size={12} /> Export
+                              </button>
+                              {isActive && (
+                                <>
+                                  <button
+                                    className="btn-secondary"
+                                    style={{
+                                      padding: '3px 10px',
+                                      fontSize: '0.72rem',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    onClick={() => openReissueModal(card)}
+                                    disabled={!hasPermission('policies:manage')}
+                                    title={
+                                      hasPermission('policies:manage')
+                                        ? undefined
+                                        : 'Requires the Manage Policies permission'
+                                    }
+                                  >
+                                    <RefreshCw size={12} /> Reissue
+                                  </button>
+                                  <button
+                                    className="btn-secondary"
+                                    style={{
+                                      padding: '3px 10px',
+                                      fontSize: '0.72rem',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    onClick={() => openEditModal(card)}
+                                    disabled={!hasPermission('policies:manage')}
+                                    title={
+                                      hasPermission('policies:manage')
+                                        ? undefined
+                                        : 'Requires the Manage Policies permission'
+                                    }
+                                  >
+                                    <Edit3 size={12} /> Edit
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                )}
-                <input
-                  type="text"
-                  placeholder="Authority name"
-                  value={bcForm.addressedToName}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, addressedToName: e.target.value }))
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    marginBottom: '8px'
-                  }}
-                />
-                <textarea
-                  placeholder="Authority address"
-                  value={bcForm.addressedToAddress}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, addressedToAddress: e.target.value }))
-                  }
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.85rem',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-            )}
+                )
+              })}
+            </div>
+          )}
 
-            {/* Cancel & Replace */}
+          {/* Blue Card Issue/Reissue/Edit Modal */}
+          {bcModalOpen && (
             <div
               style={{
-                marginBottom: '18px',
-                padding: '12px',
-                borderRadius: '8px',
-                background: bcForm.cancelReplace
-                  ? isLight
-                    ? 'rgba(255, 176, 32, 0.06)'
-                    : 'rgba(255, 176, 32, 0.08)'
-                  : 'transparent',
-                border: bcForm.cancelReplace
-                  ? '1px solid rgba(255, 176, 32, 0.2)'
-                  : '1px solid transparent'
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000
               }}
+              onClick={() => setBcModalOpen(false)}
             >
-              <label
+              <div
+                onClick={(e) => e.stopPropagation()}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  fontWeight: 500
+                  background: isLight ? '#ffffff' : '#1a1d28',
+                  borderRadius: '14px',
+                  padding: '24px',
+                  width: '560px',
+                  maxHeight: '85vh',
+                  overflowY: 'auto',
+                  border: '1px solid var(--glass-border-color)'
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={bcForm.cancelReplace}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, cancelReplace: e.target.checked }))
-                  }
-                />
-                Cancel & Replace existing card
-              </label>
-              {bcForm.cancelReplace && (
-                <textarea
-                  placeholder="Cancel & replace text..."
-                  value={bcForm.cancelReplaceText}
-                  onChange={(e) =>
-                    setBcForm((f) => ({ ...f, cancelReplaceText: e.target.value }))
-                  }
-                  rows={2}
+                {/* Modal header */}
+                <div
                   style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: isLight ? '#fff' : '#23263a',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.82rem',
-                    resize: 'vertical',
-                    marginTop: '8px'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px'
                   }}
-                />
-              )}
-            </div>
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <CreditCard size={20} style={{ color: 'var(--accent-primary)' }} />
+                    {bcModalMode === 'edit'
+                      ? 'Edit Blue Card'
+                      : bcModalMode === 'reissue'
+                        ? 'Reissue Blue Card'
+                        : 'Issue New Blue Card'}
+                  </h3>
+                  <button
+                    title="Close"
+                    aria-label="Close"
+                    onClick={() => setBcModalOpen(false)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
 
-            {/* Modal footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => setBcModalOpen(false)}
-                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleSaveBlueCard}
-                disabled={bcSaving}
-                style={{
-                  padding: '8px 20px',
-                  fontSize: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                {bcSaving ? (
-                  <Loader2 size={14} className="spinner" />
-                ) : bcModalMode === 'edit' ? (
-                  'Save Changes'
-                ) : bcModalMode === 'reissue' ? (
-                  'Reissue Card'
-                ) : (
-                  'Issue Card'
+                {/* Card Type */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={labelStyle}>Card Type</label>
+                  {bcModalMode === 'edit' || bcPreselectedType ? (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--accent-primary)'
+                      }}
+                    >
+                      {bcForm.cardType} — {CARD_TYPE_LABELS[bcForm.cardType]}
+                    </div>
+                  ) : (
+                    <select
+                      value={bcForm.cardType}
+                      onChange={(e) => handleCardTypeChange(e.target.value as CardType)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {CARD_TYPES.map((ct) => (
+                        <option key={ct} value={ct}>
+                          {ct} — {CARD_TYPE_LABELS[ct]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      marginTop: '4px',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    {CARD_TYPE_FULL_NAMES[bcForm.cardType]}
+                  </div>
+                </div>
+
+                {/* Period */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '12px',
+                    marginBottom: '14px'
+                  }}
+                >
+                  <div>
+                    <label style={labelStyle}>Inception Date</label>
+                    <input
+                      type="date"
+                      value={bcForm.inceptionDate}
+                      onChange={(e) => updateBcDate('inceptionDate', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Expiry Date</label>
+                    <input
+                      type="date"
+                      value={bcForm.expiryDate}
+                      onChange={(e) => updateBcDate('expiryDate', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Owner */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={labelStyle}>Owner</label>
+                  <select
+                    value={bcForm.ownerEntityId || '__custom__'}
+                    onChange={(e) => handleOwnerChange(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    {ownerOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.name}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom...</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Owner name"
+                    value={bcForm.ownerName}
+                    onChange={(e) => setBcForm((f) => ({ ...f, ownerName: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      marginBottom: '8px'
+                    }}
+                  />
+                  <textarea
+                    placeholder="Owner address"
+                    value={bcForm.ownerAddress}
+                    onChange={(e) => setBcForm((f) => ({ ...f, ownerAddress: e.target.value }))}
+                    rows={2}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--input-border)',
+                      background: isLight ? '#fff' : '#23263a',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                {/* Port of Registry */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={labelStyle}>Port of Registry</label>
+                  {flagPorts.length > 1 ? (
+                    <select
+                      value={bcForm.portOfRegistry}
+                      onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <option value="">Select port...</option>
+                      {flagPorts.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                          {p.isDefault ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder={
+                        flagPorts.length === 1 ? flagPorts[0].name : 'Enter port of registry...'
+                      }
+                      value={bcForm.portOfRegistry}
+                      onChange={(e) => setBcForm((f) => ({ ...f, portOfRegistry: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Addressed To (BBC/WRC only) */}
+                {needsAddressedTo(bcForm.cardType) && (
+                  <div
+                    style={{
+                      marginBottom: '14px',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--glass-border-color)'
+                    }}
+                  >
+                    <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>
+                      Addressed To (Flag State Authority)
+                    </label>
+
+                    {/* Ratification warning */}
+                    {vesselFlagState &&
+                      ((bcForm.cardType === 'BBC' && !vesselFlagState.ratifiedBunker) ||
+                        (bcForm.cardType === 'WRC' && !vesselFlagState.ratifiedWreck)) && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            background: 'rgba(255, 176, 32, 0.12)',
+                            color: isLight ? '#b07a10' : '#ffb020',
+                            fontSize: '0.78rem',
+                            fontWeight: 500,
+                            marginBottom: '10px'
+                          }}
+                        >
+                          <AlertTriangle size={14} />
+                          {vesselFlagState.name} has not ratified the{' '}
+                          {bcForm.cardType === 'BBC'
+                            ? 'Bunkers Convention'
+                            : 'Wreck Removal Convention'}
+                          . Select a ratified flag state below.
+                        </div>
+                      )}
+
+                    <select
+                      value={bcForm.addressedToFlagId}
+                      onChange={(e) => handleAddressedToFlagChange(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem',
+                        marginBottom: '8px'
+                      }}
+                    >
+                      <option value="">Select flag state...</option>
+                      {flagStates
+                        .filter((fs) =>
+                          bcForm.cardType === 'BBC' ? fs.ratifiedBunker : fs.ratifiedWreck
+                        )
+                        .map((fs) => (
+                          <option key={fs.id} value={fs.id}>
+                            {fs.name}
+                            {fs.authorityName ? ` — ${fs.authorityName}` : ''}
+                          </option>
+                        ))}
+                    </select>
+
+                    {/* Inline "add flag state" — when the ratified flag needed isn't listed */}
+                    {!bcAddingFlag ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBcAddingFlag(true)
+                          setNewFlagForm({
+                            name: '',
+                            iso3: '',
+                            ratBunker: bcForm.cardType === 'BBC',
+                            ratWreck: bcForm.cardType === 'WRC',
+                            authName: '',
+                            authAddr: ''
+                          })
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          marginBottom: '8px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          color: 'var(--accent-primary)',
+                          fontSize: '0.78rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Plus size={13} /> Flag state not listed? Add it
+                      </button>
+                    ) : (
+                      <div
+                        style={{
+                          marginBottom: '10px',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: isLight ? '#fff' : '#20233a'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '2fr 1fr',
+                            gap: '8px',
+                            marginBottom: '8px'
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="Flag state name"
+                            value={newFlagForm.name}
+                            onChange={(e) =>
+                              setNewFlagForm((f) => ({ ...f, name: e.target.value }))
+                            }
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--input-border)',
+                              background: isLight ? '#fff' : '#23263a',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.82rem'
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="ISO3 (e.g. PAN)"
+                            maxLength={3}
+                            value={newFlagForm.iso3}
+                            onChange={(e) =>
+                              setNewFlagForm((f) => ({ ...f, iso3: e.target.value.toUpperCase() }))
+                            }
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--input-border)',
+                              background: isLight ? '#fff' : '#23263a',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.82rem',
+                              textTransform: 'uppercase'
+                            }}
+                          />
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '16px',
+                            marginBottom: '8px',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={newFlagForm.ratBunker}
+                              onChange={(e) =>
+                                setNewFlagForm((f) => ({ ...f, ratBunker: e.target.checked }))
+                              }
+                            />
+                            Ratified Bunker
+                          </label>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={newFlagForm.ratWreck}
+                              onChange={(e) =>
+                                setNewFlagForm((f) => ({ ...f, ratWreck: e.target.checked }))
+                              }
+                            />
+                            Ratified Wreck
+                          </label>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Authority name"
+                          value={newFlagForm.authName}
+                          onChange={(e) =>
+                            setNewFlagForm((f) => ({ ...f, authName: e.target.value }))
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--input-border)',
+                            background: isLight ? '#fff' : '#23263a',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            marginBottom: '8px',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                        <textarea
+                          placeholder="Authority address"
+                          rows={2}
+                          value={newFlagForm.authAddr}
+                          onChange={(e) =>
+                            setNewFlagForm((f) => ({ ...f, authAddr: e.target.value }))
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--input-border)',
+                            background: isLight ? '#fff' : '#23263a',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            resize: 'vertical',
+                            marginBottom: '8px',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setBcAddingFlag(false)}
+                            style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={handleAddFlagInline}
+                            style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                          >
+                            Add &amp; Select
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      placeholder="Authority name"
+                      value={bcForm.addressedToName}
+                      onChange={(e) =>
+                        setBcForm((f) => ({ ...f, addressedToName: e.target.value }))
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem',
+                        marginBottom: '8px'
+                      }}
+                    />
+                    <textarea
+                      placeholder="Authority address"
+                      value={bcForm.addressedToAddress}
+                      onChange={(e) =>
+                        setBcForm((f) => ({ ...f, addressedToAddress: e.target.value }))
+                      }
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
                 )}
-              </button>
+
+                {/* Cancel & Replace */}
+                <div
+                  style={{
+                    marginBottom: '18px',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: bcForm.cancelReplace
+                      ? isLight
+                        ? 'rgba(255, 176, 32, 0.06)'
+                        : 'rgba(255, 176, 32, 0.08)'
+                      : 'transparent',
+                    border: bcForm.cancelReplace
+                      ? '1px solid rgba(255, 176, 32, 0.2)'
+                      : '1px solid transparent'
+                  }}
+                >
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: 500
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bcForm.cancelReplace}
+                      onChange={(e) =>
+                        setBcForm((f) => ({ ...f, cancelReplace: e.target.checked }))
+                      }
+                    />
+                    Cancel & Replace existing card
+                  </label>
+                  {bcForm.cancelReplace && (
+                    <textarea
+                      placeholder="Cancel & replace text..."
+                      value={bcForm.cancelReplaceText}
+                      onChange={(e) =>
+                        setBcForm((f) => ({ ...f, cancelReplaceText: e.target.value }))
+                      }
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: isLight ? '#fff' : '#23263a',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.82rem',
+                        resize: 'vertical',
+                        marginTop: '8px'
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Modal footer */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setBcModalOpen(false)}
+                    style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={handleSaveBlueCard}
+                    disabled={bcSaving}
+                    style={{
+                      padding: '8px 20px',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {bcSaving ? (
+                      <Loader2 size={14} className="spinner" />
+                    ) : bcModalMode === 'edit' ? (
+                      'Save Changes'
+                    ) : bcModalMode === 'reissue' ? (
+                      'Reissue Card'
+                    ) : (
+                      'Issue Card'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* Endorsements Card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <FileCheck size={18} style={{ color: 'var(--text-secondary)' }} />
+              <span style={cardTitleStyle}>Endorsements</span>
+            </div>
+            <EndorsementManager
+              policyDocId={policyId}
+              policyNumber={policy.policyNumber}
+              premiumCurrency="USD"
+            />
           </div>
-        </div>
-      )}
 
-      {/* Endorsements Card */}
-      <div style={cardStyle}>
-        <div style={cardHeaderStyle}>
-          <FileCheck size={18} style={{ color: 'var(--text-secondary)' }} />
-          <span style={cardTitleStyle}>Endorsements</span>
-        </div>
-        <EndorsementManager
-          policyDocId={policyId}
-          policyNumber={policy.policyNumber}
-          premiumCurrency="USD"
-        />
-      </div>
-
-      {/* Revision History Card */}
-      <div style={cardStyle}>
-        <div style={cardHeaderStyle}>
-          <Clock size={18} style={{ color: 'var(--text-secondary)' }} />
-          <span style={cardTitleStyle}>Revision History</span>
-        </div>
-        <RevisionHistorySection policyNumber={policy.policyNumber} currentPolicyId={policyId} onViewRevision={onNavigateToPolicy} />
-      </div>
+          {/* Revision History Card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <Clock size={18} style={{ color: 'var(--text-secondary)' }} />
+              <span style={cardTitleStyle}>Revision History</span>
+            </div>
+            <RevisionHistorySection
+              policyNumber={policy.policyNumber}
+              currentPolicyId={policyId}
+              onViewRevision={onNavigateToPolicy}
+            />
+          </div>
         </>
       )}
 
@@ -3529,29 +4807,108 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           confirmLabel={confirmation.isDangerous ? 'Delete' : 'Confirm'}
           isDangerous={confirmation.isDangerous}
           onConfirm={confirmation.onConfirm}
-          onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+          onCancel={() => setConfirmation((prev) => ({ ...prev, show: false }))}
         />
       )}
 
       {/* War Declaration Modal */}
       {showDeclarationModal && declarationFields && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowDeclarationModal(false)} />
-          <div style={{ position: 'relative', width: '700px', maxHeight: '85vh', overflowY: 'auto', borderRadius: '14px', padding: '28px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setShowDeclarationModal(false)}
+          />
+          <div
+            style={{
+              position: 'relative',
+              width: '700px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              borderRadius: '14px',
+              padding: '28px',
+              background: isLight ? '#ffffff' : '#1a1d28',
+              border: '1px solid var(--glass-border-color)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px'
+              }}
+            >
               <h2 style={{ margin: 0, fontSize: '1.1rem' }}>War Declaration</h2>
-              <button title="Close" aria-label="Close" onClick={() => setShowDeclarationModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setShowDeclarationModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
             {(() => {
               const f = declarationFields
-              const update = (key: keyof DeclarationFields, val: string) => setDeclarationFields(prev => prev ? { ...prev, [key]: val } : prev)
+              const update = (key: keyof DeclarationFields, val: string) =>
+                setDeclarationFields((prev) => (prev ? { ...prev, [key]: val } : prev))
               const fieldRow = (label: string, key: keyof DeclarationFields, rows?: number) => (
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>{label}</label>
-                  {(rows && rows > 1) ? (
-                    <textarea value={f[key]} onChange={e => update(key, e.target.value)} rows={rows} style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical' }} />
+                  <label
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: '3px'
+                    }}
+                  >
+                    {label}
+                  </label>
+                  {rows && rows > 1 ? (
+                    <textarea
+                      value={f[key]}
+                      onChange={(e) => update(key, e.target.value)}
+                      rows={rows}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.85rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: 'transparent',
+                        color: 'var(--text-primary)',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
                   ) : (
-                    <input value={f[key]} onChange={e => update(key, e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                    <input
+                      value={f[key]}
+                      onChange={(e) => update(key, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.85rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: 'transparent',
+                        color: 'var(--text-primary)'
+                      }}
+                    />
                   )}
                 </div>
               )
@@ -3563,8 +4920,24 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   </div>
                   {fieldRow('Reinsured', 'reinsured')}
                   {fieldRow('Assured', 'assuredText', 3)}
-                  <div style={{ borderTop: '1px solid var(--glass-border-color)', margin: '16px 0', paddingTop: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Vessel</div>
+                  <div
+                    style={{
+                      borderTop: '1px solid var(--glass-border-color)',
+                      margin: '16px 0',
+                      paddingTop: '12px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        marginBottom: '8px'
+                      }}
+                    >
+                      Vessel
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                       {fieldRow('Name', 'vesselName')}
                       {fieldRow('IMO', 'vesselImo')}
@@ -3577,7 +4950,13 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                     </div>
                     {fieldRow('Class', 'vesselClass')}
                   </div>
-                  <div style={{ borderTop: '1px solid var(--glass-border-color)', margin: '16px 0', paddingTop: '12px' }}>
+                  <div
+                    style={{
+                      borderTop: '1px solid var(--glass-border-color)',
+                      margin: '16px 0',
+                      paddingTop: '12px'
+                    }}
+                  >
                     {fieldRow('Period From', 'periodFrom')}
                     {fieldRow('Period To', 'periodTo')}
                   </div>
@@ -3590,15 +4969,39 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   {fieldRow('Trading', 'trading', 3)}
                   {fieldRow('Risk Code', 'riskCode')}
                   {fieldRow('Amlin Ref', 'amlinRef')}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-                    <button onClick={() => setShowDeclarationModal(false)} className="btn-secondary" style={{ padding: '8px 20px' }}>Cancel</button>
-                    <button onClick={async () => {
-                      try {
-                        await exportDeclarationDocx(policyId, f)
-                        showSuccess('Declaration exported')
-                        setShowDeclarationModal(false)
-                      } catch (err: any) { showError(err.message || 'Export failed') }
-                    }} className="btn-primary" style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '8px',
+                      marginTop: '16px'
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowDeclarationModal(false)}
+                      className="btn-secondary"
+                      style={{ padding: '8px 20px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await exportDeclarationDocx(policyId, f)
+                          showSuccess('Declaration exported')
+                          setShowDeclarationModal(false)
+                        } catch (err: any) {
+                          showError(err.message || 'Export failed')
+                        }
+                      }}
+                      className="btn-primary"
+                      style={{
+                        padding: '8px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
                       <Download size={14} /> Export
                     </button>
                   </div>
@@ -3610,7 +5013,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
       )}
 
       {/* Cancel Policy Modal */}
-      {showCancelModal && policy && (
+      {showCancelModal &&
+        policy &&
         (() => {
           const currency = (policy as any).premiumCurrency || 'USD'
           const commPct = Number(policy.commissionPercent) || 0
@@ -3619,15 +5023,25 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
           // Calculate return amounts
           let returnPremium = 0
           let returnCommission = 0
-          let returnInstalments: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number }> = []
+          let returnInstalments: Array<{
+            instalmentNumber: number
+            dueDate: string
+            premiumAmount: number
+            commissionAmount: number
+          }> = []
 
           if (cancelMode === 'instalment' && instalments.length > 0) {
             returnInstalments = instalments
-              .filter(inst => inst.instalmentNumber > cancelAfterInstalment)
-              .map(inst => {
+              .filter((inst) => inst.instalmentNumber > cancelAfterInstalment)
+              .map((inst) => {
                 const prem = Number((inst as any).premiumAmount || (inst as any).amount || 0)
                 const comm = Number(inst.commissionAmount || 0)
-                return { instalmentNumber: inst.instalmentNumber, dueDate: inst.dueDate, premiumAmount: prem, commissionAmount: comm }
+                return {
+                  instalmentNumber: inst.instalmentNumber,
+                  dueDate: inst.dueDate,
+                  premiumAmount: prem,
+                  commissionAmount: comm
+                }
               })
             returnPremium = returnInstalments.reduce((s, i) => s + i.premiumAmount, 0)
             returnCommission = returnInstalments.reduce((s, i) => s + i.commissionAmount, 0)
@@ -3637,16 +5051,28 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             const totalPeriod = countDays(policy.inceptionDate, policy.expiryDate)
             const remainPeriod = countDays(cancelDate, policy.expiryDate)
             if (totalPeriod.days > 0) {
-              const calc = calcProRataPremium(remainPeriod.days, totalPrem, totalPeriod.days, 1, commPct)
+              const calc = calcProRataPremium(
+                remainPeriod.days,
+                totalPrem,
+                totalPeriod.days,
+                1,
+                commPct
+              )
               returnPremium = calc.proRataPremium
               returnCommission = calc.commissionTotal
             }
             // Build instalments using shared bottom-fill
             if (instalments.length > 0 && returnPremium > 0) {
-              const dist = distributeInstalments(returnPremium, totalPrem, instalments.map(inst => ({
-                instalmentNumber: inst.instalmentNumber, dueDate: inst.dueDate
-              })), commPct)
-              returnInstalments = dist.map(d => ({
+              const dist = distributeInstalments(
+                returnPremium,
+                totalPrem,
+                instalments.map((inst) => ({
+                  instalmentNumber: inst.instalmentNumber,
+                  dueDate: inst.dueDate
+                })),
+                commPct
+              )
+              returnInstalments = dist.map((d) => ({
                 instalmentNumber: d.instalmentNumber,
                 dueDate: d.dueDate,
                 premiumAmount: d.premiumAmount,
@@ -3655,44 +5081,100 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
             }
           }
 
-          const effectiveDate = cancelMode === 'instalment'
-            ? (cancelAfterInstalment > 0 && instalments[cancelAfterInstalment - 1]?.dueDate
-              ? instalments[cancelAfterInstalment - 1].dueDate.slice(0, 10)
-              : policy.inceptionDate?.slice(0, 10) || '')
-            : cancelDate
+          const effectiveDate =
+            cancelMode === 'instalment'
+              ? cancelAfterInstalment > 0 && instalments[cancelAfterInstalment - 1]?.dueDate
+                ? instalments[cancelAfterInstalment - 1].dueDate.slice(0, 10)
+                : policy.inceptionDate?.slice(0, 10) || ''
+              : cancelDate
 
           return (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
-                onClick={() => setShowCancelModal(false)} />
-              <div style={{
-                position: 'relative', width: '520px', maxHeight: '85vh', overflowY: 'auto',
-                borderRadius: '14px', padding: '24px',
-                background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>Cancel Policy</h3>
-                  <button title="Cancel" aria-label="Cancel" onClick={() => setShowCancelModal(false)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <div
+                style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+                onClick={() => setShowCancelModal(false)}
+              />
+              <div
+                style={{
+                  position: 'relative',
+                  width: '520px',
+                  maxHeight: '85vh',
+                  overflowY: 'auto',
+                  borderRadius: '14px',
+                  padding: '24px',
+                  background: isLight ? '#ffffff' : '#1a1d28',
+                  border: '1px solid var(--glass-border-color)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--danger)' }}>
+                    Cancel Policy
+                  </h3>
+                  <button
+                    title="Cancel"
+                    aria-label="Cancel"
+                    onClick={() => setShowCancelModal(false)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
                     <X size={18} />
                   </button>
                 </div>
 
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                <p
+                  style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '16px'
+                  }}
+                >
                   {policy.policyNumber} — {policy.vesselName}
                 </p>
 
                 {/* Mode selector */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  {['instalment', 'date'].map(m => (
-                    <button key={m} onClick={() => setCancelMode(m as any)}
+                  {['instalment', 'date'].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setCancelMode(m as any)}
                       style={{
-                        flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
-                        border: cancelMode === m ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                        background: cancelMode === m ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        border:
+                          cancelMode === m
+                            ? '2px solid var(--accent-primary)'
+                            : '1px solid var(--glass-border-color)',
+                        background:
+                          cancelMode === m
+                            ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                            : 'transparent',
                         color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
                         cursor: 'pointer'
-                      }}>
+                      }}
+                    >
                       {m === 'instalment' ? 'Cancel on Instalment' : 'Cancel on Date (Pro-rata)'}
                     </button>
                   ))}
@@ -3701,16 +5183,43 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 {/* Instalment mode */}
                 {cancelMode === 'instalment' && instalments.length > 0 && (
                   <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    <label
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        display: 'block',
+                        marginBottom: '6px'
+                      }}
+                    >
                       Cancel after instalment
                     </label>
-                    <select value={cancelAfterInstalment}
-                      onChange={e => setCancelAfterInstalment(Number(e.target.value))}
-                      style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }}>
+                    <select
+                      value={cancelAfterInstalment}
+                      onChange={(e) => setCancelAfterInstalment(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.85rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: 'transparent',
+                        color: 'var(--text-primary)'
+                      }}
+                    >
                       <option value={0}>From inception (return all)</option>
-                      {instalments.map(inst => (
+                      {instalments.map((inst) => (
                         <option key={inst.instalmentNumber} value={inst.instalmentNumber}>
-                          After {inst.instalmentNumber}{inst.instalmentNumber === 1 ? 'st' : inst.instalmentNumber === 2 ? 'nd' : inst.instalmentNumber === 3 ? 'rd' : 'th'} instalment
+                          After {inst.instalmentNumber}
+                          {inst.instalmentNumber === 1
+                            ? 'st'
+                            : inst.instalmentNumber === 2
+                              ? 'nd'
+                              : inst.instalmentNumber === 3
+                                ? 'rd'
+                                : 'th'}{' '}
+                          instalment
                           {(inst as any).isNonRefundable ? ' (non-refundable)' : ''}
                         </option>
                       ))}
@@ -3721,42 +5230,124 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 {/* Date mode */}
                 {cancelMode === 'date' && (
                   <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    <label
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        display: 'block',
+                        marginBottom: '6px'
+                      }}
+                    >
                       Cancellation effective date
                     </label>
-                    <input type="date" value={cancelDate}
-                      onChange={e => setCancelDate(e.target.value)}
-                      style={{ width: '100%', padding: '6px 10px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'transparent', color: 'var(--text-primary)' }} />
+                    <input
+                      type="date"
+                      value={cancelDate}
+                      onChange={(e) => setCancelDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        fontSize: '0.85rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--input-border)',
+                        background: 'transparent',
+                        color: 'var(--text-primary)'
+                      }}
+                    />
                   </div>
                 )}
 
                 {/* Preview */}
                 {returnPremium > 0 && (
-                  <div style={{
-                    background: isLight ? '#f8f9fc' : '#161829',
-                    border: '1px solid var(--glass-border-color)', borderRadius: '8px',
-                    padding: '14px', marginBottom: '16px'
-                  }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+                  <div
+                    style={{
+                      background: isLight ? '#f8f9fc' : '#161829',
+                      border: '1px solid var(--glass-border-color)',
+                      borderRadius: '8px',
+                      padding: '14px',
+                      marginBottom: '16px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        marginBottom: '8px'
+                      }}
+                    >
                       Return Summary
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.85rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                        fontSize: '0.85rem'
+                      }}
+                    >
                       <span>Return Premium</span>
-                      <span style={{ fontWeight: 700 }}>{currency} {returnPremium.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      <span style={{ fontWeight: 700 }}>
+                        {currency}{' '}
+                        {returnPremium.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
                     {returnCommission > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.85rem' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginBottom: '4px',
+                          fontSize: '0.85rem'
+                        }}
+                      >
                         <span>Commission to Reclaim ({commPct}%)</span>
-                        <span style={{ fontWeight: 700 }}>{currency} {returnCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        <span style={{ fontWeight: 700 }}>
+                          {currency}{' '}
+                          {returnCommission.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     )}
                     {returnInstalments.length > 0 && (
-                      <div style={{ marginTop: '8px', borderTop: '1px solid var(--glass-border-color)', paddingTop: '8px' }}>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Instalments to return:</div>
+                      <div
+                        style={{
+                          marginTop: '8px',
+                          borderTop: '1px solid var(--glass-border-color)',
+                          paddingTop: '8px'
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--text-secondary)',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          Instalments to return:
+                        </div>
                         {returnInstalments.map((inst, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '2px' }}>
-                            <span>#{inst.instalmentNumber} — {inst.dueDate ? formatDateShort(inst.dueDate) : '—'}</span>
-                            <span>{currency} {inst.premiumAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          <div
+                            key={i}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '0.8rem',
+                              marginBottom: '2px'
+                            }}
+                          >
+                            <span>
+                              #{inst.instalmentNumber} —{' '}
+                              {inst.dueDate ? formatDateShort(inst.dueDate) : '—'}
+                            </span>
+                            <span>
+                              {currency}{' '}
+                              {inst.premiumAmount.toLocaleString('en-US', {
+                                minimumFractionDigits: 2
+                              })}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -3766,11 +5357,27 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                 {/* Warnings */}
                 <div style={{ fontSize: '0.8rem', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', color: 'var(--danger)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '4px',
+                      color: 'var(--danger)'
+                    }}
+                  >
                     <AlertTriangle size={14} /> Policy will be marked as cancelled
                   </div>
                   {isPnI && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', color: '#ffb020' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '4px',
+                        color: '#ffb020'
+                      }}
+                    >
                       <AlertTriangle size={14} /> Active blue cards will be superseded
                     </div>
                   )}
@@ -3778,44 +5385,66 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowCancelModal(false)}
-                    style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', border: '1px solid var(--glass-border-color)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <button
+                    onClick={() => setShowCancelModal(false)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      border: '1px solid var(--glass-border-color)',
+                      background: 'transparent',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer'
+                    }}
+                  >
                     Close
                   </button>
-                  <button onClick={async () => {
-                    if (returnPremium <= 0 && cancelMode === 'date') {
-                      showError('Enter a valid cancellation date')
-                      return
-                    }
-                    setCancelling(true)
-                    try {
-                      const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
-                      await window.api.endorsementCancelPolicy(policyId, {
-                        effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
-                        endorsementContent: content,
-                        returnPremium,
-                        premiumCurrency: currency,
-                        commissionPercent: commPct,
-                        instalments: returnInstalments,
-                        isProRata: cancelMode === 'date',
-                        annualPremium: cancelMode === 'date' ? (Number(policy.premiumAmount) || 0) : null,
-                        policyNumber: policy.policyNumber
-                      })
-                      showSuccess('Policy cancelled')
-                      setShowCancelModal(false)
-                      // Reload to reflect cancelled status
-                      loadData()
-                    } catch (err: any) {
-                      showError(err?.message || 'Failed to cancel policy')
-                    }
-                    setCancelling(false)
-                  }}
+                  <button
+                    onClick={async () => {
+                      if (returnPremium <= 0 && cancelMode === 'date') {
+                        showError('Enter a valid cancellation date')
+                        return
+                      }
+                      setCancelling(true)
+                      try {
+                        const content = `<p>It is hereby agreed that the above-mentioned policy is cancelled effective ${effectiveDate ? new Date(effectiveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the date hereof'}.</p>`
+                        await window.api.endorsementCancelPolicy(policyId, {
+                          effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+                          endorsementContent: content,
+                          returnPremium,
+                          premiumCurrency: currency,
+                          commissionPercent: commPct,
+                          instalments: returnInstalments,
+                          isProRata: cancelMode === 'date',
+                          annualPremium:
+                            cancelMode === 'date' ? Number(policy.premiumAmount) || 0 : null,
+                          policyNumber: policy.policyNumber
+                        })
+                        showSuccess('Policy cancelled')
+                        setShowCancelModal(false)
+                        // Reload to reflect cancelled status
+                        loadData()
+                      } catch (err: any) {
+                        showError(err?.message || 'Failed to cancel policy')
+                      }
+                      setCancelling(false)
+                    }}
                     disabled={cancelling}
                     style={{
-                      padding: '8px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
-                      background: 'var(--danger)', color: '#fff', border: 'none', cursor: 'pointer',
-                      opacity: cancelling ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '6px'
-                    }}>
+                      padding: '8px 18px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      background: 'var(--danger)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      opacity: cancelling ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
                     {cancelling ? <Loader2 size={14} className="spin" /> : <X size={14} />}
                     Cancel Policy
                   </button>
@@ -3823,26 +5452,48 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
               </div>
             </div>
           )
-        })()
-      )}
+        })()}
 
       {/* Export overlay */}
       {exportingPdfTC && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999
-        }}>
-          <div style={{
-            background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '32px 40px',
-            textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', maxWidth: '360px'
-          }}>
-            <div style={{
-              width: '36px', height: '36px', border: '3px solid var(--glass-border-color)',
-              borderTopColor: 'var(--accent)', borderRadius: '50%', margin: '0 auto 16px',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '6px' }}>Exporting Policy</div>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '12px',
+              padding: '32px 40px',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              maxWidth: '360px'
+            }}
+          >
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                border: '3px solid var(--glass-border-color)',
+                borderTopColor: 'var(--accent)',
+                borderRadius: '50%',
+                margin: '0 auto 16px',
+                animation: 'spin 1s linear infinite'
+              }}
+            />
+            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '6px' }}>
+              Exporting Policy
+            </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Converting to PDF and merging with T&C. Please wait...
             </div>
@@ -3853,7 +5504,11 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
   )
 }
 
-function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision }: {
+function RevisionHistorySection({
+  policyNumber,
+  currentPolicyId,
+  onViewRevision
+}: {
   policyNumber: string
   currentPolicyId: string
   onViewRevision?: (policyId: string) => void
@@ -3864,8 +5519,11 @@ function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision 
   const isLight = theme === 'light' || theme === 'aurora'
 
   useEffect(() => {
-    if (!policyNumber) { setLoading(false); return }
-    (async () => {
+    if (!policyNumber) {
+      setLoading(false)
+      return
+    }
+    ;(async () => {
       try {
         const revs = await window.api.policyGetRevisions(policyNumber)
         if (Array.isArray(revs)) {
@@ -3874,45 +5532,134 @@ function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision 
           // Fallback: just show current policy info
           setRevisions([])
         }
-      } catch { /* ignore */ }
-      finally { setLoading(false) }
+      } catch {
+        /* ignore */
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [policyNumber])
 
-  if (loading) return <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Loading...</div>
-  if (revisions.length === 0) return <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>No revision history</div>
+  if (loading)
+    return (
+      <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+        Loading...
+      </div>
+    )
+  if (revisions.length === 0)
+    return (
+      <div style={{ padding: '12px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+        No revision history
+      </div>
+    )
 
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
       <thead>
         <tr style={{ borderBottom: '1px solid var(--table-border)', textAlign: 'left' }}>
-          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rev</th>
-          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Status</th>
-          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Created</th>
-          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>By</th>
-          <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>Exported</th>
+          <th
+            style={{
+              padding: '8px 12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              textTransform: 'uppercase'
+            }}
+          >
+            Rev
+          </th>
+          <th
+            style={{
+              padding: '8px 12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              textTransform: 'uppercase'
+            }}
+          >
+            Status
+          </th>
+          <th
+            style={{
+              padding: '8px 12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              textTransform: 'uppercase'
+            }}
+          >
+            Created
+          </th>
+          <th
+            style={{
+              padding: '8px 12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              textTransform: 'uppercase'
+            }}
+          >
+            By
+          </th>
+          <th
+            style={{
+              padding: '8px 12px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              textTransform: 'uppercase'
+            }}
+          >
+            Exported
+          </th>
           <th style={{ padding: '8px 12px' }}></th>
         </tr>
       </thead>
       <tbody>
-        {revisions.map(rev => {
+        {revisions.map((rev) => {
           const isCurrent = rev.id === currentPolicyId
           return (
-            <tr key={rev.id} style={{
-              borderBottom: '1px solid var(--table-border)',
-              background: isCurrent ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent'
-            }}>
+            <tr
+              key={rev.id}
+              style={{
+                borderBottom: '1px solid var(--table-border)',
+                background: isCurrent
+                  ? isLight
+                    ? 'rgba(var(--accent-primary-rgb), 0.06)'
+                    : 'rgba(var(--accent-primary-rgb), 0.08)'
+                  : 'transparent'
+              }}
+            >
               <td style={{ padding: '8px 12px', fontWeight: isCurrent ? 700 : 400 }}>
                 R{rev.revisionNumber}
-                {isCurrent && <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 700 }}>CURRENT</span>}
+                {isCurrent && (
+                  <span
+                    style={{
+                      marginLeft: '6px',
+                      fontSize: '0.7rem',
+                      color: 'var(--accent-primary)',
+                      fontWeight: 700
+                    }}
+                  >
+                    CURRENT
+                  </span>
+                )}
               </td>
               <td style={{ padding: '8px 12px' }}>
-                <span style={{
-                  padding: '2px 8px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 600,
-                  background: rev.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(150,150,150,0.1)',
-                  color: rev.status === 'active' ? '#22c55e' : 'var(--text-secondary)',
-                  border: `1px solid ${rev.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(150,150,150,0.2)'}`
-                }}>{(rev.status || '').toUpperCase()}</span>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    background:
+                      rev.status === 'active' ? 'rgba(34,197,94,0.1)' : 'rgba(150,150,150,0.1)',
+                    color: rev.status === 'active' ? '#22c55e' : 'var(--text-secondary)',
+                    border: `1px solid ${rev.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(150,150,150,0.2)'}`
+                  }}
+                >
+                  {(rev.status || '').toUpperCase()}
+                </span>
               </td>
               <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
                 {rev.createdAt ? formatDate(rev.createdAt) : '-'}

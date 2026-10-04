@@ -265,9 +265,10 @@ export class DailyAlertScheduler {
     try {
       const due = await this.db.getEndorsementsDue()
       if (due.length > 0) {
-        const summary = due.length === 1
-          ? `Endorsement reminder for ${due[0].vesselName} (${due[0].surveyType || 'survey'} on ${due[0].surveyDate})`
-          : `${due.length} endorsement reminders are due`
+        const summary =
+          due.length === 1
+            ? `Endorsement reminder for ${due[0].vesselName} (${due[0].surveyType || 'survey'} on ${due[0].surveyDate})`
+            : `${due.length} endorsement reminders are due`
         await this.db.notifyGroupsForEvent(
           'endorsement_due',
           'Endorsement reminders due',

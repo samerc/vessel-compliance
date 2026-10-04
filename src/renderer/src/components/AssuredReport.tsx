@@ -41,7 +41,9 @@ export default function AssuredReport() {
   const [fleetDropdownOpen, setFleetDropdownOpen] = useState(false)
   const [assuredSearch, setAssuredSearch] = useState('')
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -84,25 +86,47 @@ export default function AssuredReport() {
   }, [assuredRoles])
 
   const filteredVessels = useMemo(() => {
-    if (filterMode === 'fleet' && selectedFleetId) return vessels.filter(v => v.fleetId === selectedFleetId)
-    if (filterMode === 'vessels' && selectedVesselIds.size > 0) return vessels.filter(v => selectedVesselIds.has(v.id))
+    if (filterMode === 'fleet' && selectedFleetId)
+      return vessels.filter((v) => v.fleetId === selectedFleetId)
+    if (filterMode === 'vessels' && selectedVesselIds.size > 0)
+      return vessels.filter((v) => selectedVesselIds.has(v.id))
     return vessels
   }, [vessels, filterMode, selectedFleetId, selectedVesselIds])
 
   const rows = useMemo(() => {
     const result: AssuredRow[] = []
     for (const v of filteredVessels) {
-      const vesselAssureds = allAssureds.filter(a => a.vesselId === v.id)
-        .sort((a, b) => (roleOrder.get(a.role?.toLowerCase()) ?? 999) - (roleOrder.get(b.role?.toLowerCase()) ?? 999))
+      const vesselAssureds = allAssureds
+        .filter((a) => a.vesselId === v.id)
+        .sort(
+          (a, b) =>
+            (roleOrder.get(a.role?.toLowerCase()) ?? 999) -
+            (roleOrder.get(b.role?.toLowerCase()) ?? 999)
+        )
       if (vesselAssureds.length === 0) {
-        result.push({ vesselName: v.name, vesselImo: v.imoNumber || '', fleetName: v.fleetId ? (fleetMap.get(v.fleetId) || '') : '', assuredName: '', role: '', entityType: '', email: '', phone: '' })
+        result.push({
+          vesselName: v.name,
+          vesselImo: v.imoNumber || '',
+          fleetName: v.fleetId ? fleetMap.get(v.fleetId) || '' : '',
+          assuredName: '',
+          role: '',
+          entityType: '',
+          email: '',
+          phone: ''
+        })
         continue
       }
       for (const a of vesselAssureds) {
         const entity = a.entityId ? entityMap.get(a.entityId) : null
         result.push({
-          vesselName: v.name, vesselImo: v.imoNumber || '', fleetName: v.fleetId ? (fleetMap.get(v.fleetId) || '') : '',
-          assuredName: entity?.name || a.entityId || '', role: a.role || '', entityType: entity?.type || '', email: entity?.email || '', phone: entity?.phone || ''
+          vesselName: v.name,
+          vesselImo: v.imoNumber || '',
+          fleetName: v.fleetId ? fleetMap.get(v.fleetId) || '' : '',
+          assuredName: entity?.name || a.entityId || '',
+          role: a.role || '',
+          entityType: entity?.type || '',
+          email: entity?.email || '',
+          phone: entity?.phone || ''
         })
       }
     }
@@ -112,15 +136,26 @@ export default function AssuredReport() {
   const displayRows = useMemo(() => {
     if (!assuredSearch) return rows
     const q = assuredSearch.toLowerCase()
-    return rows.filter(r => r.vesselName.toLowerCase().includes(q) || r.assuredName.toLowerCase().includes(q) || r.role.toLowerCase().includes(q) || r.vesselImo.includes(q))
+    return rows.filter(
+      (r) =>
+        r.vesselName.toLowerCase().includes(q) ||
+        r.assuredName.toLowerCase().includes(q) ||
+        r.role.toLowerCase().includes(q) ||
+        r.vesselImo.includes(q)
+    )
   }, [rows, assuredSearch])
 
   const groupedByVessel = useMemo(() => {
     const groups: { vessel: string; imo: string; fleet: string; assureds: AssuredRow[] }[] = []
-    const seen = new Map<string, typeof groups[0]>()
+    const seen = new Map<string, (typeof groups)[0]>()
     for (const r of displayRows) {
       if (!seen.has(r.vesselName)) {
-        const g = { vessel: r.vesselName, imo: r.vesselImo, fleet: r.fleetName, assureds: [] as AssuredRow[] }
+        const g = {
+          vessel: r.vesselName,
+          imo: r.vesselImo,
+          fleet: r.fleetName,
+          assureds: [] as AssuredRow[]
+        }
         seen.set(r.vesselName, g)
         groups.push(g)
       }
@@ -135,13 +170,36 @@ export default function AssuredReport() {
     return names.size
   }, [displayRows])
 
-  const getLabel = () => filterMode === 'fleet' && selectedFleetId ? fleetMap.get(selectedFleetId) || 'Fleet' : filterMode === 'vessels' ? 'Selected Vessels' : 'All Vessels'
+  const getLabel = () =>
+    filterMode === 'fleet' && selectedFleetId
+      ? fleetMap.get(selectedFleetId) || 'Fleet'
+      : filterMode === 'vessels'
+        ? 'Selected Vessels'
+        : 'All Vessels'
 
   const exportExcel = () => {
     if (displayRows.length === 0) return
-    const data = displayRows.map(r => ({ 'Vessel': r.vesselName, 'IMO': r.vesselImo, 'Fleet': r.fleetName, 'Assured Name': r.assuredName, 'Role': r.role, 'Type': r.entityType, 'Email': r.email, 'Phone': r.phone }))
+    const data = displayRows.map((r) => ({
+      Vessel: r.vesselName,
+      IMO: r.vesselImo,
+      Fleet: r.fleetName,
+      'Assured Name': r.assuredName,
+      Role: r.role,
+      Type: r.entityType,
+      Email: r.email,
+      Phone: r.phone
+    }))
     const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 18 }, { wch: 28 }, { wch: 18 }, { wch: 12 }, { wch: 28 }, { wch: 18 }]
+    ws['!cols'] = [
+      { wch: 22 },
+      { wch: 10 },
+      { wch: 18 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 18 }
+    ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Assured Report')
     XLSX.writeFile(wb, `Assured Report - ${getLabel()}.xlsx`)
@@ -190,12 +248,16 @@ export default function AssuredReport() {
       // Summary line
       doc.setFontSize(8)
       doc.setTextColor(100)
-      doc.text(`${groupedByVessel.length} vessel${groupedByVessel.length > 1 ? 's' : ''} — ${uniqueAssureds} assured${uniqueAssureds !== 1 ? 's' : ''}`, margin, y)
+      doc.text(
+        `${groupedByVessel.length} vessel${groupedByVessel.length > 1 ? 's' : ''} — ${uniqueAssureds} assured${uniqueAssureds !== 1 ? 's' : ''}`,
+        margin,
+        y
+      )
       y += 6
 
       for (let gi = 0; gi < groupedByVessel.length; gi++) {
         const group = groupedByVessel[gi]
-        const assuredRows = group.assureds.filter(a => a.assuredName)
+        const assuredRows = group.assureds.filter((a) => a.assuredName)
         const tableRows = assuredRows.length > 0 ? assuredRows : [group.assureds[0]]
         const estimatedHeight = 12 + tableRows.length * 7 + 8
 
@@ -218,23 +280,35 @@ export default function AssuredReport() {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(7.5)
         doc.setTextColor(160, 185, 210)
-        const vesselMeta = [group.imo ? `IMO: ${group.imo}` : '', group.fleet || ''].filter(Boolean).join('  |  ')
+        const vesselMeta = [group.imo ? `IMO: ${group.imo}` : '', group.fleet || '']
+          .filter(Boolean)
+          .join('  |  ')
         doc.text(vesselMeta, pw - margin - 2, y + 6.5, { align: 'right' })
         y += 12
 
         // Assured table for this vessel
         const head = [['Assured', 'Role', 'Type', 'Email', 'Phone']]
-        const body = assuredRows.length > 0
-          ? assuredRows.map(r => [r.assuredName, r.role, r.entityType, r.email, r.phone])
-          : [['No assureds assigned', '', '', '', '']]
+        const body =
+          assuredRows.length > 0
+            ? assuredRows.map((r) => [r.assuredName, r.role, r.entityType, r.email, r.phone])
+            : [['No assureds assigned', '', '', '', '']]
 
         autoTable(doc, {
           startY: y,
           head,
           body,
           margin: { left: margin, right: margin },
-          styles: { fontSize: 7.5, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, textColor: [40, 40, 40] },
-          headStyles: { fillColor: [235, 240, 248], textColor: [60, 70, 90], fontStyle: 'bold', fontSize: 7 },
+          styles: {
+            fontSize: 7.5,
+            cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+            textColor: [40, 40, 40]
+          },
+          headStyles: {
+            fillColor: [235, 240, 248],
+            textColor: [60, 70, 90],
+            fontStyle: 'bold',
+            fontSize: 7
+          },
           alternateRowStyles: { fillColor: [250, 251, 254] },
           columnStyles: {
             0: { cellWidth: 55, fontStyle: 'bold' },
@@ -272,40 +346,90 @@ export default function AssuredReport() {
   const filteredVesselOptions = useMemo(() => {
     if (!vesselSearch) return []
     const q = vesselSearch.toLowerCase()
-    return vessels.filter(v => !selectedVesselIds.has(v.id) && (v.name.toLowerCase().includes(q) || (v.imoNumber || '').includes(q))).slice(0, 15)
+    return vessels
+      .filter(
+        (v) =>
+          !selectedVesselIds.has(v.id) &&
+          (v.name.toLowerCase().includes(q) || (v.imoNumber || '').includes(q))
+      )
+      .slice(0, 15)
   }, [vessels, vesselSearch, selectedVesselIds])
 
   // Fleet search
   const filteredFleetOptions = useMemo(() => {
     if (!fleetSearch) return fleets
     const q = fleetSearch.toLowerCase()
-    return fleets.filter(f => f.name.toLowerCase().includes(q))
+    return fleets.filter((f) => f.name.toLowerCase().includes(q))
   }, [fleets, fleetSearch])
 
   const selectedVesselNames = useMemo(() => {
-    return vessels.filter(v => selectedVesselIds.has(v.id))
+    return vessels.filter((v) => selectedVesselIds.has(v.id))
   }, [vessels, selectedVesselIds])
 
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+  if (loading)
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        Loading...
+      </div>
+    )
 
   return (
     <div>
       {/* Filter Controls */}
-      <div className="glass-card" style={{ padding: '20px', marginBottom: '20px', overflow: 'visible', position: 'relative', zIndex: 10 }}>
+      <div
+        className="glass-card"
+        style={{
+          padding: '20px',
+          marginBottom: '20px',
+          overflow: 'visible',
+          position: 'relative',
+          zIndex: 10
+        }}
+      >
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          {(['all', 'fleet', 'vessels'] as const).map(mode => (
-            <button key={mode} onClick={() => { setFilterMode(mode); setSelectedFleetId(''); setSelectedVesselIds(new Set()); setVesselSearch(''); setFleetSearch('') }}
+          {(['all', 'fleet', 'vessels'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => {
+                setFilterMode(mode)
+                setSelectedFleetId('')
+                setSelectedVesselIds(new Set())
+                setVesselSearch('')
+                setFleetSearch('')
+              }}
               style={{
-                padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer',
-                border: filterMode === mode ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                background: filterMode === mode ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
+                padding: '7px 16px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                border:
+                  filterMode === mode
+                    ? '2px solid var(--accent-primary)'
+                    : '1px solid var(--glass-border-color)',
+                background:
+                  filterMode === mode ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                 color: filterMode === mode ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: filterMode === mode ? 600 : 400,
-                display: 'flex', alignItems: 'center', gap: '6px'
-              }}>
-              {mode === 'all' && <><Ship size={14} /> All Active Vessels</>}
-              {mode === 'fleet' && <><Layers size={14} /> By Fleet</>}
-              {mode === 'vessels' && <><Ship size={14} /> Select Vessels</>}
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              {mode === 'all' && (
+                <>
+                  <Ship size={14} /> All Active Vessels
+                </>
+              )}
+              {mode === 'fleet' && (
+                <>
+                  <Layers size={14} /> By Fleet
+                </>
+              )}
+              {mode === 'vessels' && (
+                <>
+                  <Ship size={14} /> Select Vessels
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -313,16 +437,59 @@ export default function AssuredReport() {
         {/* Fleet: searchable dropdown */}
         {filterMode === 'fleet' && (
           <div style={{ position: 'relative', maxWidth: '320px' }}>
-            <input type="text" value={fleetSearch} onChange={e => { setFleetSearch(e.target.value); setFleetDropdownOpen(true) }}
-              onFocus={() => setFleetDropdownOpen(true)} onBlur={() => setTimeout(() => setFleetDropdownOpen(false), 150)}
-              placeholder="Search fleets..." style={{ width: '100%' }} />
+            <input
+              type="text"
+              value={fleetSearch}
+              onChange={(e) => {
+                setFleetSearch(e.target.value)
+                setFleetDropdownOpen(true)
+              }}
+              onFocus={() => setFleetDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setFleetDropdownOpen(false), 150)}
+              placeholder="Search fleets..."
+              style={{ width: '100%' }}
+            />
             {fleetDropdownOpen && filteredFleetOptions.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-                {filteredFleetOptions.map(f => (
-                  <div key={f.id} onMouseDown={() => { setSelectedFleetId(f.id); setFleetSearch(f.name); setFleetDropdownOpen(false) }}
-                    style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', fontWeight: selectedFleetId === f.id ? 600 : 400, color: selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  background: isLight ? '#ffffff' : '#1a1d28',
+                  border: '1px solid var(--glass-border-color)',
+                  borderRadius: '8px',
+                  zIndex: 100,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                }}
+              >
+                {filteredFleetOptions.map((f) => (
+                  <div
+                    key={f.id}
+                    onMouseDown={() => {
+                      setSelectedFleetId(f.id)
+                      setFleetSearch(f.name)
+                      setFleetDropdownOpen(false)
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      borderBottom: '1px solid var(--table-border)',
+                      fontWeight: selectedFleetId === f.id ? 600 : 400,
+                      color:
+                        selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)'
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = isLight
+                        ? 'rgba(0,150,200,0.06)'
+                        : 'rgba(var(--accent-primary-rgb), 0.06)')
+                    }
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
                     {f.name}
                   </div>
                 ))}
@@ -337,27 +504,111 @@ export default function AssuredReport() {
             {/* Selected vessel chips */}
             {selectedVesselNames.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                {selectedVesselNames.map(v => (
-                  <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px 3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb), 0.25)' }}>
+                {selectedVesselNames.map((v) => (
+                  <span
+                    key={v.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px 3px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                      color: 'var(--accent-primary)',
+                      border: '1px solid rgba(var(--accent-primary-rgb), 0.25)'
+                    }}
+                  >
                     {v.name}
-                    <button title="Remove" aria-label="Remove" onClick={() => setSelectedVesselIds(prev => { const n = new Set(prev); n.delete(v.id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0 2px', display: 'flex' }}><X size={12} /></button>
+                    <button
+                      title="Remove"
+                      aria-label="Remove"
+                      onClick={() =>
+                        setSelectedVesselIds((prev) => {
+                          const n = new Set(prev)
+                          n.delete(v.id)
+                          return n
+                        })
+                      }
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--accent-primary)',
+                        padding: '0 2px',
+                        display: 'flex'
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
                   </span>
                 ))}
               </div>
             )}
             <div style={{ position: 'relative', maxWidth: '320px' }} ref={vesselDropdownRef}>
-              <input type="text" value={vesselSearch} onChange={e => { setVesselSearch(e.target.value); setVesselDropdownOpen(true) }}
-                onFocus={() => { if (vesselSearch) setVesselDropdownOpen(true) }} onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 150)}
-                placeholder="Search and select vessels..." style={{ width: '100%' }} />
+              <input
+                type="text"
+                value={vesselSearch}
+                onChange={(e) => {
+                  setVesselSearch(e.target.value)
+                  setVesselDropdownOpen(true)
+                }}
+                onFocus={() => {
+                  if (vesselSearch) setVesselDropdownOpen(true)
+                }}
+                onBlur={() => setTimeout(() => setVesselDropdownOpen(false), 150)}
+                placeholder="Search and select vessels..."
+                style={{ width: '100%' }}
+              />
               {vesselDropdownOpen && filteredVesselOptions.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '8px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-                  {filteredVesselOptions.map(v => (
-                    <div key={v.id} onMouseDown={() => { setSelectedVesselIds(prev => new Set(prev).add(v.id)); setVesselSearch(''); setVesselDropdownOpen(false) }}
-                      style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    background: isLight ? '#ffffff' : '#1a1d28',
+                    border: '1px solid var(--glass-border-color)',
+                    borderRadius: '8px',
+                    zIndex: 100,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {filteredVesselOptions.map((v) => (
+                    <div
+                      key={v.id}
+                      onMouseDown={() => {
+                        setSelectedVesselIds((prev) => new Set(prev).add(v.id))
+                        setVesselSearch('')
+                        setVesselDropdownOpen(false)
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        borderBottom: '1px solid var(--table-border)'
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = isLight
+                          ? 'rgba(0,150,200,0.06)'
+                          : 'rgba(var(--accent-primary-rgb), 0.06)')
+                      }
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
                       <span style={{ fontWeight: 600 }}>{v.name}</span>
-                      <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '0.78rem' }}>IMO: {v.imoNumber}</span>
+                      <span
+                        style={{
+                          color: 'var(--text-secondary)',
+                          marginLeft: '8px',
+                          fontSize: '0.78rem'
+                        }}
+                      >
+                        IMO: {v.imoNumber}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -368,24 +619,81 @@ export default function AssuredReport() {
       </div>
 
       {/* Stats + Search + Export */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-          <span><strong style={{ color: 'var(--text-primary)' }}>{filteredVessels.length}</strong> vessels</span>
-          <span><strong style={{ color: 'var(--text-primary)' }}>{uniqueAssureds}</strong> assureds</span>
-          <span><strong style={{ color: 'var(--text-primary)' }}>{displayRows.length}</strong> rows</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '14px',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: '16px',
+            fontSize: '0.82rem',
+            color: 'var(--text-secondary)'
+          }}
+        >
+          <span>
+            <strong style={{ color: 'var(--text-primary)' }}>{filteredVessels.length}</strong>{' '}
+            vessels
+          </span>
+          <span>
+            <strong style={{ color: 'var(--text-primary)' }}>{uniqueAssureds}</strong> assureds
+          </span>
+          <span>
+            <strong style={{ color: 'var(--text-primary)' }}>{displayRows.length}</strong> rows
+          </span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            <input type="text" value={assuredSearch} onChange={e => setAssuredSearch(e.target.value)}
-              placeholder="Search results..." style={{ paddingLeft: '30px', width: '200px', fontSize: '0.82rem' }} />
+            <Search
+              size={14}
+              style={{
+                position: 'absolute',
+                left: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-secondary)'
+              }}
+            />
+            <input
+              type="text"
+              value={assuredSearch}
+              onChange={(e) => setAssuredSearch(e.target.value)}
+              placeholder="Search results..."
+              style={{ paddingLeft: '30px', width: '200px', fontSize: '0.82rem' }}
+            />
           </div>
-          <button onClick={exportExcel} disabled={displayRows.length === 0} className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
+          <button
+            onClick={exportExcel}
+            disabled={displayRows.length === 0}
+            className="btn-secondary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              padding: '7px 14px'
+            }}
+          >
             <Download size={14} /> Excel
           </button>
-          <button onClick={exportPdf} disabled={displayRows.length === 0} className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}>
+          <button
+            onClick={exportPdf}
+            disabled={displayRows.length === 0}
+            className="btn-primary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              padding: '7px 14px'
+            }}
+          >
             <FileText size={14} /> PDF
           </button>
         </div>
@@ -393,16 +701,26 @@ export default function AssuredReport() {
 
       {/* Report Table */}
       {groupedByVessel.length === 0 ? (
-        <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {filterMode === 'vessels' && selectedVesselIds.size === 0 ? 'Select vessels to generate the report' :
-           filterMode === 'fleet' && !selectedFleetId ? 'Select a fleet to generate the report' :
-           'No assureds found for the selected vessels'}
+        <div
+          className="glass-card"
+          style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}
+        >
+          {filterMode === 'vessels' && selectedVesselIds.size === 0
+            ? 'Select vessels to generate the report'
+            : filterMode === 'fleet' && !selectedFleetId
+              ? 'Select a fleet to generate the report'
+              : 'No assureds found for the selected vessels'}
         </div>
       ) : (
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead>
-              <tr style={{ background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)', borderBottom: '2px solid var(--table-border)' }}>
+              <tr
+                style={{
+                  background: isLight ? '#f0f2f8' : 'rgba(255,255,255,0.03)',
+                  borderBottom: '2px solid var(--table-border)'
+                }}
+              >
                 <th style={thStyle}>Vessel</th>
                 <th style={thStyle}>IMO</th>
                 <th style={thStyle}>Fleet</th>
@@ -414,24 +732,76 @@ export default function AssuredReport() {
               </tr>
             </thead>
             <tbody>
-              {groupedByVessel.map((group, gi) => (
+              {groupedByVessel.map((group, gi) =>
                 group.assureds.map((r, ri) => (
-                  <tr key={`${gi}-${ri}`} style={{ borderBottom: '1px solid var(--table-border)', background: ri === 0 && gi % 2 === 0 ? (isLight ? 'rgba(0,150,200,0.02)' : 'rgba(var(--accent-primary-rgb), 0.015)') : 'transparent' }}>
+                  <tr
+                    key={`${gi}-${ri}`}
+                    style={{
+                      borderBottom: '1px solid var(--table-border)',
+                      background:
+                        ri === 0 && gi % 2 === 0
+                          ? isLight
+                            ? 'rgba(0,150,200,0.02)'
+                            : 'rgba(var(--accent-primary-rgb), 0.015)'
+                          : 'transparent'
+                    }}
+                  >
                     {ri === 0 ? (
                       <>
-                        <td style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }} rowSpan={group.assureds.length}>{group.vessel}</td>
-                        <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }} rowSpan={group.assureds.length}>{group.imo}</td>
-                        <td style={{ ...tdStyle, fontSize: '0.78rem' }} rowSpan={group.assureds.length}>{group.fleet}</td>
+                        <td
+                          style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }}
+                          rowSpan={group.assureds.length}
+                        >
+                          {group.vessel}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            fontSize: '0.78rem',
+                            color: 'var(--text-secondary)'
+                          }}
+                          rowSpan={group.assureds.length}
+                        >
+                          {group.imo}
+                        </td>
+                        <td
+                          style={{ ...tdStyle, fontSize: '0.78rem' }}
+                          rowSpan={group.assureds.length}
+                        >
+                          {group.fleet}
+                        </td>
                       </>
                     ) : null}
-                    <td style={{ ...tdStyle, fontWeight: 500 }}>{r.assuredName || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No assureds</span>}</td>
-                    <td style={tdStyle}>{r.role && <span style={{ padding: '1px 6px', borderRadius: '6px', background: 'rgba(var(--accent-primary-rgb), 0.08)', color: 'var(--accent-primary)', fontSize: '0.75rem' }}>{r.role}</span>}</td>
-                    <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.entityType}</td>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>
+                      {r.assuredName || (
+                        <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          No assureds
+                        </span>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      {r.role && (
+                        <span
+                          style={{
+                            padding: '1px 6px',
+                            borderRadius: '6px',
+                            background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {r.role}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      {r.entityType}
+                    </td>
                     <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.email}</td>
                     <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.phone}</td>
                   </tr>
                 ))
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -440,5 +810,12 @@ export default function AssuredReport() {
   )
 }
 
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '10px 12px', fontWeight: 500, color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }
+const thStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '10px 12px',
+  fontWeight: 500,
+  color: 'var(--text-secondary)',
+  fontSize: '0.78rem',
+  whiteSpace: 'nowrap'
+}
 const tdStyle: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' }

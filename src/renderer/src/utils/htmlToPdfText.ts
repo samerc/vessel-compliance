@@ -40,7 +40,10 @@ export function renderHtmlToPdf(
     }
   }
 
-  function extractSegments(node: Node, inherited: { bold?: boolean; italic?: boolean } = {}): PdfTextSegment[] {
+  function extractSegments(
+    node: Node,
+    inherited: { bold?: boolean; italic?: boolean } = {}
+  ): PdfTextSegment[] {
     const segments: PdfTextSegment[] = []
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -75,7 +78,8 @@ export function renderHtmlToPdf(
         continue
       }
 
-      const fontStyle = seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal'
+      const fontStyle =
+        seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal'
       doc.setFont('helvetica', fontStyle)
       doc.setFontSize(fontSize)
       doc.setTextColor(0, 0, 0)
@@ -115,7 +119,7 @@ export function renderHtmlToPdf(
 
         if (tag === 'p') {
           const segments = extractSegments(el)
-          if (segments.length > 0 && segments.some(s => s.text.trim())) {
+          if (segments.length > 0 && segments.some((s) => s.text.trim())) {
             renderSegments(segments)
           } else {
             y += lineHeight * 0.5
@@ -208,5 +212,7 @@ export function stripHtml(html: string): string {
     return parts.join('\n')
   }
 
-  return extractText(doc.body).replace(/\n{3,}/g, '\n\n').trim()
+  return extractText(doc.body)
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }

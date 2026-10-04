@@ -2,7 +2,10 @@ import XLSX from 'xlsx-js-style'
 import { normalizeText } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
-export function parseIsfSanctions(buffer: Buffer): { entities: SanctionsEntity[]; releaseDate: string | null } {
+export function parseIsfSanctions(buffer: Buffer): {
+  entities: SanctionsEntity[]
+  releaseDate: string | null
+} {
   const wb = XLSX.read(buffer, { type: 'buffer' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
@@ -17,7 +20,9 @@ export function parseIsfSanctions(buffer: Buffer): { entities: SanctionsEntity[]
     try {
       const entity = parseIsfRow(row)
       if (entity) entries.push(entity)
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   return { entities: entries, releaseDate: null }
@@ -32,7 +37,10 @@ function parseIsfRow(row: any[]): SanctionsEntity | null {
 
   const aliasStr = cleanText(row[14]) || ''
   const aliases = aliasStr
-    ? aliasStr.split(/ - /).map(a => a.trim().replace(/^-\s*/, '').replace(/\s*-$/, '')).filter(a => a && a.length > 1)
+    ? aliasStr
+        .split(/ - /)
+        .map((a) => a.trim().replace(/^-\s*/, '').replace(/\s*-$/, ''))
+        .filter((a) => a && a.length > 1)
     : []
 
   let dob: string | null = null
@@ -66,7 +74,8 @@ function parseIsfRow(row: any[]): SanctionsEntity | null {
 
   let listedDate: string | null = null
   if (row[16] != null) {
-    listedDate = typeof row[16] === 'number' ? excelDateToString(row[16]) : cleanText(row[16]) || null
+    listedDate =
+      typeof row[16] === 'number' ? excelDateToString(row[16]) : cleanText(row[16]) || null
   }
 
   const remarkParts: string[] = []

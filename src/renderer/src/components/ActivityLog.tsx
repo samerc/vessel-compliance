@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ScrollText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Filter, ShieldAlert, FileText, Table } from 'lucide-react'
+import {
+  ScrollText,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw,
+  Filter,
+  ShieldAlert,
+  FileText,
+  Table
+} from 'lucide-react'
 import XLSX from 'xlsx-js-style'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -27,7 +39,7 @@ const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   DUPLICATE: { bg: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
   CLOSE_DEFECT: { bg: 'rgba(234,179,8,0.15)', color: '#eab308' },
   DECIDE: { bg: 'rgba(249,115,22,0.15)', color: '#f97316' },
-  RUN_CHECK: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
+  RUN_CHECK: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' }
 }
 
 const MODULE_COLORS: Record<string, string> = {
@@ -45,7 +57,7 @@ const MODULE_COLORS: Record<string, string> = {
   Fleets: '#06b6d4',
   Email: '#f97316',
   RBAC: '#8b5cf6',
-  System: '#64748b',
+  System: '#64748b'
 }
 
 function getActionStyle(action: string) {
@@ -64,12 +76,32 @@ export default function ActivityLog() {
 
   if (!hasPermission('admin:activityLog')) {
     return (
-      <div style={{ padding: '64px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '12px' }}>
-        <ShieldAlert size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.3 }} />
-        <div style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
+      <div
+        style={{
+          padding: '64px',
+          textAlign: 'center',
+          background: 'var(--bg-card)',
+          borderRadius: '12px'
+        }}
+      >
+        <ShieldAlert
+          size={48}
+          color="var(--text-secondary)"
+          style={{ marginBottom: '16px', opacity: 0.3 }}
+        />
+        <div
+          style={{
+            fontSize: '1.1rem',
+            fontWeight: '600',
+            color: 'var(--text-primary)',
+            marginBottom: '8px'
+          }}
+        >
           Access Denied
         </div>
-        <p style={{ color: 'var(--text-secondary)' }}>You do not have permission to view the activity log.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>
+          You do not have permission to view the activity log.
+        </p>
       </div>
     )
   }
@@ -81,9 +113,12 @@ export default function ActivityLog() {
     { id: 'module', label: 'Module', defaultVisible: true },
     { id: 'action', label: 'Action', defaultVisible: true },
     { id: 'entity', label: 'Entity', defaultVisible: true },
-    { id: 'details', label: 'Details', defaultVisible: true },
+    { id: 'details', label: 'Details', defaultVisible: true }
   ]
-  const { visibleColumns: actVisibleCols, setVisibleColumns: setActVisibleCols } = useColumnPrefs('activity-log', ACTIVITY_COLUMNS)
+  const { visibleColumns: actVisibleCols, setVisibleColumns: setActVisibleCols } = useColumnPrefs(
+    'activity-log',
+    ACTIVITY_COLUMNS
+  )
   const actVisibleSet = new Set(actVisibleCols)
 
   const [entries, setEntries] = useState<ActivityLogEntry[]>([])
@@ -112,7 +147,7 @@ export default function ActivityLog() {
       const [mods, acts, usrs] = await Promise.all([
         window.api.activityGetDistinctModules(),
         window.api.activityGetDistinctActions(),
-        window.api.activityGetDistinctUsers(),
+        window.api.activityGetDistinctUsers()
       ])
       if (Array.isArray(mods)) setModules(mods)
       if (Array.isArray(acts)) setActions(acts)
@@ -127,7 +162,7 @@ export default function ActivityLog() {
     try {
       const filters: ActivityLogFilters = {
         page,
-        limit: LIMIT,
+        limit: LIMIT
       }
       if (moduleFilter) filters.module = moduleFilter
       if (actionFilter) filters.action = actionFilter
@@ -205,18 +240,17 @@ export default function ActivityLog() {
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
       doc.text('Activity Audit Report', pageW - 14, 10, { align: 'right' })
-      const rangeLabel = dateFrom || dateTo
-        ? `${dateFrom || 'Start'} to ${dateTo || 'Present'}`
-        : 'All Time'
+      const rangeLabel =
+        dateFrom || dateTo ? `${dateFrom || 'Start'} to ${dateTo || 'Present'}` : 'All Time'
       doc.text(rangeLabel, pageW - 14, 16, { align: 'right' })
 
-      const tableData = allEntries.map(e => [
+      const tableData = allEntries.map((e) => [
         formatDateTime(e.createdAt),
         e.username || '',
         e.action?.replace(/_/g, ' ') || '',
         e.module || '',
         e.entityName || e.entityType || '',
-        (e.details || '').slice(0, 80),
+        (e.details || '').slice(0, 80)
       ])
 
       autoTable(doc, {
@@ -226,7 +260,7 @@ export default function ActivityLog() {
         styles: { fontSize: 7, cellPadding: 3 },
         headStyles: { fillColor: [10, 22, 40], textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 247, 250] },
-        margin: { left: 14, right: 14 },
+        margin: { left: 14, right: 14 }
       })
 
       // Footer on each page
@@ -253,26 +287,34 @@ export default function ActivityLog() {
   const handleExportExcel = async () => {
     try {
       const allEntries = await window.api.activityGetLog({
-        page: 1, limit: 5000,
+        page: 1,
+        limit: 5000,
         module: moduleFilter || undefined,
         action: actionFilter || undefined,
         userId: userFilter || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-        search: search || undefined,
+        search: search || undefined
       })
       const rows = (allEntries.data || []).map((e: ActivityLogEntry) => ({
         'Date/Time': formatDateTime(e.createdAt),
-        'User': e.username || '',
-        'Action': e.action || '',
-        'Module': e.module || '',
-        'Entity': e.entityName || '',
-        'Details': e.details || '',
+        User: e.username || '',
+        Action: e.action || '',
+        Module: e.module || '',
+        Entity: e.entityName || '',
+        Details: e.details || ''
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Activity Log')
-      const colWidths = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 50 }]
+      const colWidths = [
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 24 },
+        { wch: 50 }
+      ]
       ws['!cols'] = colWidths
       XLSX.writeFile(wb, 'Activity_Log.xlsx')
       showSuccess('Activity log exported to Excel')
@@ -288,12 +330,12 @@ export default function ActivityLog() {
     background: 'var(--bg-primary)',
     color: 'var(--text-primary)',
     fontSize: '0.82rem',
-    minWidth: '120px',
+    minWidth: '120px'
   }
 
   const inputStyle: React.CSSProperties = {
     ...selectStyle,
-    minWidth: '100px',
+    minWidth: '100px'
   }
 
   return (
@@ -303,7 +345,8 @@ export default function ActivityLog() {
         icon={<ScrollText size={26} />}
         title="Activity Log"
         subtitle="System-wide audit trail"
-        actions={<>
+        actions={
+          <>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               {total} {total === 1 ? 'entry' : 'entries'}
             </span>
@@ -322,43 +365,90 @@ export default function ActivityLog() {
               <Table size={14} /> Export Excel
             </button>
             <button
-              onClick={() => { loadData(); loadFilters() }}
+              onClick={() => {
+                loadData()
+                loadFilters()
+              }}
               className="btn-secondary btn-sm"
               title="Refresh"
             >
               <RefreshCw size={14} /> Refresh
             </button>
-        </>}
+          </>
+        }
       />
 
       {/* Filters bar */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center',
-        padding: '12px 16px', marginBottom: '16px', borderRadius: '8px',
-        background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
-        border: '1px solid var(--glass-border-color)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          alignItems: 'center',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          borderRadius: '8px',
+          background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--glass-border-color)'
+        }}
+      >
         <Filter size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
 
-        <select value={moduleFilter} onChange={(e) => { setModuleFilter(e.target.value); setPage(1) }} style={selectStyle}>
+        <select
+          value={moduleFilter}
+          onChange={(e) => {
+            setModuleFilter(e.target.value)
+            setPage(1)
+          }}
+          style={selectStyle}
+        >
           <option value="">All Modules</option>
-          {modules.map(m => <option key={m} value={m}>{m}</option>)}
+          {modules.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
         </select>
 
-        <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1) }} style={selectStyle}>
+        <select
+          value={actionFilter}
+          onChange={(e) => {
+            setActionFilter(e.target.value)
+            setPage(1)
+          }}
+          style={selectStyle}
+        >
           <option value="">All Actions</option>
-          {actions.map(a => <option key={a} value={a}>{a}</option>)}
+          {actions.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
         </select>
 
-        <select value={userFilter} onChange={(e) => { setUserFilter(e.target.value); setPage(1) }} style={selectStyle}>
+        <select
+          value={userFilter}
+          onChange={(e) => {
+            setUserFilter(e.target.value)
+            setPage(1)
+          }}
+          style={selectStyle}
+        >
           <option value="">All Users</option>
-          {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.username}
+            </option>
+          ))}
         </select>
 
         <input
           type="date"
           value={dateFrom}
-          onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+          onChange={(e) => {
+            setDateFrom(e.target.value)
+            setPage(1)
+          }}
           style={inputStyle}
           title="From date"
         />
@@ -366,17 +456,32 @@ export default function ActivityLog() {
         <input
           type="date"
           value={dateTo}
-          onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+          onChange={(e) => {
+            setDateTo(e.target.value)
+            setPage(1)
+          }}
           style={inputStyle}
           title="To date"
         />
 
         <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+          <Search
+            size={14}
+            style={{
+              position: 'absolute',
+              left: '8px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-secondary)'
+            }}
+          />
           <input
             type="text"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             placeholder="Search entities, details, users..."
             style={{ ...inputStyle, width: '100%', paddingLeft: '28px' }}
           />
@@ -386,9 +491,13 @@ export default function ActivityLog() {
           <button
             onClick={handleReset}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px', padding: '6px 10px', cursor: 'pointer',
-              color: 'var(--text-secondary)', fontSize: '0.78rem',
+              background: 'transparent',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: '0.78rem'
             }}
             className="hover-effect"
           >
@@ -398,166 +507,274 @@ export default function ActivityLog() {
       </div>
 
       {/* Table */}
-      <div style={{
-        borderRadius: '10px',
-        border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
-        overflow: 'hidden',
-        background: isLight ? '#ffffff' : 'var(--bg-card)',
-      }}>
+      <div
+        style={{
+          borderRadius: '10px',
+          border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'var(--glass-border)'}`,
+          overflow: 'hidden',
+          background: isLight ? '#ffffff' : 'var(--bg-card)'
+        }}
+      >
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{
-              background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
-              borderBottom: `2px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
-            }}>
+            <tr
+              style={{
+                background: isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)',
+                borderBottom: `2px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`
+              }}
+            >
               {[
                 { id: 'date', label: 'Date / Time', width: '155px' },
                 { id: 'user', label: 'User', width: '110px' },
                 { id: 'module', label: 'Module', width: '110px' },
                 { id: 'action', label: 'Action', width: '120px' },
                 { id: 'entity', label: 'Entity', width: 'auto' },
-                { id: 'details', label: 'Details', width: '35%' },
-              ].filter(h => actVisibleSet.has(h.id)).map((h) => (
-                <th
-                  key={h.id}
-                  style={{
-                    padding: '11px 16px', textAlign: 'left', fontSize: '0.7rem',
-                    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
-                    color: isLight ? '#64748b' : 'var(--text-secondary)',
-                    width: h.width,
-                  }}
-                >
-                  {h.label}
-                </th>
-              ))}
+                { id: 'details', label: 'Details', width: '35%' }
+              ]
+                .filter((h) => actVisibleSet.has(h.id))
+                .map((h) => (
+                  <th
+                    key={h.id}
+                    style={{
+                      padding: '11px 16px',
+                      textAlign: 'left',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.6px',
+                      color: isLight ? '#64748b' : 'var(--text-secondary)',
+                      width: h.width
+                    }}
+                  >
+                    {h.label}
+                  </th>
+                ))}
               <th style={{ padding: '11px 8px', textAlign: 'right', width: '40px' }}>
-                <ColumnSelector pageKey="activity-log" allColumns={ACTIVITY_COLUMNS} visibleColumns={actVisibleCols} onChange={setActVisibleCols} />
+                <ColumnSelector
+                  pageKey="activity-log"
+                  allColumns={ACTIVITY_COLUMNS}
+                  visibleColumns={actVisibleCols}
+                  onChange={setActVisibleCols}
+                />
               </th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={actVisibleCols.length + 1} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td
+                  colSpan={actVisibleCols.length + 1}
+                  style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                >
                   Loading...
                 </td>
               </tr>
             ) : entries.length === 0 ? (
               <tr>
-                <td colSpan={actVisibleCols.length + 1} style={{ padding: '64px 20px', textAlign: 'center' }}>
-                  <ScrollText size={36} style={{ color: 'var(--text-secondary)', opacity: 0.2, marginBottom: '12px' }} />
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}>
+                <td
+                  colSpan={actVisibleCols.length + 1}
+                  style={{ padding: '64px 20px', textAlign: 'center' }}
+                >
+                  <ScrollText
+                    size={36}
+                    style={{ color: 'var(--text-secondary)', opacity: 0.2, marginBottom: '12px' }}
+                  />
+                  <div
+                    style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 500 }}
+                  >
                     No activity entries found
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', opacity: 0.6, marginTop: '4px' }}>
-                    {total === 0 && !moduleFilter && !actionFilter && !userFilter && !dateFrom && !dateTo && !search
+                  <div
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.78rem',
+                      opacity: 0.6,
+                      marginTop: '4px'
+                    }}
+                  >
+                    {total === 0 &&
+                    !moduleFilter &&
+                    !actionFilter &&
+                    !userFilter &&
+                    !dateFrom &&
+                    !dateTo &&
+                    !search
                       ? 'Activity will appear here as actions are logged across the system.'
-                      : 'Try adjusting your filters to see more results.'
-                    }
+                      : 'Try adjusting your filters to see more results.'}
                   </div>
                 </td>
               </tr>
-            ) : entries.map((entry, idx) => {
-              const actionStyle = getActionStyle(entry.action)
-              const moduleColor = getModuleColor(entry.module)
-              return (
-                <tr
-                  key={entry.id}
-                  style={{
-                    borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'}`,
-                    background: idx % 2 === 0 ? 'transparent' : (isLight ? '#fafbfc' : 'rgba(255,255,255,0.015)'),
-                    transition: 'background 0.15s',
-                  }}
-                >
-                  {actVisibleSet.has('date') && (
-                  <td style={{ padding: '10px 16px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: isLight ? '#64748b' : 'var(--text-secondary)', fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
-                    {formatDateTime(entry.createdAt)}
-                  </td>
-                  )}
-                  {actVisibleSet.has('user') && (
-                  <td style={{ padding: '10px 16px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {entry.username}
-                  </td>
-                  )}
-                  {actVisibleSet.has('module') && (
-                  <td style={{ padding: '10px 16px' }}>
-                    <span style={{
-                      display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
-                      fontSize: '0.7rem', fontWeight: 600,
-                      background: `${moduleColor}15`, color: isLight ? moduleColor : moduleColor,
-                      border: `1px solid ${moduleColor}30`,
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {entry.module}
-                    </span>
-                  </td>
-                  )}
-                  {actVisibleSet.has('action') && (
-                  <td style={{ padding: '10px 16px' }}>
-                    <span style={{
-                      display: 'inline-block', padding: '3px 10px', borderRadius: '6px',
-                      fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
-                      letterSpacing: '0.3px',
-                      background: actionStyle.bg, color: isLight ? actionStyle.color : actionStyle.color,
-                    }}>
-                      {entry.action.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  )}
-                  {actVisibleSet.has('entity') && (
-                  <td style={{ padding: '10px 16px', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                    {entry.entityName ? (
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.entityName}</span>
-                    ) : entry.entityType ? (
-                      <span style={{ color: 'var(--text-primary)', opacity: 0.7 }}>{entry.entityType}</span>
-                    ) : (
-                      <span style={{ color: 'var(--text-secondary)', opacity: 0.35 }}>&mdash;</span>
-                    )}
-                  </td>
-                  )}
-                  {actVisibleSet.has('details') && (
-                  <td style={{
-                    padding: '10px 16px', fontSize: '0.8rem', color: isLight ? '#64748b' : 'var(--text-secondary)',
-                    maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}
-                    title={entry.details || ''}
+            ) : (
+              entries.map((entry, idx) => {
+                const actionStyle = getActionStyle(entry.action)
+                const moduleColor = getModuleColor(entry.module)
+                return (
+                  <tr
+                    key={entry.id}
+                    style={{
+                      borderBottom: `1px solid ${isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)'}`,
+                      background:
+                        idx % 2 === 0
+                          ? 'transparent'
+                          : isLight
+                            ? '#fafbfc'
+                            : 'rgba(255,255,255,0.015)',
+                      transition: 'background 0.15s'
+                    }}
                   >
-                    {entry.details || ''}
-                  </td>
-                  )}
-                  <td />{/* spacer for column selector header */}
-                </tr>
-              )
-            })}
+                    {actVisibleSet.has('date') && (
+                      <td
+                        style={{
+                          padding: '10px 16px',
+                          fontSize: '0.8rem',
+                          whiteSpace: 'nowrap',
+                          color: isLight ? '#64748b' : 'var(--text-secondary)',
+                          fontFamily: 'monospace',
+                          letterSpacing: '-0.3px'
+                        }}
+                      >
+                        {formatDateTime(entry.createdAt)}
+                      </td>
+                    )}
+                    {actVisibleSet.has('user') && (
+                      <td
+                        style={{
+                          padding: '10px 16px',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        {entry.username}
+                      </td>
+                    )}
+                    {actVisibleSet.has('module') && (
+                      <td style={{ padding: '10px 16px' }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            background: `${moduleColor}15`,
+                            color: isLight ? moduleColor : moduleColor,
+                            border: `1px solid ${moduleColor}30`,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {entry.module}
+                        </span>
+                      </td>
+                    )}
+                    {actVisibleSet.has('action') && (
+                      <td style={{ padding: '10px 16px' }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.3px',
+                            background: actionStyle.bg,
+                            color: isLight ? actionStyle.color : actionStyle.color
+                          }}
+                        >
+                          {entry.action.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                    )}
+                    {actVisibleSet.has('entity') && (
+                      <td
+                        style={{
+                          padding: '10px 16px',
+                          fontSize: '0.82rem',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        {entry.entityName ? (
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {entry.entityName}
+                          </span>
+                        ) : entry.entityType ? (
+                          <span style={{ color: 'var(--text-primary)', opacity: 0.7 }}>
+                            {entry.entityType}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-secondary)', opacity: 0.35 }}>
+                            &mdash;
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {actVisibleSet.has('details') && (
+                      <td
+                        style={{
+                          padding: '10px 16px',
+                          fontSize: '0.8rem',
+                          color: isLight ? '#64748b' : 'var(--text-secondary)',
+                          maxWidth: '350px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={entry.details || ''}
+                      >
+                        {entry.details || ''}
+                      </td>
+                    )}
+                    <td />
+                    {/* spacer for column selector header */}
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '6px', marginTop: '16px',
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            marginTop: '16px'
+          }}
+        >
           <button
             onClick={() => setPage(1)}
             disabled={page === 1}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px', padding: '5px 8px', cursor: page === 1 ? 'default' : 'pointer',
-              color: 'var(--text-secondary)', opacity: page === 1 ? 0.4 : 1,
+              background: 'transparent',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '6px',
+              padding: '5px 8px',
+              cursor: page === 1 ? 'default' : 'pointer',
+              color: 'var(--text-secondary)',
+              opacity: page === 1 ? 0.4 : 1
             }}
             className="hover-effect"
           >
             <ChevronsLeft size={14} />
           </button>
-          <button title="Previous" aria-label="Previous"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+          <button
+            title="Previous"
+            aria-label="Previous"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px', padding: '5px 8px', cursor: page === 1 ? 'default' : 'pointer',
-              color: 'var(--text-secondary)', opacity: page === 1 ? 0.4 : 1,
+              background: 'transparent',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '6px',
+              padding: '5px 8px',
+              cursor: page === 1 ? 'default' : 'pointer',
+              color: 'var(--text-secondary)',
+              opacity: page === 1 ? 0.4 : 1
             }}
             className="hover-effect"
           >
@@ -566,13 +783,19 @@ export default function ActivityLog() {
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', padding: '0 8px' }}>
             Page {page} of {totalPages}
           </span>
-          <button title="Next" aria-label="Next"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          <button
+            title="Next"
+            aria-label="Next"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px', padding: '5px 8px', cursor: page === totalPages ? 'default' : 'pointer',
-              color: 'var(--text-secondary)', opacity: page === totalPages ? 0.4 : 1,
+              background: 'transparent',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '6px',
+              padding: '5px 8px',
+              cursor: page === totalPages ? 'default' : 'pointer',
+              color: 'var(--text-secondary)',
+              opacity: page === totalPages ? 0.4 : 1
             }}
             className="hover-effect"
           >
@@ -582,9 +805,13 @@ export default function ActivityLog() {
             onClick={() => setPage(totalPages)}
             disabled={page === totalPages}
             style={{
-              background: 'transparent', border: '1px solid var(--glass-border-color)',
-              borderRadius: '6px', padding: '5px 8px', cursor: page === totalPages ? 'default' : 'pointer',
-              color: 'var(--text-secondary)', opacity: page === totalPages ? 0.4 : 1,
+              background: 'transparent',
+              border: '1px solid var(--glass-border-color)',
+              borderRadius: '6px',
+              padding: '5px 8px',
+              cursor: page === totalPages ? 'default' : 'pointer',
+              color: 'var(--text-secondary)',
+              opacity: page === totalPages ? 0.4 : 1
             }}
             className="hover-effect"
           >

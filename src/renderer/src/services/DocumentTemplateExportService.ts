@@ -4,10 +4,7 @@ import { parseHtmlToParagraphs } from '../utils/htmlToDocx'
 /**
  * Replace all {{key}} placeholders in an HTML string with their context values.
  */
-export function resolveTemplatePlaceholders(
-  body: string,
-  context: Record<string, string>
-): string {
+export function resolveTemplatePlaceholders(body: string, context: Record<string, string>): string {
   let result = body
   for (const [key, value] of Object.entries(context)) {
     // key already includes {{ }}, e.g. "{{vesselName}}"
@@ -40,7 +37,9 @@ export async function buildTemplateContext(opts: {
   try {
     const session = await window.api.getSession()
     if (session?.username) ctx['{{userName}}'] = session.username
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   try {
     const raw = await window.api.getSetting('reportSettings')
@@ -48,7 +47,9 @@ export async function buildTemplateContext(opts: {
       const parsed = JSON.parse(raw)
       if (parsed.companyName) ctx['{{companyName}}'] = parsed.companyName
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Vessel
   if (opts.vesselId) {
@@ -70,16 +71,22 @@ export async function buildTemplateContext(opts: {
         if (vessel.flagStateId) {
           try {
             const flags = await window.api.getFlagStates()
-            const flag = Array.isArray(flags) ? flags.find((f: any) => f.id === vessel.flagStateId) : null
+            const flag = Array.isArray(flags)
+              ? flags.find((f: any) => f.id === vessel.flagStateId)
+              : null
             if (flag) ctx['{{flagState}}'] = flag.name || ''
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
 
         // Customer / broker entity
         if (vessel.customerId) {
           try {
             const entities = await window.api.getEntities()
-            const entity = Array.isArray(entities) ? entities.find((e: any) => e.id === vessel.customerId) : null
+            const entity = Array.isArray(entities)
+              ? entities.find((e: any) => e.id === vessel.customerId)
+              : null
             if (entity) {
               if (vessel.customerType === 'broker') {
                 ctx['{{brokerName}}'] = entity.name || ''
@@ -88,10 +95,14 @@ export async function buildTemplateContext(opts: {
                 ctx['{{customerEmail}}'] = entity.email || ''
               }
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Entity (standalone)
@@ -105,7 +116,9 @@ export async function buildTemplateContext(opts: {
         ctx['{{customerName}}'] = entity.name || ''
         ctx['{{customerEmail}}'] = entity.email || ''
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Policy
@@ -139,7 +152,9 @@ export async function buildTemplateContext(opts: {
           }
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return ctx
@@ -150,10 +165,7 @@ export async function buildTemplateContext(opts: {
  * Includes policy header from pi_section_texts.docHeader and
  * policy footer from policyExportSettings.footerText (no page numbers).
  */
-export async function generateTemplateDocx(
-  bodyHtml: string,
-  fileName: string
-): Promise<void> {
+export async function generateTemplateDocx(bodyHtml: string, fileName: string): Promise<void> {
   // Build header paragraphs from section texts
   const headerParas: Paragraph[] = []
   try {
@@ -170,7 +182,9 @@ export async function generateTemplateDocx(
         })
       )
     }
-  } catch { /* no header */ }
+  } catch {
+    /* no header */
+  }
 
   // Build footer paragraphs from policyExportSettings
   const footerParas: Paragraph[] = []
@@ -207,7 +221,9 @@ export async function generateTemplateDocx(
         }
       }
     }
-  } catch { /* no footer */ }
+  } catch {
+    /* no footer */
+  }
 
   // Build body paragraphs
   const bodyParas = parseHtmlToParagraphs(bodyHtml, {
@@ -237,9 +253,8 @@ export async function generateTemplateDocx(
           }
         },
         headers: undefined,
-        footers: footerParas.length > 0
-          ? { default: new Footer({ children: footerParas }) }
-          : undefined,
+        footers:
+          footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
         children: children as any[]
       }
     ]

@@ -11,89 +11,130 @@ import { PageHeader, SegmentedControl } from './ui'
 type QuotationView = 'list' | 'settings' | 'editor'
 
 interface QuotationManagerProps extends SubTabProps {
-    onNavigateToPolicy?: (policyId: string) => void
-    onNavigateToPolicySetup?: (quotationId: string) => void
-    initialQuotationId?: string | null
-    onClearInitialQuotation?: () => void
-    policyContext?: { policyId: string; policyNumber: string } | null
-    onClearPolicyContext?: () => void
-    onReturnToPolicy?: (policyId: string) => void
-    openCreate?: boolean
-    onCreateConsumed?: () => void
+  onNavigateToPolicy?: (policyId: string) => void
+  onNavigateToPolicySetup?: (quotationId: string) => void
+  initialQuotationId?: string | null
+  onClearInitialQuotation?: () => void
+  policyContext?: { policyId: string; policyNumber: string } | null
+  onClearPolicyContext?: () => void
+  onReturnToPolicy?: (policyId: string) => void
+  openCreate?: boolean
+  onCreateConsumed?: () => void
 }
 
-export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy, openCreate, onCreateConsumed, subTab, subTabNonce }: QuotationManagerProps) {
-    const { hasPermission } = useAuth()
-    const canSettings = hasPermission('quotations:settings')
-    const [view, setView] = useState<QuotationView>('list')
-    useRequestedSubTab(subTab, subTabNonce, (canSettings ? ['list', 'settings'] : ['list']) as QuotationView[], v => { setEditingQuotation(null); setView(v) })
-    const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
-    const [activePolicyContext, setActivePolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
-    const [listKey, setListKey] = useState(0)
-    const [listSearch, setListSearch] = useState('')
-    const initialLoadRef = useRef(false)
+export default function QuotationManager({
+  onNavigateToPolicy,
+  onNavigateToPolicySetup,
+  initialQuotationId,
+  onClearInitialQuotation,
+  policyContext,
+  onClearPolicyContext,
+  onReturnToPolicy,
+  openCreate,
+  onCreateConsumed,
+  subTab,
+  subTabNonce
+}: QuotationManagerProps) {
+  const { hasPermission } = useAuth()
+  const canSettings = hasPermission('quotations:settings')
+  const [view, setView] = useState<QuotationView>('list')
+  useRequestedSubTab(
+    subTab,
+    subTabNonce,
+    (canSettings ? ['list', 'settings'] : ['list']) as QuotationView[],
+    (v) => {
+      setEditingQuotation(null)
+      setView(v)
+    }
+  )
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
+  const [activePolicyContext, setActivePolicyContext] = useState<{
+    policyId: string
+    policyNumber: string
+  } | null>(null)
+  const [listKey, setListKey] = useState(0)
+  const [listSearch, setListSearch] = useState('')
+  const initialLoadRef = useRef(false)
 
-    // Auto-open quotation when navigating from policy
-    useEffect(() => {
-        if (initialQuotationId && !initialLoadRef.current) {
-            initialLoadRef.current = true
-            if (policyContext) setActivePolicyContext(policyContext)
-            window.api.getQuotation(initialQuotationId).then(q => {
-                if (q && !(q as any).error) {
-                    setEditingQuotation(q)
-                    setView('editor')
-                }
-                if (onClearInitialQuotation) onClearInitialQuotation()
-                if (onClearPolicyContext) onClearPolicyContext()
-            })
+  // Auto-open quotation when navigating from policy
+  useEffect(() => {
+    if (initialQuotationId && !initialLoadRef.current) {
+      initialLoadRef.current = true
+      if (policyContext) setActivePolicyContext(policyContext)
+      window.api.getQuotation(initialQuotationId).then((q) => {
+        if (q && !(q as any).error) {
+          setEditingQuotation(q)
+          setView('editor')
         }
-    }, [initialQuotationId])
-
-    const handleOpenEditor = (quotation: Quotation) => {
-        setEditingQuotation(quotation)
-        setView('editor')
+        if (onClearInitialQuotation) onClearInitialQuotation()
+        if (onClearPolicyContext) onClearPolicyContext()
+      })
     }
+  }, [initialQuotationId])
 
-    const handleBackToList = () => {
-        setEditingQuotation(null)
-        setActivePolicyContext(null)
-        setView('list')
-        setListKey(k => k + 1)
-    }
+  const handleOpenEditor = (quotation: Quotation) => {
+    setEditingQuotation(quotation)
+    setView('editor')
+  }
 
-    return (
-        <div className="page">
-            {view !== 'editor' && (
-                <PageHeader
-                    icon={<FileText size={26} />}
-                    title="Quotations"
-                    actions={canSettings && (
-                        <SegmentedControl
-                            value={view}
-                            onChange={setView}
-                            items={[
-                                { key: 'list', label: 'Quotations', icon: <List size={15} /> },
-                                { key: 'settings', label: 'Settings', icon: <Settings size={15} /> }
-                            ]}
-                        />
-                    )}
-                />
-            )}
+  const handleBackToList = () => {
+    setEditingQuotation(null)
+    setActivePolicyContext(null)
+    setView('list')
+    setListKey((k) => k + 1)
+  }
 
-            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} initialSearch={listSearch} onSearchChange={setListSearch} openCreate={openCreate} onCreateConsumed={onCreateConsumed} />}
-            {view === 'settings' && canSettings && <QuotationSettings />}
-            {view === 'editor' && editingQuotation && (
-                <QuotationEditor
-                    key={editingQuotation.id}
-                    quotation={editingQuotation}
-                    onBack={handleBackToList}
-                    onOpenQuotation={handleOpenEditor}
-                    onNavigateToPolicy={onNavigateToPolicy}
-                    onNavigateToPolicySetup={onNavigateToPolicySetup}
-                    policyContext={activePolicyContext}
-                    onReturnToPolicy={onReturnToPolicy ? (policyId) => { setActivePolicyContext(null); onReturnToPolicy(policyId) } : undefined}
-                />
-            )}
-        </div>
-    )
+  return (
+    <div className="page">
+      {view !== 'editor' && (
+        <PageHeader
+          icon={<FileText size={26} />}
+          title="Quotations"
+          actions={
+            canSettings && (
+              <SegmentedControl
+                value={view}
+                onChange={setView}
+                items={[
+                  { key: 'list', label: 'Quotations', icon: <List size={15} /> },
+                  { key: 'settings', label: 'Settings', icon: <Settings size={15} /> }
+                ]}
+              />
+            )
+          }
+        />
+      )}
+
+      {view === 'list' && (
+        <QuotationList
+          key={listKey}
+          onOpenQuotation={handleOpenEditor}
+          initialSearch={listSearch}
+          onSearchChange={setListSearch}
+          openCreate={openCreate}
+          onCreateConsumed={onCreateConsumed}
+        />
+      )}
+      {view === 'settings' && canSettings && <QuotationSettings />}
+      {view === 'editor' && editingQuotation && (
+        <QuotationEditor
+          key={editingQuotation.id}
+          quotation={editingQuotation}
+          onBack={handleBackToList}
+          onOpenQuotation={handleOpenEditor}
+          onNavigateToPolicy={onNavigateToPolicy}
+          onNavigateToPolicySetup={onNavigateToPolicySetup}
+          policyContext={activePolicyContext}
+          onReturnToPolicy={
+            onReturnToPolicy
+              ? (policyId) => {
+                  setActivePolicyContext(null)
+                  onReturnToPolicy(policyId)
+                }
+              : undefined
+          }
+        />
+      )}
+    </div>
+  )
 }

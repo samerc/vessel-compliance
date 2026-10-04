@@ -1,9 +1,59 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Eye, CheckCircle, AlertCircle, Upload, Trash2, Calendar, FileSpreadsheet, FileText, ToggleLeft, ToggleRight, Trash, Copy, ChevronDown, ClipboardList, Download, Plus, X, Shield, RefreshCcw, Users, MessageSquare, LayoutGrid, List, Search, Clock, ArrowRight, Hash, FolderSearch, FolderOpen, GitCommit, Edit3, Loader2, Receipt } from 'lucide-react'
+import {
+  ArrowLeft,
+  Eye,
+  CheckCircle,
+  AlertCircle,
+  Upload,
+  Trash2,
+  Calendar,
+  FileSpreadsheet,
+  FileText,
+  ToggleLeft,
+  ToggleRight,
+  Trash,
+  Copy,
+  ChevronDown,
+  ClipboardList,
+  Download,
+  Plus,
+  X,
+  Shield,
+  RefreshCcw,
+  Users,
+  MessageSquare,
+  LayoutGrid,
+  List,
+  Search,
+  Clock,
+  ArrowRight,
+  Hash,
+  FolderSearch,
+  FolderOpen,
+  GitCommit,
+  Edit3,
+  Loader2,
+  Receipt
+} from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { Vessel, DocumentType, VesselDocument, VesselNameHistory, FlagState, VesselCustomDocType, PolicyType, VesselPolicy, VesselDynamicPolicy, PolicyTypeCharacteristic, PolicyTypeCondition, Entity, ClassificationSociety, VesselType } from '../../../shared/types'
+import {
+  Vessel,
+  DocumentType,
+  VesselDocument,
+  VesselNameHistory,
+  FlagState,
+  VesselCustomDocType,
+  PolicyType,
+  VesselPolicy,
+  VesselDynamicPolicy,
+  PolicyTypeCharacteristic,
+  PolicyTypeCondition,
+  Entity,
+  ClassificationSociety,
+  VesselType
+} from '../../../shared/types'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
@@ -22,2458 +72,4158 @@ import ReceiptManager from './ReceiptManager'
 import { ok } from '../utils/ipc'
 
 interface VesselDetailProps {
-    vessel: Vessel
-    onBack: () => void
-    backLabel?: string
-    initialSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
-    initialEditing?: boolean
-    onNavigateToQuotation?: (quotationId: string) => void
+  vessel: Vessel
+  onBack: () => void
+  backLabel?: string
+  initialSection?:
+    'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
+  initialEditing?: boolean
+  onNavigateToQuotation?: (quotationId: string) => void
 }
 
-export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vessels', initialSection, initialEditing = false, onNavigateToQuotation }: VesselDetailProps) {
-    const [docTypes, setDocTypes] = useState<DocumentType[]>([])
-    const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
-    const [dragOverId, setDragOverId] = useState<string | null>(null)
-    const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
-    const [vesselActive, setVesselActive] = useState(vessel.isActive)
-    const [showRemapModal, setShowRemapModal] = useState(false)
-    const [remapEntityIds, setRemapEntityIds] = useState<string[]>([])
+export default function VesselDetail({
+  vessel,
+  onBack,
+  backLabel = 'Back to Vessels',
+  initialSection,
+  initialEditing = false,
+  onNavigateToQuotation
+}: VesselDetailProps) {
+  const [docTypes, setDocTypes] = useState<DocumentType[]>([])
+  const [vesselDocs, setVesselDocs] = useState<VesselDocument[]>([])
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [fileStatus, setFileStatus] = useState<Record<string, boolean>>({})
+  const [vesselActive, setVesselActive] = useState(vessel.isActive)
+  const [showRemapModal, setShowRemapModal] = useState(false)
+  const [remapEntityIds, setRemapEntityIds] = useState<string[]>([])
 
-    // Confirmation modal state
-    const [confirmation, setConfirmation] = useState<{
-        show: boolean
-        title: string
-        message: string
-        onConfirm: () => void
-        isDangerous?: boolean
-    }>({ show: false, title: '', message: '', onConfirm: () => { } })
-    const { theme } = useTheme()
-    const { user, hasPermission } = useAuth()
-    const { showSuccess, showError } = useToast()
-    const isLight = theme === 'light' || theme === 'aurora'
+  // Confirmation modal state
+  const [confirmation, setConfirmation] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    isDangerous?: boolean
+  }>({ show: false, title: '', message: '', onConfirm: () => {} })
+  const { theme } = useTheme()
+  const { user, hasPermission } = useAuth()
+  const { showSuccess, showError } = useToast()
+  const isLight = theme === 'light' || theme === 'aurora'
 
-    // Endorsement prompt state
-    const [endorsementPrompt, setEndorsementPrompt] = useState<{
-        show: boolean
-        changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }>
-        policies: Array<{ id: string; policyDocId: string | null; typeName: string; typeCode: string; policyNumber: string; nextEndNum: number; selected: boolean }>
-    }>({ show: false, changes: [], policies: [] })
+  // Endorsement prompt state
+  const [endorsementPrompt, setEndorsementPrompt] = useState<{
+    show: boolean
+    changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }>
+    policies: Array<{
+      id: string
+      policyDocId: string | null
+      typeName: string
+      typeCode: string
+      policyNumber: string
+      nextEndNum: number
+      selected: boolean
+    }>
+  }>({ show: false, changes: [], policies: [] })
 
-    useEffect(() => {
-        loadData()
-    }, [vessel])
+  useEffect(() => {
+    loadData()
+  }, [vessel])
 
-    // Track recent item view
-    useEffect(() => {
-        window.api.recentItemsAdd('vessel', vessel.id, vessel.name, vessel.imoNumber ? 'IMO: ' + vessel.imoNumber : undefined).then(() => {
-            window.dispatchEvent(new Event('recent-item-added'))
-        }).catch(() => {})
-    }, [vessel.id])
+  // Track recent item view
+  useEffect(() => {
+    window.api
+      .recentItemsAdd(
+        'vessel',
+        vessel.id,
+        vessel.name,
+        vessel.imoNumber ? 'IMO: ' + vessel.imoNumber : undefined
+      )
+      .then(() => {
+        window.dispatchEvent(new Event('recent-item-added'))
+      })
+      .catch(() => {})
+  }, [vessel.id])
 
+  const loadData = async () => {
+    const types = await window.api.getDocumentTypes()
+    const docs = await window.api.getVesselDocuments(vessel.id)
+    const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
 
-    const loadData = async () => {
-        const types = await window.api.getDocumentTypes()
-        const docs = await window.api.getVesselDocuments(vessel.id)
-        const customTypes = await window.api.getVesselCustomDocTypes(vessel.id)
+    // Custom sort: Required first, then by the 'order' defined in Admin.
+    const sortedTypes = [...types].sort((a, b) => {
+      const docA = docs.find((d) => d.documentTypeId === a.id)
+      const docB = docs.find((d) => d.documentTypeId === b.id)
+      const isReqA = docA ? docA.required : a.required
+      const isReqB = docB ? docB.required : b.required
 
-        // Custom sort: Required first, then by the 'order' defined in Admin.
-        const sortedTypes = [...types].sort((a, b) => {
-            const docA = docs.find(d => d.documentTypeId === a.id)
-            const docB = docs.find(d => d.documentTypeId === b.id)
-            const isReqA = docA ? docA.required : a.required
-            const isReqB = docB ? docB.required : b.required
+      if (isReqA !== isReqB) {
+        return isReqA ? -1 : 1 // Required comes first
+      }
+      return a.order - b.order // Then by defined order
+    })
 
-            if (isReqA !== isReqB) {
-                return isReqA ? -1 : 1 // Required comes first
-            }
-            return a.order - b.order // Then by defined order
+    setDocTypes(sortedTypes)
+    setVesselDocs(docs)
+    setCustomDocTypes(customTypes)
+
+    // Check if files exist on disk
+    const status: Record<string, boolean> = {}
+    const withFile = docs.filter((d: VesselDocument) => d.filePath)
+    try {
+      const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
+      if (Array.isArray(exists))
+        withFile.forEach((d: VesselDocument, i: number) => {
+          status[d.documentTypeId] = exists[i]
         })
+    } catch {
+      /* unknown = shown as present */
+    }
+    setFileStatus(status)
 
-        setDocTypes(sortedTypes)
-        setVesselDocs(docs)
-        setCustomDocTypes(customTypes)
+    // Load supplementary data separately so failures don't break core functionality
+    try {
+      const history = await window.api.getVesselNameHistory(vessel.id)
+      setNameHistory(Array.isArray(history) ? history : [])
+    } catch {
+      /* ignore */
+    }
+    try {
+      const fs = await window.api.getFlagStates()
+      setFlagStates(Array.isArray(fs) ? fs : [])
+    } catch {
+      /* ignore */
+    }
+    try {
+      const cs = await window.api.getClassificationSocieties()
+      setClassSocieties(
+        Array.isArray(cs) ? [...cs].sort((a, b) => a.name.localeCompare(b.name)) : []
+      )
+    } catch {
+      /* ignore */
+    }
+    try {
+      const vcs = await window.api.getVesselClassifications(vessel.id)
+      setVesselClassificationIds(
+        new Set(Array.isArray(vcs) ? vcs.map((vc: any) => vc.classificationSocietyId) : [])
+      )
+    } catch {
+      /* ignore */
+    }
+    try {
+      const vt = await window.api.getVesselTypes()
+      setVesselTypes(Array.isArray(vt) ? vt : [])
+    } catch {
+      /* ignore */
+    }
+    try {
+      const [pt, vp] = await Promise.all([
+        window.api.getPolicyTypes(),
+        window.api.getVesselPolicies(vessel.id)
+      ])
+      setAllPolicyTypes(Array.isArray(pt) ? pt : [])
+      setVesselPolicies(Array.isArray(vp) ? vp : [])
+      setAssignedPolicyTypeIds(
+        new Set(Array.isArray(vp) ? vp.map((p: VesselPolicy) => p.policyTypeId) : [])
+      )
+    } catch {
+      /* ignore */
+    }
+    try {
+      const dp = await window.api.getVesselDynamicPolicies(vessel.id)
+      setDynamicPolicies(Array.isArray(dp) ? dp : [])
+    } catch {
+      /* ignore */
+    }
+    try {
+      const notes = await window.api.getVesselNotes(vessel.id)
+      setVesselNoteCount(Array.isArray(notes) ? notes.length : 0)
+    } catch {
+      /* ignore */
+    }
+  }
 
-        // Check if files exist on disk
-        const status: Record<string, boolean> = {}
-        const withFile = docs.filter((d: VesselDocument) => d.filePath)
-        try {
-            const exists = await window.api.fsExistsMany(withFile.map((d: VesselDocument) => d.filePath!))
-            if (Array.isArray(exists)) withFile.forEach((d: VesselDocument, i: number) => { status[d.documentTypeId] = exists[i] })
-        } catch { /* unknown = shown as present */ }
-        setFileStatus(status)
+  const loadDynamicPolicies = async () => {
+    try {
+      const dp = await window.api.getVesselDynamicPolicies(vessel.id)
+      setDynamicPolicies(Array.isArray(dp) ? dp : [])
+    } catch {
+      /* ignore */
+    }
+  }
 
-        // Load supplementary data separately so failures don't break core functionality
-        try {
-            const history = await window.api.getVesselNameHistory(vessel.id)
-            setNameHistory(Array.isArray(history) ? history : [])
-        } catch { /* ignore */ }
-        try {
-            const fs = await window.api.getFlagStates()
-            setFlagStates(Array.isArray(fs) ? fs : [])
-        } catch { /* ignore */ }
-        try {
-            const cs = await window.api.getClassificationSocieties()
-            setClassSocieties(Array.isArray(cs) ? [...cs].sort((a, b) => a.name.localeCompare(b.name)) : [])
-        } catch { /* ignore */ }
-        try {
-            const vcs = await window.api.getVesselClassifications(vessel.id)
-            setVesselClassificationIds(new Set(Array.isArray(vcs) ? vcs.map((vc: any) => vc.classificationSocietyId) : []))
-        } catch { /* ignore */ }
-        try {
-            const vt = await window.api.getVesselTypes()
-            setVesselTypes(Array.isArray(vt) ? vt : [])
-        } catch { /* ignore */ }
-        try {
-            const [pt, vp] = await Promise.all([
-                window.api.getPolicyTypes(),
-                window.api.getVesselPolicies(vessel.id)
-            ])
-            setAllPolicyTypes(Array.isArray(pt) ? pt : [])
-            setVesselPolicies(Array.isArray(vp) ? vp : [])
-            setAssignedPolicyTypeIds(new Set(Array.isArray(vp) ? vp.map((p: VesselPolicy) => p.policyTypeId) : []))
-        } catch { /* ignore */ }
-        try {
-            const dp = await window.api.getVesselDynamicPolicies(vessel.id)
-            setDynamicPolicies(Array.isArray(dp) ? dp : [])
-        } catch { /* ignore */ }
-        try {
-            const notes = await window.api.getVesselNotes(vessel.id)
-            setVesselNoteCount(Array.isArray(notes) ? notes.length : 0)
-        } catch { /* ignore */ }
+  const handleExportAllPolicies = async () => {
+    try {
+      const policies = await window.api.getVesselDynamicPolicies(vessel.id)
+      if (!Array.isArray(policies) || policies.length === 0) {
+        showError('No policies found for this vessel')
+        return
+      }
+      const allChars = await window.api.getPolicyTypeCharacteristics()
+      const rows: Record<string, string>[] = []
+      for (const p of policies) {
+        const chars = Array.isArray(allChars)
+          ? allChars.filter((c) => c.policyTypeId === p.policyTypeId)
+          : []
+        const inceptionChar = chars.find(
+          (c) => /inception|start/i.test(c.name) && c.fieldType === 'date'
+        )
+        const expiryChar = chars.find((c) => /expiry|end/i.test(c.name) && c.fieldType === 'date')
+        const premiumChar = chars.find(
+          (c) =>
+            /premium|amount/i.test(c.name) && (c.fieldType === 'amount' || c.fieldType === 'text')
+        )
+        const deductibleChar = chars.find((c) => /deductible|excess/i.test(c.name))
+        const vals = Array.isArray(p.values) ? p.values : []
+        const getVal = (charId?: string) => {
+          if (!charId) return ''
+          const v = vals.find((v) => v.characteristicId === charId)
+          if (!v) return ''
+          return (
+            v.valueDate || (v.valueAmount != null ? String(v.valueAmount) : '') || v.valueText || ''
+          )
+        }
+        rows.push({
+          'Policy Type': p.policyTypeName || '',
+          'Policy Number': p.policyNumber || '',
+          Status: p.status,
+          Inception: getVal(inceptionChar?.id),
+          Expiry: getVal(expiryChar?.id),
+          Premium: getVal(premiumChar?.id),
+          Currency: p.currency || '',
+          'Customer/Broker': p.customerName || p.brokerName || '',
+          Deductible: getVal(deductibleChar?.id),
+          Condition: p.conditionName || '',
+          Notes: p.notes || ''
+        })
+      }
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
+      XLSX.utils.book_append_sheet(wb, ws, 'Policies')
+      XLSX.writeFile(wb, `${vessel.name.replace(/[^a-zA-Z0-9]/g, '_')}_Policies.xlsx`)
+      showSuccess('Policies exported to Excel')
+    } catch (err: any) {
+      showError(err.message || 'Failed to export policies')
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    if (dragOverId !== id) {
+      setDragOverId(id)
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    setDragOverId(id)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, docTypeId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverId(null)
+
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+    const file = files[0]
+
+    const filePath = window.api.getFilePath(file)
+
+    if (!filePath) {
+      console.error('Could not retrieve file path. Check Electron security settings.')
+      return
     }
 
-    const loadDynamicPolicies = async () => {
-        try {
-            const dp = await window.api.getVesselDynamicPolicies(vessel.id)
-            setDynamicPolicies(Array.isArray(dp) ? dp : [])
-        } catch { /* ignore */ }
+    // Security: Validate file type
+    const validation = await window.api.fileTypesValidateFile(filePath)
+    if (!validation.valid) {
+      showError(`File rejected: ${validation.reason}`)
+      return
     }
 
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
 
-
-    const handleExportAllPolicies = async () => {
-        try {
-            const policies = await window.api.getVesselDynamicPolicies(vessel.id)
-            if (!Array.isArray(policies) || policies.length === 0) {
-                showError('No policies found for this vessel')
-                return
-            }
-            const allChars = await window.api.getPolicyTypeCharacteristics()
-            const rows: Record<string, string>[] = []
-            for (const p of policies) {
-                const chars = Array.isArray(allChars) ? allChars.filter(c => c.policyTypeId === p.policyTypeId) : []
-                const inceptionChar = chars.find(c => /inception|start/i.test(c.name) && c.fieldType === 'date')
-                const expiryChar = chars.find(c => /expiry|end/i.test(c.name) && c.fieldType === 'date')
-                const premiumChar = chars.find(c => /premium|amount/i.test(c.name) && (c.fieldType === 'amount' || c.fieldType === 'text'))
-                const deductibleChar = chars.find(c => /deductible|excess/i.test(c.name))
-                const vals = Array.isArray(p.values) ? p.values : []
-                const getVal = (charId?: string) => {
-                    if (!charId) return ''
-                    const v = vals.find(v => v.characteristicId === charId)
-                    if (!v) return ''
-                    return v.valueDate || (v.valueAmount != null ? String(v.valueAmount) : '') || v.valueText || ''
-                }
-                rows.push({
-                    'Policy Type': p.policyTypeName || '',
-                    'Policy Number': p.policyNumber || '',
-                    'Status': p.status,
-                    'Inception': getVal(inceptionChar?.id),
-                    'Expiry': getVal(expiryChar?.id),
-                    'Premium': getVal(premiumChar?.id),
-                    'Currency': p.currency || '',
-                    'Customer/Broker': p.customerName || p.brokerName || '',
-                    'Deductible': getVal(deductibleChar?.id),
-                    'Condition': p.conditionName || '',
-                    'Notes': p.notes || '',
-                })
-            }
-            const wb = XLSX.utils.book_new()
-            const ws = XLSX.utils.json_to_sheet(rows)
-            ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
-            XLSX.utils.book_append_sheet(wb, ws, 'Policies')
-            XLSX.writeFile(wb, `${vessel.name.replace(/[^a-zA-Z0-9]/g, '_')}_Policies.xlsx`)
-            showSuccess('Policies exported to Excel')
-        } catch (err: any) {
-            showError(err.message || 'Failed to export policies')
-        }
+    const newDoc: VesselDocument = {
+      vesselId: vessel.id,
+      documentTypeId: docTypeId,
+      filePath: filePath,
+      sent: existing?.sent || false,
+      required: existing
+        ? existing.required
+        : isCustom
+          ? true
+          : docTypes.find((t) => t.id === docTypeId)?.required || false,
+      expiryDate: undefined,
+      uploadedDate: new Date().toISOString(),
+      uploadedBy: user?.username || 'Unknown',
+      receivedDate: new Date().toISOString().split('T')[0]
     }
 
-    const handleDragOver = (e: React.DragEvent, id: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = 'copy'
-        }
-        if (dragOverId !== id) {
-            setDragOverId(id)
-        }
+    if (!newDoc.filePath) {
+      console.error('File path is missing from dropped file')
+      return
     }
 
-    const handleDragEnter = (e: React.DragEvent, id: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = 'copy'
-        }
-        setDragOverId(id)
+    await window.api.upsertVesselDocument(newDoc)
+    await loadData()
+  }
+
+  const handleClickUpload = async (docTypeId: string) => {
+    const filePath = await window.api.dialogOpenFileAny()
+    if (!filePath) return
+
+    const validation = await window.api.fileTypesValidateFile(filePath)
+    if (!validation.valid) {
+      showError(`File rejected: ${validation.reason}`)
+      return
     }
 
-    const handleDragLeave = (e: React.DragEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setDragOverId(null)
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const isCustom = customDocTypes.some((c) => c.id === docTypeId)
+
+    const newDoc: VesselDocument = {
+      vesselId: vessel.id,
+      documentTypeId: docTypeId,
+      filePath: filePath,
+      sent: existing?.sent || false,
+      required: existing
+        ? existing.required
+        : isCustom
+          ? true
+          : docTypes.find((t) => t.id === docTypeId)?.required || false,
+      expiryDate: undefined,
+      uploadedDate: new Date().toISOString(),
+      uploadedBy: user?.username || 'Unknown',
+      receivedDate: new Date().toISOString().split('T')[0]
     }
 
-    const handleDrop = async (e: React.DragEvent, docTypeId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setDragOverId(null)
+    await window.api.upsertVesselDocument(newDoc)
+    showSuccess('Document linked successfully')
+    await loadData()
+  }
 
-        const files = e.dataTransfer.files
-        if (files.length === 0) return
-        const file = files[0]
+  const handleToggleRequired = async (docTypeId: string) => {
+    const existing = vesselDocs.find((d) => d.documentTypeId === docTypeId)
+    const docType = docTypes.find((t) => t.id === docTypeId)
 
-        const filePath = window.api.getFilePath(file)
-
-        if (!filePath) {
-            console.error("Could not retrieve file path. Check Electron security settings.")
-            return
-        }
-
-        // Security: Validate file type
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
-
-        const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
-        const isCustom = customDocTypes.some(c => c.id === docTypeId)
-
-        const newDoc: VesselDocument = {
-            vesselId: vessel.id,
-            documentTypeId: docTypeId,
-            filePath: filePath,
-            sent: existing?.sent || false,
-            required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-            expiryDate: undefined,
-            uploadedDate: new Date().toISOString(),
-            uploadedBy: user?.username || 'Unknown',
-            receivedDate: new Date().toISOString().split('T')[0]
-        }
-
-        if (!newDoc.filePath) {
-            console.error("File path is missing from dropped file")
-            return
-        }
-
-        await window.api.upsertVesselDocument(newDoc)
-        await loadData()
+    if (existing) {
+      const updated = { ...existing, required: !existing.required }
+      await window.api.upsertVesselDocument(updated)
+    } else {
+      const newDoc: VesselDocument = {
+        vesselId: vessel.id,
+        documentTypeId: docTypeId,
+        filePath: '',
+        sent: false,
+        required: docType ? !docType.required : true,
+        uploadedDate: new Date().toISOString(),
+        uploadedBy: user?.username || 'System'
+      }
+      await window.api.upsertVesselDocument(newDoc)
     }
+    loadData()
+  }
 
-    const handleClickUpload = async (docTypeId: string) => {
-        const filePath = await window.api.dialogOpenFileAny()
-        if (!filePath) return
+  const handleUpdateExpiry = async (docTypeId: string, expiryDate: string) => {
+    await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
+    loadData()
+  }
 
-        const validation = await window.api.fileTypesValidateFile(filePath)
-        if (!validation.valid) {
-            showError(`File rejected: ${validation.reason}`)
-            return
-        }
+  const handleDeleteDoc = async (doc: VesselDocument) => {
+    setConfirmation({
+      show: true,
+      title: 'Unlink File?',
+      message:
+        'Are you sure you want to unlink this file? The document record will remain but the file path will be cleared.',
+      onConfirm: async () => {
+        const updated = { ...doc, filePath: '' }
+        await window.api.upsertVesselDocument(updated)
+        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
 
-        const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
-        const isCustom = customDocTypes.some(c => c.id === docTypeId)
-
-        const newDoc: VesselDocument = {
-            vesselId: vessel.id,
-            documentTypeId: docTypeId,
-            filePath: filePath,
-            sent: existing?.sent || false,
-            required: existing ? existing.required : (isCustom ? true : (docTypes.find(t => t.id === docTypeId)?.required || false)),
-            expiryDate: undefined,
-            uploadedDate: new Date().toISOString(),
-            uploadedBy: user?.username || 'Unknown',
-            receivedDate: new Date().toISOString().split('T')[0]
-        }
-
-        await window.api.upsertVesselDocument(newDoc)
-        showSuccess('Document linked successfully')
-        await loadData()
+  const handleDuplicateDoc = async (doc: VesselDocument) => {
+    try {
+      await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
+      showSuccess('Document duplicated')
+      loadData()
+    } catch (error: any) {
+      showError(error.message || 'Failed to duplicate document')
     }
+  }
 
-    const handleToggleRequired = async (docTypeId: string) => {
-        const existing = vesselDocs.find(d => d.documentTypeId === docTypeId)
-        const docType = docTypes.find(t => t.id === docTypeId)
+  const handleDeleteDocById = async (doc: VesselDocument) => {
+    setConfirmation({
+      show: true,
+      title: 'Remove Document?',
+      message: 'Are you sure you want to remove this document entry?',
+      isDangerous: true,
+      onConfirm: async () => {
+        await window.api.deleteVesselDocumentById(doc.id!)
+        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
 
-        if (existing) {
-            const updated = { ...existing, required: !existing.required }
-            await window.api.upsertVesselDocument(updated)
+  const openFile = async (path: string) => {
+    if (!path) return
+    console.log('[OpenFile]', path)
+    const res: any = await window.api.fsOpen(path)
+    if (res?.error) {
+      showError(res.message || `Cannot open: ${path}`)
+    } else if (typeof res === 'string' && res) {
+      showError(`Failed to open: ${res}`)
+    }
+  }
+
+  const [isEditing, setIsEditing] = useState(initialEditing)
+  useEffect(() => {
+    if (initialEditing) setIsEditing(true)
+  }, [initialEditing])
+  const [editName, setEditName] = useState(vessel.name)
+  const [editImo, setEditImo] = useState(vessel.imoNumber)
+  const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
+  const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
+  const [detailView, setDetailView] = useState<
+    'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'
+  >(initialSection === ('history' as any) ? 'timeline' : initialSection || 'documents')
+  useEffect(() => {
+    if (initialSection) {
+      setDetailView(initialSection)
+      if (initialSection === 'policies' || initialSection === 'surveys') loadDynamicPolicies()
+      // History merged into Activity (timeline)
+    }
+  }, [initialSection])
+  const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
+  // auditLog removed — merged into Activity (timeline) tab
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
+  const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
+  const [showNotesModal, setShowNotesModal] = useState(false)
+  const [vesselNotesList, setVesselNotesList] = useState<any[]>([])
+  const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
+  const [newVesselNoteText, setNewVesselNoteText] = useState('')
+  const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
+  const [replyingToNoteId, setReplyingToNoteId] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
+  const [vesselNoteCount, setVesselNoteCount] = useState(0)
+  const [flagStates, setFlagStates] = useState<FlagState[]>([])
+  const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
+  const [showAddFlagModal, setShowAddFlagModal] = useState(false)
+  const [newFlagName, setNewFlagName] = useState('')
+  const [newFlagIso3, setNewFlagIso3] = useState('')
+  const [newFlagAddress, setNewFlagAddress] = useState('')
+  const [newFlagEmail, setNewFlagEmail] = useState('')
+  const [editBuiltYear, setEditBuiltYear] = useState(vessel.builtYear?.toString() || '')
+  const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
+  const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
+  const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
+  const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
+  const [showAddVesselType, setShowAddVesselType] = useState(false)
+  const [newVesselTypeName, setNewVesselTypeName] = useState('')
+  const [showAddClass, setShowAddClass] = useState(false)
+  const [newClassName, setNewClassName] = useState('')
+  const [newClassAbbr, setNewClassAbbr] = useState('')
+  const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
+  const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
+  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
+  const [classSearch, setClassSearch] = useState('')
+  const [classConfirm, setClassConfirm] = useState<{
+    show: boolean
+    newId: string
+    newName: string
+  } | null>(null)
+  const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
+  const [flagSearch, setFlagSearch] = useState('')
+  const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
+  const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
+  const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
+  const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
+  const [useCardDocs, setUseCardDocs] = useState(
+    () => localStorage.getItem('vessel_doc_card_view') === '1'
+  )
+  const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
+  const [newCustomDocName, setNewCustomDocName] = useState('')
+  const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+
+  // Seed classification IDs from legacy text field if junction table is empty OR has stale IDs
+  // (stale = IDs exist in junction but don't match any current classSociety record)
+  useEffect(() => {
+    if (classSocieties.length === 0) return
+    const validIds = classSocieties.filter((cs) => vesselClassificationIds.has(cs.id))
+    if (validIds.length === 0 && vessel.classificationSociety) {
+      const text = vessel.classificationSociety.trim().toLowerCase()
+      const matched = classSocieties.find(
+        (cs) =>
+          cs.name.toLowerCase() === text ||
+          (cs.abbreviation && cs.abbreviation.toLowerCase() === text)
+      )
+      if (matched) setVesselClassificationIds(new Set([matched.id]))
+    }
+  }, [classSocieties, vessel.classificationSociety])
+  const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
+  const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
+  const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
+
+  const handleTogglePolicy = async (policyTypeId: string) => {
+    try {
+      if (assignedPolicyTypeIds.has(policyTypeId)) {
+        // Remove
+        const vp = vesselPolicies.find((p) => p.policyTypeId === policyTypeId)
+        if (vp) {
+          await window.api.deleteVesselPolicy(vp.id)
+          setVesselPolicies((prev) => prev.filter((p) => p.id !== vp.id))
+          setAssignedPolicyTypeIds((prev) => {
+            const n = new Set(prev)
+            n.delete(policyTypeId)
+            return n
+          })
+        }
+      } else {
+        // Add
+        const vp = await window.api.addVesselPolicy(vessel.id, policyTypeId)
+        setVesselPolicies((prev) => [...prev, vp])
+        setAssignedPolicyTypeIds((prev) => new Set([...prev, policyTypeId]))
+      }
+    } catch (err: any) {
+      showError(err.message || 'Failed to update policies')
+    }
+  }
+
+  const handleAddVesselType = async () => {
+    if (!newVesselTypeName.trim()) return
+    try {
+      const created = await window.api.addVesselType({
+        name: newVesselTypeName.trim(),
+        order: vesselTypes.length
+      })
+      setVesselTypes((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setEditVesselType(created.id)
+      setShowAddVesselType(false)
+      setNewVesselTypeName('')
+      showSuccess('Vessel type added')
+    } catch (err: any) {
+      showError(err.message || 'Failed to add vessel type')
+    }
+  }
+
+  const handleAddClassSociety = async () => {
+    if (!newClassName.trim()) return
+    try {
+      const created = await window.api.addClassificationSociety({
+        name: newClassName.trim(),
+        abbreviation: newClassAbbr.trim() || undefined,
+        isIacs: false
+      } as any)
+      setClassSocieties((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setVesselClassificationIds((prev) => new Set(prev).add(created.id))
+      setShowAddClass(false)
+      setNewClassName('')
+      setNewClassAbbr('')
+      showSuccess('Classification society added')
+    } catch (err: any) {
+      showError(err.message || 'Failed to add classification society')
+    }
+  }
+
+  const handleAddFlag = async () => {
+    if (!newFlagName.trim() || !newFlagIso3.trim()) return
+    try {
+      const created = ok(
+        await window.api.addFlagState({
+          name: newFlagName.trim(),
+          iso3Code: newFlagIso3.trim().toUpperCase(),
+          address: newFlagAddress.trim() || undefined,
+          email: newFlagEmail.trim() || undefined
+        })
+      )
+      setFlagStates((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setSelectedFlagStateId(created.id)
+      vessel.flagStateId = created.id
+      await window.api.updateVessel(vessel.id, { flagStateId: created.id as any })
+      setShowAddFlagModal(false)
+      setNewFlagName('')
+      setNewFlagIso3('')
+      setNewFlagAddress('')
+      setNewFlagEmail('')
+      showSuccess('Flag state created and assigned')
+    } catch (err: any) {
+      showError(err.message || 'Failed to create flag state')
+    }
+  }
+
+  const handleAddCustomDocType = async () => {
+    if (!newCustomDocName.trim()) return
+    await window.api.addVesselCustomDocType({
+      vesselId: vessel.id,
+      name: newCustomDocName.trim(),
+      order: customDocTypes.length
+    })
+    setNewCustomDocName('')
+    setShowAddCustomDoc(false)
+    showSuccess('Custom document type added')
+    loadData()
+  }
+
+  const handleDeleteCustomDocType = async (customType: VesselCustomDocType) => {
+    setConfirmation({
+      show: true,
+      title: 'Remove Custom Document Type?',
+      message: `Are you sure you want to remove "${customType.name}"? Any linked file will also be removed.`,
+      isDangerous: true,
+      onConfirm: async () => {
+        // Delete any vessel document linked to this custom type
+        const linkedDoc = vesselDocs.find((d) => d.documentTypeId === customType.id)
+        if (linkedDoc?.id) {
+          await window.api.deleteVesselDocumentById(linkedDoc.id)
+        }
+        await window.api.deleteVesselCustomDocType(customType.id)
+        showSuccess('Custom document type removed')
+        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
+
+  const handleSaveVessel = async () => {
+    if (!editName.trim() || !editImo.trim()) return
+    // Capture old values before save for endorsement trigger check
+    const oldValues: Record<string, string> = {
+      name: vessel.name || '',
+      flagStateId: vessel.flagStateId || '',
+      classificationSociety: vessel.classificationSociety || ''
+    }
+    // Derive classification text from junction table selection
+    const classText =
+      vesselClassificationIds.size > 0
+        ? classSocieties
+            .filter((cs) => vesselClassificationIds.has(cs.id))
+            .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
+            .map((cs) => cs.abbreviation || cs.name)
+            .join(' / ')
+        : editClassification || null
+    await window.api.updateVessel(vessel.id, {
+      name: editName,
+      imoNumber: editImo,
+      builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
+      rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
+      grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
+      vesselTypeId: editVesselType || null,
+      classificationSociety: classText,
+      callSign: editCallSign || null,
+      flagStateId: selectedFlagStateId || null
+    } as any)
+    vessel.name = editName
+    vessel.imoNumber = editImo
+    vessel.builtYear = editBuiltYear ? parseInt(editBuiltYear) : undefined
+    vessel.rebuiltYear = editRebuiltYear ? parseInt(editRebuiltYear) : undefined
+    vessel.grossTonnage = editGrossTonnage ? parseFloat(editGrossTonnage) : undefined
+    vessel.vesselTypeId = editVesselType || undefined
+    vessel.vesselType = vesselTypes.find((vt) => vt.id === editVesselType)?.name || undefined
+    vessel.classificationSociety = editClassification || undefined
+    vessel.callSign = editCallSign || undefined
+    vessel.flagStateId = selectedFlagStateId || undefined
+    await window.api.setVesselClassifications(vessel.id, [...vesselClassificationIds])
+    setIsEditing(false)
+    showSuccess('Vessel details updated')
+    // Reload to refresh name history
+    const history = await window.api.getVesselNameHistory(vessel.id)
+    setNameHistory(Array.isArray(history) ? history : [])
+
+    // Check endorsement triggers
+    try {
+      const newValues: Record<string, string> = {
+        name: editName || '',
+        flagStateId: selectedFlagStateId || '',
+        classificationSociety: classText || ''
+      }
+      const triggerFields = await window.api.endorsementGetTriggerFields()
+      if (!Array.isArray(triggerFields)) return
+      const activeFields = triggerFields.filter((f) => f.isActive)
+      const changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }> = []
+      for (const f of activeFields) {
+        const oldV = oldValues[f.fieldKey] || ''
+        const newV = newValues[f.fieldKey] || ''
+        if (oldV !== newV) {
+          // Resolve flag state names for display
+          let displayOld = oldV
+          let displayNew = newV
+          if (f.fieldKey === 'flagStateId') {
+            const fs = flagStates || []
+            displayOld = fs.find((s) => s.id === oldV)?.name || oldV
+            displayNew = fs.find((s) => s.id === newV)?.name || newV
+          }
+          changes.push({ fieldLabel: f.fieldLabel, oldValue: displayOld, newValue: displayNew })
+        }
+      }
+      if (changes.length > 0) {
+        // Find active policy documents for this vessel
+        const dp = dynamicPolicies.filter((p) => p.status === 'active')
+        const policyTypes = await window.api.getPolicyTypes()
+        const policies: typeof endorsementPrompt.policies = []
+        for (const p of dp) {
+          const pt = Array.isArray(policyTypes)
+            ? policyTypes.find((t) => t.id === p.policyTypeId)
+            : null
+          const code = pt?.code || ''
+          const policyDocId = await window.api.policyFindActiveForVessel(vessel.id, code)
+          if (policyDocId) {
+            const nextNum = await window.api.endorsementNextNumber(policyDocId)
+            policies.push({
+              id: p.id,
+              policyDocId,
+              typeName: pt?.name || p.policyTypeName || '',
+              typeCode: code,
+              policyNumber: p.policyNumber || '',
+              nextEndNum: nextNum,
+              selected: true
+            })
+          }
+        }
+        if (policies.length > 0) {
+          setEndorsementPrompt({ show: true, changes, policies })
+        }
+      }
+    } catch {
+      /* endorsement prompt is best-effort */
+    }
+  }
+
+  const handleToggleVesselActive = async () => {
+    const newStatus = !vesselActive
+    await window.api.updateVessel(vessel.id, { isActive: newStatus })
+    setVesselActive(newStatus)
+    vessel.isActive = newStatus
+    showSuccess(`Vessel is now ${newStatus ? 'ACTIVE' : 'INACTIVE'}`)
+    // Refresh policies so cascade changes (active ↔ inactive) are reflected immediately
+    loadDynamicPolicies()
+  }
+
+  const handleDeleteVessel = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const confirmMsg =
+      'Are you sure you want to delete this vessel? \n\nThis will also delete all its documents and linked assureds that are not associated with other vessels. \n\nTHIS ACTION CANNOT BE UNDONE.'
+
+    setConfirmation({
+      show: true,
+      title: 'Delete Vessel?',
+      message: confirmMsg,
+      isDangerous: true,
+      onConfirm: async () => {
+        const result = await window.api.deleteVessel(vessel.id)
+        if (result.success) {
+          showSuccess('Vessel deleted successfully')
+          onBack()
         } else {
-            const newDoc: VesselDocument = {
-                vesselId: vessel.id,
-                documentTypeId: docTypeId,
-                filePath: '',
-                sent: false,
-                required: docType ? !docType.required : true,
-                uploadedDate: new Date().toISOString(),
-                uploadedBy: user?.username || 'System'
-            }
-            await window.api.upsertVesselDocument(newDoc)
+          showError(result.message || 'Failed to delete vessel')
         }
-        loadData()
+        setConfirmation((prev) => ({ ...prev, show: false }))
+      }
+    })
+  }
+
+  const handleOpenVesselNotes = async () => {
+    setShowNotesModal(true)
+    setVesselNotesList([])
+    setNewVesselNoteText('')
+    setReplyingToNoteId(null)
+    setReplyText('')
+    setVesselNotesLoading(true)
+    try {
+      const [data, users] = await Promise.all([
+        window.api.getVesselNotes(vessel.id),
+        window.api.notificationsGetUsernames().catch(() => [])
+      ])
+      const list = Array.isArray(data) ? data : []
+      setVesselNotesList(list)
+      setVesselNoteCount(list.length)
+      setMentionUsers(Array.isArray(users) ? users : [])
+    } finally {
+      setVesselNotesLoading(false)
     }
+  }
 
-    const handleUpdateExpiry = async (docTypeId: string, expiryDate: string) => {
-        await window.api.updateVesselDocumentExpiry(vessel.id, docTypeId, expiryDate)
-        loadData()
+  const handleAddVesselNote = async () => {
+    if (!newVesselNoteText.trim()) return
+    setVesselNotesSaving(true)
+    try {
+      const note = await window.api.addVesselNote(vessel.id, newVesselNoteText.trim())
+      setVesselNotesList((prev) => {
+        const next = [...prev, note]
+        setVesselNoteCount(next.length)
+        return next
+      })
+      setNewVesselNoteText('')
+    } finally {
+      setVesselNotesSaving(false)
     }
+  }
 
-    const handleDeleteDoc = async (doc: VesselDocument) => {
-        setConfirmation({
-            show: true,
-            title: 'Unlink File?',
-            message: 'Are you sure you want to unlink this file? The document record will remain but the file path will be cleared.',
-            onConfirm: async () => {
-                const updated = { ...doc, filePath: '' }
-                await window.api.upsertVesselDocument(updated)
-                loadData()
-                setConfirmation(prev => ({ ...prev, show: false }))
-            }
-        })
+  const handleDeleteVesselNote = async (noteId: string) => {
+    await window.api.deleteVesselNote(noteId)
+    setVesselNotesList((prev) => {
+      const next = prev.filter((n) => n.id !== noteId && n.parentNoteId !== noteId)
+      setVesselNoteCount(next.length)
+      return next
+    })
+  }
+
+  const handleAddReply = async (parentId: string) => {
+    if (!replyText.trim()) return
+    setVesselNotesSaving(true)
+    try {
+      const note = await window.api.addVesselNote(vessel.id, replyText.trim(), parentId)
+      setVesselNotesList((prev) => [...prev, note])
+      setReplyText('')
+      setReplyingToNoteId(null)
+    } finally {
+      setVesselNotesSaving(false)
     }
+  }
 
-    const handleDuplicateDoc = async (doc: VesselDocument) => {
-        try {
-            await window.api.duplicateVesselDocument(doc.id!, user?.username || 'Unknown')
-            showSuccess('Document duplicated')
-            loadData()
-        } catch (error: any) {
-            showError(error.message || 'Failed to duplicate document')
-        }
+  const handleMentionCheck = (text: string, target: 'new' | 'reply') => {
+    if (target === 'new') setNewVesselNoteText(text)
+    else setReplyText(text)
+    setMentionTarget(target)
+    const cursorEl = document.activeElement as HTMLTextAreaElement
+    const cursorPos = cursorEl?.selectionStart || 0
+    const textBefore = text.slice(0, cursorPos)
+    const atMatch = textBefore.match(/@(\w*)$/)
+    if (atMatch) setMentionQuery(atMatch[1].toLowerCase())
+    else setMentionQuery(null)
+  }
+
+  const insertMention = (username: string) => {
+    const getter = mentionTarget === 'new' ? newVesselNoteText : replyText
+    const setter = mentionTarget === 'new' ? setNewVesselNoteText : setReplyText
+    const cursorEl = document.activeElement as HTMLTextAreaElement
+    const cursorPos = cursorEl?.selectionStart || getter.length
+    const textBefore = getter.slice(0, cursorPos)
+    const atMatch = textBefore.match(/@(\w*)$/)
+    if (atMatch) {
+      const before = textBefore.slice(0, textBefore.length - atMatch[0].length)
+      const after = getter.slice(cursorPos)
+      setter(before + '@' + username + ' ' + after)
     }
+    setMentionQuery(null)
+  }
 
-    const handleDeleteDocById = async (doc: VesselDocument) => {
-        setConfirmation({
-            show: true,
-            title: 'Remove Document?',
-            message: 'Are you sure you want to remove this document entry?',
-            isDangerous: true,
-            onConfirm: async () => {
-                await window.api.deleteVesselDocumentById(doc.id!)
-                loadData()
-                setConfirmation(prev => ({ ...prev, show: false }))
-            }
-        })
-    }
+  const filteredMentionUsers =
+    mentionQuery !== null
+      ? mentionUsers
+          .filter((u) => u.username.toLowerCase().includes(mentionQuery) && u.id !== user?.id)
+          .slice(0, 6)
+      : []
 
-    const openFile = async (path: string) => {
-        if (!path) return
-        console.log('[OpenFile]', path)
-        const res: any = await window.api.fsOpen(path)
-        if (res?.error) {
-            showError(res.message || `Cannot open: ${path}`)
-        } else if (typeof res === 'string' && res) {
-            showError(`Failed to open: ${res}`)
-        }
-    }
-
-    const [isEditing, setIsEditing] = useState(initialEditing)
-    useEffect(() => { if (initialEditing) setIsEditing(true) }, [initialEditing])
-    const [editName, setEditName] = useState(vessel.name)
-    const [editImo, setEditImo] = useState(vessel.imoNumber)
-    const [editingExpiry, setEditingExpiry] = useState<Record<string, string>>({})
-    const [editingReceived, setEditingReceived] = useState<Record<string, string>>({})
-    const [detailView, setDetailView] = useState<'documents' | 'assureds' | 'surveys' | 'policies' | 'payments' | 'timeline' | 'quotations'>(initialSection === 'history' as any ? 'timeline' : initialSection || 'documents')
-    useEffect(() => {
-        if (initialSection) {
-            setDetailView(initialSection)
-            if (initialSection === 'policies' || initialSection === 'surveys') loadDynamicPolicies()
-            // History merged into Activity (timeline)
-        }
-    }, [initialSection])
-    const [dynamicPolicies, setDynamicPolicies] = useState<VesselDynamicPolicy[]>([])
-    // auditLog removed — merged into Activity (timeline) tab
-    const [showExportMenu, setShowExportMenu] = useState(false)
-    const [showTemplateGenerate, setShowTemplateGenerate] = useState(false)
-    const [nameHistory, setNameHistory] = useState<VesselNameHistory[]>([])
-    const [showNotesModal, setShowNotesModal] = useState(false)
-    const [vesselNotesList, setVesselNotesList] = useState<any[]>([])
-    const [vesselNotesLoading, setVesselNotesLoading] = useState(false)
-    const [newVesselNoteText, setNewVesselNoteText] = useState('')
-    const [vesselNotesSaving, setVesselNotesSaving] = useState(false)
-    const [replyingToNoteId, setReplyingToNoteId] = useState<string | null>(null)
-    const [replyText, setReplyText] = useState('')
-    const [mentionUsers, setMentionUsers] = useState<{ id: string; username: string }[]>([])
-    const [mentionQuery, setMentionQuery] = useState<string | null>(null)
-    const [mentionTarget, setMentionTarget] = useState<'new' | 'reply'>('new')
-    const [vesselNoteCount, setVesselNoteCount] = useState(0)
-    const [flagStates, setFlagStates] = useState<FlagState[]>([])
-    const [selectedFlagStateId, setSelectedFlagStateId] = useState(vessel.flagStateId || '')
-    const [showAddFlagModal, setShowAddFlagModal] = useState(false)
-    const [newFlagName, setNewFlagName] = useState('')
-    const [newFlagIso3, setNewFlagIso3] = useState('')
-    const [newFlagAddress, setNewFlagAddress] = useState('')
-    const [newFlagEmail, setNewFlagEmail] = useState('')
-    const [editBuiltYear, setEditBuiltYear] = useState(vessel.builtYear?.toString() || '')
-    const [editRebuiltYear, setEditRebuiltYear] = useState(vessel.rebuiltYear?.toString() || '')
-    const [showRebuiltYear, setShowRebuiltYear] = useState(!!vessel.rebuiltYear)
-    const [editGrossTonnage, setEditGrossTonnage] = useState(vessel.grossTonnage?.toString() || '')
-    const [editVesselType, setEditVesselType] = useState(vessel.vesselTypeId || '')
-    const [showAddVesselType, setShowAddVesselType] = useState(false)
-    const [newVesselTypeName, setNewVesselTypeName] = useState('')
-    const [showAddClass, setShowAddClass] = useState(false)
-    const [newClassName, setNewClassName] = useState('')
-    const [newClassAbbr, setNewClassAbbr] = useState('')
-    const [editClassification, setEditClassification] = useState(vessel.classificationSociety || '')
-    const [vesselClassificationIds, setVesselClassificationIds] = useState<Set<string>>(new Set())
-    const [classDropdownOpen, setClassDropdownOpen] = useState(false)
-    const [classSearch, setClassSearch] = useState('')
-    const [classConfirm, setClassConfirm] = useState<{ show: boolean; newId: string; newName: string } | null>(null)
-    const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
-    const [flagSearch, setFlagSearch] = useState('')
-    const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
-    const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
-    const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
-    const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
-    const [useCardDocs, setUseCardDocs] = useState(() => localStorage.getItem('vessel_doc_card_view') === '1')
-    const [showAddCustomDoc, setShowAddCustomDoc] = useState(false)
-    const [newCustomDocName, setNewCustomDocName] = useState('')
-    const [showPoliciesModal, setShowPoliciesModal] = useState(false)
-
-    // Seed classification IDs from legacy text field if junction table is empty OR has stale IDs
-    // (stale = IDs exist in junction but don't match any current classSociety record)
-    useEffect(() => {
-        if (classSocieties.length === 0) return
-        const validIds = classSocieties.filter(cs => vesselClassificationIds.has(cs.id))
-        if (validIds.length === 0 && vessel.classificationSociety) {
-            const text = vessel.classificationSociety.trim().toLowerCase()
-            const matched = classSocieties.find(cs =>
-                cs.name.toLowerCase() === text ||
-                (cs.abbreviation && cs.abbreviation.toLowerCase() === text)
-            )
-            if (matched) setVesselClassificationIds(new Set([matched.id]))
-        }
-    }, [classSocieties, vessel.classificationSociety])
-    const [allPolicyTypes, setAllPolicyTypes] = useState<PolicyType[]>([])
-    const [vesselPolicies, setVesselPolicies] = useState<VesselPolicy[]>([])
-    const [assignedPolicyTypeIds, setAssignedPolicyTypeIds] = useState<Set<string>>(new Set())
-
-    const handleTogglePolicy = async (policyTypeId: string) => {
-        try {
-            if (assignedPolicyTypeIds.has(policyTypeId)) {
-                // Remove
-                const vp = vesselPolicies.find(p => p.policyTypeId === policyTypeId)
-                if (vp) {
-                    await window.api.deleteVesselPolicy(vp.id)
-                    setVesselPolicies(prev => prev.filter(p => p.id !== vp.id))
-                    setAssignedPolicyTypeIds(prev => { const n = new Set(prev); n.delete(policyTypeId); return n })
-                }
-            } else {
-                // Add
-                const vp = await window.api.addVesselPolicy(vessel.id, policyTypeId)
-                setVesselPolicies(prev => [...prev, vp])
-                setAssignedPolicyTypeIds(prev => new Set([...prev, policyTypeId]))
-            }
-        } catch (err: any) {
-            showError(err.message || 'Failed to update policies')
-        }
-    }
-
-    const handleAddVesselType = async () => {
-        if (!newVesselTypeName.trim()) return
-        try {
-            const created = await window.api.addVesselType({ name: newVesselTypeName.trim(), order: vesselTypes.length })
-            setVesselTypes(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-            setEditVesselType(created.id)
-            setShowAddVesselType(false)
-            setNewVesselTypeName('')
-            showSuccess('Vessel type added')
-        } catch (err: any) {
-            showError(err.message || 'Failed to add vessel type')
-        }
-    }
-
-    const handleAddClassSociety = async () => {
-        if (!newClassName.trim()) return
-        try {
-            const created = await window.api.addClassificationSociety({ name: newClassName.trim(), abbreviation: newClassAbbr.trim() || undefined, isIacs: false } as any)
-            setClassSocieties(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-            setVesselClassificationIds(prev => new Set(prev).add(created.id))
-            setShowAddClass(false)
-            setNewClassName('')
-            setNewClassAbbr('')
-            showSuccess('Classification society added')
-        } catch (err: any) {
-            showError(err.message || 'Failed to add classification society')
-        }
-    }
-
-    const handleAddFlag = async () => {
-        if (!newFlagName.trim() || !newFlagIso3.trim()) return
-        try {
-            const created = ok(await window.api.addFlagState({
-                name: newFlagName.trim(),
-                iso3Code: newFlagIso3.trim().toUpperCase(),
-                address: newFlagAddress.trim() || undefined,
-                email: newFlagEmail.trim() || undefined
-            }))
-            setFlagStates(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
-            setSelectedFlagStateId(created.id)
-            vessel.flagStateId = created.id
-            await window.api.updateVessel(vessel.id, { flagStateId: created.id as any })
-            setShowAddFlagModal(false)
-            setNewFlagName('')
-            setNewFlagIso3('')
-            setNewFlagAddress('')
-            setNewFlagEmail('')
-            showSuccess('Flag state created and assigned')
-        } catch (err: any) {
-            showError(err.message || 'Failed to create flag state')
-        }
-    }
-
-    const handleAddCustomDocType = async () => {
-        if (!newCustomDocName.trim()) return
-        await window.api.addVesselCustomDocType({
-            vesselId: vessel.id,
-            name: newCustomDocName.trim(),
-            order: customDocTypes.length
-        })
-        setNewCustomDocName('')
-        setShowAddCustomDoc(false)
-        showSuccess('Custom document type added')
-        loadData()
-    }
-
-    const handleDeleteCustomDocType = async (customType: VesselCustomDocType) => {
-        setConfirmation({
-            show: true,
-            title: 'Remove Custom Document Type?',
-            message: `Are you sure you want to remove "${customType.name}"? Any linked file will also be removed.`,
-            isDangerous: true,
-            onConfirm: async () => {
-                // Delete any vessel document linked to this custom type
-                const linkedDoc = vesselDocs.find(d => d.documentTypeId === customType.id)
-                if (linkedDoc?.id) {
-                    await window.api.deleteVesselDocumentById(linkedDoc.id)
-                }
-                await window.api.deleteVesselCustomDocType(customType.id)
-                showSuccess('Custom document type removed')
-                loadData()
-                setConfirmation(prev => ({ ...prev, show: false }))
-            }
-        })
-    }
-
-    const handleSaveVessel = async () => {
-        if (!editName.trim() || !editImo.trim()) return
-        // Capture old values before save for endorsement trigger check
-        const oldValues: Record<string, string> = {
-            name: vessel.name || '',
-            flagStateId: vessel.flagStateId || '',
-            classificationSociety: vessel.classificationSociety || '',
-        }
-        // Derive classification text from junction table selection
-        const classText = vesselClassificationIds.size > 0
-            ? classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(' / ')
-            : (editClassification || null)
-        await window.api.updateVessel(vessel.id, {
-            name: editName,
-            imoNumber: editImo,
-            builtYear: editBuiltYear ? parseInt(editBuiltYear) : null,
-            rebuiltYear: editRebuiltYear ? parseInt(editRebuiltYear) : null,
-            grossTonnage: editGrossTonnage ? parseFloat(editGrossTonnage) : null,
-            vesselTypeId: editVesselType || null,
-            classificationSociety: classText,
-            callSign: editCallSign || null,
-            flagStateId: selectedFlagStateId || null
-        } as any)
-        vessel.name = editName
-        vessel.imoNumber = editImo
-        vessel.builtYear = editBuiltYear ? parseInt(editBuiltYear) : undefined
-        vessel.rebuiltYear = editRebuiltYear ? parseInt(editRebuiltYear) : undefined
-        vessel.grossTonnage = editGrossTonnage ? parseFloat(editGrossTonnage) : undefined
-        vessel.vesselTypeId = editVesselType || undefined
-        vessel.vesselType = vesselTypes.find(vt => vt.id === editVesselType)?.name || undefined
-        vessel.classificationSociety = editClassification || undefined
-        vessel.callSign = editCallSign || undefined
-        vessel.flagStateId = selectedFlagStateId || undefined
-        await window.api.setVesselClassifications(vessel.id, [...vesselClassificationIds])
-        setIsEditing(false)
-        showSuccess('Vessel details updated')
-        // Reload to refresh name history
-        const history = await window.api.getVesselNameHistory(vessel.id)
-        setNameHistory(Array.isArray(history) ? history : [])
-
-        // Check endorsement triggers
-        try {
-            const newValues: Record<string, string> = {
-                name: editName || '',
-                flagStateId: selectedFlagStateId || '',
-                classificationSociety: classText || '',
-            }
-            const triggerFields = await window.api.endorsementGetTriggerFields()
-            if (!Array.isArray(triggerFields)) return
-            const activeFields = triggerFields.filter(f => f.isActive)
-            const changes: Array<{ fieldLabel: string; oldValue: string; newValue: string }> = []
-            for (const f of activeFields) {
-                const oldV = oldValues[f.fieldKey] || ''
-                const newV = newValues[f.fieldKey] || ''
-                if (oldV !== newV) {
-                    // Resolve flag state names for display
-                    let displayOld = oldV
-                    let displayNew = newV
-                    if (f.fieldKey === 'flagStateId') {
-                        const fs = flagStates || []
-                        displayOld = fs.find(s => s.id === oldV)?.name || oldV
-                        displayNew = fs.find(s => s.id === newV)?.name || newV
-                    }
-                    changes.push({ fieldLabel: f.fieldLabel, oldValue: displayOld, newValue: displayNew })
-                }
-            }
-            if (changes.length > 0) {
-                // Find active policy documents for this vessel
-                const dp = dynamicPolicies.filter(p => p.status === 'active')
-                const policyTypes = await window.api.getPolicyTypes()
-                const policies: typeof endorsementPrompt.policies = []
-                for (const p of dp) {
-                    const pt = Array.isArray(policyTypes) ? policyTypes.find(t => t.id === p.policyTypeId) : null
-                    const code = pt?.code || ''
-                    const policyDocId = await window.api.policyFindActiveForVessel(vessel.id, code)
-                    if (policyDocId) {
-                        const nextNum = await window.api.endorsementNextNumber(policyDocId)
-                        policies.push({
-                            id: p.id,
-                            policyDocId,
-                            typeName: pt?.name || p.policyTypeName || '',
-                            typeCode: code,
-                            policyNumber: p.policyNumber || '',
-                            nextEndNum: nextNum,
-                            selected: true
-                        })
-                    }
-                }
-                if (policies.length > 0) {
-                    setEndorsementPrompt({ show: true, changes, policies })
-                }
-            }
-        } catch { /* endorsement prompt is best-effort */ }
-    }
-
-    const handleToggleVesselActive = async () => {
-        const newStatus = !vesselActive
-        await window.api.updateVessel(vessel.id, { isActive: newStatus })
-        setVesselActive(newStatus)
-        vessel.isActive = newStatus
-        showSuccess(`Vessel is now ${newStatus ? 'ACTIVE' : 'INACTIVE'}`)
-        // Refresh policies so cascade changes (active ↔ inactive) are reflected immediately
-        loadDynamicPolicies()
-    }
-
-    const handleDeleteVessel = async (e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const confirmMsg = 'Are you sure you want to delete this vessel? \n\nThis will also delete all its documents and linked assureds that are not associated with other vessels. \n\nTHIS ACTION CANNOT BE UNDONE.'
-
-        setConfirmation({
-            show: true,
-            title: 'Delete Vessel?',
-            message: confirmMsg,
-            isDangerous: true,
-            onConfirm: async () => {
-                const result = await window.api.deleteVessel(vessel.id)
-                if (result.success) {
-                    showSuccess('Vessel deleted successfully')
-                    onBack()
-                } else {
-                    showError(result.message || 'Failed to delete vessel')
-                }
-                setConfirmation(prev => ({ ...prev, show: false }))
-            }
-        })
-    }
-
-    const handleOpenVesselNotes = async () => {
-        setShowNotesModal(true)
-        setVesselNotesList([])
-        setNewVesselNoteText('')
-        setReplyingToNoteId(null)
-        setReplyText('')
-        setVesselNotesLoading(true)
-        try {
-            const [data, users] = await Promise.all([
-                window.api.getVesselNotes(vessel.id),
-                window.api.notificationsGetUsernames().catch(() => [])
-            ])
-            const list = Array.isArray(data) ? data : []
-            setVesselNotesList(list)
-            setVesselNoteCount(list.length)
-            setMentionUsers(Array.isArray(users) ? users : [])
-        } finally {
-            setVesselNotesLoading(false)
-        }
-    }
-
-    const handleAddVesselNote = async () => {
-        if (!newVesselNoteText.trim()) return
-        setVesselNotesSaving(true)
-        try {
-            const note = await window.api.addVesselNote(vessel.id, newVesselNoteText.trim())
-            setVesselNotesList(prev => { const next = [...prev, note]; setVesselNoteCount(next.length); return next })
-            setNewVesselNoteText('')
-        } finally {
-            setVesselNotesSaving(false)
-        }
-    }
-
-    const handleDeleteVesselNote = async (noteId: string) => {
-        await window.api.deleteVesselNote(noteId)
-        setVesselNotesList(prev => { const next = prev.filter(n => n.id !== noteId && n.parentNoteId !== noteId); setVesselNoteCount(next.length); return next })
-    }
-
-    const handleAddReply = async (parentId: string) => {
-        if (!replyText.trim()) return
-        setVesselNotesSaving(true)
-        try {
-            const note = await window.api.addVesselNote(vessel.id, replyText.trim(), parentId)
-            setVesselNotesList(prev => [...prev, note])
-            setReplyText('')
-            setReplyingToNoteId(null)
-        } finally {
-            setVesselNotesSaving(false)
-        }
-    }
-
-    const handleMentionCheck = (text: string, target: 'new' | 'reply') => {
-        if (target === 'new') setNewVesselNoteText(text)
-        else setReplyText(text)
-        setMentionTarget(target)
-        const cursorEl = document.activeElement as HTMLTextAreaElement
-        const cursorPos = cursorEl?.selectionStart || 0
-        const textBefore = text.slice(0, cursorPos)
-        const atMatch = textBefore.match(/@(\w*)$/)
-        if (atMatch) setMentionQuery(atMatch[1].toLowerCase())
-        else setMentionQuery(null)
-    }
-
-    const insertMention = (username: string) => {
-        const getter = mentionTarget === 'new' ? newVesselNoteText : replyText
-        const setter = mentionTarget === 'new' ? setNewVesselNoteText : setReplyText
-        const cursorEl = document.activeElement as HTMLTextAreaElement
-        const cursorPos = cursorEl?.selectionStart || getter.length
-        const textBefore = getter.slice(0, cursorPos)
-        const atMatch = textBefore.match(/@(\w*)$/)
-        if (atMatch) {
-            const before = textBefore.slice(0, textBefore.length - atMatch[0].length)
-            const after = getter.slice(cursorPos)
-            setter(before + '@' + username + ' ' + after)
-        }
-        setMentionQuery(null)
-    }
-
-    const filteredMentionUsers = mentionQuery !== null
-        ? mentionUsers.filter(u => u.username.toLowerCase().includes(mentionQuery) && u.id !== user?.id).slice(0, 6)
-        : []
-
-    const renderMentionDropdown = () => {
-        if (mentionQuery === null || filteredMentionUsers.length === 0) return null
-        return (
-            <div style={{
-                position: 'absolute', bottom: '100%', left: 0, zIndex: 200,
-                background: isLight ? '#ffffff' : '#1a1d28',
-                border: '1px solid var(--glass-border-color)', borderRadius: '6px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)', maxHeight: '150px',
-                overflowY: 'auto', minWidth: '160px'
-            }}>
-                {filteredMentionUsers.map(u => (
-                    <div key={u.id} onClick={() => insertMention(u.username)}
-                        style={{ padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem' }}
-                        className="hover-effect"
-                    >@{u.username}</div>
-                ))}
-            </div>
-        )
-    }
-
-    const highlightMentions = (text: string) => {
-        const parts = text.split(/(@\w+)/g)
-        return parts.map((part, i) =>
-            part.startsWith('@') ? <span key={i} style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{part}</span> : part
-        )
-    }
-
-    // Group notes into threads
-    const parentVesselNotes = vesselNotesList.filter(n => !n.parentNoteId)
-    const vesselRepliesMap = new Map<string, any[]>()
-    for (const n of vesselNotesList) {
-        if (n.parentNoteId) {
-            const existing = vesselRepliesMap.get(n.parentNoteId) || []
-            existing.push(n)
-            vesselRepliesMap.set(n.parentNoteId, existing)
-        }
-    }
-
+  const renderMentionDropdown = () => {
+    if (mentionQuery === null || filteredMentionUsers.length === 0) return null
     return (
-        <div className="fade-in">
-            <button onClick={onBack} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-                <ArrowLeft size={18} /> {backLabel}
-            </button>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: 0,
+          zIndex: 200,
+          background: isLight ? '#ffffff' : '#1a1d28',
+          border: '1px solid var(--glass-border-color)',
+          borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          maxHeight: '150px',
+          overflowY: 'auto',
+          minWidth: '160px'
+        }}
+      >
+        {filteredMentionUsers.map((u) => (
+          <div
+            key={u.id}
+            onClick={() => insertMention(u.username)}
+            style={{ padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem' }}
+            className="hover-effect"
+          >
+            @{u.username}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
-            <header style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                    {isEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <input
-                                type="text"
-                                value={editName}
-                                onChange={e => setEditName(e.target.value.toUpperCase())}
-                                style={{ fontSize: '2.5rem', width: '100%', textTransform: 'uppercase' }}
-                                aria-label="Vessel name"
-                            />
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>
-                                <input
-                                    type="text"
-                                    value={editImo}
-                                    onChange={e => setEditImo(e.target.value)}
-                                    style={{ padding: '4px 8px', borderRadius: '4px' }}
-                                    aria-label="IMO number"
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Built:</span>
-                                    <input type="number" value={editBuiltYear} onChange={e => setEditBuiltYear(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }} aria-label="Built year" />
-                                    {showRebuiltYear ? (
-                                        <>
-                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Rebuilt:</span>
-                                            <input type="number" value={editRebuiltYear} onChange={e => setEditRebuiltYear(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }} aria-label="Rebuilt year" />
-                                        </>
-                                    ) : (
-                                        <button type="button" onClick={() => setShowRebuiltYear(true)} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.78rem', padding: '2px 4px' }}>+ Rebuilt Year</button>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>GT:</span>
-                                    <input type="number" value={editGrossTonnage} onChange={e => setEditGrossTonnage(e.target.value)} style={{ padding: '4px 8px', borderRadius: '4px', width: '100px' }} aria-label="Gross tonnage" />
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Type:</span>
-                                    {showAddVesselType ? (
-                                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                            <input value={newVesselTypeName} onChange={e => setNewVesselTypeName(e.target.value)}
-                                                placeholder="Type name" autoFocus
-                                                onKeyDown={e => { if (e.key === 'Enter') handleAddVesselType(); if (e.key === 'Escape') setShowAddVesselType(false) }}
-                                                style={{ padding: '4px 8px', borderRadius: '4px', width: '120px', fontSize: '0.85rem' }} />
-                                            <button onClick={handleAddVesselType} disabled={!newVesselTypeName.trim()} className="btn-primary" style={{ padding: '3px 8px', fontSize: '0.78rem' }}>Add</button>
-                                            <button title="Cancel" aria-label="Cancel" onClick={() => { setShowAddVesselType(false); setNewVesselTypeName('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={14} /></button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <select
-                                                value={editVesselType}
-                                                onChange={e => setEditVesselType(e.target.value)}
-                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', width: '160px' }}
-                                                aria-label="Vessel type"
-                                            >
-                                                <option value="">No type</option>
-                                                {vesselTypes.map(vt => (
-                                                    <option key={vt.id} value={vt.id}>
-                                                        {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <button onClick={() => setShowAddVesselType(true)} style={{ background: 'none', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', padding: '3px 6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center' }} title="Add new vessel type">
-                                                <Plus size={12} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', paddingTop: '6px', flexShrink: 0 }}>Class:</span>
-                                    <div style={{ position: 'relative' }}>
-                                        {/* Trigger button */}
-                                        <button
-                                            type="button"
-                                            onClick={() => { if (classDropdownOpen) setClassSearch(''); setClassDropdownOpen(o => !o) }}
-                                            onBlur={e => { if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) setTimeout(() => { setClassDropdownOpen(false); setClassSearch('') }, 150) }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', cursor: 'pointer', minWidth: '220px', justifyContent: 'space-between' }}
-                                        >
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
-                                                {vesselClassificationIds.size === 0
-                                                    ? 'None'
-                                                    : classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(', ')}
-                                            </span>
-                                            <ChevronDown size={13} style={{ flexShrink: 0, transform: classDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                                        </button>
-                                        {/* Dropdown list */}
-                                        {classDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '264px', display: 'flex', flexDirection: 'column' }}>
-                                                {classSocieties.length > 6 && (
-                                                    <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--table-border)', flexShrink: 0 }}>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Search…"
-                                                            value={classSearch}
-                                                            onChange={e => setClassSearch(e.target.value)}
-                                                            onMouseDown={e => e.stopPropagation()}
-                                                            autoFocus
-                                                            style={{ width: '100%', padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)', fontSize: '0.8rem', boxSizing: 'border-box', outline: 'none' }}
-                                                        />
-                                                    </div>
-                                                )}
-                                                <div style={{ overflowY: 'auto', flex: 1 }}>
-                                                    {(() => {
-                                                        const filtered = classSearch.trim()
-                                                            ? classSocieties.filter(cs => cs.name.toLowerCase().includes(classSearch.toLowerCase()) || cs.abbreviation?.toLowerCase().includes(classSearch.toLowerCase()))
-                                                            : classSocieties
-                                                        if (filtered.length === 0) return (
-                                                            <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                                                {classSearch ? 'No matches' : 'No classification societies defined'}
-                                                            </div>
-                                                        )
-                                                        return filtered.map(cs => {
-                                                            const checked = vesselClassificationIds.has(cs.id)
-                                                            return (
-                                                                <div
-                                                                    key={cs.id}
-                                                                    onMouseDown={e => {
-                                                                        e.preventDefault()
-                                                                        if (checked) {
-                                                                            // Unchecking — always allow
-                                                                            setVesselClassificationIds(prev => { const next = new Set(prev); next.delete(cs.id); return next })
-                                                                        } else if (vesselClassificationIds.size > 0) {
-                                                                            // Adding when one exists — ask replace or add
-                                                                            setClassConfirm({ show: true, newId: cs.id, newName: cs.abbreviation || cs.name })
-                                                                        } else {
-                                                                            // Adding first class — just add
-                                                                            setVesselClassificationIds(prev => new Set(prev).add(cs.id))
-                                                                        }
-                                                                    }}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
-                                                                >
-                                                                    <input type="checkbox" readOnly checked={checked} style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }} />
-                                                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                                                        {cs.abbreviation ? <><strong>{cs.abbreviation}</strong> – {cs.name}</> : cs.name}
-                                                                    </span>
-                                                                </div>
-                                                            )
-                                                        })
-                                                    })()}
-                                                </div>
-                                                {/* Add new classification inline */}
-                                                {showAddClass ? (
-                                                    <div style={{ padding: '8px', borderTop: '1px solid var(--table-border)', display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }} onMouseDown={e => e.preventDefault()}>
-                                                        <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="Name" autoFocus
-                                                            onKeyDown={e => { if (e.key === 'Enter') handleAddClassSociety(); if (e.key === 'Escape') { setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') } }}
-                                                            style={{ padding: '3px 6px', borderRadius: '4px', width: '110px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)' }} />
-                                                        <input value={newClassAbbr} onChange={e => setNewClassAbbr(e.target.value)} placeholder="Abbr"
-                                                            onKeyDown={e => { if (e.key === 'Enter') handleAddClassSociety(); if (e.key === 'Escape') { setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') } }}
-                                                            style={{ padding: '3px 6px', borderRadius: '4px', width: '60px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)' }} />
-                                                        <button onMouseDown={e => { e.preventDefault(); handleAddClassSociety() }} disabled={!newClassName.trim()} className="btn-primary" style={{ padding: '2px 6px', fontSize: '0.72rem' }}>Add</button>
-                                                        <button onMouseDown={e => { e.preventDefault(); setShowAddClass(false); setNewClassName(''); setNewClassAbbr('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><X size={12} /></button>
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ padding: '6px 8px', borderTop: '1px solid var(--table-border)' }} onMouseDown={e => e.preventDefault()}>
-                                                        <button onMouseDown={e => { e.preventDefault(); setShowAddClass(true) }} style={{ background: 'none', border: '1px dashed var(--input-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--accent-primary)', padding: '3px 8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
-                                                            <Plus size={11} /> Add new
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Call Sign:</span>
-                                    <input type="text" value={editCallSign} onChange={e => setEditCallSign(e.target.value.toUpperCase())} style={{ padding: '4px 8px', borderRadius: '4px', width: '100px', textTransform: 'uppercase' }} aria-label="Call sign" />
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Flag:</span>
-                                    <div
-                                        style={{ position: 'relative' }}
-                                        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setFlagDropdownOpen(false); setFlagSearch('') } }}
-                                    >
-                                        <button
-                                            type="button"
-                                            onClick={() => { if (flagDropdownOpen) setFlagSearch(''); setFlagDropdownOpen(o => !o) }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--input-bg)', color: selectedFlagStateId ? 'var(--text-primary)' : 'var(--text-secondary)', border: '1px solid var(--input-border)', cursor: 'pointer', minWidth: '180px', justifyContent: 'space-between' }}
-                                        >
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
-                                                {selectedFlagStateId ? (flagStates.find(f => f.id === selectedFlagStateId)?.name || 'Unknown') : 'No flag'}
-                                            </span>
-                                            <ChevronDown size={13} style={{ flexShrink: 0, transform: flagDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                                        </button>
-                                        {flagDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: '4px', background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', minWidth: '220px', maxHeight: '264px', display: 'flex', flexDirection: 'column' }}>
-                                                <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--table-border)', flexShrink: 0 }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search flags…"
-                                                        value={flagSearch}
-                                                        onChange={e => setFlagSearch(e.target.value)}
-                                                        onMouseDown={e => e.stopPropagation()}
-                                                        autoFocus
-                                                        style={{ width: '100%', padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--input-border)', background: isLight ? '#f0f2f5' : '#0f1118', color: 'var(--text-primary)', fontSize: '0.8rem', boxSizing: 'border-box', outline: 'none' }}
-                                                    />
-                                                </div>
-                                                <div style={{ overflowY: 'auto', flex: 1 }}>
-                                                    <div
-                                                        onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(''); setFlagDropdownOpen(false); setFlagSearch('') }}
-                                                        style={{ display: 'flex', alignItems: 'center', padding: '7px 12px', cursor: 'pointer', background: !selectedFlagStateId ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
-                                                    >
-                                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No flag</span>
-                                                    </div>
-                                                    {flagStates
-                                                        .filter(fs => !flagSearch.trim() || fs.name.toLowerCase().includes(flagSearch.toLowerCase()) || fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase()))
-                                                        .map(fs => (
-                                                            <div
-                                                                key={fs.id}
-                                                                onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(fs.id); setFlagDropdownOpen(false); setFlagSearch('') }}
-                                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', cursor: 'pointer', background: selectedFlagStateId === fs.id ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
-                                                            >
-                                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                                                    {fs.name} <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>({fs.iso3Code})</span>
-                                                                </span>
-                                                            </div>
-                                                        ))
-                                                    }
-                                                    {flagSearch.trim() && flagStates.filter(fs => fs.name.toLowerCase().includes(flagSearch.toLowerCase()) || fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())).length === 0 && (
-                                                        <div style={{ padding: '10px 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>No matches</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={() => setShowAddFlagModal(true)}
-                                        title="Add new flag state"
-                                        style={{ background: 'none', border: '1px solid var(--glass-border-color)', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}
-                                    >
-                                        <Plus size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <h1 style={{ fontSize: '1.75rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                {vessel.name}
-                                {(() => {
-                                    const currentFlag = flagStates.find(f => f.id === selectedFlagStateId)
-                                    const flagCls = currentFlag ? getFlagClass(currentFlag.iso3Code) : ''
-                                    return flagCls ? <span className={flagCls} title={`${currentFlag!.name} (${currentFlag!.iso3Code})`} style={{ fontSize: '1.4rem', cursor: 'help' }}></span> : null
-                                })()}
-                            </h1>
-                            <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
-                            {(vessel.builtYear || vessel.rebuiltYear || vessel.grossTonnage || vessel.vesselType || vesselClassificationIds.size > 0 || vessel.classificationSociety || vessel.callSign) && (
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-                                    {[
-                                        vessel.builtYear && (vessel.rebuiltYear ? `Built ${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}` : `Built ${vessel.builtYear}`),
-                                        vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
-                                        (vessel.vesselTypeId || vessel.vesselType) && (() => { const vt = vessel.vesselTypeId ? vesselTypes.find(t => t.id === vessel.vesselTypeId) : vesselTypes.find(t => t.name === vessel.vesselType); return vt?.description ? `${vt.name} (${vt.description})` : vt?.name || vessel.vesselType })(),
-                                        vesselClassificationIds.size > 0
-                                            ? `Class: ${classSocieties.filter(cs => vesselClassificationIds.has(cs.id)).sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0)).map(cs => cs.abbreviation || cs.name).join(' / ')}`
-                                            : (vessel.classificationSociety && `Class: ${vessel.classificationSociety}`),
-                                        vessel.callSign && `Call Sign: ${vessel.callSign}`
-                                    ].filter(Boolean).join(' · ')}
-                                </p>
-                            )}
-                            <button
-                                onClick={() => {
-                                    const vt = vessel.vesselTypeId ? vesselTypes.find(t => t.id === vessel.vesselTypeId) : vesselTypes.find(t => t.name === vessel.vesselType)
-                                    const typeName = vt?.name || vessel.vesselType || ''
-                                    const currentFlag = flagStates.find(f => f.id === selectedFlagStateId)
-                                    const flagName = currentFlag?.name || ''
-                                    const built = vessel.rebuiltYear ? `${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}` : (vessel.builtYear || '')
-                                    const gt = vessel.grossTonnage ? vessel.grossTonnage.toLocaleString('en-US') : ''
-                                    const text = `M/V ${vessel.name}, Type ${typeName}, Flag ${flagName}, Built ${built}, GT ${gt}, IMO ${vessel.imoNumber || ''}`
-                                    navigator.clipboard.writeText(text)
-                                    showSuccess('Vessel details copied')
-                                }}
-                                className="btn-secondary"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.78rem', marginTop: '8px' }}
-                                title="Copy vessel details"
-                            >
-                                <Copy size={13} /> Copy details
-                            </button>
-                            {nameHistory.length > 0 && (
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                    Former name{nameHistory.length > 1 ? 's' : ''}: {nameHistory.map((h, i) => (
-                                        <span key={h.id}>
-                                            <em>{h.previousName}</em>
-                                            <span style={{ fontSize: '0.7rem', opacity: 0.7 }}> ({formatDate(h.changedAt)})</span>
-                                            {i < nameHistory.length - 1 ? ', ' : ''}
-                                        </span>
-                                    ))}
-                                </p>
-                            )}
-                        </>
-                    )}
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {isEditing ? (
-                        <>
-                            <button onClick={handleSaveVessel} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <CheckCircle size={18} /> Save Changes
-                            </button>
-                            <button onClick={async () => { setIsEditing(false); setEditName(vessel.name); setEditImo(vessel.imoNumber); setEditBuiltYear(vessel.builtYear?.toString() || ''); setEditRebuiltYear(vessel.rebuiltYear?.toString() || ''); setShowRebuiltYear(!!vessel.rebuiltYear); setEditGrossTonnage(vessel.grossTonnage?.toString() || ''); setEditVesselType(vessel.vesselType || ''); setEditClassification(vessel.classificationSociety || ''); setEditCallSign(vessel.callSign || ''); const vcs = await window.api.getVesselClassifications(vessel.id); setVesselClassificationIds(new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))); }} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                Cancel
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            {hasPermission('vessels:edit') && (
-                                <button onClick={() => setIsEditing(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem' }}>
-                                    Edit Details
-                                </button>
-                            )}
-                            <button
-                                onClick={handleToggleVesselActive}
-                                className="btn-secondary"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '6px 12px',
-                                    fontSize: '0.82rem',
-                                    color: vesselActive ? 'var(--accent-primary)' : 'var(--text-secondary)'
-                                }}
-                            >
-                                {vesselActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                                {vesselActive ? 'Active' : 'Inactive'}
-                            </button>
-                            <button
-                                onClick={handleOpenVesselNotes}
-                                className="btn-secondary"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '6px 12px',
-                                    fontSize: '0.82rem',
-                                    position: 'relative'
-                                }}
-                            >
-                                <MessageSquare size={16} /> Notes
-                                {vesselNoteCount > 0 && (
-                                    <span style={{
-                                        position: 'absolute', top: '-6px', right: '-6px',
-                                        background: 'var(--accent-primary)', color: '#fff',
-                                        fontSize: '0.65rem', fontWeight: 700,
-                                        minWidth: '16px', height: '16px',
-                                        borderRadius: '8px', display: 'flex',
-                                        alignItems: 'center', justifyContent: 'center',
-                                        padding: '0 4px'
-                                    }}>{vesselNoteCount}</span>
-                                )}
-                            </button>
-                            <div style={{ position: 'relative' }}>
-                                <button
-                                    onClick={() => setShowExportMenu(!showExportMenu)}
-                                    className="btn-secondary"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.82rem' }}
-                                >
-                                    <Download size={16} /> Export <ChevronDown size={14} />
-                                </button>
-                                {showExportMenu && (
-                                    <>
-                                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowExportMenu(false)} />
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        right: 0,
-                                        marginTop: '4px',
-                                        background: isLight ? '#ffffff' : '#1e222a',
-                                        border: '1px solid var(--glass-border-color)',
-                                        borderRadius: '8px',
-                                        boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
-                                        zIndex: 100,
-                                        minWidth: '160px',
-                                        overflow: 'hidden'
-                                    }}>
-                                        <button
-                                            onClick={() => { ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs); setShowExportMenu(false); }}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px 16px',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                borderBottom: '1px solid var(--glass-border-color)',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                            className="hover-effect"
-                                        >
-                                            <FileSpreadsheet size={16} /> Excel Report
-                                        </button>
-                                        <button
-                                            onClick={() => { ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs); setShowExportMenu(false); }}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px 16px',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                borderBottom: '1px solid var(--glass-border-color)',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                            className="hover-effect"
-                                        >
-                                            <FileText size={16} /> PDF Report
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowExportMenu(false); setShowTemplateGenerate(true) }}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px 16px',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                borderTop: '1px solid var(--glass-border-color)',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                            className="hover-effect"
-                                        >
-                                            <FileText size={16} /> From Template
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowExportMenu(false); handleExportAllPolicies() }}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px 16px',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                borderTop: '1px solid var(--glass-border-color)',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                            className="hover-effect"
-                                        >
-                                            <FileSpreadsheet size={16} /> All Policies (Excel)
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                setShowExportMenu(false)
-                                                try {
-                                                    // Build missing/expired/expiring documents list
-                                                    const lines: string[] = []
-                                                    lines.push(`${vessel.name} — Outstanding Documents`)
-                                                    lines.push('')
+  const highlightMentions = (text: string) => {
+    const parts = text.split(/(@\w+)/g)
+    return parts.map((part, i) =>
+      part.startsWith('@') ? (
+        <span key={i} style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+          {part}
+        </span>
+      ) : (
+        part
+      )
+    )
+  }
 
-                                                    // Resolve effective policy expiry for annual docs
-                                                    const { resolveEffectivePolicyExpiry } = await import('../utils/policyUtils')
-                                                    const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
-                                                    // Annual docs received within grace period of P&I expiry are treated as compliant
-                                                    const graceSetting = await window.api.getSetting('annual_grace_days')
-                                                    const graceDays = graceSetting ? parseInt(graceSetting) || 90 : 90
-                                                    const shortCycle = (expiry: string | null | undefined, received: string | null | undefined) => {
-                                                        if (!expiry || !received) return false
-                                                        const e = new Date(expiry + 'T00:00:00')
-                                                        const r = new Date(received.split('T')[0] + 'T00:00:00')
-                                                        const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
-                                                        return days >= 0 && days < graceDays
-                                                    }
-                                                    const today = new Date()
-                                                    today.setHours(0, 0, 0, 0)
-                                                    const threshold = new Date(today)
-                                                    threshold.setDate(today.getDate() + 30)
+  // Group notes into threads
+  const parentVesselNotes = vesselNotesList.filter((n) => !n.parentNoteId)
+  const vesselRepliesMap = new Map<string, any[]>()
+  for (const n of vesselNotesList) {
+    if (n.parentNoteId) {
+      const existing = vesselRepliesMap.get(n.parentNoteId) || []
+      existing.push(n)
+      vesselRepliesMap.set(n.parentNoteId, existing)
+    }
+  }
 
-                                                    // Vessel documents
-                                                    const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
-                                                    const allDocTypes = [...docTypes, ...(Array.isArray(customDocTypes) ? customDocTypes : []).map((c: any) => ({ id: c.id, name: c.name, required: true, annualRenewal: false }))]
-                                                    const issues: string[] = []
-                                                    for (const dt of allDocTypes) {
-                                                        if (!(dt as any).required) continue // skip optional documents
-                                                        const doc = vesselDocs.find(d => d.documentTypeId === dt.id)
-                                                        if (!doc?.filePath) {
-                                                            issues.push(`${dt.name} — MISSING`)
-                                                            continue
-                                                        }
-                                                        // Check expiry
-                                                        let expiryDate = doc.expiryDate || null
-                                                        if ((dt as any).annualRenewal && effectiveExpiry) {
-                                                            expiryDate = effectiveExpiry
-                                                        }
-                                                        if (expiryDate) {
-                                                            // Short-cycle check
-                                                            // Skip annual docs that were recently received (short-cycle: received within 60 days of expiry)
-                                                            const docReceived = doc.receivedDate || doc.uploadedDate?.split('T')[0]
-                                                            if ((dt as any).annualRenewal && docReceived && shortCycle(expiryDate, docReceived)) {
-                                                                continue // compliant via short-cycle
-                                                            }
-                                                            const exp = new Date(expiryDate + 'T00:00:00')
-                                                            if (exp < today) {
-                                                                issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
-                                                            } else if (exp <= threshold) {
-                                                                issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
-                                                            }
-                                                        }
-                                                    }
-                                                    if (issues.length > 0) {
-                                                        lines.push('Vessel Documents:')
-                                                        for (const issue of issues) lines.push(`  - ${issue}`)
-                                                        lines.push('')
-                                                    }
+  return (
+    <div className="fade-in">
+      <button
+        onClick={onBack}
+        className="btn-secondary"
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}
+      >
+        <ArrowLeft size={18} /> {backLabel}
+      </button>
 
-                                                    // Entity documents
-                                                    const assureds = await window.api.getVesselAssureds(vessel.id)
-                                                    const entities = await window.api.getEntities()
-                                                    const safeAssureds = Array.isArray(assureds) ? assureds : []
-                                                    const safeEntities = Array.isArray(entities) ? entities : []
-                                                    const edTypesRaw = await window.api.getEntityDocumentTypes()
-                                                    const edDocsRaw = await window.api.getEntityDocuments()
-                                                    const activeEdTypes = (Array.isArray(edTypesRaw) ? edTypesRaw : []).filter((t: any) => t.isActive && t.isRequired)
-                                                    const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
-                                                    for (const va of safeAssureds) {
-                                                        const entity = safeEntities.find((e: any) => e.id === va.entityId)
-                                                        if (!entity) continue
-                                                        const missing: string[] = []
-                                                        for (const edt of activeEdTypes.filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)) {
-                                                            if (!allEdDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === edt.id && d.filePath)) {
-                                                                missing.push(edt.name)
-                                                            }
-                                                        }
-                                                        if (missing.length > 0) {
-                                                            lines.push(`${entity.name}${va.role ? ` (${va.role})` : ''}:`)
-                                                            for (const m of missing) lines.push(`  - ${m}`)
-                                                            lines.push('')
-                                                        }
-                                                    }
-
-                                                    if (issues.length === 0 && lines.length <= 2) {
-                                                        showSuccess('No outstanding documents')
-                                                        return
-                                                    }
-
-                                                    await navigator.clipboard.writeText(lines.join('\n'))
-                                                    showSuccess('Missing documents list copied to clipboard')
-                                                } catch (err: any) {
-                                                    showError(err.message || 'Failed to copy')
-                                                }
-                                            }}
-                                            style={{
-                                                width: '100%',
-                                                padding: '10px 16px',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                borderTop: '1px solid var(--glass-border-color)',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                            className="hover-effect"
-                                        >
-                                            <Copy size={16} /> Copy Missing Documents
-                                        </button>
-                                    </div>
-                                    </>
-                                )}
-                            </div>
-                            {user?.role === 'admin' && (
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteVessel}
-                                    className="btn-secondary"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 12px',
-                                        fontSize: '0.82rem',
-                                        color: 'var(--danger)',
-                                        borderColor: 'rgba(255, 77, 77, 0.3)'
-                                    }}
-                                >
-                                    <Trash size={16} /> Delete
-                                </button>
-                            )}
-                        </>
-                    )}
-                </div>
-            </header>
-
-            {/* Section navigation tabs */}
-            <div style={{
-                display: 'flex',
-                gap: '0',
-                borderBottom: '2px solid var(--table-border)',
-                marginBottom: '16px',
-                alignItems: 'center'
-            }}>
-                {(['documents', 'assureds', 'surveys', 'quotations', 'policies', 'payments', 'timeline'] as const).map(view => (
+      <header
+        style={{
+          marginBottom: '32px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}
+      >
+        <div>
+          {isEditing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value.toUpperCase())}
+                style={{ fontSize: '2.5rem', width: '100%', textTransform: 'uppercase' }}
+                aria-label="Vessel name"
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>IMO:</span>
+                <input
+                  type="text"
+                  value={editImo}
+                  onChange={(e) => setEditImo(e.target.value)}
+                  style={{ padding: '4px 8px', borderRadius: '4px' }}
+                  aria-label="IMO number"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    Built:
+                  </span>
+                  <input
+                    type="number"
+                    value={editBuiltYear}
+                    onChange={(e) => setEditBuiltYear(e.target.value)}
+                    style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }}
+                    aria-label="Built year"
+                  />
+                  {showRebuiltYear ? (
+                    <>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        Rebuilt:
+                      </span>
+                      <input
+                        type="number"
+                        value={editRebuiltYear}
+                        onChange={(e) => setEditRebuiltYear(e.target.value)}
+                        style={{ padding: '4px 8px', borderRadius: '4px', width: '80px' }}
+                        aria-label="Rebuilt year"
+                      />
+                    </>
+                  ) : (
                     <button
-                        key={view}
-                        onClick={() => {
-                            setDetailView(view)
-                            if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
+                      type="button"
+                      onClick={() => setShowRebuiltYear(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-primary)',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        padding: '2px 4px'
+                      }}
+                    >
+                      + Rebuilt Year
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>GT:</span>
+                  <input
+                    type="number"
+                    value={editGrossTonnage}
+                    onChange={(e) => setEditGrossTonnage(e.target.value)}
+                    style={{ padding: '4px 8px', borderRadius: '4px', width: '100px' }}
+                    aria-label="Gross tonnage"
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Type:</span>
+                  {showAddVesselType ? (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <input
+                        value={newVesselTypeName}
+                        onChange={(e) => setNewVesselTypeName(e.target.value)}
+                        placeholder="Type name"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddVesselType()
+                          if (e.key === 'Escape') setShowAddVesselType(false)
                         }}
                         style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          width: '120px',
+                          fontSize: '0.85rem'
+                        }}
+                      />
+                      <button
+                        onClick={handleAddVesselType}
+                        disabled={!newVesselTypeName.trim()}
+                        className="btn-primary"
+                        style={{ padding: '3px 8px', fontSize: '0.78rem' }}
+                      >
+                        Add
+                      </button>
+                      <button
+                        title="Cancel"
+                        aria-label="Cancel"
+                        onClick={() => {
+                          setShowAddVesselType(false)
+                          setNewVesselTypeName('')
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--text-secondary)',
+                          padding: '2px'
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={editVesselType}
+                        onChange={(e) => setEditVesselType(e.target.value)}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.85rem',
+                          background: 'var(--input-bg)',
+                          color: 'var(--input-text)',
+                          border: '1px solid var(--input-border)',
+                          width: '160px'
+                        }}
+                        aria-label="Vessel type"
+                      >
+                        <option value="">No type</option>
+                        {vesselTypes.map((vt) => (
+                          <option key={vt.id} value={vt.id}>
+                            {vt.description ? `${vt.name} – ${vt.description}` : vt.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setShowAddVesselType(true)}
+                        style={{
+                          background: 'none',
+                          border: '1px dashed var(--input-border)',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          color: 'var(--accent-primary)',
+                          padding: '3px 6px',
+                          fontSize: '0.78rem',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Add new vessel type"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem',
+                      paddingTop: '6px',
+                      flexShrink: 0
+                    }}
+                  >
+                    Class:
+                  </span>
+                  <div style={{ position: 'relative' }}>
+                    {/* Trigger button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (classDropdownOpen) setClassSearch('')
+                        setClassDropdownOpen((o) => !o)
+                      }}
+                      onBlur={(e) => {
+                        if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node))
+                          setTimeout(() => {
+                            setClassDropdownOpen(false)
+                            setClassSearch('')
+                          }, 150)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--input-border)',
+                        cursor: 'pointer',
+                        minWidth: '220px',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                          textAlign: 'left'
+                        }}
+                      >
+                        {vesselClassificationIds.size === 0
+                          ? 'None'
+                          : classSocieties
+                              .filter((cs) => vesselClassificationIds.has(cs.id))
+                              .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
+                              .map((cs) => cs.abbreviation || cs.name)
+                              .join(', ')}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        style={{
+                          flexShrink: 0,
+                          transform: classDropdownOpen ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.15s'
+                        }}
+                      />
+                    </button>
+                    {/* Dropdown list */}
+                    {classDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 200,
+                          marginTop: '4px',
+                          background: isLight ? '#ffffff' : '#1a1d28',
+                          border: '1px solid var(--input-border)',
+                          borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                          minWidth: '220px',
+                          maxHeight: '264px',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        {classSocieties.length > 6 && (
+                          <div
+                            style={{
+                              padding: '6px 8px',
+                              borderBottom: '1px solid var(--table-border)',
+                              flexShrink: 0
+                            }}
+                          >
+                            <input
+                              type="text"
+                              placeholder="Search…"
+                              value={classSearch}
+                              onChange={(e) => setClassSearch(e.target.value)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              autoFocus
+                              style={{
+                                width: '100%',
+                                padding: '4px 8px',
+                                borderRadius: '5px',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.8rem',
+                                boxSizing: 'border-box',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+                        <div style={{ overflowY: 'auto', flex: 1 }}>
+                          {(() => {
+                            const filtered = classSearch.trim()
+                              ? classSocieties.filter(
+                                  (cs) =>
+                                    cs.name.toLowerCase().includes(classSearch.toLowerCase()) ||
+                                    cs.abbreviation
+                                      ?.toLowerCase()
+                                      .includes(classSearch.toLowerCase())
+                                )
+                              : classSocieties
+                            if (filtered.length === 0)
+                              return (
+                                <div
+                                  style={{
+                                    padding: '10px 12px',
+                                    fontSize: '0.82rem',
+                                    color: 'var(--text-secondary)'
+                                  }}
+                                >
+                                  {classSearch
+                                    ? 'No matches'
+                                    : 'No classification societies defined'}
+                                </div>
+                              )
+                            return filtered.map((cs) => {
+                              const checked = vesselClassificationIds.has(cs.id)
+                              return (
+                                <div
+                                  key={cs.id}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    if (checked) {
+                                      // Unchecking — always allow
+                                      setVesselClassificationIds((prev) => {
+                                        const next = new Set(prev)
+                                        next.delete(cs.id)
+                                        return next
+                                      })
+                                    } else if (vesselClassificationIds.size > 0) {
+                                      // Adding when one exists — ask replace or add
+                                      setClassConfirm({
+                                        show: true,
+                                        newId: cs.id,
+                                        newName: cs.abbreviation || cs.name
+                                      })
+                                    } else {
+                                      // Adding first class — just add
+                                      setVesselClassificationIds((prev) => new Set(prev).add(cs.id))
+                                    }
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '8px 12px',
+                                    cursor: 'pointer',
+                                    background: checked
+                                      ? isLight
+                                        ? 'rgba(0,119,163,0.08)'
+                                        : 'rgba(var(--accent-primary-rgb), 0.08)'
+                                      : 'transparent',
+                                    borderBottom: '1px solid var(--table-border)'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    readOnly
+                                    checked={checked}
+                                    style={{
+                                      accentColor: 'var(--accent-primary)',
+                                      pointerEvents: 'none',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                  <span
+                                    style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}
+                                  >
+                                    {cs.abbreviation ? (
+                                      <>
+                                        <strong>{cs.abbreviation}</strong> – {cs.name}
+                                      </>
+                                    ) : (
+                                      cs.name
+                                    )}
+                                  </span>
+                                </div>
+                              )
+                            })
+                          })()}
+                        </div>
+                        {/* Add new classification inline */}
+                        {showAddClass ? (
+                          <div
+                            style={{
+                              padding: '8px',
+                              borderTop: '1px solid var(--table-border)',
+                              display: 'flex',
+                              gap: '4px',
+                              alignItems: 'center',
+                              flexWrap: 'wrap'
+                            }}
+                            onMouseDown={(e) => e.preventDefault()}
+                          >
+                            <input
+                              value={newClassName}
+                              onChange={(e) => setNewClassName(e.target.value)}
+                              placeholder="Name"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddClassSociety()
+                                if (e.key === 'Escape') {
+                                  setShowAddClass(false)
+                                  setNewClassName('')
+                                  setNewClassAbbr('')
+                                }
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                borderRadius: '4px',
+                                width: '110px',
+                                fontSize: '0.78rem',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                color: 'var(--text-primary)'
+                              }}
+                            />
+                            <input
+                              value={newClassAbbr}
+                              onChange={(e) => setNewClassAbbr(e.target.value)}
+                              placeholder="Abbr"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddClassSociety()
+                                if (e.key === 'Escape') {
+                                  setShowAddClass(false)
+                                  setNewClassName('')
+                                  setNewClassAbbr('')
+                                }
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                borderRadius: '4px',
+                                width: '60px',
+                                fontSize: '0.78rem',
+                                border: '1px solid var(--input-border)',
+                                background: isLight ? '#f0f2f5' : '#0f1118',
+                                color: 'var(--text-primary)'
+                              }}
+                            />
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleAddClassSociety()
+                              }}
+                              disabled={!newClassName.trim()}
+                              className="btn-primary"
+                              style={{ padding: '2px 6px', fontSize: '0.72rem' }}
+                            >
+                              Add
+                            </button>
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                setShowAddClass(false)
+                                setNewClassName('')
+                                setNewClassAbbr('')
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                padding: '2px'
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              padding: '6px 8px',
+                              borderTop: '1px solid var(--table-border)'
+                            }}
+                            onMouseDown={(e) => e.preventDefault()}
+                          >
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                setShowAddClass(true)
+                              }}
+                              style={{
+                                background: 'none',
+                                border: '1px dashed var(--input-border)',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                color: 'var(--accent-primary)',
+                                padding: '3px 8px',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                width: '100%'
+                              }}
+                            >
+                              <Plus size={11} /> Add new
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    Call Sign:
+                  </span>
+                  <input
+                    type="text"
+                    value={editCallSign}
+                    onChange={(e) => setEditCallSign(e.target.value.toUpperCase())}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      width: '100px',
+                      textTransform: 'uppercase'
+                    }}
+                    aria-label="Call sign"
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Flag:</span>
+                  <div
+                    style={{ position: 'relative' }}
+                    onBlur={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setFlagDropdownOpen(false)
+                        setFlagSearch('')
+                      }
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (flagDropdownOpen) setFlagSearch('')
+                        setFlagDropdownOpen((o) => !o)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
+                        background: 'var(--input-bg)',
+                        color: selectedFlagStateId
+                          ? 'var(--text-primary)'
+                          : 'var(--text-secondary)',
+                        border: '1px solid var(--input-border)',
+                        cursor: 'pointer',
+                        minWidth: '180px',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                          textAlign: 'left'
+                        }}
+                      >
+                        {selectedFlagStateId
+                          ? flagStates.find((f) => f.id === selectedFlagStateId)?.name || 'Unknown'
+                          : 'No flag'}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        style={{
+                          flexShrink: 0,
+                          transform: flagDropdownOpen ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.15s'
+                        }}
+                      />
+                    </button>
+                    {flagDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 200,
+                          marginTop: '4px',
+                          background: isLight ? '#ffffff' : '#1a1d28',
+                          border: '1px solid var(--input-border)',
+                          borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                          minWidth: '220px',
+                          maxHeight: '264px',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: '6px 8px',
+                            borderBottom: '1px solid var(--table-border)',
+                            flexShrink: 0
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="Search flags…"
+                            value={flagSearch}
+                            onChange={(e) => setFlagSearch(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              padding: '4px 8px',
+                              borderRadius: '5px',
+                              border: '1px solid var(--input-border)',
+                              background: isLight ? '#f0f2f5' : '#0f1118',
+                              color: 'var(--text-primary)',
+                              fontSize: '0.8rem',
+                              boxSizing: 'border-box',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                        <div style={{ overflowY: 'auto', flex: 1 }}>
+                          <div
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              setSelectedFlagStateId('')
+                              setFlagDropdownOpen(false)
+                              setFlagSearch('')
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '7px 12px',
+                              cursor: 'pointer',
+                              background: !selectedFlagStateId
+                                ? isLight
+                                  ? 'rgba(0,119,163,0.08)'
+                                  : 'rgba(var(--accent-primary-rgb), 0.08)'
+                                : 'transparent',
+                              borderBottom: '1px solid var(--table-border)'
+                            }}
+                          >
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                              No flag
+                            </span>
+                          </div>
+                          {flagStates
+                            .filter(
+                              (fs) =>
+                                !flagSearch.trim() ||
+                                fs.name.toLowerCase().includes(flagSearch.toLowerCase()) ||
+                                fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())
+                            )
+                            .map((fs) => (
+                              <div
+                                key={fs.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  setSelectedFlagStateId(fs.id)
+                                  setFlagDropdownOpen(false)
+                                  setFlagSearch('')
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  padding: '7px 12px',
+                                  cursor: 'pointer',
+                                  background:
+                                    selectedFlagStateId === fs.id
+                                      ? isLight
+                                        ? 'rgba(0,119,163,0.08)'
+                                        : 'rgba(var(--accent-primary-rgb), 0.08)'
+                                      : 'transparent',
+                                  borderBottom: '1px solid var(--table-border)'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                  {fs.name}{' '}
+                                  <span
+                                    style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+                                  >
+                                    ({fs.iso3Code})
+                                  </span>
+                                </span>
+                              </div>
+                            ))}
+                          {flagSearch.trim() &&
+                            flagStates.filter(
+                              (fs) =>
+                                fs.name.toLowerCase().includes(flagSearch.toLowerCase()) ||
+                                fs.iso3Code.toLowerCase().includes(flagSearch.toLowerCase())
+                            ).length === 0 && (
+                              <div
+                                style={{
+                                  padding: '10px 12px',
+                                  fontSize: '0.82rem',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                No matches
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowAddFlagModal(true)}
+                    title="Add new flag state"
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--glass-border-color)',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1
+                style={{
+                  fontSize: '1.75rem',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                {vessel.name}
+                {(() => {
+                  const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
+                  const flagCls = currentFlag ? getFlagClass(currentFlag.iso3Code) : ''
+                  return flagCls ? (
+                    <span
+                      className={flagCls}
+                      title={`${currentFlag!.name} (${currentFlag!.iso3Code})`}
+                      style={{ fontSize: '1.4rem', cursor: 'help' }}
+                    ></span>
+                  ) : null
+                })()}
+              </h1>
+              <p style={{ color: 'var(--text-secondary)' }}>IMO: {vessel.imoNumber}</p>
+              {(vessel.builtYear ||
+                vessel.rebuiltYear ||
+                vessel.grossTonnage ||
+                vessel.vesselType ||
+                vesselClassificationIds.size > 0 ||
+                vessel.classificationSociety ||
+                vessel.callSign) && (
+                <p
+                  style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}
+                >
+                  {[
+                    vessel.builtYear &&
+                      (vessel.rebuiltYear
+                        ? `Built ${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}`
+                        : `Built ${vessel.builtYear}`),
+                    vessel.grossTonnage && `GT ${vessel.grossTonnage.toLocaleString('en-US')}`,
+                    (vessel.vesselTypeId || vessel.vesselType) &&
+                      (() => {
+                        const vt = vessel.vesselTypeId
+                          ? vesselTypes.find((t) => t.id === vessel.vesselTypeId)
+                          : vesselTypes.find((t) => t.name === vessel.vesselType)
+                        return vt?.description
+                          ? `${vt.name} (${vt.description})`
+                          : vt?.name || vessel.vesselType
+                      })(),
+                    vesselClassificationIds.size > 0
+                      ? `Class: ${classSocieties
+                          .filter((cs) => vesselClassificationIds.has(cs.id))
+                          .sort((a, b) => (b.isIacs ? 1 : 0) - (a.isIacs ? 1 : 0))
+                          .map((cs) => cs.abbreviation || cs.name)
+                          .join(' / ')}`
+                      : vessel.classificationSociety && `Class: ${vessel.classificationSociety}`,
+                    vessel.callSign && `Call Sign: ${vessel.callSign}`
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
+              <button
+                onClick={() => {
+                  const vt = vessel.vesselTypeId
+                    ? vesselTypes.find((t) => t.id === vessel.vesselTypeId)
+                    : vesselTypes.find((t) => t.name === vessel.vesselType)
+                  const typeName = vt?.name || vessel.vesselType || ''
+                  const currentFlag = flagStates.find((f) => f.id === selectedFlagStateId)
+                  const flagName = currentFlag?.name || ''
+                  const built = vessel.rebuiltYear
+                    ? `${vessel.builtYear} / Rebuilt ${vessel.rebuiltYear}`
+                    : vessel.builtYear || ''
+                  const gt = vessel.grossTonnage ? vessel.grossTonnage.toLocaleString('en-US') : ''
+                  const text = `M/V ${vessel.name}, Type ${typeName}, Flag ${flagName}, Built ${built}, GT ${gt}, IMO ${vessel.imoNumber || ''}`
+                  navigator.clipboard.writeText(text)
+                  showSuccess('Vessel details copied')
+                }}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  marginTop: '8px'
+                }}
+                title="Copy vessel details"
+              >
+                <Copy size={13} /> Copy details
+              </button>
+              {nameHistory.length > 0 && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Former name{nameHistory.length > 1 ? 's' : ''}:{' '}
+                  {nameHistory.map((h, i) => (
+                    <span key={h.id}>
+                      <em>{h.previousName}</em>
+                      <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                        {' '}
+                        ({formatDate(h.changedAt)})
+                      </span>
+                      {i < nameHistory.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSaveVessel}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <CheckCircle size={18} /> Save Changes
+              </button>
+              <button
+                onClick={async () => {
+                  setIsEditing(false)
+                  setEditName(vessel.name)
+                  setEditImo(vessel.imoNumber)
+                  setEditBuiltYear(vessel.builtYear?.toString() || '')
+                  setEditRebuiltYear(vessel.rebuiltYear?.toString() || '')
+                  setShowRebuiltYear(!!vessel.rebuiltYear)
+                  setEditGrossTonnage(vessel.grossTonnage?.toString() || '')
+                  setEditVesselType(vessel.vesselType || '')
+                  setEditClassification(vessel.classificationSociety || '')
+                  setEditCallSign(vessel.callSign || '')
+                  const vcs = await window.api.getVesselClassifications(vessel.id)
+                  setVesselClassificationIds(
+                    new Set((vcs || []).map((vc: any) => vc.classificationSocietyId))
+                  )
+                }}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {hasPermission('vessels:edit') && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  Edit Details
+                </button>
+              )}
+              <button
+                onClick={handleToggleVesselActive}
+                className="btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
+                  color: vesselActive ? 'var(--accent-primary)' : 'var(--text-secondary)'
+                }}
+              >
+                {vesselActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                {vesselActive ? 'Active' : 'Inactive'}
+              </button>
+              <button
+                onClick={handleOpenVesselNotes}
+                className="btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
+                  position: 'relative'
+                }}
+              >
+                <MessageSquare size={16} /> Notes
+                {vesselNoteCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-6px',
+                      background: 'var(--accent-primary)',
+                      color: '#fff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      minWidth: '16px',
+                      height: '16px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 4px'
+                    }}
+                  >
+                    {vesselNoteCount}
+                  </span>
+                )}
+              </button>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  <Download size={16} /> Export <ChevronDown size={14} />
+                </button>
+                {showExportMenu && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                      onClick={() => setShowExportMenu(false)}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '4px',
+                        background: isLight ? '#ffffff' : '#1e222a',
+                        border: '1px solid var(--glass-border-color)',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                        zIndex: 100,
+                        minWidth: '160px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)
+                          setShowExportMenu(false)
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px solid var(--glass-border-color)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        className="hover-effect"
+                      >
+                        <FileSpreadsheet size={16} /> Excel Report
+                      </button>
+                      <button
+                        onClick={() => {
+                          ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs)
+                          setShowExportMenu(false)
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px solid var(--glass-border-color)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        className="hover-effect"
+                      >
+                        <FileText size={16} /> PDF Report
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowExportMenu(false)
+                          setShowTemplateGenerate(true)
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderTop: '1px solid var(--glass-border-color)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        className="hover-effect"
+                      >
+                        <FileText size={16} /> From Template
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowExportMenu(false)
+                          handleExportAllPolicies()
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderTop: '1px solid var(--glass-border-color)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        className="hover-effect"
+                      >
+                        <FileSpreadsheet size={16} /> All Policies (Excel)
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setShowExportMenu(false)
+                          try {
+                            // Build missing/expired/expiring documents list
+                            const lines: string[] = []
+                            lines.push(`${vessel.name} — Outstanding Documents`)
+                            lines.push('')
+
+                            // Resolve effective policy expiry for annual docs
+                            const { resolveEffectivePolicyExpiry } =
+                              await import('../utils/policyUtils')
+                            const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
+                            // Annual docs received within grace period of P&I expiry are treated as compliant
+                            const graceSetting = await window.api.getSetting('annual_grace_days')
+                            const graceDays = graceSetting ? parseInt(graceSetting) || 90 : 90
+                            const shortCycle = (
+                              expiry: string | null | undefined,
+                              received: string | null | undefined
+                            ) => {
+                              if (!expiry || !received) return false
+                              const e = new Date(expiry + 'T00:00:00')
+                              const r = new Date(received.split('T')[0] + 'T00:00:00')
+                              const days = Math.floor((e.getTime() - r.getTime()) / 86400000)
+                              return days >= 0 && days < graceDays
+                            }
+                            const today = new Date()
+                            today.setHours(0, 0, 0, 0)
+                            const threshold = new Date(today)
+                            threshold.setDate(today.getDate() + 30)
+
+                            // Vessel documents
+                            const customDocTypes = await window.api.getVesselCustomDocTypes(
+                              vessel.id
+                            )
+                            const allDocTypes = [
+                              ...docTypes,
+                              ...(Array.isArray(customDocTypes) ? customDocTypes : []).map(
+                                (c: any) => ({
+                                  id: c.id,
+                                  name: c.name,
+                                  required: true,
+                                  annualRenewal: false
+                                })
+                              )
+                            ]
+                            const issues: string[] = []
+                            for (const dt of allDocTypes) {
+                              if (!(dt as any).required) continue // skip optional documents
+                              const doc = vesselDocs.find((d) => d.documentTypeId === dt.id)
+                              if (!doc?.filePath) {
+                                issues.push(`${dt.name} — MISSING`)
+                                continue
+                              }
+                              // Check expiry
+                              let expiryDate = doc.expiryDate || null
+                              if ((dt as any).annualRenewal && effectiveExpiry) {
+                                expiryDate = effectiveExpiry
+                              }
+                              if (expiryDate) {
+                                // Short-cycle check
+                                // Skip annual docs that were recently received (short-cycle: received within 60 days of expiry)
+                                const docReceived =
+                                  doc.receivedDate || doc.uploadedDate?.split('T')[0]
+                                if (
+                                  (dt as any).annualRenewal &&
+                                  docReceived &&
+                                  shortCycle(expiryDate, docReceived)
+                                ) {
+                                  continue // compliant via short-cycle
+                                }
+                                const exp = new Date(expiryDate + 'T00:00:00')
+                                if (exp < today) {
+                                  issues.push(`${dt.name} — EXPIRED (${expiryDate})`)
+                                } else if (exp <= threshold) {
+                                  issues.push(`${dt.name} — EXPIRING SOON (${expiryDate})`)
+                                }
+                              }
+                            }
+                            if (issues.length > 0) {
+                              lines.push('Vessel Documents:')
+                              for (const issue of issues) lines.push(`  - ${issue}`)
+                              lines.push('')
+                            }
+
+                            // Entity documents
+                            const assureds = await window.api.getVesselAssureds(vessel.id)
+                            const entities = await window.api.getEntities()
+                            const safeAssureds = Array.isArray(assureds) ? assureds : []
+                            const safeEntities = Array.isArray(entities) ? entities : []
+                            const edTypesRaw = await window.api.getEntityDocumentTypes()
+                            const edDocsRaw = await window.api.getEntityDocuments()
+                            const activeEdTypes = (
+                              Array.isArray(edTypesRaw) ? edTypesRaw : []
+                            ).filter((t: any) => t.isActive && t.isRequired)
+                            const allEdDocs = Array.isArray(edDocsRaw) ? edDocsRaw : []
+                            for (const va of safeAssureds) {
+                              const entity = safeEntities.find((e: any) => e.id === va.entityId)
+                              if (!entity) continue
+                              const missing: string[] = []
+                              for (const edt of activeEdTypes.filter(
+                                (t: any) =>
+                                  t.entityScope === 'both' || t.entityScope === entity.type
+                              )) {
+                                if (
+                                  !allEdDocs.some(
+                                    (d: any) =>
+                                      d.entityId === entity.id &&
+                                      d.documentTypeId === edt.id &&
+                                      d.filePath
+                                  )
+                                ) {
+                                  missing.push(edt.name)
+                                }
+                              }
+                              if (missing.length > 0) {
+                                lines.push(`${entity.name}${va.role ? ` (${va.role})` : ''}:`)
+                                for (const m of missing) lines.push(`  - ${m}`)
+                                lines.push('')
+                              }
+                            }
+
+                            if (issues.length === 0 && lines.length <= 2) {
+                              showSuccess('No outstanding documents')
+                              return
+                            }
+
+                            await navigator.clipboard.writeText(lines.join('\n'))
+                            showSuccess('Missing documents list copied to clipboard')
+                          } catch (err: any) {
+                            showError(err.message || 'Failed to copy')
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderTop: '1px solid var(--glass-border-color)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem'
+                        }}
+                        className="hover-effect"
+                      >
+                        <Copy size={16} /> Copy Missing Documents
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {user?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={handleDeleteVessel}
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem',
+                    color: 'var(--danger)',
+                    borderColor: 'rgba(255, 77, 77, 0.3)'
+                  }}
+                >
+                  <Trash size={16} /> Delete
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Section navigation tabs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0',
+          borderBottom: '2px solid var(--table-border)',
+          marginBottom: '16px',
+          alignItems: 'center'
+        }}
+      >
+        {(
+          [
+            'documents',
+            'assureds',
+            'surveys',
+            'quotations',
+            'policies',
+            'payments',
+            'timeline'
+          ] as const
+        ).map((view) => (
+          <button
+            key={view}
+            onClick={() => {
+              setDetailView(view)
+              if (view === 'policies' || view === 'surveys') loadDynamicPolicies()
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom:
+                detailView === view ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              marginBottom: '-2px',
+              color: detailView === view ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              fontWeight: detailView === view ? '600' : '400',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'var(--transition)'
+            }}
+          >
+            {view === 'documents' && <FileText size={18} />}
+            {view === 'assureds' && <Users size={18} />}
+            {view === 'surveys' && <ClipboardList size={18} />}
+            {view === 'policies' && <Shield size={18} />}
+            {view === 'quotations' && <Hash size={18} />}
+            {view === 'payments' && <Receipt size={18} />}
+            {view === 'timeline' && <Clock size={18} />}
+            {view === 'assureds'
+              ? 'Assured'
+              : view === 'timeline'
+                ? 'Activity'
+                : view.charAt(0).toUpperCase() + view.slice(1)}
+          </button>
+        ))}
+        {detailView === 'documents' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={async () => {
+                // Load associated entity IDs for combined remap
+                try {
+                  const assureds = await window.api.getVesselAssureds(vessel.id)
+                  const eIds = (Array.isArray(assureds) ? assureds : [])
+                    .map((a: any) => a.entityId)
+                    .filter(Boolean)
+                  setRemapEntityIds([...new Set(eIds)])
+                } catch {
+                  setRemapEntityIds([])
+                }
+                setShowRemapModal(true)
+              }}
+              title="Remap file paths for this vessel and its entities"
+              style={{
+                marginBottom: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--glass-border-color)',
+                borderRadius: '8px',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              <FolderSearch size={15} />
+              Remap Files
+            </button>
+            <button
+              onClick={() => {
+                const next = !useCardDocs
+                setUseCardDocs(next)
+                localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
+              }}
+              title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
+              style={{
+                marginBottom: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--glass-border-color)',
+                borderRadius: '8px',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
+              {useCardDocs ? 'Table View' : 'Card View'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {detailView === 'documents' && useCardDocs && (
+        <VesselDocumentsView
+          vessel={vessel}
+          dynamicPolicies={dynamicPolicies}
+          onReload={loadData}
+        />
+      )}
+
+      {detailView === 'documents' && !useCardDocs && (
+        <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+            <caption className="sr-only">Document compliance</caption>
+            <thead>
+              <tr
+                style={{
+                  textAlign: 'left',
+                  background: 'var(--table-header-bg)',
+                  borderBottom: '1px solid var(--table-border)'
+                }}
+              >
+                <th scope="col" style={{ padding: '18px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Document Name
+                    <button
+                      onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
+                      style={{
+                        background: isLight
+                          ? 'rgba(0, 119, 163, 0.12)'
+                          : 'rgba(var(--accent-primary-rgb), 0.12)',
+                        border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}
+                      title="Add custom document type"
+                    >
+                      <Plus size={14} />
+                      Custom
+                    </button>
+                  </div>
+                </th>
+                <th scope="col" style={{ padding: '18px 16px' }}>
+                  Requirement
+                </th>
+                <th scope="col" style={{ padding: '18px 16px' }}>
+                  File Status
+                </th>
+                <th scope="col" style={{ padding: '18px 16px' }}>
+                  Date of Receipt
+                </th>
+                <th scope="col" style={{ padding: '18px 16px' }}>
+                  Expiry Date
+                </th>
+                <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {docTypes.map((type) => {
+                const docsForType = vesselDocs.filter((d) => d.documentTypeId === type.id)
+                const doc = docsForType[0]
+                const extraDocs = docsForType.slice(1)
+                const isRequired = doc ? doc.required : type.required || false
+
+                const renderDocRow = (
+                  rowDoc: VesselDocument | undefined,
+                  rowType: DocumentType,
+                  isExtra: boolean,
+                  key: string
+                ) => {
+                  const rowHasFile = !!rowDoc?.filePath
+                  const rowExists = fileStatus[rowType.id]
+                  // Determine left border color based on document status
+                  const getRowBorderColor = () => {
+                    if (isExtra) return 'transparent'
+                    if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
+                    if (rowDoc?.expiryDate) {
+                      const exp = new Date(rowDoc.expiryDate)
+                      const now = new Date()
+                      if (exp < now) return 'var(--danger)' // expired
+                      const soon = new Date()
+                      soon.setDate(soon.getDate() + 30)
+                      if (exp < soon) return '#e6a800' // expiring soon
+                    }
+                    return 'transparent' // compliant
+                  }
+
+                  return (
+                    <tr
+                      key={key}
+                      style={{
+                        borderBottom: '1px solid var(--table-border)',
+                        borderLeft: `4px solid ${getRowBorderColor()}`,
+                        background:
+                          dragOverId === rowType.id
+                            ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                            : isRequired && !rowHasFile && !isExtra
+                              ? 'rgba(255, 77, 77, 0.1)'
+                              : 'transparent',
+                        outline:
+                          dragOverId === rowType.id ? '2px dashed var(--accent-primary)' : 'none',
+                        outlineOffset: '-2px',
+                        transition: 'all 0.2s ease',
+                        cursor: dragOverId === rowType.id ? 'copy' : 'default'
+                      }}
+                      onDragOver={(e) => handleDragOver(e, rowType.id)}
+                      onDragEnter={(e) => handleDragEnter(e, rowType.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, rowType.id)}
+                    >
+                      <td style={{ padding: '16px' }}>
+                        <div
+                          style={{
+                            fontWeight: isExtra ? '400' : '600',
+                            paddingLeft: isExtra ? '20px' : '0',
+                            color: isExtra ? 'var(--text-secondary)' : 'inherit',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            padding: '10px 20px',
-                            background: 'transparent',
-                            border: 'none',
-                            borderBottom: detailView === view ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                            marginBottom: '-2px',
-                            color: detailView === view ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                            fontWeight: detailView === view ? '600' : '400',
-                            fontSize: '0.9rem',
-                            cursor: 'pointer',
-                            transition: 'var(--transition)'
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          {isExtra ? `${rowType.name} (copy)` : rowType.name}
+                          {rowHasFile && (
+                            <DocExpiryBadge expiryDate={rowDoc?.expiryDate} isLight={isLight} />
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        {!isExtra && (
+                          <button
+                            onClick={() => handleToggleRequired(rowType.id)}
+                            style={{
+                              background: isRequired ? 'rgba(128, 128, 128, 0.1)' : 'transparent',
+                              border: '1px solid var(--table-border)',
+                              padding: '4px 8px',
+                              borderRadius: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer'
+                            }}
+                            title="Toggle Mandatory"
+                          >
+                            {isRequired ? 'Mandatory' : 'Optional'}
+                          </button>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        {rowHasFile ? (
+                          isExtra || rowExists ? (
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                background: isLight
+                                  ? 'rgba(0, 140, 70, 0.12)'
+                                  : 'rgba(0, 255, 136, 0.1)',
+                                border: isLight
+                                  ? '1px solid rgba(0, 140, 70, 0.35)'
+                                  : '1px solid rgba(0, 255, 136, 0.3)',
+                                color: isLight ? '#008c46' : '#00ff88',
+                                textTransform: 'uppercase'
+                              }}
+                            >
+                              <CheckCircle size={14} />
+                              LINKED
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                background: isLight
+                                  ? 'rgba(200, 0, 0, 0.12)'
+                                  : 'rgba(255, 77, 77, 0.1)',
+                                border: isLight
+                                  ? '1px solid rgba(200, 0, 0, 0.35)'
+                                  : '1px solid rgba(255, 77, 77, 0.3)',
+                                color: 'var(--danger)',
+                                textTransform: 'uppercase'
+                              }}
+                            >
+                              <AlertCircle size={14} />
+                              MISSING
+                            </div>
+                          )
+                        ) : hasPermission('documents:upload') ? (
+                          <button
+                            onClick={() => handleClickUpload(rowType.id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              background: isLight
+                                ? 'rgba(0, 119, 163, 0.05)'
+                                : 'rgba(var(--accent-primary-rgb), 0.05)',
+                              border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                              color: 'var(--accent-primary)',
+                              textTransform: 'uppercase',
+                              cursor: 'pointer'
+                            }}
+                            title="Click to browse or drag a file here"
+                          >
+                            <Upload size={14} />
+                            UPLOAD FILE
+                          </button>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        {rowHasFile ? (
+                          <input
+                            type="date"
+                            title="Click to change received date"
+                            value={
+                              editingReceived[rowType.id] !== undefined
+                                ? editingReceived[rowType.id]
+                                : rowDoc?.receivedDate?.split('T')[0] || ''
+                            }
+                            onFocus={() =>
+                              setEditingReceived((prev) => ({
+                                ...prev,
+                                [rowType.id]: rowDoc?.receivedDate?.split('T')[0] || ''
+                              }))
+                            }
+                            onChange={(e) =>
+                              setEditingReceived((prev) => ({
+                                ...prev,
+                                [rowType.id]: e.target.value
+                              }))
+                            }
+                            onBlur={async (e) => {
+                              const val = e.target.value
+                              setEditingReceived((prev) => {
+                                const n = { ...prev }
+                                delete n[rowType.id]
+                                return n
+                              })
+                              if (val) {
+                                await window.api.updateVesselDocumentReceivedDate(
+                                  vessel.id,
+                                  rowType.id,
+                                  val
+                                )
+                                loadData()
+                              }
+                            }}
+                            min="1900-01-01"
+                            max="2100-12-31"
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.85rem',
+                              background: 'var(--input-bg)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--input-border)',
+                              colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                            }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            -
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        {rowType.annualRenewal ? (
+                          rowHasFile ? (
+                            (() => {
+                              const piExpiry =
+                                resolveEffectivePolicyExpiry(dynamicPolicies) ||
+                                vessel.policyExpiryDate
+                              return piExpiry ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Calendar size={14} color="var(--text-secondary)" />
+                                  <span
+                                    style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+                                  >
+                                    Expires with P&I ·{' '}
+                                    <span
+                                      style={{ color: 'var(--text-primary)', fontWeight: '500' }}
+                                    >
+                                      {formatDate(piExpiry)}
+                                    </span>
+                                  </span>
+                                </div>
+                              ) : rowDoc?.expiryDate ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Calendar size={14} color="var(--text-secondary)" />
+                                  <input
+                                    type="date"
+                                    value={
+                                      editingExpiry[rowType.id] !== undefined
+                                        ? editingExpiry[rowType.id]
+                                        : rowDoc.expiryDate || ''
+                                    }
+                                    onFocus={() =>
+                                      setEditingExpiry((prev) => ({
+                                        ...prev,
+                                        [rowType.id]: rowDoc.expiryDate || ''
+                                      }))
+                                    }
+                                    onChange={(e) =>
+                                      setEditingExpiry((prev) => ({
+                                        ...prev,
+                                        [rowType.id]: e.target.value
+                                      }))
+                                    }
+                                    onBlur={async (e) => {
+                                      const val = e.target.value
+                                      setEditingExpiry((prev) => {
+                                        const n = { ...prev }
+                                        delete n[rowType.id]
+                                        return n
+                                      })
+                                      await window.api.updateVesselDocumentExpiry(
+                                        vessel.id,
+                                        rowType.id,
+                                        val || null
+                                      )
+                                      loadData()
+                                    }}
+                                    min="1900-01-01"
+                                    max="2100-12-31"
+                                    style={{
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.85rem',
+                                      background: 'var(--input-bg)',
+                                      color: 'var(--text-primary)',
+                                      border: '1px solid var(--input-border)',
+                                      colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'var(--text-secondary)',
+                                    fontStyle: 'italic'
+                                  }}
+                                >
+                                  Annual — P&I date not set
+                                </span>
+                              )
+                            })()
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--text-secondary)',
+                                fontStyle: 'italic'
+                              }}
+                            >
+                              Annual (P&I)
+                            </span>
+                          )
+                        ) : !rowHasFile ? (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            -
+                          </span>
+                        ) : !rowDoc?.expiryDate || rowDoc.expiryDate === '0000-00-00' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={14} color="var(--text-secondary)" />
+                            <input
+                              type="date"
+                              placeholder="Set expiry"
+                              value={
+                                editingExpiry[rowType.id] !== undefined
+                                  ? editingExpiry[rowType.id]
+                                  : ''
+                              }
+                              onFocus={() =>
+                                setEditingExpiry((prev) => ({ ...prev, [rowType.id]: '' }))
+                              }
+                              onChange={(e) =>
+                                setEditingExpiry((prev) => ({
+                                  ...prev,
+                                  [rowType.id]: e.target.value
+                                }))
+                              }
+                              onBlur={async (e) => {
+                                const val = e.target.value
+                                setEditingExpiry((prev) => {
+                                  const n = { ...prev }
+                                  delete n[rowType.id]
+                                  return n
+                                })
+                                if (val) {
+                                  await handleUpdateExpiry(rowType.id, val)
+                                }
+                              }}
+                              min="1900-01-01"
+                              max="2100-12-31"
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem',
+                                background: 'var(--input-bg)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid var(--input-border)',
+                                colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                              }}
+                              aria-label={`Expiry date for ${rowType.name}`}
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={14} color="var(--text-secondary)" />
+                            <input
+                              type="date"
+                              value={
+                                editingExpiry[rowType.id] !== undefined
+                                  ? editingExpiry[rowType.id]
+                                  : rowDoc?.expiryDate || ''
+                              }
+                              onFocus={() =>
+                                setEditingExpiry((prev) => ({
+                                  ...prev,
+                                  [rowType.id]: rowDoc?.expiryDate || ''
+                                }))
+                              }
+                              onChange={(e) =>
+                                setEditingExpiry((prev) => ({
+                                  ...prev,
+                                  [rowType.id]: e.target.value
+                                }))
+                              }
+                              onBlur={async (e) => {
+                                const val = e.target.value
+                                setEditingExpiry((prev) => {
+                                  const n = { ...prev }
+                                  delete n[rowType.id]
+                                  return n
+                                })
+                                await window.api.updateVesselDocumentExpiry(
+                                  vessel.id,
+                                  rowType.id,
+                                  val || null
+                                )
+                                loadData()
+                              }}
+                              min="1900-01-01"
+                              max="2100-12-31"
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem',
+                                background: 'var(--input-bg)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid var(--input-border)',
+                                colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                              }}
+                              aria-label={`Expiry date for ${rowType.name}`}
+                            />
+                            <button
+                              title="Clear expiry date"
+                              onClick={async () => {
+                                await window.api.updateVesselDocumentExpiry(
+                                  vessel.id,
+                                  rowType.id,
+                                  null
+                                )
+                                loadData()
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                padding: 0,
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                          {rowHasFile && (
+                            <>
+                              <button
+                                onClick={() => openFile(rowDoc!.filePath)}
+                                className="btn-secondary"
+                                style={{ padding: '6px' }}
+                                title="View File"
+                                aria-label="View file"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              <button
+                                onClick={() => window.api.shellShowItemInFolder(rowDoc!.filePath)}
+                                className="btn-secondary"
+                                style={{ padding: '6px' }}
+                                title="Open file location"
+                                aria-label="Open file location"
+                              >
+                                <FolderOpen size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDuplicateDoc(rowDoc!)}
+                                className="btn-secondary"
+                                style={{ padding: '6px' }}
+                                title="Duplicate Document"
+                                aria-label="Duplicate document"
+                              >
+                                <Copy size={18} />
+                              </button>
+                              {isExtra ? (
+                                <button
+                                  onClick={() => handleDeleteDocById(rowDoc!)}
+                                  className="btn-secondary"
+                                  style={{ padding: '6px', color: 'var(--danger)' }}
+                                  title="Remove Document"
+                                  aria-label="Remove document"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeleteDoc(rowDoc!)}
+                                  className="btn-secondary"
+                                  style={{ padding: '6px', color: 'var(--danger)' }}
+                                  title="Unlink File"
+                                  aria-label="Unlink file"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+
+                return [
+                  renderDocRow(doc, type, false, type.id),
+                  ...extraDocs.map((ed) => renderDocRow(ed, type, true, ed.id!))
+                ]
+              })}
+              {customDocTypes.map((customType) => {
+                const doc = vesselDocs.find((d) => d.documentTypeId === customType.id)
+                const rowHasFile = !!doc?.filePath
+                const rowExists = fileStatus[customType.id]
+
+                return (
+                  <tr
+                    key={customType.id}
+                    style={{
+                      borderBottom: '1px solid var(--table-border)',
+                      background:
+                        dragOverId === customType.id
+                          ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                          : !rowHasFile
+                            ? 'rgba(255, 77, 77, 0.05)'
+                            : 'transparent',
+                      outline:
+                        dragOverId === customType.id ? '2px dashed var(--accent-primary)' : 'none',
+                      outlineOffset: '-2px',
+                      transition: 'all 0.2s ease',
+                      cursor: dragOverId === customType.id ? 'copy' : 'default'
+                    }}
+                    onDragOver={(e) => handleDragOver(e, customType.id)}
+                    onDragEnter={(e) => handleDragEnter(e, customType.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, customType.id)}
+                  >
+                    <td style={{ padding: '16px' }}>
+                      <div
+                        style={{
+                          fontWeight: '600',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
+                      >
+                        {customType.name}
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: isLight
+                              ? 'rgba(59, 130, 246, 0.1)'
+                              : 'rgba(59, 130, 246, 0.2)',
+                            color: isLight ? '#3b82f6' : '#93c5fd',
+                            fontWeight: '500'
+                          }}
+                        >
+                          Custom
+                        </span>
+                        {rowHasFile && (
+                          <DocExpiryBadge expiryDate={doc?.expiryDate} isLight={isLight} />
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        CUSTOM
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      {rowHasFile ? (
+                        rowExists ? (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              background: isLight
+                                ? 'rgba(0, 140, 70, 0.12)'
+                                : 'rgba(0, 255, 136, 0.1)',
+                              border: isLight
+                                ? '1px solid rgba(0, 140, 70, 0.35)'
+                                : '1px solid rgba(0, 255, 136, 0.3)',
+                              color: isLight ? '#008c46' : '#00ff88',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            <CheckCircle size={14} />
+                            LINKED
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              background: isLight
+                                ? 'rgba(200, 0, 0, 0.12)'
+                                : 'rgba(255, 77, 77, 0.1)',
+                              border: isLight
+                                ? '1px solid rgba(200, 0, 0, 0.35)'
+                                : '1px solid rgba(255, 77, 77, 0.3)',
+                              color: 'var(--danger)',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            <AlertCircle size={14} />
+                            MISSING
+                          </div>
+                        )
+                      ) : hasPermission('documents:upload') ? (
+                        <button
+                          onClick={() => handleClickUpload(customType.id)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            background: isLight
+                              ? 'rgba(0, 119, 163, 0.05)'
+                              : 'rgba(var(--accent-primary-rgb), 0.05)',
+                            border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                            color: 'var(--accent-primary)',
+                            textTransform: 'uppercase',
+                            cursor: 'pointer'
+                          }}
+                          title="Click to browse or drag a file here"
+                        >
+                          <Upload size={14} />
+                          UPLOAD FILE
+                        </button>
+                      ) : null}
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      {rowHasFile ? (
+                        <input
+                          type="date"
+                          title="Click to change received date"
+                          value={
+                            editingReceived[customType.id] !== undefined
+                              ? editingReceived[customType.id]
+                              : doc?.receivedDate?.split('T')[0] || ''
+                          }
+                          onFocus={() =>
+                            setEditingReceived((prev) => ({
+                              ...prev,
+                              [customType.id]: doc?.receivedDate?.split('T')[0] || ''
+                            }))
+                          }
+                          onChange={(e) =>
+                            setEditingReceived((prev) => ({
+                              ...prev,
+                              [customType.id]: e.target.value
+                            }))
+                          }
+                          onBlur={async (e) => {
+                            const val = e.target.value
+                            setEditingReceived((prev) => {
+                              const n = { ...prev }
+                              delete n[customType.id]
+                              return n
+                            })
+                            if (val) {
+                              await window.api.updateVesselDocumentReceivedDate(
+                                vessel.id,
+                                customType.id,
+                                val
+                              )
+                              loadData()
+                            }
+                          }}
+                          min="1900-01-01"
+                          max="2100-12-31"
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.85rem',
+                            background: 'var(--input-bg)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--input-border)',
+                            colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          -
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '16px' }}>
+                      {!rowHasFile ? (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          -
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} color="var(--text-secondary)" />
+                          <input
+                            type="date"
+                            value={
+                              editingExpiry[customType.id] !== undefined
+                                ? editingExpiry[customType.id]
+                                : doc?.expiryDate || ''
+                            }
+                            onFocus={() =>
+                              setEditingExpiry((prev) => ({
+                                ...prev,
+                                [customType.id]: doc?.expiryDate || ''
+                              }))
+                            }
+                            onChange={(e) =>
+                              setEditingExpiry((prev) => ({
+                                ...prev,
+                                [customType.id]: e.target.value
+                              }))
+                            }
+                            onBlur={async (e) => {
+                              const val = e.target.value
+                              setEditingExpiry((prev) => {
+                                const n = { ...prev }
+                                delete n[customType.id]
+                                return n
+                              })
+                              await window.api.updateVesselDocumentExpiry(
+                                vessel.id,
+                                customType.id,
+                                val || null
+                              )
+                              loadData()
+                            }}
+                            min="1900-01-01"
+                            max="2100-12-31"
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.85rem',
+                              background: 'var(--input-bg)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--input-border)',
+                              colorScheme: isLight ? ('light' as const) : ('dark' as const)
+                            }}
+                            aria-label={`Expiry date for ${customType.name}`}
+                          />
+                          {doc?.expiryDate && doc.expiryDate !== '0000-00-00' && (
+                            <button
+                              title="Clear expiry date"
+                              onClick={async () => {
+                                await window.api.updateVesselDocumentExpiry(
+                                  vessel.id,
+                                  customType.id,
+                                  null
+                                )
+                                loadData()
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                padding: 0,
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        {rowHasFile && (
+                          <>
+                            <button
+                              onClick={() => openFile(doc!.filePath)}
+                              className="btn-secondary"
+                              style={{ padding: '6px' }}
+                              title="View File"
+                              aria-label="View file"
+                            >
+                              <Eye size={18} />
+                            </button>
+                            <button
+                              onClick={() => window.api.shellShowItemInFolder(doc!.filePath)}
+                              className="btn-secondary"
+                              style={{ padding: '6px' }}
+                              title="Open file location"
+                              aria-label="Open file location"
+                            >
+                              <FolderOpen size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDoc(doc!)}
+                              className="btn-secondary"
+                              style={{ padding: '6px', color: 'var(--danger)' }}
+                              title="Unlink File"
+                              aria-label="Unlink file"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => handleDeleteCustomDocType(customType)}
+                          className="btn-secondary"
+                          style={{ padding: '6px', color: 'var(--danger)' }}
+                          title="Remove custom document type"
+                          aria-label="Remove custom document type"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {showAddCustomDoc && (
+                <tr
+                  style={{
+                    borderBottom: '1px solid var(--table-border)',
+                    background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)'
+                  }}
+                >
+                  <td colSpan={6} style={{ padding: '12px 16px' }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        handleAddCustomDocType()
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
                     >
-                        {view === 'documents' && <FileText size={18} />}
-                        {view === 'assureds' && <Users size={18} />}
-                        {view === 'surveys' && <ClipboardList size={18} />}
-                        {view === 'policies' && <Shield size={18} />}
-                        {view === 'quotations' && <Hash size={18} />}
-                        {view === 'payments' && <Receipt size={18} />}
-                        {view === 'timeline' && <Clock size={18} />}
-                        {view === 'assureds' ? 'Assured' : view === 'timeline' ? 'Activity' : view.charAt(0).toUpperCase() + view.slice(1)}
-                    </button>
-                ))}
-                {detailView === 'documents' && (
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button
-                            onClick={async () => {
-                                // Load associated entity IDs for combined remap
-                                try {
-                                    const assureds = await window.api.getVesselAssureds(vessel.id)
-                                    const eIds = (Array.isArray(assureds) ? assureds : []).map((a: any) => a.entityId).filter(Boolean)
-                                    setRemapEntityIds([...new Set(eIds)])
-                                } catch { setRemapEntityIds([]) }
-                                setShowRemapModal(true)
-                            }}
-                            title="Remap file paths for this vessel and its entities"
-                            style={{
-                                marginBottom: '2px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--glass-border-color)',
-                                borderRadius: '8px',
-                                color: 'var(--text-secondary)',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            <FolderSearch size={15} />
-                            Remap Files
-                        </button>
-                        <button
-                            onClick={() => {
-                                const next = !useCardDocs
-                                setUseCardDocs(next)
-                                localStorage.setItem('vessel_doc_card_view', next ? '1' : '0')
-                            }}
-                            title={useCardDocs ? 'Switch to table view' : 'Switch to card view'}
-                            style={{
-                                marginBottom: '2px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--glass-border-color)',
-                                borderRadius: '8px',
-                                color: 'var(--text-secondary)',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            {useCardDocs ? <List size={15} /> : <LayoutGrid size={15} />}
-                            {useCardDocs ? 'Table View' : 'Card View'}
-                        </button>
-                    </div>
-                )}
+                      <input
+                        type="text"
+                        value={newCustomDocName}
+                        onChange={(e) => setNewCustomDocName(e.target.value)}
+                        placeholder="Custom document type name..."
+                        style={{
+                          flex: 1,
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem'
+                        }}
+                        autoFocus
+                        aria-label="Custom document type name"
+                      />
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                        disabled={!newCustomDocName.trim()}
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                        onClick={() => {
+                          setShowAddCustomDoc(false)
+                          setNewCustomDocName('')
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
+
+      {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
+
+      {detailView === 'policies' && (
+        <>
+          <DynamicPoliciesView
+            vesselId={vessel.id}
+            dynamicPolicies={dynamicPolicies}
+            isLight={isLight}
+            onReload={loadDynamicPolicies}
+            showSuccess={showSuccess}
+            showError={showError}
+          />
+
+          {/* Section divider between policies and warranties */}
+          <div
+            style={{
+              margin: '32px 0 24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}
+          >
+            <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+            <span
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Survey Warranties
+            </span>
+            <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
+          </div>
+
+          <WarrantyManager
+            vesselId={vessel.id}
+            dynamicPolicies={dynamicPolicies}
+            isLight={isLight}
+          />
+        </>
+      )}
+
+      {detailView === 'payments' && (
+        <ReceiptManager vesselId={vessel.id} vesselName={vessel.name} embedded />
+      )}
+
+      {detailView === 'timeline' && <VesselTimeline vesselId={vessel.id} isLight={isLight} />}
+
+      {detailView === 'quotations' && (
+        <VesselQuotationsView
+          vessel={vessel}
+          onNavigateToQuotation={(qId) => {
+            if (onNavigateToQuotation) onNavigateToQuotation(qId)
+          }}
+        />
+      )}
+
+      {confirmation.show && (
+        <ConfirmationModal
+          title={confirmation.title}
+          message={confirmation.message}
+          isDangerous={confirmation.isDangerous}
+          onConfirm={confirmation.onConfirm}
+          onCancel={() => setConfirmation((prev) => ({ ...prev, show: false }))}
+        />
+      )}
+
+      {/* Endorsement Prompt Modal */}
+      {endorsementPrompt.show && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setEndorsementPrompt((prev) => ({ ...prev, show: false }))}
+          />
+          <div
+            style={{
+              position: 'relative',
+              width: '480px',
+              borderRadius: '14px',
+              padding: '24px',
+              background: isLight ? '#ffffff' : '#1a1d28',
+              border: '1px solid var(--glass-border-color)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>Issue Endorsement?</h3>
+            <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
+              {endorsementPrompt.changes.map((c, i) => (
+                <div key={i} style={{ marginBottom: '6px' }}>
+                  <strong>{c.fieldLabel}</strong> changed from{' '}
+                  <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>
+                    {c.oldValue || '(empty)'}
+                  </span>
+                  {' → '}
+                  <span style={{ fontWeight: 600 }}>{c.newValue || '(empty)'}</span>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}
+            >
+              Select policies to create endorsements for:
+            </div>
+            {endorsementPrompt.policies.map((p) => (
+              <label
+                key={p.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '6px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={p.selected}
+                  onChange={() =>
+                    setEndorsementPrompt((prev) => ({
+                      ...prev,
+                      policies: prev.policies.map((x) =>
+                        x.id === p.id ? { ...x, selected: !x.selected } : x
+                      )
+                    }))
+                  }
+                />
+                {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    padding: '1px 6px',
+                    borderRadius: '8px',
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                    color: 'var(--accent-primary)'
+                  }}
+                >
+                  Endorsement No. {p.nextEndNum}
+                </span>
+              </label>
+            ))}
+            <div
+              style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}
+            >
+              <button
+                onClick={() => setEndorsementPrompt((prev) => ({ ...prev, show: false }))}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  border: '1px solid var(--glass-border-color)',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
+                }}
+              >
+                Skip
+              </button>
+              <button
+                onClick={async () => {
+                  const selected = endorsementPrompt.policies.filter(
+                    (p) => p.selected && p.policyDocId
+                  )
+                  if (selected.length === 0) {
+                    setEndorsementPrompt((prev) => ({ ...prev, show: false }))
+                    return
+                  }
+                  try {
+                    const changeDesc = endorsementPrompt.changes
+                      .map(
+                        (c) =>
+                          `It is hereby noted and agreed that the ${c.fieldLabel} has been changed from ${c.oldValue || '(none)'} to ${c.newValue || '(none)'}.`
+                      )
+                      .join('\n')
+                    for (const p of selected) {
+                      const id = await window.api.endorsementCreate({
+                        policyDocId: p.policyDocId!,
+                        endorsementNumber: p.nextEndNum,
+                        effectiveDate: new Date().toISOString().slice(0, 10)
+                      })
+                      // Set interest section with change description
+                      await window.api.endorsementSetSections(id, [
+                        {
+                          sectionKey: 'interest',
+                          sectionTitle: 'Interest / Vessel',
+                          content: `<p>${changeDesc.replace(/\n/g, '</p><p>')}</p>`,
+                          isEnabled: true,
+                          orderIndex: 0
+                        }
+                      ])
+                    }
+                    showSuccess(
+                      `${selected.length} draft endorsement${selected.length > 1 ? 's' : ''} created`
+                    )
+                  } catch {
+                    showError('Failed to create endorsements')
+                  }
+                  setEndorsementPrompt((prev) => ({ ...prev, show: false }))
+                }}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  background: 'var(--accent-primary)',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRemapModal && (
+        <RemapFilePathsModal
+          vesselId={vessel.id}
+          vesselName={vessel.name}
+          includeEntityIds={remapEntityIds}
+          onClose={() => {
+            setShowRemapModal(false)
+            setRemapEntityIds([])
+          }}
+        />
+      )}
+
+      {showAddFlagModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowAddFlagModal(false)}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1e222a',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '420px',
+              maxWidth: '90vw',
+              border: '1px solid var(--glass-border-color)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: '16px' }}>Add Flag State</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px',
+                    display: 'block'
+                  }}
+                >
+                  Country *
+                </label>
+                <select
+                  value={newFlagIso3}
+                  onChange={(e) => {
+                    const iso3 = e.target.value
+                    setNewFlagIso3(iso3)
+                    const country = countryNameToIso3.find((c) => c.iso3 === iso3)
+                    setNewFlagName(country ? country.name : '')
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--glass-border-color)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem'
+                  }}
+                  autoFocus
+                >
+                  <option value="">Select a country...</option>
+                  {countryNameToIso3.map((c) => (
+                    <option key={c.iso3} value={c.iso3}>
+                      {c.name} ({c.iso3})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px',
+                    display: 'block'
+                  }}
+                >
+                  Address
+                </label>
+                <input
+                  value={newFlagAddress}
+                  onChange={(e) => setNewFlagAddress(e.target.value)}
+                  placeholder="Optional"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--glass-border-color)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px',
+                    display: 'block'
+                  }}
+                >
+                  Email
+                </label>
+                <input
+                  value={newFlagEmail}
+                  onChange={(e) => setNewFlagEmail(e.target.value)}
+                  placeholder="Optional"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--glass-border-color)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+            </div>
+            <div
+              style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
+            >
+              <button onClick={() => setShowAddFlagModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={handleAddFlag}
+                disabled={!newFlagName.trim() || !newFlagIso3.trim()}
+                className="btn-primary"
+                style={{ opacity: !newFlagName.trim() || !newFlagIso3.trim() ? 0.5 : 1 }}
+              >
+                Add Flag State
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPoliciesModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowPoliciesModal(false)}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1e222a',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '400px',
+              maxWidth: '90vw',
+              border: '1px solid var(--glass-border-color)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: '16px' }}>Assign Policy Types</h3>
+            <p
+              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}
+            >
+              Toggle policy types for this vessel. Used by the Dynamic Address Book.
+            </p>
+            {allPolicyTypes.map((pt) => (
+              <label
+                key={pt.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  marginBottom: '4px',
+                  background: assignedPolicyTypeIds.has(pt.id)
+                    ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                    : 'transparent'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={assignedPolicyTypeIds.has(pt.id)}
+                  onChange={() => handleTogglePolicy(pt.id)}
+                  style={{ accentColor: 'var(--accent-primary)' }}
+                />
+                <span>{pt.name}</span>
+              </label>
+            ))}
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowPoliciesModal(false)} className="btn-secondary">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNotesModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '28px',
+              width: '520px',
+              maxWidth: '95vw',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '16px',
+                flexShrink: 0
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-primary)',
+                    fontSize: '1.05rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <MessageSquare size={16} color="var(--accent-primary)" /> Vessel Notes
+                </h3>
+                <p
+                  style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
+                >
+                  {vessel.name}
+                </p>
+              </div>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={() => setShowNotesModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  flexShrink: 0
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            {detailView === 'documents' && useCardDocs && (
-                <VesselDocumentsView vessel={vessel} dynamicPolicies={dynamicPolicies} onReload={loadData} />
-            )}
-
-            {detailView === 'documents' && !useCardDocs && <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
-                    <caption className="sr-only">Document compliance</caption>
-                    <thead>
-                        <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                            <th scope="col" style={{ padding: '18px 16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    Document Name
-                                    <button
-                                        onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
-                                        style={{
-                                            background: isLight ? 'rgba(0, 119, 163, 0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)',
-                                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                                            borderRadius: '6px',
-                                            padding: '3px 8px',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            color: 'var(--accent-primary)',
-                                            fontSize: '0.75rem',
-                                            fontWeight: '600'
-                                        }}
-                                        title="Add custom document type"
-                                    >
-                                        <Plus size={14} />
-                                        Custom
-                                    </button>
-                                </div>
-                            </th>
-                            <th scope="col" style={{ padding: '18px 16px' }}>Requirement</th>
-                            <th scope="col" style={{ padding: '18px 16px' }}>File Status</th>
-                            <th scope="col" style={{ padding: '18px 16px' }}>Date of Receipt</th>
-                            <th scope="col" style={{ padding: '18px 16px' }}>Expiry Date</th>
-                            <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {docTypes.map(type => {
-                            const docsForType = vesselDocs.filter(d => d.documentTypeId === type.id)
-                            const doc = docsForType[0]
-                            const extraDocs = docsForType.slice(1)
-                            const isRequired = doc ? doc.required : (type.required || false)
-
-                            const renderDocRow = (rowDoc: VesselDocument | undefined, rowType: DocumentType, isExtra: boolean, key: string) => {
-                                const rowHasFile = !!(rowDoc?.filePath)
-                                const rowExists = fileStatus[rowType.id]
-                                // Determine left border color based on document status
-                                const getRowBorderColor = () => {
-                                    if (isExtra) return 'transparent'
-                                    if (isRequired && (!rowHasFile || !rowExists)) return 'var(--danger)' // missing
-                                    if (rowDoc?.expiryDate) {
-                                        const exp = new Date(rowDoc.expiryDate)
-                                        const now = new Date()
-                                        if (exp < now) return 'var(--danger)' // expired
-                                        const soon = new Date()
-                                        soon.setDate(soon.getDate() + 30)
-                                        if (exp < soon) return '#e6a800' // expiring soon
-                                    }
-                                    return 'transparent' // compliant
-                                }
-
-                                return (
-                                    <tr
-                                        key={key}
-                                        style={{
-                                            borderBottom: '1px solid var(--table-border)',
-                                            borderLeft: `4px solid ${getRowBorderColor()}`,
-                                            background: dragOverId === rowType.id
-                                                ? 'rgba(var(--accent-primary-rgb), 0.2)'
-                                                : (isRequired && !rowHasFile && !isExtra) ? 'rgba(255, 77, 77, 0.1)' : 'transparent',
-                                            outline: dragOverId === rowType.id ? '2px dashed var(--accent-primary)' : 'none',
-                                            outlineOffset: '-2px',
-                                            transition: 'all 0.2s ease',
-                                            cursor: dragOverId === rowType.id ? 'copy' : 'default'
-                                        }}
-                                        onDragOver={e => handleDragOver(e, rowType.id)}
-                                        onDragEnter={e => handleDragEnter(e, rowType.id)}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={e => handleDrop(e, rowType.id)}
-                                    >
-                                        <td style={{ padding: '16px' }}>
-                                            <div style={{ fontWeight: isExtra ? '400' : '600', paddingLeft: isExtra ? '20px' : '0', color: isExtra ? 'var(--text-secondary)' : 'inherit', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                {isExtra ? `${rowType.name} (copy)` : rowType.name}
-                                                {rowHasFile && <DocExpiryBadge expiryDate={rowDoc?.expiryDate} isLight={isLight} />}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {!isExtra && (
-                                                <button
-                                                    onClick={() => handleToggleRequired(rowType.id)}
-                                                    style={{
-                                                        background: isRequired ? 'rgba(128, 128, 128, 0.1)' : 'transparent',
-                                                        border: '1px solid var(--table-border)',
-                                                        padding: '4px 8px',
-                                                        borderRadius: '20px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px',
-                                                        color: 'var(--text-secondary)',
-                                                        fontSize: '0.75rem',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                    title="Toggle Mandatory"
-                                                >
-                                                    {isRequired ? 'Mandatory' : 'Optional'}
-                                                </button>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {rowHasFile ? (
-                                                (isExtra || rowExists) ? (
-                                                    <div
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '6px',
-                                                            fontSize: '0.75rem',
-                                                            fontWeight: '600',
-                                                            background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
-                                                            border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
-                                                            color: isLight ? '#008c46' : '#00ff88',
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                    >
-                                                        <CheckCircle size={14} />
-                                                        LINKED
-                                                    </div>
-                                                ) : (
-                                                    <div
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '6px',
-                                                            fontSize: '0.75rem',
-                                                            fontWeight: '600',
-                                                            background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
-                                                            border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                            color: 'var(--danger)',
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                    >
-                                                        <AlertCircle size={14} />
-                                                        MISSING
-                                                    </div>
-                                                )
-                                            ) : hasPermission('documents:upload') ? (
-                                                <button
-                                                    onClick={() => handleClickUpload(rowType.id)}
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '500',
-                                                        background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(var(--accent-primary-rgb), 0.05)',
-                                                        border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                                                        color: 'var(--accent-primary)',
-                                                        textTransform: 'uppercase',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                    title="Click to browse or drag a file here"
-                                                >
-                                                    <Upload size={14} />
-                                                    UPLOAD FILE
-                                                </button>
-                                            ) : null}
-                                        </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {rowHasFile ? (
-                                                <input
-                                                    type="date"
-                                                    title="Click to change received date"
-                                                    value={editingReceived[rowType.id] !== undefined ? editingReceived[rowType.id] : (rowDoc?.receivedDate?.split('T')[0] || '')}
-                                                    onFocus={() => setEditingReceived(prev => ({ ...prev, [rowType.id]: rowDoc?.receivedDate?.split('T')[0] || '' }))}
-                                                    onChange={e => setEditingReceived(prev => ({ ...prev, [rowType.id]: e.target.value }))}
-                                                    onBlur={async e => {
-                                                        const val = e.target.value
-                                                        setEditingReceived(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
-                                                        if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, rowType.id, val); loadData() }
-                                                    }}
-                                                    min="1900-01-01" max="2100-12-31"
-                                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                                />
-                                            ) : (
-                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '16px' }}>
-                                            {rowType.annualRenewal ? (
-                                                rowHasFile ? (
-                                                    (() => {
-                                                        const piExpiry = resolveEffectivePolicyExpiry(dynamicPolicies) || vessel.policyExpiryDate
-                                                        return piExpiry ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <Calendar size={14} color="var(--text-secondary)" />
-                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                                Expires with P&I ·{' '}
-                                                                <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                                                                    {formatDate(piExpiry)}
-                                                                </span>
-                                                            </span>
-                                                        </div>
-                                                    ) : rowDoc?.expiryDate ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <Calendar size={14} color="var(--text-secondary)" />
-                                                            <input
-                                                                type="date"
-                                                                value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : (rowDoc.expiryDate || '')}
-                                                                onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: rowDoc.expiryDate || '' }))}
-                                                                onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
-                                                                onBlur={async e => {
-                                                                    const val = e.target.value
-                                                                    setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
-                                                                    await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, val || null); loadData()
-                                                                }}
-                                                                min="1900-01-01" max="2100-12-31"
-                                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual — P&I date not set</span>
-                                                    )
-                                                    })()
-                                                ) : (
-                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Annual (P&I)</span>
-                                                )
-                                            ) : !rowHasFile ? (
-                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
-                                            ) : !rowDoc?.expiryDate || rowDoc.expiryDate === '0000-00-00' ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Calendar size={14} color="var(--text-secondary)" />
-                                                    <input
-                                                        type="date"
-                                                        placeholder="Set expiry"
-                                                        value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : ''}
-                                                        onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: '' }))}
-                                                        onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
-                                                        onBlur={async e => {
-                                                            const val = e.target.value
-                                                            setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
-                                                            if (val) { await handleUpdateExpiry(rowType.id, val) }
-                                                        }}
-                                                        min="1900-01-01" max="2100-12-31"
-                                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                                        aria-label={`Expiry date for ${rowType.name}`}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Calendar size={14} color="var(--text-secondary)" />
-                                                    <input
-                                                        type="date"
-                                                        value={editingExpiry[rowType.id] !== undefined ? editingExpiry[rowType.id] : (rowDoc?.expiryDate || '')}
-                                                        onFocus={() => setEditingExpiry(prev => ({ ...prev, [rowType.id]: rowDoc?.expiryDate || '' }))}
-                                                        onChange={e => setEditingExpiry(prev => ({ ...prev, [rowType.id]: e.target.value }))}
-                                                        onBlur={async e => {
-                                                            const val = e.target.value
-                                                            setEditingExpiry(prev => { const n = { ...prev }; delete n[rowType.id]; return n })
-                                                            await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, val || null); loadData()
-                                                        }}
-                                                        min="1900-01-01"
-                                                        max="2100-12-31"
-                                                        style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                                        aria-label={`Expiry date for ${rowType.name}`}
-                                                    />
-                                                    <button
-                                                        title="Clear expiry date"
-                                                        onClick={async () => { await window.api.updateVesselDocumentExpiry(vessel.id, rowType.id, null); loadData() }}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                                {rowHasFile && (
-                                                    <>
-                                                        <button onClick={() => openFile(rowDoc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
-                                                            <Eye size={18} />
-                                                        </button>
-                                                        <button onClick={() => window.api.shellShowItemInFolder(rowDoc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="Open file location" aria-label="Open file location">
-                                                            <FolderOpen size={18} />
-                                                        </button>
-                                                        <button onClick={() => handleDuplicateDoc(rowDoc!)} className="btn-secondary" style={{ padding: '6px' }} title="Duplicate Document" aria-label="Duplicate document">
-                                                            <Copy size={18} />
-                                                        </button>
-                                                        {isExtra ? (
-                                                            <button onClick={() => handleDeleteDocById(rowDoc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Remove Document" aria-label="Remove document">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        ) : (
-                                                            <button onClick={() => handleDeleteDoc(rowDoc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File" aria-label="Unlink file">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )
-                            }
-
-                            return [
-                                renderDocRow(doc, type, false, type.id),
-                                ...extraDocs.map(ed => renderDocRow(ed, type, true, ed.id!))
-                            ]
-                        })}
-                        {customDocTypes.map(customType => {
-                            const doc = vesselDocs.find(d => d.documentTypeId === customType.id)
-                            const rowHasFile = !!(doc?.filePath)
-                            const rowExists = fileStatus[customType.id]
-
-                            return (
-                                <tr
-                                    key={customType.id}
-                                    style={{
-                                        borderBottom: '1px solid var(--table-border)',
-                                        background: dragOverId === customType.id
-                                            ? 'rgba(var(--accent-primary-rgb), 0.2)'
-                                            : (!rowHasFile) ? 'rgba(255, 77, 77, 0.05)' : 'transparent',
-                                        outline: dragOverId === customType.id ? '2px dashed var(--accent-primary)' : 'none',
-                                        outlineOffset: '-2px',
-                                        transition: 'all 0.2s ease',
-                                        cursor: dragOverId === customType.id ? 'copy' : 'default'
-                                    }}
-                                    onDragOver={e => handleDragOver(e, customType.id)}
-                                    onDragEnter={e => handleDragEnter(e, customType.id)}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={e => handleDrop(e, customType.id)}
-                                >
-                                    <td style={{ padding: '16px' }}>
-                                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {customType.name}
-                                            <span style={{
-                                                fontSize: '0.65rem',
-                                                padding: '2px 6px',
-                                                borderRadius: '4px',
-                                                background: isLight ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.2)',
-                                                color: isLight ? '#3b82f6' : '#93c5fd',
-                                                fontWeight: '500'
-                                            }}>Custom</span>
-                                            {rowHasFile && <DocExpiryBadge expiryDate={doc?.expiryDate} isLight={isLight} />}
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '16px' }}>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>CUSTOM</span>
-                                    </td>
-                                    <td style={{ padding: '16px' }}>
-                                        {rowHasFile ? (
-                                            rowExists ? (
-                                                <div
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '600',
-                                                        background: isLight ? 'rgba(0, 140, 70, 0.12)' : 'rgba(0, 255, 136, 0.1)',
-                                                        border: isLight ? '1px solid rgba(0, 140, 70, 0.35)' : '1px solid rgba(0, 255, 136, 0.3)',
-                                                        color: isLight ? '#008c46' : '#00ff88',
-                                                        textTransform: 'uppercase'
-                                                    }}
-                                                >
-                                                    <CheckCircle size={14} />
-                                                    LINKED
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: '600',
-                                                        background: isLight ? 'rgba(200, 0, 0, 0.12)' : 'rgba(255, 77, 77, 0.1)',
-                                                        border: isLight ? '1px solid rgba(200, 0, 0, 0.35)' : '1px solid rgba(255, 77, 77, 0.3)',
-                                                        color: 'var(--danger)',
-                                                        textTransform: 'uppercase'
-                                                    }}
-                                                >
-                                                    <AlertCircle size={14} />
-                                                    MISSING
-                                                </div>
-                                            )
-                                        ) : hasPermission('documents:upload') ? (
-                                            <button
-                                                onClick={() => handleClickUpload(customType.id)}
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '500',
-                                                    background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(var(--accent-primary-rgb), 0.05)',
-                                                    border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                                                    color: 'var(--accent-primary)',
-                                                    textTransform: 'uppercase',
-                                                    cursor: 'pointer'
-                                                }}
-                                                title="Click to browse or drag a file here"
-                                            >
-                                                <Upload size={14} />
-                                                UPLOAD FILE
-                                            </button>
-                                        ) : null}
-                                    </td>
-                                    <td style={{ padding: '16px' }}>
-                                        {rowHasFile ? (
-                                            <input
-                                                type="date"
-                                                title="Click to change received date"
-                                                value={editingReceived[customType.id] !== undefined ? editingReceived[customType.id] : (doc?.receivedDate?.split('T')[0] || '')}
-                                                onFocus={() => setEditingReceived(prev => ({ ...prev, [customType.id]: doc?.receivedDate?.split('T')[0] || '' }))}
-                                                onChange={e => setEditingReceived(prev => ({ ...prev, [customType.id]: e.target.value }))}
-                                                onBlur={async e => {
-                                                    const val = e.target.value
-                                                    setEditingReceived(prev => { const n = { ...prev }; delete n[customType.id]; return n })
-                                                    if (val) { await window.api.updateVesselDocumentReceivedDate(vessel.id, customType.id, val); loadData() }
-                                                }}
-                                                min="1900-01-01" max="2100-12-31"
-                                                style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                            />
-                                        ) : (
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '16px' }}>
-                                        {!rowHasFile ? (
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>-</span>
-                                        ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <Calendar size={14} color="var(--text-secondary)" />
-                                                <input
-                                                    type="date"
-                                                    value={editingExpiry[customType.id] !== undefined ? editingExpiry[customType.id] : (doc?.expiryDate || '')}
-                                                    onFocus={() => setEditingExpiry(prev => ({ ...prev, [customType.id]: doc?.expiryDate || '' }))}
-                                                    onChange={e => setEditingExpiry(prev => ({ ...prev, [customType.id]: e.target.value }))}
-                                                    onBlur={async e => {
-                                                        const val = e.target.value
-                                                        setEditingExpiry(prev => { const n = { ...prev }; delete n[customType.id]; return n })
-                                                        await window.api.updateVesselDocumentExpiry(vessel.id, customType.id, val || null); loadData()
-                                                    }}
-                                                    min="1900-01-01" max="2100-12-31"
-                                                    style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)', colorScheme: isLight ? 'light' as const : 'dark' as const }}
-                                                    aria-label={`Expiry date for ${customType.name}`}
-                                                />
-                                                {doc?.expiryDate && doc.expiryDate !== '0000-00-00' && (
-                                                    <button
-                                                        title="Clear expiry date"
-                                                        onClick={async () => { await window.api.updateVesselDocumentExpiry(vessel.id, customType.id, null); loadData() }}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', padding: 0, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                            {rowHasFile && (
-                                                <>
-                                                    <button onClick={() => openFile(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="View File" aria-label="View file">
-                                                        <Eye size={18} />
-                                                    </button>
-                                                    <button onClick={() => window.api.shellShowItemInFolder(doc!.filePath)} className="btn-secondary" style={{ padding: '6px' }} title="Open file location" aria-label="Open file location">
-                                                        <FolderOpen size={18} />
-                                                    </button>
-                                                    <button onClick={() => handleDeleteDoc(doc!)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Unlink File" aria-label="Unlink file">
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </>
-                                            )}
-                                            <button onClick={() => handleDeleteCustomDocType(customType)} className="btn-secondary" style={{ padding: '6px', color: 'var(--danger)' }} title="Remove custom document type" aria-label="Remove custom document type">
-                                                <X size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                        {showAddCustomDoc && (
-                            <tr style={{ borderBottom: '1px solid var(--table-border)', background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)' }}>
-                                <td colSpan={6} style={{ padding: '12px 16px' }}>
-                                    <form
-                                        onSubmit={e => { e.preventDefault(); handleAddCustomDocType() }}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
-                                    >
-                                        <input
-                                            type="text"
-                                            value={newCustomDocName}
-                                            onChange={e => setNewCustomDocName(e.target.value)}
-                                            placeholder="Custom document type name..."
-                                            style={{ flex: 1, padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                            autoFocus
-                                            aria-label="Custom document type name"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="btn-primary"
-                                            style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-                                            disabled={!newCustomDocName.trim()}
-                                        >
-                                            Add
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-secondary"
-                                            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                                            onClick={() => { setShowAddCustomDoc(false); setNewCustomDocName('') }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>}
-
-            {detailView === 'assureds' && <AssuredManager vessel={vessel} />}
-
-            {detailView === 'surveys' && <ConditionSurveyManager vessel={vessel} />}
-
-            {detailView === 'policies' && (
-                <>
-                    <DynamicPoliciesView
-                        vesselId={vessel.id}
-                        dynamicPolicies={dynamicPolicies}
-                        isLight={isLight}
-                        onReload={loadDynamicPolicies}
-                        showSuccess={showSuccess}
-                        showError={showError}
-                    />
-
-                    {/* Section divider between policies and warranties */}
-                    <div style={{
-                        margin: '32px 0 24px',
-                        display: 'flex', alignItems: 'center', gap: '12px'
-                    }}>
-                        <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
-                        <span style={{
-                            fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px',
-                            textTransform: 'uppercase', color: 'var(--text-secondary)',
-                            whiteSpace: 'nowrap'
-                        }}>Survey Warranties</span>
-                        <div style={{ height: '1px', flex: 1, background: 'var(--glass-border)' }} />
-                    </div>
-
-                    <WarrantyManager
-                        vesselId={vessel.id}
-                        dynamicPolicies={dynamicPolicies}
-                        isLight={isLight}
-                    />
-                </>
-            )}
-
-            {detailView === 'payments' && (
-                <ReceiptManager vesselId={vessel.id} vesselName={vessel.name} embedded />
-            )}
-
-            {detailView === 'timeline' && (
-                <VesselTimeline vesselId={vessel.id} isLight={isLight} />
-            )}
-
-            {detailView === 'quotations' && (
-                <VesselQuotationsView
-                    vessel={vessel}
-                    onNavigateToQuotation={(qId) => {
-                        if (onNavigateToQuotation) onNavigateToQuotation(qId)
-                    }}
+            {/* New note input */}
+            <div style={{ flexShrink: 0, marginBottom: '16px', position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={newVesselNoteText}
+                  onChange={(e) => handleMentionCheck(e.target.value, 'new')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote()
+                  }}
+                  rows={3}
+                  placeholder="Add a note... (use @ to mention, Ctrl+Enter to submit)"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    resize: 'none',
+                    fontFamily: 'inherit',
+                    fontSize: '0.9rem',
+                    background: 'var(--input-bg)',
+                    color: 'var(--input-text)',
+                    border: '1px solid var(--input-border)',
+                    boxSizing: 'border-box'
+                  }}
                 />
-            )}
+                {mentionTarget === 'new' && renderMentionDropdown()}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button
+                  onClick={handleAddVesselNote}
+                  disabled={vesselNotesSaving || !newVesselNoteText.trim()}
+                  className="btn-primary"
+                  style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                >
+                  {vesselNotesSaving ? 'Saving...' : 'Add Note'}
+                </button>
+              </div>
+            </div>
 
-            {confirmation.show && (
-                <ConfirmationModal
-                    title={confirmation.title}
-                    message={confirmation.message}
-                    isDangerous={confirmation.isDangerous}
-                    onConfirm={confirmation.onConfirm}
-                    onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
-                />
-            )}
-
-            {/* Endorsement Prompt Modal */}
-            {endorsementPrompt.show && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
-                        onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))} />
-                    <div style={{
-                        position: 'relative', width: '480px', borderRadius: '14px', padding: '24px',
-                        background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)'
-                    }}>
-                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>Issue Endorsement?</h3>
-                        <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
-                            {endorsementPrompt.changes.map((c, i) => (
-                                <div key={i} style={{ marginBottom: '6px' }}>
-                                    <strong>{c.fieldLabel}</strong> changed from{' '}
-                                    <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>{c.oldValue || '(empty)'}</span>
-                                    {' → '}
-                                    <span style={{ fontWeight: 600 }}>{c.newValue || '(empty)'}</span>
-                                </div>
-                            ))}
+            {/* Notes thread */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}
+            >
+              {vesselNotesLoading ? (
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem',
+                    textAlign: 'center',
+                    padding: '16px'
+                  }}
+                >
+                  Loading...
+                </p>
+              ) : parentVesselNotes.length === 0 ? (
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem',
+                    textAlign: 'center',
+                    padding: '16px',
+                    fontStyle: 'italic'
+                  }}
+                >
+                  No notes yet for this vessel.
+                </p>
+              ) : (
+                parentVesselNotes.map((n) => (
+                  <div key={n.id}>
+                    {/* Parent note */}
+                    <div
+                      style={{
+                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        borderLeft: '3px solid var(--accent-primary)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            background: 'var(--accent-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            color: '#fff',
+                            flexShrink: 0
+                          }}
+                        >
+                          {(n.createdByUsername || '?').charAt(0).toUpperCase()}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                            Select policies to create endorsements for:
-                        </div>
-                        {endorsementPrompt.policies.map(p => (
-                            <label key={p.id} style={{
-                                display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px',
-                                fontSize: '0.85rem', cursor: 'pointer'
-                            }}>
-                                <input type="checkbox" checked={p.selected}
-                                    onChange={() => setEndorsementPrompt(prev => ({
-                                        ...prev,
-                                        policies: prev.policies.map(x => x.id === p.id ? { ...x, selected: !x.selected } : x)
-                                    }))} />
-                                {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
-                                <span style={{
-                                    fontSize: '0.72rem', padding: '1px 6px', borderRadius: '8px',
-                                    background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
-                                }}>
-                                    Endorsement No. {p.nextEndNum}
-                                </span>
-                            </label>
-                        ))}
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-                            <button onClick={() => setEndorsementPrompt(prev => ({ ...prev, show: false }))}
-                                style={{
-                                    padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem',
-                                    border: '1px solid var(--glass-border-color)', background: 'transparent',
-                                    color: 'var(--text-primary)', cursor: 'pointer'
-                                }}>Skip</button>
-                            <button onClick={async () => {
-                                const selected = endorsementPrompt.policies.filter(p => p.selected && p.policyDocId)
-                                if (selected.length === 0) {
-                                    setEndorsementPrompt(prev => ({ ...prev, show: false }))
-                                    return
-                                }
-                                try {
-                                    const changeDesc = endorsementPrompt.changes.map(c =>
-                                        `It is hereby noted and agreed that the ${c.fieldLabel} has been changed from ${c.oldValue || '(none)'} to ${c.newValue || '(none)'}.`
-                                    ).join('\n')
-                                    for (const p of selected) {
-                                        const id = await window.api.endorsementCreate({
-                                            policyDocId: p.policyDocId!,
-                                            endorsementNumber: p.nextEndNum,
-                                            effectiveDate: new Date().toISOString().slice(0, 10)
-                                        })
-                                        // Set interest section with change description
-                                        await window.api.endorsementSetSections(id, [{
-                                            sectionKey: 'interest',
-                                            sectionTitle: 'Interest / Vessel',
-                                            content: `<p>${changeDesc.replace(/\n/g, '</p><p>')}</p>`,
-                                            isEnabled: true,
-                                            orderIndex: 0
-                                        }])
-                                    }
-                                    showSuccess(`${selected.length} draft endorsement${selected.length > 1 ? 's' : ''} created`)
-                                } catch {
-                                    showError('Failed to create endorsements')
-                                }
-                                setEndorsementPrompt(prev => ({ ...prev, show: false }))
+                        <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>
+                          {n.createdByUsername || 'Unknown'}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-secondary)',
+                            marginLeft: 'auto'
+                          }}
+                        >
+                          {formatDateTime(n.createdAt)}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setReplyingToNoteId(replyingToNoteId === n.id ? null : n.id)
+                          }
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            padding: '2px 6px'
+                          }}
+                        >
+                          Reply
+                        </button>
+                        {n.createdByUserId === user?.id && (
+                          <button
+                            onClick={() => handleDeleteVesselNote(n.id)}
+                            title="Delete"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--danger)',
+                              display: 'flex',
+                              padding: '2px',
+                              flexShrink: 0
                             }}
-                                style={{
-                                    padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
-                                    background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer'
-                                }}>Create</button>
-                        </div>
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '0.88rem',
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: '1.5'
+                        }}
+                      >
+                        {highlightMentions(n.note)}
+                      </p>
                     </div>
-                </div>
-            )}
 
-            {showRemapModal && (
-                <RemapFilePathsModal
-                    vesselId={vessel.id}
-                    vesselName={vessel.name}
-                    includeEntityIds={remapEntityIds}
-                    onClose={() => { setShowRemapModal(false); setRemapEntityIds([]) }}
-                />
-            )}
-
-            {showAddFlagModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', zIndex: 1000
-                }} onClick={() => setShowAddFlagModal(false)}>
-                    <div style={{
-                        background: isLight ? '#ffffff' : '#1e222a',
-                        borderRadius: '16px', padding: '24px', width: '420px', maxWidth: '90vw',
-                        border: '1px solid var(--glass-border-color)',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-                    }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: '16px' }}>Add Flag State</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Country *</label>
-                                <select
-                                    value={newFlagIso3}
-                                    onChange={e => {
-                                        const iso3 = e.target.value
-                                        setNewFlagIso3(iso3)
-                                        const country = countryNameToIso3.find(c => c.iso3 === iso3)
-                                        setNewFlagName(country ? country.name : '')
-                                    }}
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
-                                    autoFocus
-                                >
-                                    <option value="">Select a country...</option>
-                                    {countryNameToIso3.map(c => (
-                                        <option key={c.iso3} value={c.iso3}>{c.name} ({c.iso3})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Address</label>
-                                <input
-                                    value={newFlagAddress}
-                                    onChange={e => setNewFlagAddress(e.target.value)}
-                                    placeholder="Optional"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Email</label>
-                                <input
-                                    value={newFlagEmail}
-                                    onChange={e => setNewFlagEmail(e.target.value)}
-                                    placeholder="Optional"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--glass-border-color)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                        </div>
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                            <button onClick={() => setShowAddFlagModal(false)} className="btn-secondary">Cancel</button>
+                    {/* Replies */}
+                    {(vesselRepliesMap.get(n.id) || []).map((reply) => (
+                      <div
+                        key={reply.id}
+                        style={{
+                          marginLeft: '24px',
+                          marginTop: '6px',
+                          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          borderLeft: '2px solid var(--glass-border-color)'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '50%',
+                              background: 'var(--accent-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.65rem',
+                              fontWeight: '700',
+                              color: '#fff',
+                              flexShrink: 0
+                            }}
+                          >
+                            {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>
+                            {reply.createdByUsername || 'Unknown'}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--text-secondary)',
+                              marginLeft: 'auto'
+                            }}
+                          >
+                            {formatDateTime(reply.createdAt)}
+                          </span>
+                          {reply.createdByUserId === user?.id && (
                             <button
-                                onClick={handleAddFlag}
-                                disabled={!newFlagName.trim() || !newFlagIso3.trim()}
-                                className="btn-primary"
-                                style={{ opacity: (!newFlagName.trim() || !newFlagIso3.trim()) ? 0.5 : 1 }}
+                              onClick={() => handleDeleteVesselNote(reply.id)}
+                              title="Delete"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--danger)',
+                                display: 'flex',
+                                padding: '2px',
+                                flexShrink: 0
+                              }}
                             >
-                                Add Flag State
+                              <Trash2 size={12} />
                             </button>
+                          )}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {showPoliciesModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', zIndex: 1000
-                }} onClick={() => setShowPoliciesModal(false)}>
-                    <div style={{
-                        background: isLight ? '#ffffff' : '#1e222a',
-                        borderRadius: '16px', padding: '24px', width: '400px', maxWidth: '90vw',
-                        border: '1px solid var(--glass-border-color)'
-                    }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: '16px' }}>Assign Policy Types</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                            Toggle policy types for this vessel. Used by the Dynamic Address Book.
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '0.84rem',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: '1.4'
+                          }}
+                        >
+                          {highlightMentions(reply.note)}
                         </p>
-                        {allPolicyTypes.map(pt => (
-                            <label key={pt.id} style={{
-                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px',
-                                borderRadius: '8px', cursor: 'pointer', marginBottom: '4px',
-                                background: assignedPolicyTypeIds.has(pt.id) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent'
-                            }}>
-                                <input
-                                    type="checkbox"
-                                    checked={assignedPolicyTypeIds.has(pt.id)}
-                                    onChange={() => handleTogglePolicy(pt.id)}
-                                    style={{ accentColor: 'var(--accent-primary)' }}
-                                />
-                                <span>{pt.name}</span>
-                            </label>
-                        ))}
-                        <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button onClick={() => setShowPoliciesModal(false)} className="btn-secondary">Done</button>
+                      </div>
+                    ))}
+
+                    {/* Reply input */}
+                    {replyingToNoteId === n.id && (
+                      <div style={{ marginLeft: '24px', marginTop: '6px', position: 'relative' }}>
+                        <div style={{ position: 'relative' }}>
+                          <textarea
+                            value={replyText}
+                            onChange={(e) => handleMentionCheck(e.target.value, 'reply')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
+                                handleAddReply(n.id)
+                            }}
+                            rows={2}
+                            placeholder="Reply... (@ to mention)"
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              borderRadius: '6px',
+                              resize: 'none',
+                              fontSize: '0.85rem',
+                              background: 'var(--input-bg)',
+                              color: 'var(--input-text)',
+                              border: '1px solid var(--input-border)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                          {mentionTarget === 'reply' && renderMentionDropdown()}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {showNotesModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{
-                        background: isLight ? '#ffffff' : '#1a1d28',
-                        borderRadius: '16px', padding: '28px', width: '520px', maxWidth: '95vw', maxHeight: '80vh',
-                        display: 'flex', flexDirection: 'column',
-                        border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-                    }}>
-                        {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexShrink: 0 }}>
-                            <div>
-                                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <MessageSquare size={16} color="var(--accent-primary)" /> Vessel Notes
-                                </h3>
-                                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                    {vessel.name}
-                                </p>
-                            </div>
-                            <button title="Close" aria-label="Close" onClick={() => setShowNotesModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', flexShrink: 0 }}>
-                                <X size={18} />
-                            </button>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                          <button
+                            onClick={() => handleAddReply(n.id)}
+                            disabled={vesselNotesSaving || !replyText.trim()}
+                            className="btn-primary"
+                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                          >
+                            Reply
+                          </button>
+                          <button
+                            onClick={() => {
+                              setReplyingToNoteId(null)
+                              setReplyText('')
+                            }}
+                            className="btn-secondary"
+                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                          >
+                            Cancel
+                          </button>
                         </div>
-
-                        {/* New note input */}
-                        <div style={{ flexShrink: 0, marginBottom: '16px', position: 'relative' }}>
-                            <div style={{ position: 'relative' }}>
-                                <textarea
-                                    value={newVesselNoteText}
-                                    onChange={e => handleMentionCheck(e.target.value, 'new')}
-                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote() }}
-                                    rows={3}
-                                    placeholder="Add a note... (use @ to mention, Ctrl+Enter to submit)"
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', resize: 'none', fontFamily: 'inherit', fontSize: '0.9rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
-                                />
-                                {mentionTarget === 'new' && renderMentionDropdown()}
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                                <button onClick={handleAddVesselNote} disabled={vesselNotesSaving || !newVesselNoteText.trim()} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
-                                    {vesselNotesSaving ? 'Saving...' : 'Add Note'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Notes thread */}
-                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {vesselNotesLoading ? (
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px' }}>Loading...</p>
-                            ) : parentVesselNotes.length === 0 ? (
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '16px', fontStyle: 'italic' }}>No notes yet for this vessel.</p>
-                            ) : parentVesselNotes.map(n => (
-                                <div key={n.id}>
-                                    {/* Parent note */}
-                                    <div style={{ background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px 14px', borderLeft: '3px solid var(--accent-primary)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                            <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
-                                                {(n.createdByUsername || '?').charAt(0).toUpperCase()}
-                                            </div>
-                                            <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{n.createdByUsername || 'Unknown'}</span>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{formatDateTime(n.createdAt)}</span>
-                                            <button onClick={() => setReplyingToNoteId(replyingToNoteId === n.id ? null : n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '0.72rem', fontWeight: 600, padding: '2px 6px' }}>Reply</button>
-                                            {n.createdByUserId === user?.id && (
-                                                <button onClick={() => handleDeleteVesselNote(n.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', flexShrink: 0 }}><Trash2 size={13} /></button>
-                                            )}
-                                        </div>
-                                        <p style={{ margin: 0, fontSize: '0.88rem', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{highlightMentions(n.note)}</p>
-                                    </div>
-
-                                    {/* Replies */}
-                                    {(vesselRepliesMap.get(n.id) || []).map(reply => (
-                                        <div key={reply.id} style={{ marginLeft: '24px', marginTop: '6px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px 12px', borderLeft: '2px solid var(--glass-border-color)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', color: '#fff', flexShrink: 0 }}>
-                                                    {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
-                                                </div>
-                                                <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>{reply.createdByUsername || 'Unknown'}</span>
-                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{formatDateTime(reply.createdAt)}</span>
-                                                {reply.createdByUserId === user?.id && (
-                                                    <button onClick={() => handleDeleteVesselNote(reply.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: '2px', flexShrink: 0 }}><Trash2 size={12} /></button>
-                                                )}
-                                            </div>
-                                            <p style={{ margin: 0, fontSize: '0.84rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{highlightMentions(reply.note)}</p>
-                                        </div>
-                                    ))}
-
-                                    {/* Reply input */}
-                                    {replyingToNoteId === n.id && (
-                                        <div style={{ marginLeft: '24px', marginTop: '6px', position: 'relative' }}>
-                                            <div style={{ position: 'relative' }}>
-                                                <textarea
-                                                    value={replyText}
-                                                    onChange={e => handleMentionCheck(e.target.value, 'reply')}
-                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddReply(n.id) }}
-                                                    rows={2}
-                                                    placeholder="Reply... (@ to mention)"
-                                                    autoFocus
-                                                    style={{ width: '100%', padding: '8px', borderRadius: '6px', resize: 'none', fontSize: '0.85rem', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
-                                                />
-                                                {mentionTarget === 'reply' && renderMentionDropdown()}
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                                                <button onClick={() => handleAddReply(n.id)} disabled={vesselNotesSaving || !replyText.trim()} className="btn-primary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Reply</button>
-                                                <button onClick={() => { setReplyingToNoteId(null); setReplyText('') }} className="btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}>Cancel</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Template Generation Modal */}
-            {showTemplateGenerate && (
-                <VesselTemplateGenerateModal
-                    vesselId={vessel.id}
-                    vesselName={vessel.name}
-                    isLight={isLight}
-                    onClose={() => setShowTemplateGenerate(false)}
-                    showSuccess={showSuccess}
-                    showError={showError}
-                />
-            )}
-
-            {/* Classification replace/add modal */}
-            {classConfirm?.show && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onClick={() => setClassConfirm(null)}>
-                    <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '12px', padding: '24px', maxWidth: '400px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
-                        onClick={e => e.stopPropagation()}>
-                        <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Change Classification</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                            This vessel already has a classification assigned. Do you want to replace it with <strong>{classConfirm.newName}</strong> or add it alongside?
-                        </p>
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                            <button className="btn-secondary" onClick={() => setClassConfirm(null)} style={{ padding: '8px 16px' }}>Cancel</button>
-                            <button className="btn-secondary" onClick={() => {
-                                setVesselClassificationIds(prev => new Set(prev).add(classConfirm.newId))
-                                setClassConfirm(null)
-                            }} style={{ padding: '8px 16px' }}>Add Alongside</button>
-                            <button className="btn-primary" onClick={() => {
-                                setVesselClassificationIds(new Set([classConfirm.newId]))
-                                setClassConfirm(null)
-                            }} style={{ padding: '8px 16px' }}>Replace</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
-    )
+      )}
+
+      {/* Template Generation Modal */}
+      {showTemplateGenerate && (
+        <VesselTemplateGenerateModal
+          vesselId={vessel.id}
+          vesselName={vessel.name}
+          isLight={isLight}
+          onClose={() => setShowTemplateGenerate(false)}
+          showSuccess={showSuccess}
+          showError={showError}
+        />
+      )}
+
+      {/* Classification replace/add modal */}
+      {classConfirm?.show && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => setClassConfirm(null)}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '400px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Change Classification</h3>
+            <p
+              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}
+            >
+              This vessel already has a classification assigned. Do you want to replace it with{' '}
+              <strong>{classConfirm.newName}</strong> or add it alongside?
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setClassConfirm(null)}
+                style={{ padding: '8px 16px' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => {
+                  setVesselClassificationIds((prev) => new Set(prev).add(classConfirm.newId))
+                  setClassConfirm(null)
+                }}
+                style={{ padding: '8px 16px' }}
+              >
+                Add Alongside
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setVesselClassificationIds(new Set([classConfirm.newId]))
+                  setClassConfirm(null)
+                }}
+                style={{ padding: '8px 16px' }}
+              >
+                Replace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ==================== Dynamic Policies View ====================
@@ -2481,1307 +4231,2246 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
 /** Visible EXPIRED / EXPIRING SOON badge for a document row (same thresholds as the row's
  *  left border: past = expired, within 30 days = expiring soon). Null when fine or no date. */
 function DocExpiryBadge({ expiryDate, isLight }: { expiryDate?: string | null; isLight: boolean }) {
-    if (!expiryDate || expiryDate === '0000-00-00') return null
-    const exp = new Date(expiryDate)
-    if (isNaN(exp.getTime())) return null
-    const now = new Date()
-    const soon = new Date(); soon.setDate(soon.getDate() + 30)
-    const expired = exp < now
-    if (!expired && exp >= soon) return null
-    const color = expired ? 'var(--danger)' : (isLight ? '#b45309' : '#e6a800')
-    const bg = expired ? (isLight ? 'rgba(200,0,0,0.1)' : 'rgba(255,77,77,0.14)') : (isLight ? 'rgba(180,83,9,0.1)' : 'rgba(230,168,0,0.14)')
-    return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase', color, background: bg, border: `1px solid ${color}`, whiteSpace: 'nowrap' }}>
-            <AlertCircle size={11} />
-            {expired ? 'Expired' : 'Expiring Soon'}
-        </span>
-    )
+  if (!expiryDate || expiryDate === '0000-00-00') return null
+  const exp = new Date(expiryDate)
+  if (isNaN(exp.getTime())) return null
+  const now = new Date()
+  const soon = new Date()
+  soon.setDate(soon.getDate() + 30)
+  const expired = exp < now
+  if (!expired && exp >= soon) return null
+  const color = expired ? 'var(--danger)' : isLight ? '#b45309' : '#e6a800'
+  const bg = expired
+    ? isLight
+      ? 'rgba(200,0,0,0.1)'
+      : 'rgba(255,77,77,0.14)'
+    : isLight
+      ? 'rgba(180,83,9,0.1)'
+      : 'rgba(230,168,0,0.14)'
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '2px 8px',
+        borderRadius: '6px',
+        fontSize: '0.68rem',
+        fontWeight: 700,
+        letterSpacing: '0.3px',
+        textTransform: 'uppercase',
+        color,
+        background: bg,
+        border: `1px solid ${color}`,
+        whiteSpace: 'nowrap'
+      }}
+    >
+      <AlertCircle size={11} />
+      {expired ? 'Expired' : 'Expiring Soon'}
+    </span>
+  )
 }
 
 function formatCurrency(value?: number, currency?: string): string {
-    if (value == null) return '-'
-    const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
-    return `${sym}${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  if (value == null) return '-'
+  const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
+  return `${sym}${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
-function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, showSuccess, showError }: {
-    vesselId: string
-    dynamicPolicies: VesselDynamicPolicy[]
-    isLight: boolean
-    onReload: () => void
-    showSuccess: (msg: string) => void
-    showError: (msg: string) => void
+function DynamicPoliciesView({
+  vesselId,
+  dynamicPolicies,
+  isLight,
+  onReload,
+  showSuccess,
+  showError
+}: {
+  vesselId: string
+  dynamicPolicies: VesselDynamicPolicy[]
+  isLight: boolean
+  onReload: () => void
+  showSuccess: (msg: string) => void
+  showError: (msg: string) => void
 }) {
-    const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
-    const [characteristics, setCharacteristics] = useState<PolicyTypeCharacteristic[]>([])
-    const [conditions, setConditions] = useState<PolicyTypeCondition[]>([])
-    const [entities, setEntities] = useState<Entity[]>([])
-    const [activeTypeTab, setActiveTypeTab] = useState<string>('current')
-    const [collapsedPolicies, setCollapsedPolicies] = useState<Set<string>>(new Set())
-    const [showAddModal, setShowAddModal] = useState(false)
-    const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null)
+  const [policyTypes, setPolicyTypes] = useState<PolicyType[]>([])
+  const [characteristics, setCharacteristics] = useState<PolicyTypeCharacteristic[]>([])
+  const [conditions, setConditions] = useState<PolicyTypeCondition[]>([])
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [activeTypeTab, setActiveTypeTab] = useState<string>('current')
+  const [collapsedPolicies, setCollapsedPolicies] = useState<Set<string>>(new Set())
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null)
 
-    // Add/edit form state
-    const [formTypeId, setFormTypeId] = useState('')
-    const [formNumber, setFormNumber] = useState('')
-    const [formConditionId, setFormConditionId] = useState('')
-    const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled' | 'inactive'>('active')
-    const [formCurrency, setFormCurrency] = useState('USD')
-    const [formBrokerId, setFormBrokerId] = useState('')
-    const [formCustomerType, setFormCustomerType] = useState<'broker' | 'direct' | ''>('')
-    const [brokerSearch, setBrokerSearch] = useState('')
-    const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
-    const [formNotes, setFormNotes] = useState('')
-    const [formValues, setFormValues] = useState<Record<string, any>>({})
-    const modalRef = useRef<HTMLDivElement>(null)
+  // Add/edit form state
+  const [formTypeId, setFormTypeId] = useState('')
+  const [formNumber, setFormNumber] = useState('')
+  const [formConditionId, setFormConditionId] = useState('')
+  const [formStatus, setFormStatus] = useState<'active' | 'expired' | 'cancelled' | 'inactive'>(
+    'active'
+  )
+  const [formCurrency, setFormCurrency] = useState('USD')
+  const [formBrokerId, setFormBrokerId] = useState('')
+  const [formCustomerType, setFormCustomerType] = useState<'broker' | 'direct' | ''>('')
+  const [brokerSearch, setBrokerSearch] = useState('')
+  const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false)
+  const [formNotes, setFormNotes] = useState('')
+  const [formValues, setFormValues] = useState<Record<string, any>>({})
+  const modalRef = useRef<HTMLDivElement>(null)
 
-    // Confirmation modal state
-    const [confirmation, setConfirmation] = useState<{
-        show: boolean
-        title: string
-        message: string
-        onConfirm: () => void
-        isDangerous?: boolean
-    }>({ show: false, title: '', message: '', onConfirm: () => { } })
+  // Confirmation modal state
+  const [confirmation, setConfirmation] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    isDangerous?: boolean
+  }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
-    useEffect(() => {
-        loadMeta()
-    }, [])
+  useEffect(() => {
+    loadMeta()
+  }, [])
 
-    // Focus trap for modal
-    useEffect(() => {
-        if (!showAddModal) return
-        const modal = modalRef.current
-        if (!modal) return
+  // Focus trap for modal
+  useEffect(() => {
+    if (!showAddModal) return
+    const modal = modalRef.current
+    if (!modal) return
 
-        // Small timeout to allow render
-        setTimeout(() => {
-            const focusable = modal.querySelectorAll<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-            )
-            const first = focusable[0]
-            const last = focusable[focusable.length - 1]
-            first?.focus()
+    // Small timeout to allow render
+    setTimeout(() => {
+      const focusable = modal.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      first?.focus()
 
-            const handleKeyDown = (e: KeyboardEvent) => {
-                if (e.key === 'Escape') { setShowAddModal(false); return }
-                if (e.key === 'Tab') {
-                    if (e.shiftKey) {
-                        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
-                    } else {
-                        if (document.activeElement === last) { e.preventDefault(); first?.focus() }
-                    }
-                }
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setShowAddModal(false)
+          return
+        }
+        if (e.key === 'Tab') {
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              e.preventDefault()
+              last?.focus()
             }
-            document.addEventListener('keydown', handleKeyDown)
-            return () => document.removeEventListener('keydown', handleKeyDown)
-        }, 50)
-    }, [showAddModal])
+          } else {
+            if (document.activeElement === last) {
+              e.preventDefault()
+              first?.focus()
+            }
+          }
+        }
+      }
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }, 50)
+  }, [showAddModal])
 
-    const loadMeta = async () => {
-        try {
-            const [pt, allChars, allConds, ent] = await Promise.all([
-                window.api.getPolicyTypes(),
-                window.api.getPolicyTypeCharacteristics(),
-                window.api.getPolicyTypeConditions(),
-                window.api.getEntities()
-            ])
-            setPolicyTypes(Array.isArray(pt) ? pt : [])
-            setCharacteristics(Array.isArray(allChars) ? allChars : [])
-            setConditions(Array.isArray(allConds) ? allConds : [])
-            setEntities(Array.isArray(ent) ? ent : [])
-        } catch { /* ignore */ }
+  const loadMeta = async () => {
+    try {
+      const [pt, allChars, allConds, ent] = await Promise.all([
+        window.api.getPolicyTypes(),
+        window.api.getPolicyTypeCharacteristics(),
+        window.api.getPolicyTypeConditions(),
+        window.api.getEntities()
+      ])
+      setPolicyTypes(Array.isArray(pt) ? pt : [])
+      setCharacteristics(Array.isArray(allChars) ? allChars : [])
+      setConditions(Array.isArray(allConds) ? allConds : [])
+      setEntities(Array.isArray(ent) ? ent : [])
+    } catch {
+      /* ignore */
     }
+  }
 
-    const toggleCollapse = (id: string) => {
-        setCollapsedPolicies(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id); else next.add(id)
-            return next
-        })
-    }
-
-    // Filter policies
-    const filtered = dynamicPolicies.filter(p => {
-        if (activeTypeTab === 'current') return p.status === 'active'
-        return p.policyTypeId === activeTypeTab
+  const toggleCollapse = (id: string) => {
+    setCollapsedPolicies((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
+  }
 
-    // Group by policy type
-    const groupedByType = new Map<string, VesselDynamicPolicy[]>()
-    for (const p of filtered) {
-        const key = p.policyTypeName || p.policyTypeId
-        if (!groupedByType.has(key)) groupedByType.set(key, [])
-        groupedByType.get(key)!.push(p)
+  // Filter policies
+  const filtered = dynamicPolicies.filter((p) => {
+    if (activeTypeTab === 'current') return p.status === 'active'
+    return p.policyTypeId === activeTypeTab
+  })
+
+  // Group by policy type
+  const groupedByType = new Map<string, VesselDynamicPolicy[]>()
+  for (const p of filtered) {
+    const key = p.policyTypeName || p.policyTypeId
+    if (!groupedByType.has(key)) groupedByType.set(key, [])
+    groupedByType.get(key)!.push(p)
+  }
+
+  const openAddModal = () => {
+    setEditingPolicyId(null)
+    setFormTypeId(policyTypes[0]?.id || '')
+    setFormNumber('')
+    setFormConditionId('')
+    setFormStatus('active')
+    setFormCurrency('USD')
+    setFormBrokerId('')
+    setFormCustomerType('')
+    setFormNotes('')
+    setFormValues({})
+
+    setShowAddModal(true)
+  }
+
+  const openEditModal = (p: VesselDynamicPolicy) => {
+    setEditingPolicyId(p.id)
+    setFormTypeId(p.policyTypeId)
+    // Strip the warning suffix if present so it doesn't persist after edit
+    const rawNumber = p.policyNumber || ''
+    setFormNumber(rawNumber.replace(' (RENEWED - PLEASE VERIFY)', ''))
+    setFormConditionId(p.conditionId || '')
+    setFormStatus(p.status)
+    setFormCurrency(p.currency)
+    setFormBrokerId(p.customerEntityId || p.brokerEntityId || '')
+    setFormCustomerType(p.customerType || (p.brokerEntityId ? 'broker' : ''))
+    setFormNotes(p.notes || '')
+    const vals: Record<string, any> = {}
+    if (p.values) {
+      for (const v of p.values) {
+        if (v.fieldType === 'amount') vals[v.characteristicId] = v.valueAmount
+        else if (v.fieldType === 'date') vals[v.characteristicId] = v.valueDate
+        else if (v.fieldType === 'boolean') vals[v.characteristicId] = v.valueBoolean
+        else vals[v.characteristicId] = v.valueText
+      }
     }
+    setFormValues(vals)
 
-    const openAddModal = () => {
-        setEditingPolicyId(null)
-        setFormTypeId(policyTypes[0]?.id || '')
-        setFormNumber('')
-        setFormConditionId('')
-        setFormStatus('active')
-        setFormCurrency('USD')
-        setFormBrokerId('')
-        setFormCustomerType('')
-        setFormNotes('')
-        setFormValues({})
+    setShowAddModal(true)
+  }
 
-        setShowAddModal(true)
+  const handleSavePolicy = async () => {
+    if (!formTypeId) return
+    try {
+      const typeChars = characteristics.filter((c) => c.policyTypeId === formTypeId)
+      if (editingPolicyId) {
+        ok(
+          await window.api.updateVesselDynamicPolicy(editingPolicyId, {
+            policyNumber: formNumber,
+            conditionId: formConditionId || undefined,
+            status: formStatus,
+            currency: formCurrency,
+            brokerEntityId: formBrokerId || undefined,
+            customerEntityId: formBrokerId || undefined,
+            customerType: formCustomerType || undefined,
+            notes: formNotes
+          })
+        )
+        const vals = typeChars.map((c) => ({
+          characteristicId: c.id,
+          valueText:
+            c.fieldType === 'text' || c.fieldType === 'select' ? formValues[c.id] || '' : undefined,
+          valueAmount:
+            c.fieldType === 'amount' ? parseFloat(formValues[c.id]) || undefined : undefined,
+          valueDate: c.fieldType === 'date' ? formValues[c.id] || undefined : undefined,
+          valueBoolean: c.fieldType === 'boolean' ? formValues[c.id] || false : undefined
+        }))
+        ok(await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals))
+        showSuccess('Policy updated')
+      } else {
+        const newId = await window.api.addVesselDynamicPolicy({
+          vesselId,
+          policyTypeId: formTypeId,
+          policyNumber: formNumber,
+          conditionId: formConditionId || undefined,
+          status: formStatus,
+          currency: formCurrency,
+          brokerEntityId: formBrokerId || undefined,
+          customerEntityId: formBrokerId || undefined,
+          customerType: formCustomerType || undefined,
+          notes: formNotes
+        })
+        const vals = typeChars.map((c) => ({
+          characteristicId: c.id,
+          valueText:
+            c.fieldType === 'text' || c.fieldType === 'select' ? formValues[c.id] || '' : undefined,
+          valueAmount:
+            c.fieldType === 'amount' ? parseFloat(formValues[c.id]) || undefined : undefined,
+          valueDate: c.fieldType === 'date' ? formValues[c.id] || undefined : undefined,
+          valueBoolean: c.fieldType === 'boolean' ? formValues[c.id] || false : undefined
+        }))
+        await window.api.setVesselDynamicPolicyValues(newId, vals)
+        showSuccess('Policy added')
+      }
+      setShowAddModal(false)
+      onReload()
+    } catch (err: any) {
+      showError(err.message || 'Failed to save policy')
     }
+  }
 
-    const openEditModal = (p: VesselDynamicPolicy) => {
-        setEditingPolicyId(p.id)
-        setFormTypeId(p.policyTypeId)
-        // Strip the warning suffix if present so it doesn't persist after edit
-        const rawNumber = p.policyNumber || ''
-        setFormNumber(rawNumber.replace(' (RENEWED - PLEASE VERIFY)', ''))
-        setFormConditionId(p.conditionId || '')
-        setFormStatus(p.status)
-        setFormCurrency(p.currency)
-        setFormBrokerId(p.customerEntityId || p.brokerEntityId || '')
-        setFormCustomerType(p.customerType || (p.brokerEntityId ? 'broker' : ''))
-        setFormNotes(p.notes || '')
-        const vals: Record<string, any> = {}
-        if (p.values) {
-            for (const v of p.values) {
-                if (v.fieldType === 'amount') vals[v.characteristicId] = v.valueAmount
-                else if (v.fieldType === 'date') vals[v.characteristicId] = v.valueDate
-                else if (v.fieldType === 'boolean') vals[v.characteristicId] = v.valueBoolean
-                else vals[v.characteristicId] = v.valueText
-            }
-        }
-        setFormValues(vals)
+  const handleDeletePolicy = (id: string) => {
+    setConfirmation({
+      show: true,
+      title: 'Delete Policy',
+      message: 'Delete this policy? This cannot be undone.',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmation((prev) => ({ ...prev, show: false }))
+        await window.api.deleteVesselDynamicPolicy(id)
+        showSuccess('Policy deleted')
+        onReload()
+      }
+    })
+  }
 
-        setShowAddModal(true)
-    }
-
-    const handleSavePolicy = async () => {
-        if (!formTypeId) return
+  const handleRenewPolicy = (p: VesselDynamicPolicy) => {
+    setConfirmation({
+      show: true,
+      title: 'Renew Policy',
+      message: 'Renew this policy? A new copy will be created with incremented dates.',
+      onConfirm: async () => {
+        setConfirmation((prev) => ({ ...prev, show: false }))
         try {
-            const typeChars = characteristics.filter(c => c.policyTypeId === formTypeId)
-            if (editingPolicyId) {
-                ok(await window.api.updateVesselDynamicPolicy(editingPolicyId, {
-                    policyNumber: formNumber, conditionId: formConditionId || undefined,
-                    status: formStatus, currency: formCurrency,
-                    brokerEntityId: formBrokerId || undefined,
-                    customerEntityId: formBrokerId || undefined,
-                    customerType: formCustomerType || undefined,
-                    notes: formNotes
-                }))
-                const vals = typeChars.map(c => ({
-                    characteristicId: c.id,
-                    valueText: c.fieldType === 'text' || c.fieldType === 'select' ? (formValues[c.id] || '') : undefined,
-                    valueAmount: c.fieldType === 'amount' ? (parseFloat(formValues[c.id]) || undefined) : undefined,
-                    valueDate: c.fieldType === 'date' ? (formValues[c.id] || undefined) : undefined,
-                    valueBoolean: c.fieldType === 'boolean' ? (formValues[c.id] || false) : undefined
-                }))
-                ok(await window.api.setVesselDynamicPolicyValues(editingPolicyId, vals))
-                showSuccess('Policy updated')
-            } else {
-                const newId = await window.api.addVesselDynamicPolicy({
-                    vesselId, policyTypeId: formTypeId, policyNumber: formNumber,
-                    conditionId: formConditionId || undefined, status: formStatus,
-                    currency: formCurrency, brokerEntityId: formBrokerId || undefined,
-                    customerEntityId: formBrokerId || undefined,
-                    customerType: formCustomerType || undefined,
-                    notes: formNotes
-                })
-                const vals = typeChars.map(c => ({
-                    characteristicId: c.id,
-                    valueText: c.fieldType === 'text' || c.fieldType === 'select' ? (formValues[c.id] || '') : undefined,
-                    valueAmount: c.fieldType === 'amount' ? (parseFloat(formValues[c.id]) || undefined) : undefined,
-                    valueDate: c.fieldType === 'date' ? (formValues[c.id] || undefined) : undefined,
-                    valueBoolean: c.fieldType === 'boolean' ? (formValues[c.id] || false) : undefined
-                }))
-                await window.api.setVesselDynamicPolicyValues(newId, vals)
-                showSuccess('Policy added')
+          // 1. Conditionally expire old policy
+          // Find expiry date characteristic (only from THIS policy type's characteristics)
+          const policyTypeChars = characteristics.filter((c) => c.policyTypeId === p.policyTypeId)
+          const expiryChar = policyTypeChars.find(
+            (c) =>
+              c.name.toLowerCase().includes('expiry') ||
+              c.name.toLowerCase().includes('expiration') ||
+              c.name.toLowerCase().includes('end date')
+          )
+          let shouldExpire = false
+
+          if (expiryChar && p.values) {
+            const expiryVal = p.values.find((v) => v.characteristicId === expiryChar.id)
+            if (expiryVal && expiryVal.valueDate) {
+              const todayStr = new Date().toISOString().split('T')[0]
+              if (expiryVal.valueDate <= todayStr) {
+                shouldExpire = true
+              }
             }
-            setShowAddModal(false)
-            onReload()
+          }
+
+          if (shouldExpire) {
+            ok(await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' }))
+          }
+
+          // 2. Roll every policy date forward by exactly 1 calendar year.
+          // Each date keeps its own day/month — inception must NOT be set to the old
+          // expiry (e.g. 03/07/2025–02/07/2026 renews to 03/07/2026–02/07/2027).
+          const policyTypeCharsAll = characteristics.filter(
+            (c) => c.policyTypeId === p.policyTypeId
+          )
+          const addOneYear = (iso: string): string => {
+            const parts = iso.split('-')
+            if (parts.length !== 3) return iso
+            const yr = parseInt(parts[0], 10) + 1
+            return `${yr}-${parts[1]}-${parts[2]}`
+          }
+
+          // New inception = existing inception + 1 year — used for the new policy number's year
+          const inceptionChar = policyTypeCharsAll.find((c) => {
+            const n = c.name.toLowerCase()
+            return (
+              n.includes('inception') ||
+              n.includes('start') ||
+              (n.includes('from') && n.includes('date'))
+            )
+          })
+          let newInception: string | null = null
+          if (inceptionChar && p.values) {
+            const iv = p.values.find((v) => v.characteristicId === inceptionChar.id)
+            if (iv?.valueDate) newInception = addOneYear(iv.valueDate)
+          }
+
+          // Generate new policy number: type letter + inverted year from new inception
+          const policyType = policyTypes.find((pt) => pt.id === p.policyTypeId)
+          const typeCode = policyType?.name?.charAt(0)?.toUpperCase() || 'P'
+          let newPolicyNumber = typeCode
+          if (newInception) {
+            const yr = newInception.substring(0, 4) // e.g., "2026"
+            newPolicyNumber += yr.substring(2, 4) + yr.substring(0, 2) // "2620"
+          }
+
+          // 3. Create new policy
+          const newId = await window.api.addVesselDynamicPolicy({
+            vesselId: p.vesselId,
+            policyTypeId: p.policyTypeId,
+            policyNumber: newPolicyNumber + ' (RENEWED - PLEASE VERIFY)',
+            conditionId: p.conditionId,
+            status: 'active',
+            currency: p.currency,
+            brokerEntityId: p.brokerEntityId,
+            notes: p.notes
+          })
+
+          // 4. Copy values — every date field keeps its day/month and advances 1 year
+          if (p.values) {
+            const newVals = p.values.map((v) => {
+              let valDate = v.valueDate
+              if (v.fieldType === 'date') {
+                valDate = v.valueDate ? addOneYear(v.valueDate) : undefined
+              }
+              return {
+                characteristicId: v.characteristicId,
+                valueText: v.valueText,
+                valueAmount: v.valueAmount,
+                valueDate: valDate,
+                valueBoolean: v.valueBoolean
+              }
+            })
+            ok(await window.api.setVesselDynamicPolicyValues(newId, newVals))
+          }
+
+          // 4. Reload and notify
+          onReload()
+          showSuccess('Policy renewed. Please review and edit the new policy details.')
         } catch (err: any) {
-            showError(err.message || 'Failed to save policy')
+          showError(err.message || 'Failed to renew policy')
         }
+      }
+    })
+  }
+
+  const typeCharsForForm = characteristics.filter((c) => c.policyTypeId === formTypeId)
+  const typeCondsForForm = conditions.filter((c) => c.policyTypeId === formTypeId)
+
+  const statusColors: Record<string, { bg: string; color: string }> = {
+    active: { bg: 'rgba(0, 200, 100, 0.1)', color: isLight ? '#008c46' : '#00ff88' },
+    expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
+    cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)' },
+    inactive: {
+      bg: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+      color: 'var(--text-secondary)'
     }
+  }
 
-    const handleDeletePolicy = (id: string) => {
-        setConfirmation({
-            show: true,
-            title: 'Delete Policy',
-            message: 'Delete this policy? This cannot be undone.',
-            isDangerous: true,
-            onConfirm: async () => {
-                setConfirmation(prev => ({ ...prev, show: false }))
-                await window.api.deleteVesselDynamicPolicy(id)
-                showSuccess('Policy deleted')
-                onReload()
-            }
-        })
-    }
+  return (
+    <div>
+      {/* Controls */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginBottom: '16px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <button
+          onClick={openAddModal}
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+        >
+          <Plus size={16} /> Add Policy
+        </button>
+      </div>
 
-    const handleRenewPolicy = (p: VesselDynamicPolicy) => {
-        setConfirmation({
-            show: true,
-            title: 'Renew Policy',
-            message: 'Renew this policy? A new copy will be created with incremented dates.',
-            onConfirm: async () => {
-                setConfirmation(prev => ({ ...prev, show: false }))
-                try {
-                    // 1. Conditionally expire old policy
-                    // Find expiry date characteristic (only from THIS policy type's characteristics)
-                    const policyTypeChars = characteristics.filter(c => c.policyTypeId === p.policyTypeId)
-                    const expiryChar = policyTypeChars.find(c => c.name.toLowerCase().includes('expiry') || c.name.toLowerCase().includes('expiration') || c.name.toLowerCase().includes('end date'))
-                    let shouldExpire = false
+      {/* Type tabs: Current + per-type */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveTypeTab('current')}
+          className={activeTypeTab === 'current' ? 'btn-primary' : 'btn-secondary'}
+          style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+        >
+          Current
+        </button>
+        {policyTypes.map((pt) => (
+          <button
+            key={pt.id}
+            onClick={() => setActiveTypeTab(pt.id)}
+            className={activeTypeTab === pt.id ? 'btn-primary' : 'btn-secondary'}
+            style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+          >
+            {pt.name}
+          </button>
+        ))}
+      </div>
 
-                    if (expiryChar && p.values) {
-                        const expiryVal = p.values.find(v => v.characteristicId === expiryChar.id)
-                        if (expiryVal && expiryVal.valueDate) {
-                            const todayStr = new Date().toISOString().split('T')[0]
-                            if (expiryVal.valueDate <= todayStr) {
-                                shouldExpire = true
-                            }
-                        }
-                    }
-
-                    if (shouldExpire) {
-                        ok(await window.api.updateVesselDynamicPolicy(p.id, { status: 'expired' }))
-                    }
-
-                    // 2. Roll every policy date forward by exactly 1 calendar year.
-                    // Each date keeps its own day/month — inception must NOT be set to the old
-                    // expiry (e.g. 03/07/2025–02/07/2026 renews to 03/07/2026–02/07/2027).
-                    const policyTypeCharsAll = characteristics.filter(c => c.policyTypeId === p.policyTypeId)
-                    const addOneYear = (iso: string): string => {
-                        const parts = iso.split('-')
-                        if (parts.length !== 3) return iso
-                        const yr = parseInt(parts[0], 10) + 1
-                        return `${yr}-${parts[1]}-${parts[2]}`
-                    }
-
-                    // New inception = existing inception + 1 year — used for the new policy number's year
-                    const inceptionChar = policyTypeCharsAll.find(c => {
-                        const n = c.name.toLowerCase()
-                        return n.includes('inception') || n.includes('start') || (n.includes('from') && n.includes('date'))
-                    })
-                    let newInception: string | null = null
-                    if (inceptionChar && p.values) {
-                        const iv = p.values.find(v => v.characteristicId === inceptionChar.id)
-                        if (iv?.valueDate) newInception = addOneYear(iv.valueDate)
-                    }
-
-                    // Generate new policy number: type letter + inverted year from new inception
-                    const policyType = policyTypes.find(pt => pt.id === p.policyTypeId)
-                    const typeCode = policyType?.name?.charAt(0)?.toUpperCase() || 'P'
-                    let newPolicyNumber = typeCode
-                    if (newInception) {
-                        const yr = newInception.substring(0, 4) // e.g., "2026"
-                        newPolicyNumber += yr.substring(2, 4) + yr.substring(0, 2) // "2620"
-                    }
-
-                    // 3. Create new policy
-                    const newId = await window.api.addVesselDynamicPolicy({
-                        vesselId: p.vesselId,
-                        policyTypeId: p.policyTypeId,
-                        policyNumber: newPolicyNumber + ' (RENEWED - PLEASE VERIFY)',
-                        conditionId: p.conditionId,
-                        status: 'active',
-                        currency: p.currency,
-                        brokerEntityId: p.brokerEntityId,
-                        notes: p.notes
-                    })
-
-                    // 4. Copy values — every date field keeps its day/month and advances 1 year
-                    if (p.values) {
-                        const newVals = p.values.map(v => {
-                            let valDate = v.valueDate
-                            if (v.fieldType === 'date') {
-                                valDate = v.valueDate ? addOneYear(v.valueDate) : undefined
-                            }
-                            return {
-                                characteristicId: v.characteristicId,
-                                valueText: v.valueText,
-                                valueAmount: v.valueAmount,
-                                valueDate: valDate,
-                                valueBoolean: v.valueBoolean
-                            }
-                        })
-                        ok(await window.api.setVesselDynamicPolicyValues(newId, newVals))
-                    }
-
-                    // 4. Reload and notify
-                    onReload()
-                    showSuccess('Policy renewed. Please review and edit the new policy details.')
-
-                } catch (err: any) {
-                    showError(err.message || 'Failed to renew policy')
-                }
-            }
-        })
-    }
-
-    const typeCharsForForm = characteristics.filter(c => c.policyTypeId === formTypeId)
-    const typeCondsForForm = conditions.filter(c => c.policyTypeId === formTypeId)
-
-    const statusColors: Record<string, { bg: string; color: string }> = {
-        active: { bg: 'rgba(0, 200, 100, 0.1)', color: isLight ? '#008c46' : '#00ff88' },
-        expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
-        cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)' },
-        inactive: { bg: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }
-    }
-
-    return (
-        <div>
-            {/* Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                <button onClick={openAddModal} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
-                    <Plus size={16} /> Add Policy
-                </button>
-            </div>
-
-            {/* Type tabs: Current + per-type */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                <button onClick={() => setActiveTypeTab('current')} className={activeTypeTab === 'current' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Current</button>
-                {policyTypes.map(pt => (
-                    <button key={pt.id} onClick={() => setActiveTypeTab(pt.id)} className={activeTypeTab === pt.id ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '4px 12px' }}>{pt.name}</button>
-                ))}
-            </div>
-
-            {/* Dynamic policies */}
-            {filtered.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {filtered.map(p => {
-                        const isCollapsed = collapsedPolicies.has(p.id)
-                        const sc = statusColors[p.status] || statusColors.active
-                        return (
-                            <div key={p.id} className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-                                {/* Header */}
-                                <div onClick={() => toggleCollapse(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: isCollapsed ? 'transparent' : 'rgba(var(--accent-primary-rgb), 0.03)' }}>
-                                    <ChevronDown size={16} style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s', color: 'var(--text-secondary)' }} />
-                                    <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
-                                    {(() => {
-                                        const headerNum = p.policyNumber ||
-                                            p.values?.find(v => /policy\s*(no\.?|num(ber)?)/i.test(v.characteristicName || '') && v.valueText)?.valueText
-                                        return headerNum
-                                            ? <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{headerNum.replace(' (RENEWED - PLEASE VERIFY)', '')}</span>
-                                            : null
-                                    })()}
-                                    {p.conditionName && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{p.conditionName}</span>}
-                                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: sc.bg, color: sc.color, fontWeight: '600', textTransform: 'uppercase' }}>{p.status}</span>
-                                    {p.policyNumber && p.policyNumber.includes('RENEWED') && (
-                                        <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--danger)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <AlertCircle size={10} /> NEEDS EDITING
-                                        </span>
-                                    )}
-                                    {(p.customerName || p.brokerName) && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{p.customerType === 'direct' ? '' : 'via '}{p.customerName || p.brokerName}{p.customerType ? ` (${p.customerType})` : ''}</span>}
-                                </div>
-                                {/* Body */}
-                                {!isCollapsed && (
-                                    <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--table-border)' }}>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px', paddingTop: '12px' }}>
-                                            {p.values && p.values.map(v => (
-                                                <div key={v.id} style={{ fontSize: '0.85rem' }}>
-                                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{v.characteristicName}</span>
-                                                    <div style={{ fontWeight: '500' }}>
-                                                        {v.fieldType === 'amount' ? formatCurrency(v.valueAmount, p.currency) :
-                                                            v.fieldType === 'boolean' ? (v.valueBoolean ? 'Yes' : 'No') :
-                                                                v.fieldType === 'date' ? (v.valueDate || '-') :
-                                                                    (v.valueText || '-')}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div style={{ fontSize: '0.85rem' }}>
-                                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Currency</span>
-                                                <div style={{ fontWeight: '500' }}>{p.currency}</div>
-                                            </div>
-                                        </div>
-                                        {p.notes && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>{p.notes}</p>}
-                                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                            <button onClick={() => openEditModal(p)} className="btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 12px' }}>Edit</button>
-                                            <button onClick={() => handleRenewPolicy(p)} className="btn-primary" style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <RefreshCcw size={14} /> Renew
-                                            </button>
-                                            <button onClick={() => handleDeletePolicy(p.id)} style={{ background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.35)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.8rem', padding: '4px 12px', cursor: 'pointer' }}>Delete</button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-            ) : (
-                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
-                    <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                    <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '6px' }}>
-                        {dynamicPolicies.length > 0 ? 'No matching policies' : 'No policies yet'}
-                    </div>
-                    <div style={{ fontSize: '0.85rem' }}>
-                        {dynamicPolicies.length > 0 ? 'Try switching to a different type tab.' : 'Add a policy to start tracking insurance coverage.'}
-                    </div>
-                </div>
-            )}
-
-            {/* Add/Edit Modal */}
-            {/* Add/Edit Modal */}
-            {showAddModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
-                    <div
-                        ref={modalRef}
-                        role="dialog"
-                        aria-modal="true"
-                        onClick={e => e.stopPropagation()}
-                        style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)' }}
+      {/* Dynamic policies */}
+      {filtered.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {filtered.map((p) => {
+            const isCollapsed = collapsedPolicies.has(p.id)
+            const sc = statusColors[p.status] || statusColors.active
+            return (
+              <div key={p.id} className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+                {/* Header */}
+                <div
+                  onClick={() => toggleCollapse(p.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px 16px',
+                    cursor: 'pointer',
+                    background: isCollapsed
+                      ? 'transparent'
+                      : 'rgba(var(--accent-primary-rgb), 0.03)'
+                  }}
+                >
+                  <ChevronDown
+                    size={16}
+                    style={{
+                      transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                      transition: 'transform 0.2s',
+                      color: 'var(--text-secondary)'
+                    }}
+                  />
+                  <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
+                  {(() => {
+                    const headerNum =
+                      p.policyNumber ||
+                      p.values?.find(
+                        (v) =>
+                          /policy\s*(no\.?|num(ber)?)/i.test(v.characteristicName || '') &&
+                          v.valueText
+                      )?.valueText
+                    return headerNum ? (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        #{headerNum.replace(' (RENEWED - PLEASE VERIFY)', '')}
+                      </span>
+                    ) : null
+                  })()}
+                  {p.conditionName && (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                        color: 'var(--accent-primary)'
+                      }}
                     >
-                        <h3 style={{ marginBottom: '16px' }}>{editingPolicyId ? 'Edit Policy' : 'Add Policy'}</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {!editingPolicyId && (
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Policy Type</label>
-                                    <select name="policyType" value={formTypeId} onChange={e => { setFormTypeId(e.target.value); setFormConditionId(''); setFormValues({}) }} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
-                                        {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
-                                    </select>
-                                </div>
-                            )}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Policy Number</label>
-                                    <input
-                                        type="text"
-                                        value={formNumber}
-                                        onChange={e => setFormNumber(e.target.value)}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Status</label>
-                                    <select value={formStatus} onChange={e => setFormStatus(e.target.value as any)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
-                                        <option value="active">Active</option>
-                                        <option value="expired">Expired</option>
-                                        <option value="cancelled">Cancelled</option>
-                                        <option value="inactive">Inactive</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Currency</label>
-                                    <select value={formCurrency} onChange={e => setFormCurrency(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
-                                        <option value="USD">USD ($)</option>
-                                        <option value="EUR">EUR (\u20AC)</option>
-                                        <option value="GBP">GBP (\u00A3)</option>
-                                    </select>
-                                </div>
-                                {typeCondsForForm.length > 0 && (
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Condition</label>
-                                        <select value={formConditionId} onChange={e => setFormConditionId(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
-                                            <option value="">None</option>
-                                            {typeCondsForForm.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                    </div>
-                                )}
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Customer / Broker</label>
-                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                                        {(['broker', 'direct'] as const).map(ct => (
-                                            <button key={ct} type="button" onClick={() => setFormCustomerType(ct)}
-                                                style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: formCustomerType === ct ? 600 : 400, border: formCustomerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: formCustomerType === ct ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: formCustomerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
-                                                {ct}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div style={{ position: 'relative' }}>
-                                        <input
-                                            type="text"
-                                            placeholder={formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'}
-                                            value={brokerDropdownOpen ? brokerSearch : (entities.find(e => e.id === formBrokerId)?.name || '')}
-                                            onFocus={() => { setBrokerDropdownOpen(true); setBrokerSearch('') }}
-                                            onChange={e => setBrokerSearch(e.target.value)}
-                                            onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
-                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }}
-                                        />
-                                        {brokerDropdownOpen && (
-                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#ffffff' : '#1a1d28', border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                                                <div
-                                                    onMouseDown={() => { setFormBrokerId(''); setFormCustomerType(''); setBrokerDropdownOpen(false); setBrokerSearch('') }}
-                                                    style={{ padding: '8px 12px', cursor: 'pointer', color: formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.9rem' }}
-                                                >
-                                                    None
-                                                </div>
-                                                {entities.filter(e => e.name.toLowerCase().includes(brokerSearch.toLowerCase())).map(e => (
-                                                    <div
-                                                        key={e.id}
-                                                        onMouseDown={() => { setFormBrokerId(e.id); if (!formCustomerType) setFormCustomerType('broker'); setBrokerDropdownOpen(false); setBrokerSearch('') }}
-                                                        style={{ padding: '8px 12px', cursor: 'pointer', color: e.id === formBrokerId ? 'var(--accent-primary)' : 'var(--text-primary)', background: e.id === formBrokerId ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)') : 'transparent', fontSize: '0.9rem' }}
-                                                    >
-                                                        {e.name}
-                                                    </div>
-                                                ))}
-                                                {entities.filter(e => e.name.toLowerCase().includes(brokerSearch.toLowerCase())).length === 0 && (
-                                                    <div style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>No matches</div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Dynamic characteristic fields */}
-                            {typeCharsForForm.length > 0 && (
-                                <div>
-                                    <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: 'var(--text-secondary)' }}>Characteristics</h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                        {typeCharsForForm.map(c => (
-                                            <div key={c.id}>
-                                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>{c.name} {c.isRequired && '*'}</label>
-                                                {c.fieldType === 'text' && (
-                                                    <input type="text" name={`policy_${c.id}`} value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }} />
-                                                )}
-                                                {c.fieldType === 'date' && (
-                                                    <input type="date" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} min="1900-01-01" max="2100-12-31" style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }} />
-                                                )}
-                                                {c.fieldType === 'amount' && (
-                                                    <input type="number" step="0.01" value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', boxSizing: 'border-box' }} />
-                                                )}
-                                                {c.fieldType === 'boolean' && (
-                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                                        <input type="checkbox" checked={!!formValues[c.id]} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.checked }))} /> Yes
-                                                    </label>
-                                                )}
-                                                {c.fieldType === 'select' && c.selectOptions && (
-                                                    <select value={formValues[c.id] || ''} onChange={e => setFormValues(prev => ({ ...prev, [c.id]: e.target.value }))} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}>
-                                                        <option value="">Select...</option>
-                                                        {c.selectOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                    </select>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '500' }}>Notes</label>
-                                <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)', resize: 'vertical', boxSizing: 'border-box' }} />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--table-border)' }}>
-                                <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
-                                <button onClick={handleSavePolicy} className="btn-primary">{editingPolicyId ? 'Update' : 'Add'} Policy</button>
-                            </div>
-                        </div>
-                    </div>
+                      {p.conditionName}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      background: sc.bg,
+                      color: sc.color,
+                      fontWeight: '600',
+                      textTransform: 'uppercase'
+                    }}
+                  >
+                    {p.status}
+                  </span>
+                  {p.policyNumber && p.policyNumber.includes('RENEWED') && (
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        background: 'var(--danger)',
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <AlertCircle size={10} /> NEEDS EDITING
+                    </span>
+                  )}
+                  {(p.customerName || p.brokerName) && (
+                    <span
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                        marginLeft: 'auto'
+                      }}
+                    >
+                      {p.customerType === 'direct' ? '' : 'via '}
+                      {p.customerName || p.brokerName}
+                      {p.customerType ? ` (${p.customerType})` : ''}
+                    </span>
+                  )}
                 </div>
-            )}
-
-            {/* Confirmation Modal */}
-            {confirmation.show && (
-                <ConfirmationModal
-                    title={confirmation.title}
-                    message={confirmation.message}
-                    isDangerous={confirmation.isDangerous}
-                    onConfirm={confirmation.onConfirm}
-                    onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
-                />
-            )}
-
+                {/* Body */}
+                {!isCollapsed && (
+                  <div
+                    style={{ padding: '0 16px 16px', borderTop: '1px solid var(--table-border)' }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                        gap: '8px',
+                        paddingTop: '12px'
+                      }}
+                    >
+                      {p.values &&
+                        p.values.map((v) => (
+                          <div key={v.id} style={{ fontSize: '0.85rem' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                              {v.characteristicName}
+                            </span>
+                            <div style={{ fontWeight: '500' }}>
+                              {v.fieldType === 'amount'
+                                ? formatCurrency(v.valueAmount, p.currency)
+                                : v.fieldType === 'boolean'
+                                  ? v.valueBoolean
+                                    ? 'Yes'
+                                    : 'No'
+                                  : v.fieldType === 'date'
+                                    ? v.valueDate || '-'
+                                    : v.valueText || '-'}
+                            </div>
+                          </div>
+                        ))}
+                      <div style={{ fontSize: '0.85rem' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                          Currency
+                        </span>
+                        <div style={{ fontWeight: '500' }}>{p.currency}</div>
+                      </div>
+                    </div>
+                    {p.notes && (
+                      <p
+                        style={{
+                          fontSize: '0.8rem',
+                          color: 'var(--text-secondary)',
+                          marginTop: '8px',
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        {p.notes}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                      <button
+                        onClick={() => openEditModal(p)}
+                        className="btn-secondary"
+                        style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleRenewPolicy(p)}
+                        className="btn-primary"
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '4px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <RefreshCcw size={14} /> Renew
+                      </button>
+                      <button
+                        onClick={() => handleDeletePolicy(p.id)}
+                        style={{
+                          background: 'rgba(255,77,77,0.12)',
+                          border: '1px solid rgba(255,77,77,0.35)',
+                          color: 'var(--danger)',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          padding: '4px 12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
-    )
+      ) : (
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
+          <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+          <div
+            style={{
+              fontWeight: '600',
+              fontSize: '1rem',
+              color: 'var(--text-primary)',
+              marginBottom: '6px'
+            }}
+          >
+            {dynamicPolicies.length > 0 ? 'No matching policies' : 'No policies yet'}
+          </div>
+          <div style={{ fontSize: '0.85rem' }}>
+            {dynamicPolicies.length > 0
+              ? 'Try switching to a different type tab.'
+              : 'Add a policy to start tracking insurance coverage.'}
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal */}
+      {showAddModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999
+          }}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '28px',
+              width: '600px',
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <h3 style={{ marginBottom: '16px' }}>
+              {editingPolicyId ? 'Edit Policy' : 'Add Policy'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {!editingPolicyId && (
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Policy Type
+                  </label>
+                  <select
+                    name="policyType"
+                    value={formTypeId}
+                    onChange={(e) => {
+                      setFormTypeId(e.target.value)
+                      setFormConditionId('')
+                      setFormValues({})
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: 'var(--input-bg)',
+                      color: 'var(--input-text)',
+                      border: '1px solid var(--input-border)'
+                    }}
+                  >
+                    {policyTypes.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Policy Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formNumber}
+                    onChange={(e) => setFormNumber(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: 'var(--input-bg)',
+                      color: 'var(--input-text)',
+                      border: '1px solid var(--input-border)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Status
+                  </label>
+                  <select
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value as any)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: 'var(--input-bg)',
+                      color: 'var(--input-text)',
+                      border: '1px solid var(--input-border)'
+                    }}
+                  >
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Currency
+                  </label>
+                  <select
+                    value={formCurrency}
+                    onChange={(e) => setFormCurrency(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      background: 'var(--input-bg)',
+                      color: 'var(--input-text)',
+                      border: '1px solid var(--input-border)'
+                    }}
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (\u20AC)</option>
+                    <option value="GBP">GBP (\u00A3)</option>
+                  </select>
+                </div>
+                {typeCondsForForm.length > 0 && (
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '6px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Condition
+                    </label>
+                    <select
+                      value={formConditionId}
+                      onChange={(e) => setFormConditionId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--input-text)',
+                        border: '1px solid var(--input-border)'
+                      }}
+                    >
+                      <option value="">None</option>
+                      {typeCondsForForm.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Customer / Broker
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    {(['broker', 'direct'] as const).map((ct) => (
+                      <button
+                        key={ct}
+                        type="button"
+                        onClick={() => setFormCustomerType(ct)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.82rem',
+                          fontWeight: formCustomerType === ct ? 600 : 400,
+                          border:
+                            formCustomerType === ct
+                              ? '1.5px solid var(--accent-primary)'
+                              : '1px solid var(--input-border)',
+                          background:
+                            formCustomerType === ct
+                              ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                              : 'transparent',
+                          color:
+                            formCustomerType === ct
+                              ? 'var(--accent-primary)'
+                              : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          textTransform: 'capitalize'
+                        }}
+                      >
+                        {ct}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder={
+                        formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'
+                      }
+                      value={
+                        brokerDropdownOpen
+                          ? brokerSearch
+                          : entities.find((e) => e.id === formBrokerId)?.name || ''
+                      }
+                      onFocus={() => {
+                        setBrokerDropdownOpen(true)
+                        setBrokerSearch('')
+                      }}
+                      onChange={(e) => setBrokerSearch(e.target.value)}
+                      onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--input-text)',
+                        border: '1px solid var(--input-border)',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    {brokerDropdownOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          background: isLight ? '#ffffff' : '#1a1d28',
+                          border: isLight
+                            ? '1px solid rgba(0,0,0,0.1)'
+                            : '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '8px',
+                          zIndex: 100,
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                        }}
+                      >
+                        <div
+                          onMouseDown={() => {
+                            setFormBrokerId('')
+                            setFormCustomerType('')
+                            setBrokerDropdownOpen(false)
+                            setBrokerSearch('')
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            color:
+                              formBrokerId === ''
+                                ? 'var(--accent-primary)'
+                                : 'var(--text-secondary)',
+                            fontStyle: 'italic',
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          None
+                        </div>
+                        {entities
+                          .filter((e) => e.name.toLowerCase().includes(brokerSearch.toLowerCase()))
+                          .map((e) => (
+                            <div
+                              key={e.id}
+                              onMouseDown={() => {
+                                setFormBrokerId(e.id)
+                                if (!formCustomerType) setFormCustomerType('broker')
+                                setBrokerDropdownOpen(false)
+                                setBrokerSearch('')
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                color:
+                                  e.id === formBrokerId
+                                    ? 'var(--accent-primary)'
+                                    : 'var(--text-primary)',
+                                background:
+                                  e.id === formBrokerId
+                                    ? isLight
+                                      ? 'rgba(0,119,163,0.1)'
+                                      : 'rgba(var(--accent-primary-rgb), 0.1)'
+                                    : 'transparent',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              {e.name}
+                            </div>
+                          ))}
+                        {entities.filter((e) =>
+                          e.name.toLowerCase().includes(brokerSearch.toLowerCase())
+                        ).length === 0 && (
+                          <div
+                            style={{
+                              padding: '8px 12px',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.85rem',
+                              fontStyle: 'italic'
+                            }}
+                          >
+                            No matches
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic characteristic fields */}
+              {typeCharsForForm.length > 0 && (
+                <div>
+                  <h4
+                    style={{
+                      fontSize: '0.9rem',
+                      marginBottom: '8px',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    Characteristics
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {typeCharsForForm.map((c) => (
+                      <div key={c.id}>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-secondary)',
+                            marginBottom: '6px',
+                            fontWeight: '500'
+                          }}
+                        >
+                          {c.name} {c.isRequired && '*'}
+                        </label>
+                        {c.fieldType === 'text' && (
+                          <input
+                            type="text"
+                            name={`policy_${c.id}`}
+                            value={formValues[c.id] || ''}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: 'var(--input-text)',
+                              border: '1px solid var(--input-border)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        )}
+                        {c.fieldType === 'date' && (
+                          <input
+                            type="date"
+                            value={formValues[c.id] || ''}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                            }
+                            min="1900-01-01"
+                            max="2100-12-31"
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: 'var(--input-text)',
+                              border: '1px solid var(--input-border)'
+                            }}
+                          />
+                        )}
+                        {c.fieldType === 'amount' && (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formValues[c.id] || ''}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: 'var(--input-text)',
+                              border: '1px solid var(--input-border)',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        )}
+                        {c.fieldType === 'boolean' && (
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              marginTop: '4px'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!formValues[c.id]}
+                              onChange={(e) =>
+                                setFormValues((prev) => ({ ...prev, [c.id]: e.target.checked }))
+                              }
+                            />{' '}
+                            Yes
+                          </label>
+                        )}
+                        {c.fieldType === 'select' && c.selectOptions && (
+                          <select
+                            value={formValues[c.id] || ''}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: 'var(--input-text)',
+                              border: '1px solid var(--input-border)'
+                            }}
+                          >
+                            <option value="">Select...</option>
+                            {c.selectOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '6px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Notes
+                </label>
+                <textarea
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    background: 'var(--input-bg)',
+                    color: 'var(--input-text)',
+                    border: '1px solid var(--input-border)',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  justifyContent: 'flex-end',
+                  marginTop: '24px',
+                  paddingTop: '20px',
+                  borderTop: '1px solid var(--table-border)'
+                }}
+              >
+                <button onClick={() => setShowAddModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button onClick={handleSavePolicy} className="btn-primary">
+                  {editingPolicyId ? 'Update' : 'Add'} Policy
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmation.show && (
+        <ConfirmationModal
+          title={confirmation.title}
+          message={confirmation.message}
+          isDangerous={confirmation.isDangerous}
+          onConfirm={confirmation.onConfirm}
+          onCancel={() => setConfirmation((prev) => ({ ...prev, show: false }))}
+        />
+      )}
+    </div>
+  )
 }
 
 // ==================== Vessel Template Generate Modal ====================
-function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, showSuccess, showError }: {
-    vesselId: string
-    vesselName: string
-    isLight: boolean
-    onClose: () => void
-    showSuccess: (msg: string) => void
-    showError: (msg: string) => void
+function VesselTemplateGenerateModal({
+  vesselId,
+  vesselName,
+  isLight,
+  onClose,
+  showSuccess,
+  showError
+}: {
+  vesselId: string
+  vesselName: string
+  isLight: boolean
+  onClose: () => void
+  showSuccess: (msg: string) => void
+  showError: (msg: string) => void
 }) {
-    const [templates, setTemplates] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [generating, setGenerating] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState<string | null>(null)
 
-    useEffect(() => {
-        window.api.docTemplateGetAll().then(result => {
-            if (Array.isArray(result)) setTemplates(result)
-        }).catch(() => {}).finally(() => setLoading(false))
-    }, [])
+  useEffect(() => {
+    window.api
+      .docTemplateGetAll()
+      .then((result) => {
+        if (Array.isArray(result)) setTemplates(result)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
-    const handleGenerate = async (templateId: string) => {
-        try {
-            setGenerating(templateId)
-            const tpl = templates.find(t => t.id === templateId)
-            if (!tpl?.body) { showError('Template has no body content'); return }
-            const { buildTemplateContext, resolveTemplatePlaceholders, generateTemplateDocx } = await import('../services/DocumentTemplateExportService')
-            const ctx = await buildTemplateContext({ vesselId })
-            const resolvedHtml = resolveTemplatePlaceholders(tpl.body, ctx)
-            const fileName = `${tpl.name.replace(/\s+/g, '_')}_${vesselName.replace(/\s+/g, '_')}`
-            await generateTemplateDocx(resolvedHtml, fileName)
-            showSuccess('Document generated')
-            onClose()
-        } catch {
-            showError('Failed to generate document')
-        } finally {
-            setGenerating(null)
-        }
+  const handleGenerate = async (templateId: string) => {
+    try {
+      setGenerating(templateId)
+      const tpl = templates.find((t) => t.id === templateId)
+      if (!tpl?.body) {
+        showError('Template has no body content')
+        return
+      }
+      const { buildTemplateContext, resolveTemplatePlaceholders, generateTemplateDocx } =
+        await import('../services/DocumentTemplateExportService')
+      const ctx = await buildTemplateContext({ vesselId })
+      const resolvedHtml = resolveTemplatePlaceholders(tpl.body, ctx)
+      const fileName = `${tpl.name.replace(/\s+/g, '_')}_${vesselName.replace(/\s+/g, '_')}`
+      await generateTemplateDocx(resolvedHtml, fileName)
+      showSuccess('Document generated')
+      onClose()
+    } catch {
+      showError('Failed to generate document')
+    } finally {
+      setGenerating(null)
     }
+  }
 
-    return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '12px', padding: '24px', width: '440px', maxWidth: '90vw',
-                border: 'var(--glass-border)', maxHeight: '70vh', display: 'flex', flexDirection: 'column'
-            }} onClick={e => e.stopPropagation()}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <FileText size={18} /> Generate from Template
-                    </h3>
-                    <button title="Close" aria-label="Close" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                        <X size={18} />
-                    </button>
-                </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    Select a template to generate a document pre-filled with data for <strong>{vesselName}</strong>.
-                </p>
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>Loading...</div>
-                    ) : templates.length === 0 ? (
-                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
-                            No templates available. Upload templates in Document Templates page.
-                        </div>
-                    ) : templates.map(t => (
-                        <div
-                            key={t.id}
-                            style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '10px 12px', borderRadius: '8px', marginBottom: '4px',
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--input-bg)'
-                            }}
-                        >
-                            <div>
-                                <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{t.name}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                                    <span style={{
-                                        padding: '1px 5px', borderRadius: '3px', fontSize: '0.68rem',
-                                        background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
-                                    }}>{t.category}</span>
-                                    {t.placeholders?.length > 0 && <span>{t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}</span>}
-                                </div>
-                            </div>
-                            <button
-                                className="btn-primary"
-                                onClick={() => handleGenerate(t.id)}
-                                disabled={generating !== null}
-                                style={{ padding: '5px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            >
-                                {generating === t.id ? 'Generating...' : <><Download size={13} /> Generate</>}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}
+    >
+      <div
+        style={{
+          background: isLight ? '#ffffff' : '#1a1d28',
+          borderRadius: '12px',
+          padding: '24px',
+          width: '440px',
+          maxWidth: '90vw',
+          border: 'var(--glass-border)',
+          maxHeight: '70vh',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: '1.05rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <FileText size={18} /> Generate from Template
+          </h3>
+          <button
+            title="Close"
+            aria-label="Close"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer'
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
-    )
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          Select a template to generate a document pre-filled with data for{' '}
+          <strong>{vesselName}</strong>.
+        </p>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+              Loading...
+            </div>
+          ) : templates.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+              No templates available. Upload templates in Document Templates page.
+            </div>
+          ) : (
+            templates.map((t) => (
+              <div
+                key={t.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  marginBottom: '4px',
+                  border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg)'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{t.name}</div>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      display: 'flex',
+                      gap: '6px',
+                      alignItems: 'center',
+                      marginTop: '2px'
+                    }}
+                  >
+                    <span
+                      style={{
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        fontSize: '0.68rem',
+                        background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                        color: 'var(--accent-primary)'
+                      }}
+                    >
+                      {t.category}
+                    </span>
+                    {t.placeholders?.length > 0 && (
+                      <span>
+                        {t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={() => handleGenerate(t.id)}
+                  disabled={generating !== null}
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  {generating === t.id ? (
+                    'Generating...'
+                  ) : (
+                    <>
+                      <Download size={13} /> Generate
+                    </>
+                  )}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ==================== Vessel Activity (formerly Timeline + History) ====================
 
 /** Format audit values: add thousand separators if the value is a plain number */
 function formatAuditValue(val: string | null | undefined): string {
-    if (!val) return ''
-    const num = Number(val)
-    if (!isNaN(num) && String(num) === val.trim()) return num.toLocaleString()
-    return val
+  if (!val) return ''
+  const num = Number(val)
+  if (!isNaN(num) && String(num) === val.trim()) return num.toLocaleString()
+  return val
 }
 
 interface TimelineEvent {
-    date: string
-    type: 'audit' | 'document' | 'policy' | 'survey' | 'warranty' | 'sanctions'
-    title: string
-    subtitle?: string
-    oldValue?: string | null
-    newValue?: string | null
-    changedBy?: string
-    iconType: string
-    color: string
+  date: string
+  type: 'audit' | 'document' | 'policy' | 'survey' | 'warranty' | 'sanctions'
+  title: string
+  subtitle?: string
+  oldValue?: string | null
+  newValue?: string | null
+  changedBy?: string
+  iconType: string
+  color: string
 }
 
 interface MergedEvent {
-    date: string
-    type: string
-    title: string
-    count: number
-    items: TimelineEvent[]
-    icon: string
-    color: string
+  date: string
+  type: string
+  title: string
+  count: number
+  items: TimelineEvent[]
+  icon: string
+  color: string
 }
 
 const TIMELINE_PAGE_SIZE = 50
 
 const TIMELINE_TYPE_META: Record<string, { label: string; color: string }> = {
-    audit: { label: 'Changes', color: '#6495ed' },
-    document: { label: 'Documents', color: '#00aac8' },
-    policy: { label: 'Policies', color: '#9370db' },
-    survey: { label: 'Surveys', color: '#22c55e' },
-    warranty: { label: 'Warranties', color: '#f59e0b' },
-    sanctions: { label: 'Sanctions', color: '#ef4444' }
+  audit: { label: 'Changes', color: '#6495ed' },
+  document: { label: 'Documents', color: '#00aac8' },
+  policy: { label: 'Policies', color: '#9370db' },
+  survey: { label: 'Surveys', color: '#22c55e' },
+  warranty: { label: 'Warranties', color: '#f59e0b' },
+  sanctions: { label: 'Sanctions', color: '#ef4444' }
 }
 
 function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: boolean }) {
-    const [events, setEvents] = useState<TimelineEvent[]>([])
-    const [loading, setLoading] = useState(true)
-    const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
-    const [typeFilter, setTypeFilter] = useState<string>('all')
-    // Local YYYY-MM-DD (NOT UTC) so the range matches the server-local audit timestamps
-    const localDateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const [dateFrom, setDateFrom] = useState<string>(() => {
-        const d = new Date()
-        d.setFullYear(d.getFullYear() - 1)
-        return localDateKey(d)
-    })
-    const [dateTo, setDateTo] = useState<string>(() => localDateKey(new Date()))
-    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
-    const [activitySearch, setActivitySearch] = useState('')
+  const [events, setEvents] = useState<TimelineEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(TIMELINE_PAGE_SIZE)
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Local YYYY-MM-DD (NOT UTC) so the range matches the server-local audit timestamps
+  const localDateKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 1)
+    return localDateKey(d)
+  })
+  const [dateTo, setDateTo] = useState<string>(() => localDateKey(new Date()))
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const [activitySearch, setActivitySearch] = useState('')
 
-    useEffect(() => {
-        let cancelled = false
-        setLoading(true)
-        setVisibleCount(TIMELINE_PAGE_SIZE)
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setVisibleCount(TIMELINE_PAGE_SIZE)
 
-        const load = async () => {
-            const allEvents: TimelineEvent[] = []
+    const load = async () => {
+      const allEvents: TimelineEvent[] = []
 
-            try {
-                const [auditLog, docs, policies, surveys, warranties, sanctionsResults] = await Promise.all([
-                    window.api.getVesselAuditLog(vesselId).catch(() => []),
-                    window.api.getVesselDocuments(vesselId).catch(() => []),
-                    window.api.getVesselDynamicPolicies(vesselId).catch(() => []),
-                    window.api.getConditionSurveys(vesselId).catch(() => []),
-                    window.api.surveyWarrantyGetByVessel(vesselId).catch(() => []),
-                    window.api.complianceGetCheckResults().catch(() => [])
-                ])
-
-                // Audit log entries
-                if (Array.isArray(auditLog)) {
-                    for (const entry of auditLog) {
-                        const isAssured = entry.fieldName?.toLowerCase().includes('assured')
-                        allEvents.push({
-                            date: entry.changedAt || '',
-                            type: 'audit',
-                            title: isAssured ? entry.fieldName : `${entry.fieldName} changed`,
-                            subtitle: isAssured
-                                ? (entry.newValue || entry.oldValue || undefined)
-                                : (entry.oldValue && entry.newValue ? `${entry.oldValue} → ${entry.newValue}` : entry.newValue ? `Set to ${entry.newValue}` : undefined),
-                            oldValue: entry.oldValue,
-                            newValue: entry.newValue,
-                            changedBy: entry.changedBy,
-                            iconType: isAssured ? 'assured' : 'audit',
-                            color: isAssured ? '#c084fc' : '#6495ed'
-                        })
-                    }
-                }
-
-                // Document uploads
-                const allDocTypes = await window.api.getDocumentTypes().catch(() => [])
-                const docTypeMap = new Map((allDocTypes as any[]).map((dt: any) => [dt.id, dt.name]))
-                if (Array.isArray(docs)) {
-                    for (const doc of docs) {
-                        if (doc.uploadedDate) {
-                            const docTypeName = docTypeMap.get(doc.documentTypeId) || 'Document'
-                            allEvents.push({
-                                date: doc.uploadedDate,
-                                type: 'document',
-                                title: `${docTypeName} uploaded`,
-                                subtitle: doc.uploadedBy ? `by ${doc.uploadedBy}` : undefined,
-                                iconType: 'document',
-                                color: '#00aac8'
-                            })
-                        }
-                    }
-                }
-
-                // Policies
-                if (Array.isArray(policies)) {
-                    for (const p of policies) {
-                        if (p.createdAt) {
-                            allEvents.push({
-                                date: p.createdAt,
-                                type: 'policy',
-                                title: `Policy created`,
-                                subtitle: p.policyNumber || undefined,
-                                iconType: 'policy',
-                                color: '#9370db'
-                            })
-                        }
-                    }
-                }
-
-                // Surveys
-                if (Array.isArray(surveys)) {
-                    for (const s of surveys) {
-                        if (s.surveyDate) {
-                            allEvents.push({
-                                date: s.surveyDate,
-                                type: 'survey',
-                                title: `Survey: ${s.surveyType || 'Condition'}`,
-                                subtitle: s.location || undefined,
-                                iconType: 'survey',
-                                color: '#22c55e'
-                            })
-                        }
-                    }
-                }
-
-                // Warranties
-                if (Array.isArray(warranties)) {
-                    for (const w of warranties) {
-                        if (w.createdAt) {
-                            const statusLabel = w.status === 'completed' ? 'Completed' : w.status === 'waived' ? 'Waived' : 'Open'
-                            allEvents.push({
-                                date: w.createdAt,
-                                type: 'warranty',
-                                title: `Warranty: ${w.description || 'Created'}`,
-                                subtitle: statusLabel,
-                                iconType: 'warranty',
-                                color: '#f59e0b'
-                            })
-                        }
-                    }
-                }
-
-                // Sanctions check results for this vessel
-                if (Array.isArray(sanctionsResults)) {
-                    const vesselResults = sanctionsResults.filter((r: any) => r.entityType === 'vessel' && r.entityId === vesselId)
-                    for (const r of vesselResults) {
-                        const isPending = r.status === 'pending_review'
-                        allEvents.push({
-                            date: r.createdAt || '',
-                            type: 'sanctions',
-                            title: `Sanctions check: ${r.entityName || 'Unknown'}`,
-                            subtitle: `Score: ${r.matchScore || 0}%`,
-                            iconType: 'sanctions',
-                            color: isPending ? 'var(--danger)' : '#22c55e'
-                        })
-                    }
-                }
-            } catch { /* ignore */ }
-
-            // Sort by date descending
-            allEvents.sort((a, b) => {
-                const da = new Date(a.date).getTime() || 0
-                const db = new Date(b.date).getTime() || 0
-                return db - da
-            })
-
-            if (!cancelled) {
-                setEvents(allEvents)
-                setLoading(false)
-            }
-        }
-
-        load()
-        return () => { cancelled = true }
-    }, [vesselId])
-
-    // Compute type counts for filter chips
-    const typeCounts: Record<string, number> = {}
-    for (const ev of events) {
-        typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1
-    }
-
-    // Filter by type, date range, and search
-    const filteredEvents = events.filter(ev => {
-        if (typeFilter !== 'all' && ev.type !== typeFilter) return false
-        if (ev.date) {
-            // Date strings come back space-separated ("2026-06-22 06:46:11"), not ISO with 'T',
-            // so take the first 10 chars (YYYY-MM-DD) rather than split on 'T'.
-            const evDate = String(ev.date).slice(0, 10)
-            if (dateFrom && evDate < dateFrom) return false
-            if (dateTo && evDate > dateTo) return false
-        }
-        if (activitySearch.trim()) {
-            const q = activitySearch.toLowerCase()
-            const searchable = [ev.title, ev.subtitle, ev.oldValue, ev.newValue, ev.changedBy].filter(Boolean).join(' ').toLowerCase()
-            if (!searchable.includes(q)) return false
-        }
-        return true
-    })
-
-    const visibleEvents = filteredEvents.slice(0, visibleCount)
-
-    // Group by month+year, then merge same-day events of same type
-    const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-    const monthGroups: { label: string; key: string; merged: MergedEvent[] }[] = []
-    let curMonthKey = ''
-    for (const ev of visibleEvents) {
-        const d = ev.date ? new Date(ev.date) : null
-        const mKey = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'unknown'
-        const mLabel = d ? `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` : 'Unknown'
-        if (mKey !== curMonthKey) {
-            curMonthKey = mKey
-            monthGroups.push({ label: mLabel, key: mKey, merged: [] })
-        }
-        const dateStr = ev.date ? (ev.date.includes('T') ? ev.date.split('T')[0] : ev.date.substring(0, 10)) : ''
-        const groupKey = `${dateStr}|${ev.type}`
-        const currentGroup = monthGroups[monthGroups.length - 1]
-        const existing = currentGroup.merged.find(m => `${m.date}|${m.type}` === groupKey)
-        if (existing) {
-            existing.count++
-            existing.items.push(ev)
-            if (ev.type === 'document') {
-                existing.title = `${existing.count} documents uploaded`
-            } else if (ev.type === 'audit') {
-                existing.title = `${existing.count} field changes`
-            } else if (ev.type === 'policy') {
-                existing.title = `${existing.count} policies created`
-            } else if (ev.type === 'survey') {
-                existing.title = `${existing.count} surveys`
-            } else if (ev.type === 'warranty') {
-                existing.title = `${existing.count} warranties`
-            } else if (ev.type === 'sanctions') {
-                existing.title = `${existing.count} sanctions checks`
-            }
-        } else {
-            currentGroup.merged.push({
-                date: dateStr,
-                type: ev.type,
-                title: ev.title,
-                count: 1,
-                items: [ev],
-                icon: ev.iconType,
-                color: ev.color
-            })
-        }
-    }
-
-    const toggleExpanded = (key: string) => {
-        setExpandedKeys(prev => {
-            const next = new Set(prev)
-            if (next.has(key)) next.delete(key)
-            else next.add(key)
-            return next
-        })
-    }
-
-    const getIcon = (iconType: string) => {
-        switch (iconType) {
-            case 'audit': return <Edit3 size={14} />
-            case 'assured': return <Users size={14} />
-            case 'document': return <FileText size={14} />
-            case 'policy': return <Shield size={14} />
-            case 'survey': return <ClipboardList size={14} />
-            case 'warranty': return <AlertCircle size={14} />
-            case 'sanctions': return <Search size={14} />
-            default: return <GitCommit size={14} />
-        }
-    }
-
-    if (loading) {
-        return (
-            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
-                <Loader2 size={24} className="spin" style={{ marginBottom: '12px' }} />
-                <div>Loading timeline...</div>
-            </div>
+      try {
+        const [auditLog, docs, policies, surveys, warranties, sanctionsResults] = await Promise.all(
+          [
+            window.api.getVesselAuditLog(vesselId).catch(() => []),
+            window.api.getVesselDocuments(vesselId).catch(() => []),
+            window.api.getVesselDynamicPolicies(vesselId).catch(() => []),
+            window.api.getConditionSurveys(vesselId).catch(() => []),
+            window.api.surveyWarrantyGetByVessel(vesselId).catch(() => []),
+            window.api.complianceGetCheckResults().catch(() => [])
+          ]
         )
+
+        // Audit log entries
+        if (Array.isArray(auditLog)) {
+          for (const entry of auditLog) {
+            const isAssured = entry.fieldName?.toLowerCase().includes('assured')
+            allEvents.push({
+              date: entry.changedAt || '',
+              type: 'audit',
+              title: isAssured ? entry.fieldName : `${entry.fieldName} changed`,
+              subtitle: isAssured
+                ? entry.newValue || entry.oldValue || undefined
+                : entry.oldValue && entry.newValue
+                  ? `${entry.oldValue} → ${entry.newValue}`
+                  : entry.newValue
+                    ? `Set to ${entry.newValue}`
+                    : undefined,
+              oldValue: entry.oldValue,
+              newValue: entry.newValue,
+              changedBy: entry.changedBy,
+              iconType: isAssured ? 'assured' : 'audit',
+              color: isAssured ? '#c084fc' : '#6495ed'
+            })
+          }
+        }
+
+        // Document uploads
+        const allDocTypes = await window.api.getDocumentTypes().catch(() => [])
+        const docTypeMap = new Map((allDocTypes as any[]).map((dt: any) => [dt.id, dt.name]))
+        if (Array.isArray(docs)) {
+          for (const doc of docs) {
+            if (doc.uploadedDate) {
+              const docTypeName = docTypeMap.get(doc.documentTypeId) || 'Document'
+              allEvents.push({
+                date: doc.uploadedDate,
+                type: 'document',
+                title: `${docTypeName} uploaded`,
+                subtitle: doc.uploadedBy ? `by ${doc.uploadedBy}` : undefined,
+                iconType: 'document',
+                color: '#00aac8'
+              })
+            }
+          }
+        }
+
+        // Policies
+        if (Array.isArray(policies)) {
+          for (const p of policies) {
+            if (p.createdAt) {
+              allEvents.push({
+                date: p.createdAt,
+                type: 'policy',
+                title: `Policy created`,
+                subtitle: p.policyNumber || undefined,
+                iconType: 'policy',
+                color: '#9370db'
+              })
+            }
+          }
+        }
+
+        // Surveys
+        if (Array.isArray(surveys)) {
+          for (const s of surveys) {
+            if (s.surveyDate) {
+              allEvents.push({
+                date: s.surveyDate,
+                type: 'survey',
+                title: `Survey: ${s.surveyType || 'Condition'}`,
+                subtitle: s.location || undefined,
+                iconType: 'survey',
+                color: '#22c55e'
+              })
+            }
+          }
+        }
+
+        // Warranties
+        if (Array.isArray(warranties)) {
+          for (const w of warranties) {
+            if (w.createdAt) {
+              const statusLabel =
+                w.status === 'completed' ? 'Completed' : w.status === 'waived' ? 'Waived' : 'Open'
+              allEvents.push({
+                date: w.createdAt,
+                type: 'warranty',
+                title: `Warranty: ${w.description || 'Created'}`,
+                subtitle: statusLabel,
+                iconType: 'warranty',
+                color: '#f59e0b'
+              })
+            }
+          }
+        }
+
+        // Sanctions check results for this vessel
+        if (Array.isArray(sanctionsResults)) {
+          const vesselResults = sanctionsResults.filter(
+            (r: any) => r.entityType === 'vessel' && r.entityId === vesselId
+          )
+          for (const r of vesselResults) {
+            const isPending = r.status === 'pending_review'
+            allEvents.push({
+              date: r.createdAt || '',
+              type: 'sanctions',
+              title: `Sanctions check: ${r.entityName || 'Unknown'}`,
+              subtitle: `Score: ${r.matchScore || 0}%`,
+              iconType: 'sanctions',
+              color: isPending ? 'var(--danger)' : '#22c55e'
+            })
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+
+      // Sort by date descending
+      allEvents.sort((a, b) => {
+        const da = new Date(a.date).getTime() || 0
+        const db = new Date(b.date).getTime() || 0
+        return db - da
+      })
+
+      if (!cancelled) {
+        setEvents(allEvents)
+        setLoading(false)
+      }
     }
 
-    if (events.length === 0) {
-        return (
-            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
-                No timeline events found for this vessel.
-            </div>
-        )
+    load()
+    return () => {
+      cancelled = true
     }
+  }, [vesselId])
 
+  // Compute type counts for filter chips
+  const typeCounts: Record<string, number> = {}
+  for (const ev of events) {
+    typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1
+  }
+
+  // Filter by type, date range, and search
+  const filteredEvents = events.filter((ev) => {
+    if (typeFilter !== 'all' && ev.type !== typeFilter) return false
+    if (ev.date) {
+      // Date strings come back space-separated ("2026-06-22 06:46:11"), not ISO with 'T',
+      // so take the first 10 chars (YYYY-MM-DD) rather than split on 'T'.
+      const evDate = String(ev.date).slice(0, 10)
+      if (dateFrom && evDate < dateFrom) return false
+      if (dateTo && evDate > dateTo) return false
+    }
+    if (activitySearch.trim()) {
+      const q = activitySearch.toLowerCase()
+      const searchable = [ev.title, ev.subtitle, ev.oldValue, ev.newValue, ev.changedBy]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      if (!searchable.includes(q)) return false
+    }
+    return true
+  })
+
+  const visibleEvents = filteredEvents.slice(0, visibleCount)
+
+  // Group by month+year, then merge same-day events of same type
+  const MONTH_LABELS = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ]
+
+  const monthGroups: { label: string; key: string; merged: MergedEvent[] }[] = []
+  let curMonthKey = ''
+  for (const ev of visibleEvents) {
+    const d = ev.date ? new Date(ev.date) : null
+    const mKey = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'unknown'
+    const mLabel = d ? `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` : 'Unknown'
+    if (mKey !== curMonthKey) {
+      curMonthKey = mKey
+      monthGroups.push({ label: mLabel, key: mKey, merged: [] })
+    }
+    const dateStr = ev.date
+      ? ev.date.includes('T')
+        ? ev.date.split('T')[0]
+        : ev.date.substring(0, 10)
+      : ''
+    const groupKey = `${dateStr}|${ev.type}`
+    const currentGroup = monthGroups[monthGroups.length - 1]
+    const existing = currentGroup.merged.find((m) => `${m.date}|${m.type}` === groupKey)
+    if (existing) {
+      existing.count++
+      existing.items.push(ev)
+      if (ev.type === 'document') {
+        existing.title = `${existing.count} documents uploaded`
+      } else if (ev.type === 'audit') {
+        existing.title = `${existing.count} field changes`
+      } else if (ev.type === 'policy') {
+        existing.title = `${existing.count} policies created`
+      } else if (ev.type === 'survey') {
+        existing.title = `${existing.count} surveys`
+      } else if (ev.type === 'warranty') {
+        existing.title = `${existing.count} warranties`
+      } else if (ev.type === 'sanctions') {
+        existing.title = `${existing.count} sanctions checks`
+      }
+    } else {
+      currentGroup.merged.push({
+        date: dateStr,
+        type: ev.type,
+        title: ev.title,
+        count: 1,
+        items: [ev],
+        icon: ev.iconType,
+        color: ev.color
+      })
+    }
+  }
+
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const getIcon = (iconType: string) => {
+    switch (iconType) {
+      case 'audit':
+        return <Edit3 size={14} />
+      case 'assured':
+        return <Users size={14} />
+      case 'document':
+        return <FileText size={14} />
+      case 'policy':
+        return <Shield size={14} />
+      case 'survey':
+        return <ClipboardList size={14} />
+      case 'warranty':
+        return <AlertCircle size={14} />
+      case 'sanctions':
+        return <Search size={14} />
+      default:
+        return <GitCommit size={14} />
+    }
+  }
+
+  if (loading) {
     return (
-        <div className="fade-in" style={{ maxWidth: '800px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <GitCommit size={20} color="var(--accent-primary)" />
-                <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Activity</span>
-                <span style={{
-                    padding: '2px 10px',
-                    borderRadius: '12px',
-                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                    color: 'var(--accent-primary)',
-                    fontSize: '0.78rem',
-                    fontWeight: 600
-                }}>
-                    {filteredEvents.length}
-                </span>
-                <div style={{ position: 'relative', marginLeft: 'auto' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                    <input
-                        type="text"
-                        value={activitySearch}
-                        onChange={e => { setActivitySearch(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
-                        placeholder="Search activity..."
-                        style={{ padding: '5px 10px 5px 28px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '200px' }}
-                    />
-                </div>
+      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+        <Loader2 size={24} className="spin" style={{ marginBottom: '12px' }} />
+        <div>Loading timeline...</div>
+      </div>
+    )
+  }
+
+  if (events.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+        No timeline events found for this vessel.
+      </div>
+    )
+  }
+
+  return (
+    <div className="fade-in" style={{ maxWidth: '800px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <GitCommit size={20} color="var(--accent-primary)" />
+        <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Activity</span>
+        <span
+          style={{
+            padding: '2px 10px',
+            borderRadius: '12px',
+            background: 'rgba(var(--accent-primary-rgb), 0.1)',
+            color: 'var(--accent-primary)',
+            fontSize: '0.78rem',
+            fontWeight: 600
+          }}
+        >
+          {filteredEvents.length}
+        </span>
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <Search
+            size={14}
+            style={{
+              position: 'absolute',
+              left: '8px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-secondary)'
+            }}
+          />
+          <input
+            type="text"
+            value={activitySearch}
+            onChange={(e) => {
+              setActivitySearch(e.target.value)
+              setVisibleCount(TIMELINE_PAGE_SIZE)
+            }}
+            placeholder="Search activity..."
+            style={{
+              padding: '5px 10px 5px 28px',
+              borderRadius: '8px',
+              border: '1px solid var(--input-border)',
+              background: 'var(--input-bg, transparent)',
+              color: 'var(--text-primary)',
+              fontSize: '0.82rem',
+              width: '200px'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => {
+            setTypeFilter('all')
+            setVisibleCount(TIMELINE_PAGE_SIZE)
+          }}
+          style={{
+            padding: '4px 12px',
+            borderRadius: '14px',
+            border:
+              typeFilter === 'all'
+                ? '1.5px solid var(--accent-primary)'
+                : '1px solid var(--glass-border-color)',
+            background:
+              typeFilter === 'all' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
+            color: typeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          All <span style={{ opacity: 0.7 }}>{events.length}</span>
+        </button>
+        {Object.entries(TIMELINE_TYPE_META).map(([key, meta]) => {
+          const cnt = typeCounts[key] || 0
+          if (cnt === 0) return null
+          const isActive = typeFilter === key
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                setTypeFilter(key)
+                setVisibleCount(TIMELINE_PAGE_SIZE)
+              }}
+              style={{
+                padding: '4px 12px',
+                borderRadius: '14px',
+                border: isActive
+                  ? `1.5px solid ${meta.color}`
+                  : '1px solid var(--glass-border-color)',
+                background: isActive ? `${meta.color}18` : 'transparent',
+                color: isActive ? meta.color : 'var(--text-secondary)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              {meta.label} <span style={{ opacity: 0.7 }}>{cnt}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Date range filter */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+          From
+        </span>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => {
+            setDateFrom(e.target.value)
+            setVisibleCount(TIMELINE_PAGE_SIZE)
+          }}
+          style={{
+            padding: '5px 8px',
+            borderRadius: '6px',
+            fontSize: '0.82rem',
+            background: 'var(--input-bg)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--input-border)',
+            colorScheme: isLight ? 'light' : 'dark'
+          }}
+        />
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+          To
+        </span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => {
+            setDateTo(e.target.value)
+            setVisibleCount(TIMELINE_PAGE_SIZE)
+          }}
+          style={{
+            padding: '5px 8px',
+            borderRadius: '6px',
+            fontSize: '0.82rem',
+            background: 'var(--input-bg)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--input-border)',
+            colorScheme: isLight ? 'light' : 'dark'
+          }}
+        />
+      </div>
+
+      <div style={{ position: 'relative', paddingLeft: '32px' }}>
+        {/* Vertical line */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '11px',
+            top: '0',
+            bottom: '0',
+            width: '2px',
+            background: isLight
+              ? 'rgba(var(--accent-primary-rgb), 0.2)'
+              : 'rgba(var(--accent-primary-rgb), 0.15)'
+          }}
+        />
+
+        {monthGroups.map((group) => (
+          <div key={group.key}>
+            {/* Month header — sticky */}
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                marginBottom: '16px',
+                marginTop: '8px',
+                marginLeft: '-32px',
+                paddingLeft: '32px'
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '0',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'var(--accent-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Calendar size={12} color="#fff" />
+              </div>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  color: 'var(--text-primary)',
+                  background: isLight ? '#f4f6fb' : '#14172a',
+                  padding: '4px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--glass-border-color)'
+                }}
+              >
+                {group.label}
+              </span>
             </div>
 
-            {/* Filter chips */}
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                <button
-                    onClick={() => { setTypeFilter('all'); setVisibleCount(TIMELINE_PAGE_SIZE) }}
+            {group.merged.map((me, idx) => {
+              const expandKey = `${group.key}-${me.date}-${me.type}`
+              const isExpanded = expandedKeys.has(expandKey)
+              const isMerged = me.count > 1
+              return (
+                <div key={`${group.key}-${idx}`}>
+                  <div
                     style={{
-                        padding: '4px 12px',
-                        borderRadius: '14px',
-                        border: typeFilter === 'all' ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                        background: typeFilter === 'all' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
-                        color: typeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
+                      position: 'relative',
+                      marginBottom: '12px',
+                      padding: '10px 16px',
+                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      borderRadius: '8px',
+                      borderLeft: `3px solid ${me.color}`,
+                      transition: 'background 0.15s',
+                      cursor: isMerged ? 'pointer' : 'default'
+                    }}
+                    onClick={isMerged ? () => toggleExpanded(expandKey) : undefined}
+                  >
+                    {/* Dot on the line */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '-37px',
+                        top: '14px',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: me.color,
+                        border: `2px solid ${isLight ? '#f4f6fb' : '#14172a'}`
+                      }}
+                    />
+
+                    <div
+                      style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '5px'
-                    }}
-                >
-                    All <span style={{ opacity: 0.7 }}>{events.length}</span>
-                </button>
-                {Object.entries(TIMELINE_TYPE_META).map(([key, meta]) => {
-                    const cnt = typeCounts[key] || 0
-                    if (cnt === 0) return null
-                    const isActive = typeFilter === key
-                    return (
-                        <button
-                            key={key}
-                            onClick={() => { setTypeFilter(key); setVisibleCount(TIMELINE_PAGE_SIZE) }}
-                            style={{
-                                padding: '4px 12px',
-                                borderRadius: '14px',
-                                border: isActive ? `1.5px solid ${meta.color}` : '1px solid var(--glass-border-color)',
-                                background: isActive ? `${meta.color}18` : 'transparent',
-                                color: isActive ? meta.color : 'var(--text-secondary)',
-                                fontSize: '0.78rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px'
-                            }}
-                        >
-                            {meta.label} <span style={{ opacity: 0.7 }}>{cnt}</span>
-                        </button>
-                    )
-                })}
-            </div>
-
-            {/* Date range filter */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>From</span>
-                <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={e => { setDateFrom(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
-                    style={{
-                        padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem',
-                        background: 'var(--input-bg)', color: 'var(--text-primary)',
-                        border: '1px solid var(--input-border)',
-                        colorScheme: isLight ? 'light' : 'dark'
-                    }}
-                />
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>To</span>
-                <input
-                    type="date"
-                    value={dateTo}
-                    onChange={e => { setDateTo(e.target.value); setVisibleCount(TIMELINE_PAGE_SIZE) }}
-                    style={{
-                        padding: '5px 8px', borderRadius: '6px', fontSize: '0.82rem',
-                        background: 'var(--input-bg)', color: 'var(--text-primary)',
-                        border: '1px solid var(--input-border)',
-                        colorScheme: isLight ? 'light' : 'dark'
-                    }}
-                />
-            </div>
-
-            <div style={{ position: 'relative', paddingLeft: '32px' }}>
-                {/* Vertical line */}
-                <div style={{
-                    position: 'absolute',
-                    left: '11px',
-                    top: '0',
-                    bottom: '0',
-                    width: '2px',
-                    background: isLight ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'rgba(var(--accent-primary-rgb), 0.15)'
-                }} />
-
-                {monthGroups.map(group => (
-                    <div key={group.key}>
-                        {/* Month header — sticky */}
-                        <div style={{
-                            position: 'sticky',
-                            top: 0,
-                            zIndex: 2,
-                            marginBottom: '16px',
-                            marginTop: '8px',
-                            marginLeft: '-32px',
-                            paddingLeft: '32px'
-                        }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '0',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '50%',
-                                background: 'var(--accent-primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                                <Calendar size={12} color="#fff" />
-                            </div>
-                            <span style={{
-                                fontWeight: 700,
-                                fontSize: '1rem',
-                                color: 'var(--text-primary)',
-                                background: isLight ? '#f4f6fb' : '#14172a',
-                                padding: '4px 12px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--glass-border-color)'
-                            }}>
-                                {group.label}
-                            </span>
-                        </div>
-
-                        {group.merged.map((me, idx) => {
-                            const expandKey = `${group.key}-${me.date}-${me.type}`
-                            const isExpanded = expandedKeys.has(expandKey)
-                            const isMerged = me.count > 1
-                            return (
-                                <div key={`${group.key}-${idx}`}>
-                                    <div
-                                        style={{
-                                            position: 'relative',
-                                            marginBottom: '12px',
-                                            padding: '10px 16px',
-                                            background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                                            borderRadius: '8px',
-                                            borderLeft: `3px solid ${me.color}`,
-                                            transition: 'background 0.15s',
-                                            cursor: isMerged ? 'pointer' : 'default'
-                                        }}
-                                        onClick={isMerged ? () => toggleExpanded(expandKey) : undefined}
-                                    >
-                                        {/* Dot on the line */}
-                                        <div style={{
-                                            position: 'absolute',
-                                            left: '-37px',
-                                            top: '14px',
-                                            width: '12px',
-                                            height: '12px',
-                                            borderRadius: '50%',
-                                            background: me.color,
-                                            border: `2px solid ${isLight ? '#f4f6fb' : '#14172a'}`
-                                        }} />
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                                            <span style={{ color: me.color, display: 'flex', alignItems: 'center' }}>
-                                                {getIcon(me.icon)}
-                                            </span>
-                                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                                                {me.title}
-                                            </span>
-                                            {isMerged && (
-                                                <span style={{
-                                                    padding: '1px 8px',
-                                                    borderRadius: '10px',
-                                                    background: `${me.color}20`,
-                                                    color: me.color,
-                                                    fontSize: '0.7rem',
-                                                    fontWeight: 700
-                                                }}>
-                                                    {me.count}
-                                                </span>
-                                            )}
-                                            {isMerged && (
-                                                <ChevronDown size={14} style={{
-                                                    color: 'var(--text-secondary)',
-                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.15s'
-                                                }} />
-                                            )}
-                                            <span style={{
-                                                marginLeft: 'auto',
-                                                fontSize: '0.75rem',
-                                                color: 'var(--text-secondary)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                            }}>
-                                                <Clock size={11} />
-                                                {me.date ? formatDate(me.date) : 'Unknown'}
-                                            </span>
-                                        </div>
-                                        {!isMerged && me.type === 'audit' && (me.items[0]?.oldValue || me.items[0]?.newValue) ? (
-                                            <div style={{ fontSize: '0.8rem', paddingLeft: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                {me.items[0].oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{formatAuditValue(me.items[0].oldValue)}</span>}
-                                                {me.items[0].oldValue && me.items[0].newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
-                                                {me.items[0].newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatAuditValue(me.items[0].newValue)}</span>}
-                                                {me.items[0].changedBy && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>by {me.items[0].changedBy}</span>}
-                                            </div>
-                                        ) : !isMerged && me.items[0]?.subtitle ? (
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '22px' }}>
-                                                {me.items[0].subtitle}
-                                            </div>
-                                        ) : null}
-                                    </div>
-
-                                    {/* Expanded items */}
-                                    {isMerged && isExpanded && (
-                                        <div style={{ marginLeft: '20px', marginBottom: '12px', borderLeft: `2px solid ${me.color}30`, paddingLeft: '12px' }}>
-                                            {me.items.map((ev, eIdx) => (
-                                                <div key={eIdx} style={{
-                                                    padding: '6px 12px',
-                                                    marginBottom: '4px',
-                                                    background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)',
-                                                    borderRadius: '6px',
-                                                    fontSize: '0.82rem'
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <span style={{ color: ev.color, display: 'flex', alignItems: 'center' }}>{getIcon(ev.iconType)}</span>
-                                                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ev.title}</span>
-                                                        {ev.changedBy && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>by {ev.changedBy}</span>}
-                                                    </div>
-                                                    {ev.type === 'audit' && (ev.oldValue || ev.newValue) ? (
-                                                        <div style={{ fontSize: '0.78rem', paddingLeft: '20px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            {ev.oldValue && <span style={{ textDecoration: 'line-through', color: 'var(--text-secondary)', opacity: 0.7 }}>{formatAuditValue(ev.oldValue)}</span>}
-                                                            {ev.oldValue && ev.newValue && <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />}
-                                                            {ev.newValue && <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatAuditValue(ev.newValue)}</span>}
-                                                        </div>
-                                                    ) : ev.subtitle ? (
-                                                        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', paddingLeft: '20px' }}>
-                                                            {ev.subtitle}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                ))}
-            </div>
-
-            {visibleCount < filteredEvents.length && (
-                <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                    <button
-                        onClick={() => setVisibleCount(prev => prev + TIMELINE_PAGE_SIZE)}
-                        className="btn-secondary"
-                        style={{ padding: '8px 24px', fontSize: '0.85rem' }}
+                        gap: '8px',
+                        marginBottom: '2px'
+                      }}
                     >
-                        Load more ({filteredEvents.length - visibleCount} remaining)
-                    </button>
-                </div>
-            )}
-        </div>
-    )
-}
+                      <span style={{ color: me.color, display: 'flex', alignItems: 'center' }}>
+                        {getIcon(me.icon)}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        {me.title}
+                      </span>
+                      {isMerged && (
+                        <span
+                          style={{
+                            padding: '1px 8px',
+                            borderRadius: '10px',
+                            background: `${me.color}20`,
+                            color: me.color,
+                            fontSize: '0.7rem',
+                            fontWeight: 700
+                          }}
+                        >
+                          {me.count}
+                        </span>
+                      )}
+                      {isMerged && (
+                        <ChevronDown
+                          size={14}
+                          style={{
+                            color: 'var(--text-secondary)',
+                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                            transition: 'transform 0.15s'
+                          }}
+                        />
+                      )}
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Clock size={11} />
+                        {me.date ? formatDate(me.date) : 'Unknown'}
+                      </span>
+                    </div>
+                    {!isMerged &&
+                    me.type === 'audit' &&
+                    (me.items[0]?.oldValue || me.items[0]?.newValue) ? (
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          paddingLeft: '22px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {me.items[0].oldValue && (
+                          <span
+                            style={{
+                              textDecoration: 'line-through',
+                              color: 'var(--text-secondary)',
+                              opacity: 0.7
+                            }}
+                          >
+                            {formatAuditValue(me.items[0].oldValue)}
+                          </span>
+                        )}
+                        {me.items[0].oldValue && me.items[0].newValue && (
+                          <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />
+                        )}
+                        {me.items[0].newValue && (
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {formatAuditValue(me.items[0].newValue)}
+                          </span>
+                        )}
+                        {me.items[0].changedBy && (
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              fontSize: '0.72rem',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
+                            by {me.items[0].changedBy}
+                          </span>
+                        )}
+                      </div>
+                    ) : !isMerged && me.items[0]?.subtitle ? (
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          color: 'var(--text-secondary)',
+                          paddingLeft: '22px'
+                        }}
+                      >
+                        {me.items[0].subtitle}
+                      </div>
+                    ) : null}
+                  </div>
 
+                  {/* Expanded items */}
+                  {isMerged && isExpanded && (
+                    <div
+                      style={{
+                        marginLeft: '20px',
+                        marginBottom: '12px',
+                        borderLeft: `2px solid ${me.color}30`,
+                        paddingLeft: '12px'
+                      }}
+                    >
+                      {me.items.map((ev, eIdx) => (
+                        <div
+                          key={eIdx}
+                          style={{
+                            padding: '6px 12px',
+                            marginBottom: '4px',
+                            background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)',
+                            borderRadius: '6px',
+                            fontSize: '0.82rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{ color: ev.color, display: 'flex', alignItems: 'center' }}
+                            >
+                              {getIcon(ev.iconType)}
+                            </span>
+                            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                              {ev.title}
+                            </span>
+                            {ev.changedBy && (
+                              <span
+                                style={{
+                                  marginLeft: 'auto',
+                                  fontSize: '0.72rem',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                by {ev.changedBy}
+                              </span>
+                            )}
+                          </div>
+                          {ev.type === 'audit' && (ev.oldValue || ev.newValue) ? (
+                            <div
+                              style={{
+                                fontSize: '0.78rem',
+                                paddingLeft: '20px',
+                                marginTop: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              {ev.oldValue && (
+                                <span
+                                  style={{
+                                    textDecoration: 'line-through',
+                                    color: 'var(--text-secondary)',
+                                    opacity: 0.7
+                                  }}
+                                >
+                                  {formatAuditValue(ev.oldValue)}
+                                </span>
+                              )}
+                              {ev.oldValue && ev.newValue && (
+                                <ArrowRight size={10} style={{ color: 'var(--text-secondary)' }} />
+                              )}
+                              {ev.newValue && (
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {formatAuditValue(ev.newValue)}
+                                </span>
+                              )}
+                            </div>
+                          ) : ev.subtitle ? (
+                            <div
+                              style={{
+                                fontSize: '0.76rem',
+                                color: 'var(--text-secondary)',
+                                paddingLeft: '20px'
+                              }}
+                            >
+                              {ev.subtitle}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      {visibleCount < filteredEvents.length && (
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <button
+            onClick={() => setVisibleCount((prev) => prev + TIMELINE_PAGE_SIZE)}
+            className="btn-secondary"
+            style={{ padding: '8px 24px', fontSize: '0.85rem' }}
+          >
+            Load more ({filteredEvents.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

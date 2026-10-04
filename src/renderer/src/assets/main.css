@@ -97,7 +97,7 @@
   --bg-primary: #1a1d28;
   --bg-sidebar: rgba(255, 255, 255, 0.04);
   --bg-card: rgba(255, 255, 255, 0.06);
-  --bg-card-hover: rgba(255, 255, 255, 0.10);
+  --bg-card-hover: rgba(255, 255, 255, 0.1);
   --accent-primary: #64b5f6;
   --accent-primary-rgb: 100, 181, 246;
   --accent-secondary: #42a5f5;
@@ -111,7 +111,7 @@
   --bg-sticky-header: #161c29;
 
   --input-bg: rgba(255, 255, 255, 0.06);
-  --input-border: rgba(255, 255, 255, 0.10);
+  --input-border: rgba(255, 255, 255, 0.1);
   --input-text: #e2e8f0;
   --table-header-bg: rgba(255, 255, 255, 0.03);
   --table-border: rgba(255, 255, 255, 0.07);
@@ -154,7 +154,7 @@ body {
 body.aurora {
   background-image:
     radial-gradient(at 0% 0%, rgba(124, 108, 239, 0.12) 0, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(167, 139, 250, 0.10) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(167, 139, 250, 0.1) 0, transparent 50%),
     radial-gradient(at 50% 100%, rgba(99, 88, 212, 0.06) 0, transparent 50%);
 }
 
@@ -172,7 +172,9 @@ body.premium {
   border: var(--glass-border);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .glass-card:hover {
@@ -192,7 +194,9 @@ body.premium {
 
 .premium .glass-card:hover {
   border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 h1,
@@ -241,13 +245,18 @@ textarea:focus {
   outline: none;
   border-color: var(--accent-primary) !important;
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: white;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
 }
 
 .btn-primary:hover {
@@ -271,7 +280,10 @@ textarea:focus {
   background: var(--bg-card);
   color: var(--text-primary);
   border: var(--glass-border);
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.1s ease;
 }
 
 .btn-secondary:hover {
@@ -283,7 +295,7 @@ textarea:focus {
 }
 
 /* Generic button active feedback */
-button[class*="btn-"]:active {
+button[class*='btn-']:active {
   transform: scale(0.97);
 }
 
@@ -417,13 +429,27 @@ button[class*="btn-"]:active {
   background: currentColor;
 }
 
-.badge-success { --badge-color: var(--success); }
-.badge-danger { --badge-color: var(--danger); }
-.badge-warning { --badge-color: var(--warning); }
-.badge-info { --badge-color: var(--info); }
-.badge-accent { --badge-color: var(--accent-primary); }
-.badge-violet { --badge-color: var(--violet); }
-.badge-neutral { --badge-color: var(--text-secondary); }
+.badge-success {
+  --badge-color: var(--success);
+}
+.badge-danger {
+  --badge-color: var(--danger);
+}
+.badge-warning {
+  --badge-color: var(--warning);
+}
+.badge-info {
+  --badge-color: var(--info);
+}
+.badge-accent {
+  --badge-color: var(--accent-primary);
+}
+.badge-violet {
+  --badge-color: var(--violet);
+}
+.badge-neutral {
+  --badge-color: var(--text-secondary);
+}
 
 /* Underline tabs */
 .tabs {
@@ -832,7 +858,9 @@ button[class*="btn-"]:active {
 }
 
 .hover-effect {
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .hover-effect:hover {
@@ -867,12 +895,12 @@ table tbody tr:hover {
 
 /* Spinner animation */
 /* Hide number input spinners and disable keyboard up/down arrows */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-input[type="number"] {
+input[type='number'] {
   -moz-appearance: textfield;
 }
 
@@ -931,8 +959,8 @@ input[type="number"] {
 
 /* Accessibility: Focus-visible outlines for buttons and interactive elements */
 button:focus-visible,
-[role="button"]:focus-visible,
-[role="tab"]:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--accent-primary);
   outline-offset: 2px;
@@ -1093,7 +1121,7 @@ a:focus-visible {
 /* ── Visual Polish & Micro-interactions ────────────────────────────────────── */
 
 /* Sidebar section group headers */
-.sidebar button[style*="textTransform"] {
+.sidebar button[style*='textTransform'] {
   letter-spacing: 0.5px;
   transition: color 0.2s ease;
 }
@@ -1133,8 +1161,12 @@ header h1::after {
 
 /* Modal backdrop & content animations */
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalSlideIn {
@@ -1150,12 +1182,17 @@ header h1::after {
 
 /* Skeleton loader for loading states */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     rgba(128, 128, 128, 0.1) 25%,
     rgba(128, 128, 128, 0.2) 50%,
     rgba(128, 128, 128, 0.1) 75%
@@ -1166,7 +1203,8 @@ header h1::after {
 }
 
 .light .skeleton {
-  background: linear-gradient(90deg,
+  background: linear-gradient(
+    90deg,
     rgba(0, 0, 0, 0.06) 25%,
     rgba(0, 0, 0, 0.1) 50%,
     rgba(0, 0, 0, 0.06) 75%

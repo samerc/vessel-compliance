@@ -11,10 +11,22 @@ const BRANCH_MAP: Record<string, string> = {
   F: 'F:FD&D',
   L: 'L:Loss of Hire',
   V: 'V:Voyage',
-  Y: 'Y:Yacht',
+  Y: 'Y:Yacht'
 }
 
-const HEADERS = ['Date', 'Quotation Type', 'Branch', 'Seq. Number', 'Reference', 'Managers', 'Vessel', 'IMO', 'Type', 'Broker', 'Remarks']
+const HEADERS = [
+  'Date',
+  'Quotation Type',
+  'Branch',
+  'Seq. Number',
+  'Reference',
+  'Managers',
+  'Vessel',
+  'IMO',
+  'Type',
+  'Broker',
+  'Remarks'
+]
 
 // ── Excel COM availability check ──────────────────────────────────────────────
 
@@ -84,15 +96,33 @@ function runPowerShellScript(body: string, data: Record<string, unknown>): strin
   } catch (err: any) {
     throw new Error(`Excel COM failed: ${err.stderr || err.message}`)
   } finally {
-    try { require('fs').unlinkSync(tempFile) } catch { /* ignore */ }
-    try { require('fs').unlinkSync(dataFile) } catch { /* ignore */ }
+    try {
+      require('fs').unlinkSync(tempFile)
+    } catch {
+      /* ignore */
+    }
+    try {
+      require('fs').unlinkSync(dataFile)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 function appendRowViaCom(
   filePath: string,
   sheetName: string,
-  values: { quotationType: string; branch: string; serial: number; reference: string; managers: string; vessel: string; imo: string; vesselType: string; broker: string }
+  values: {
+    quotationType: string
+    branch: string
+    serial: number
+    reference: string
+    managers: string
+    vessel: string
+    imo: string
+    vesselType: string
+    broker: string
+  }
 ): void {
   const ps = `
 $excel = New-Object -ComObject Excel.Application
@@ -133,7 +163,13 @@ try {
   }
 }
 
-function setCellViaCom(filePath: string, sheetName: string, row: number, col: number, value: string): void {
+function setCellViaCom(
+  filePath: string,
+  sheetName: string,
+  row: number,
+  col: number,
+  value: string
+): void {
   const ps = `
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
@@ -160,7 +196,21 @@ try {
 
 // ── Write via xlsx-js-style (fallback when Excel not installed) ───────────────
 
-function appendRowViaXlsx(filePath: string, sheetName: string, values: { quotationType: string; branch: string; serial: number; reference: string; managers: string; vessel: string; imo: string; vesselType: string; broker: string }): void {
+function appendRowViaXlsx(
+  filePath: string,
+  sheetName: string,
+  values: {
+    quotationType: string
+    branch: string
+    serial: number
+    reference: string
+    managers: string
+    vessel: string
+    imo: string
+    vesselType: string
+    broker: string
+  }
+): void {
   const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
   const ws = wb.Sheets[sheetName]
   if (!ws) throw new Error(`Sheet ${sheetName} not found`)
@@ -179,16 +229,25 @@ function appendRowViaXlsx(filePath: string, sheetName: string, values: { quotati
     [6, { v: values.vessel, t: 's' }],
     [7, { v: values.imo, t: 's' }],
     [8, { v: values.vesselType, t: 's' }],
-    [9, { v: values.broker, t: 's' }],
+    [9, { v: values.broker, t: 's' }]
   ]
   cells.forEach(([c, cell]) => {
     ws[XLSX.utils.encode_cell({ r: newRow, c })] = cell
   })
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: newRow, c: HEADERS.length - 1 } })
+  ws['!ref'] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: newRow, c: HEADERS.length - 1 }
+  })
   XLSX.writeFile(wb, filePath)
 }
 
-function setCellViaXlsx(filePath: string, sheetName: string, row0based: number, col0based: number, value: string): void {
+function setCellViaXlsx(
+  filePath: string,
+  sheetName: string,
+  row0based: number,
+  col0based: number,
+  value: string
+): void {
   const wb = XLSX.readFile(filePath, { cellFormula: true, cellStyles: true })
   const ws = wb.Sheets[sheetName]
   if (!ws) return
@@ -221,9 +280,15 @@ export function assignRegistryNumber(
   const reference = `Q/${quotationTypeCode}/${data.typeCode}/${yearShort}/${nextSerial}`
 
   const values = {
-    quotationType, branch, serial: nextSerial, reference,
-    managers: data.managers || '', vessel: data.vessel || '',
-    imo: data.imo || '', vesselType: data.vesselType || '', broker: data.broker || ''
+    quotationType,
+    branch,
+    serial: nextSerial,
+    reference,
+    managers: data.managers || '',
+    vessel: data.vessel || '',
+    imo: data.imo || '',
+    vesselType: data.vesselType || '',
+    broker: data.broker || ''
   }
 
   if (checkExcelCom()) {

@@ -436,7 +436,8 @@ export default function EntityDirectory({
       setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
       const custMap = new Map<string, string | null>()
       for (const p of Array.isArray(pols) ? pols : []) {
-        if (p.status === 'active' && p.customerEntityId) custMap.set(p.customerEntityId, p.customerType || null)
+        if (p.status === 'active' && p.customerEntityId)
+          custMap.set(p.customerEntityId, p.customerType || null)
       }
       setPolicyCustomers(custMap)
     } finally {
@@ -1035,7 +1036,11 @@ export default function EntityDirectory({
             gap: '6px',
             fontSize: '0.82rem'
           }}
-          title={selectMode ? 'Hide the checkboxes' : 'Tick several entities to export or delete them together'}
+          title={
+            selectMode
+              ? 'Hide the checkboxes'
+              : 'Tick several entities to export or delete them together'
+          }
         >
           <CheckSquare size={15} />
           {selectMode ? 'Done' : 'Bulk select'}
@@ -1250,10 +1255,30 @@ export default function EntityDirectory({
                         compact
                         icon={<Shield size={34} />}
                         title={searchTerm ? 'No entities match your search' : 'No entities found'}
-                        text={searchTerm ? 'Type and status filters also apply.' : 'Entities are the owners, managers, brokers and UBOs linked to vessels.'}
-                        action={searchTerm
-                          ? <button className="btn-secondary btn-sm" onClick={() => setSearchTerm('')}>Clear search</button>
-                          : hasPermission('entities:create') && <button className="btn-primary btn-sm" onClick={() => setShowCreateModal(true)}><Plus size={14} /> Create Entity</button>}
+                        text={
+                          searchTerm
+                            ? 'Type and status filters also apply.'
+                            : 'Entities are the owners, managers, brokers and UBOs linked to vessels.'
+                        }
+                        action={
+                          searchTerm ? (
+                            <button
+                              className="btn-secondary btn-sm"
+                              onClick={() => setSearchTerm('')}
+                            >
+                              Clear search
+                            </button>
+                          ) : (
+                            hasPermission('entities:create') && (
+                              <button
+                                className="btn-primary btn-sm"
+                                onClick={() => setShowCreateModal(true)}
+                              >
+                                <Plus size={14} /> Create Entity
+                              </button>
+                            )
+                          )
+                        }
                       />
                     </td>
                   </tr>
@@ -1481,7 +1506,9 @@ export default function EntityDirectory({
                 >
                   <ChevronsLeft size={13} />
                 </button>
-                <button title="Previous" aria-label="Previous"
+                <button
+                  title="Previous"
+                  aria-label="Previous"
                   className="btn-secondary"
                   disabled={page === 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -1492,7 +1519,9 @@ export default function EntityDirectory({
                 <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>
                   {page}/{totalPages}
                 </span>
-                <button title="Next" aria-label="Next"
+                <button
+                  title="Next"
+                  aria-label="Next"
                   className="btn-secondary"
                   disabled={page === totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -1594,7 +1623,9 @@ export default function EntityDirectory({
                     {selectedEntity.type}
                   </span>
                 </div>
-                <button title="Close" aria-label="Close"
+                <button
+                  title="Close"
+                  aria-label="Close"
                   onClick={() => setSelectedEntity(null)}
                   style={{
                     padding: '4px',
@@ -1670,7 +1701,9 @@ export default function EntityDirectory({
                   <Merge size={13} /> Merge
                 </button>
                 {hasPermission('entities:delete') && (
-                  <button title="Delete" aria-label="Delete"
+                  <button
+                    title="Delete"
+                    aria-label="Delete"
                     onClick={() => handleDeleteEntity(selectedEntity)}
                     className="btn-secondary"
                     style={{
@@ -1952,7 +1985,9 @@ export default function EntityDirectory({
               }}
             >
               <h3 style={{ fontSize: '1.3rem' }}>Create Entity</h3>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setShowCreateModal(false)}
                 className="btn-secondary"
                 style={{ padding: '6px' }}
@@ -2182,7 +2217,9 @@ export default function EntityDirectory({
               <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Merge size={20} /> Merge Entities
               </h3>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setShowMergeModal(false)}
                 className="btn-secondary"
                 style={{ padding: '6px' }}
@@ -2489,7 +2526,9 @@ export default function EntityDirectory({
                   Entities with similar names based on Jaro-Winkler similarity
                 </p>
               </div>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setShowDuplicatesModal(false)}
                 style={{
                   background: 'none',

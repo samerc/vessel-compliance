@@ -1,24 +1,63 @@
 import {
-  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  WidthType, BorderStyle, AlignmentType, PageBreak, VerticalAlign,
-  PageOrientation, TableLayoutType, LevelFormat,
-  Footer, PageNumber, ImageRun, Header
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  BorderStyle,
+  AlignmentType,
+  PageBreak,
+  VerticalAlign,
+  PageOrientation,
+  TableLayoutType,
+  LevelFormat,
+  Footer,
+  PageNumber,
+  ImageRun,
+  Header
 } from 'docx'
 import {
-  Quotation, Vessel, QuotationAssured, QuotationSubLimit, QuotationDeductible,
-  QuotationTextDeductible, QuotationExcludedCountry,
-  PIClause, PIWarranty, PIExclusion, PIAdditionalClause, PISectionTexts,
-  PISanctionsVersion, QuotationVessel, QuotationCustomWarranty, QuotationCustomExclusion,
+  Quotation,
+  Vessel,
+  QuotationAssured,
+  QuotationSubLimit,
+  QuotationDeductible,
+  QuotationTextDeductible,
+  QuotationExcludedCountry,
+  PIClause,
+  PIWarranty,
+  PIExclusion,
+  PIAdditionalClause,
+  PISectionTexts,
+  PISanctionsVersion,
+  QuotationVessel,
+  QuotationCustomWarranty,
+  QuotationCustomExclusion,
   QuotationSubjectivity,
-  HullClause, HullClauseCondition, HullAdditionalCondition,
-  QuotationAgreedValueItem, QuotationHullCondition, QuotationHullAdditionalCondition,
+  HullClause,
+  HullClauseCondition,
+  HullAdditionalCondition,
+  QuotationAgreedValueItem,
+  QuotationHullCondition,
+  QuotationHullAdditionalCondition,
   QuotationHullAlternative,
-  QuotationPIAlternative, WarCondition, QuotationWarCondition, WarSettings,
-  QuotationAssuredGroup, QuotationAgreedValueOption, QuotationDiscount
+  QuotationPIAlternative,
+  WarCondition,
+  QuotationWarCondition,
+  WarSettings,
+  QuotationAssuredGroup,
+  QuotationAgreedValueOption,
+  QuotationDiscount
 } from '../../../shared/types'
 import { computePayablePremium } from '../../../shared/premium'
 import JSZip from 'jszip'
-import { DEFAULT_SECTION_TEXTS, getDefaultSectionOrder } from '../components/quotationSettingsConstants'
+import {
+  DEFAULT_SECTION_TEXTS,
+  getDefaultSectionOrder
+} from '../components/quotationSettingsConstants'
 import { parseHtmlToParagraphs, htmlToPlainText } from '../utils/htmlToDocx'
 import { numberToWords } from '../utils/numberToWords'
 import { stripHtml } from '../utils/htmlToPdfText'
@@ -90,7 +129,7 @@ const BC_DEFAULT_CERTIFY_MLC252 =
   'THIS IS TO CERTIFY that there is in force, in respect of the above-named ship, a policy of insurance or other financial security satisfying the requirements of Regulation 2.5.2, Standard A2.5.2 of the Maritime Labour Convention, 2006, as amended.'
 
 const BC_DEFAULT_CANCEL_BBC =
-  'Provided always that the insurer may cancel this certificate by giving three months\' written notice to the above Authority, the insurance ceasing to be effective on the date of expiry of the said notice or on the date of expiry of the policy whichever is the earlier.'
+  "Provided always that the insurer may cancel this certificate by giving three months' written notice to the above Authority, the insurance ceasing to be effective on the date of expiry of the said notice or on the date of expiry of the policy whichever is the earlier."
 
 const BC_DEFAULT_CANCEL_WRC = BC_DEFAULT_CANCEL_BBC
 
@@ -117,7 +156,7 @@ export const BC_DEFAULTS = {
   bc_mlc_email: '',
   bc_mlc_phone: '',
   bc_mlc_website: '',
-  bc_mlc_company_address: '',
+  bc_mlc_company_address: ''
 } as const
 
 type BcSettingsMap = Record<keyof typeof BC_DEFAULTS, string>
@@ -125,12 +164,16 @@ type BcSettingsMap = Record<keyof typeof BC_DEFAULTS, string>
 async function loadBcSettings(): Promise<BcSettingsMap> {
   const result = { ...BC_DEFAULTS } as unknown as BcSettingsMap
   const keys = Object.keys(BC_DEFAULTS) as (keyof typeof BC_DEFAULTS)[]
-  await Promise.all(keys.map(async (key) => {
-    try {
-      const val = await window.api.getSetting(key)
-      if (val) (result as any)[key] = val
-    } catch { /* use default */ }
-  }))
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        const val = await window.api.getSetting(key)
+        if (val) (result as any)[key] = val
+      } catch {
+        /* use default */
+      }
+    })
+  )
   return result
 }
 
@@ -146,7 +189,7 @@ function bcText(text: string, opts?: { bold?: boolean; size?: number; caps?: boo
     text: opts?.caps ? text.toUpperCase() : text,
     font: BC_FONT,
     size: opts?.size ?? BC_SIZE,
-    bold: opts?.bold ?? false,
+    bold: opts?.bold ?? false
   })
 }
 
@@ -166,7 +209,7 @@ function bcParagraph(
     alignment: opts?.alignment ?? AlignmentType.LEFT,
     spacing: { before: opts?.spacingBefore ?? 0, after: opts?.spacingAfter ?? 60 },
     indent: opts?.indent ? { left: opts.indent } : undefined,
-    children: [bcText(text, { bold: opts?.bold, size: opts?.size, caps: opts?.caps })],
+    children: [bcText(text, { bold: opts?.bold, size: opts?.size, caps: opts?.caps })]
   })
 }
 
@@ -189,29 +232,44 @@ function bcDetailRow(label: string, value: string): TableRow {
       new TableCell({
         width: { size: BC_LABEL_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(label, { caps: true })] })],
+        children: [
+          new Paragraph({
+            spacing: { before: 100, after: 100 },
+            children: [bcText(label, { caps: true })]
+          })
+        ]
       }),
       new TableCell({
         width: { size: BC_SEP_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(':')] })],
+        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(':')] })]
       }),
       new TableCell({
         width: { size: BC_VALUE_W, type: WidthType.DXA },
         borders: bcNoBorders(),
-        children: [new Paragraph({ spacing: { before: 100, after: 100 }, children: [bcText(value, { bold: true })] })],
-      }),
-    ],
+        children: [
+          new Paragraph({
+            spacing: { before: 100, after: 100 },
+            children: [bcText(value, { bold: true })]
+          })
+        ]
+      })
+    ]
   })
 }
 
 /** Multi-line address block */
-function bcAddressBlock(lines: string[], spacingAfter: number = 120, bold: boolean = false): Paragraph[] {
-  return lines.filter(Boolean).map((line, i) =>
-    new Paragraph({
-      spacing: { after: i === lines.length - 1 ? spacingAfter : 20 },
-      children: [bcText(line, { bold })],
-    })
+function bcAddressBlock(
+  lines: string[],
+  spacingAfter: number = 120,
+  bold: boolean = false
+): Paragraph[] {
+  return lines.filter(Boolean).map(
+    (line, i) =>
+      new Paragraph({
+        spacing: { after: i === lines.length - 1 ? spacingAfter : 20 },
+        children: [bcText(line, { bold })]
+      })
   )
 }
 
@@ -220,8 +278,20 @@ function bcFormatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
-  const months = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December']
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ]
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
@@ -238,8 +308,13 @@ function buildBbcWrcPage(
   const ref = `${data.policyNumber}/${cardType}`
   const inceptionFmt = bcFormatDate(data.inceptionDate)
   const expiryFmt = bcFormatDate(data.expiryDate)
-  const gtNum = typeof data.grossTonnage === 'number' ? data.grossTonnage : parseFloat(String(data.grossTonnage))
-  const gt = !isNaN(gtNum) ? gtNum.toLocaleString('en-US', { maximumFractionDigits: gtNum % 1 === 0 ? 0 : 2 }) : String(data.grossTonnage || '')
+  const gtNum =
+    typeof data.grossTonnage === 'number'
+      ? data.grossTonnage
+      : parseFloat(String(data.grossTonnage))
+  const gt = !isNaN(gtNum)
+    ? gtNum.toLocaleString('en-US', { maximumFractionDigits: gtNum % 1 === 0 ? 0 : 2 })
+    : String(data.grossTonnage || '')
   const portOfRegistry = data.portOfRegistry || ''
   const today = bcFormatDate(new Date().toISOString())
   const city = data.closingCity || 'Beirut'
@@ -251,23 +326,27 @@ function buildBbcWrcPage(
   const children: Paragraph[] = []
 
   // 1+2. NOT TRANSFERABLE (left) + REF (right) on same line
-  children.push(new Paragraph({
-    spacing: { after: 300 },
-    children: [
-      bcText('NOT TRANSFERABLE', { bold: true }),
-      new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
-      bcText(`REF: ${ref}`, { bold: true }),
-    ],
-    tabStops: [{ type: 'right' as any, position: 9600 }],
-  }))
+  children.push(
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        bcText('NOT TRANSFERABLE', { bold: true }),
+        new TextRun({ text: '\t', font: BC_FONT, size: BC_SIZE }),
+        bcText(`REF: ${ref}`, { bold: true })
+      ],
+      tabStops: [{ type: 'right' as any, position: 9600 }]
+    })
+  )
 
   // 3. To: flag authority
   children.push(bcParagraph('To:', { bold: true, spacingAfter: 40 }))
   if (data.flagAuthorityName) {
-    children.push(...bcAddressBlock([
-      data.flagAuthorityName,
-      ...(data.flagAuthorityAddress || '').split('\n'),
-    ], 300))
+    children.push(
+      ...bcAddressBlock(
+        [data.flagAuthorityName, ...(data.flagAuthorityAddress || '').split('\n')],
+        300
+      )
+    )
   } else {
     children.push(bcSpacer(200))
   }
@@ -276,51 +355,65 @@ function buildBbcWrcPage(
   const titleLines = settings[titleKey].split('\n').filter(Boolean)
   titleLines.forEach((line, i) => {
     const isCertLine = line.trim().toUpperCase().startsWith('CERTIFICATE OF INSURANCE')
-    children.push(bcParagraph(line.trim(), {
-      bold: true,
-      alignment: AlignmentType.CENTER,
-      size: isCertLine ? 32 : BC_SIZE,
-      spacingBefore: i > 0 ? 120 : 0,
-      spacingAfter: i === titleLines.length - 1 ? 300 : 80,
-    }))
+    children.push(
+      bcParagraph(line.trim(), {
+        bold: true,
+        alignment: AlignmentType.CENTER,
+        size: isCertLine ? 32 : BC_SIZE,
+        spacingBefore: i > 0 ? 120 : 0,
+        spacingAfter: i === titleLines.length - 1 ? 300 : 80
+      })
+    )
   })
 
   // 5. Vessel details table (3 col fixed: label | : | value bold)
-  const vesselRows = [
-    bcDetailRow('NAME OF SHIP', data.vesselName),
-  ]
+  const vesselRows = [bcDetailRow('NAME OF SHIP', data.vesselName)]
   if (cardType === 'WRC') {
     vesselRows.push(bcDetailRow('GROSS TONNAGE', gt))
   }
   vesselRows.push(
     bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
-    bcDetailRow('IMO NUMBER', data.imoNumber),
+    bcDetailRow(
+      'PORT OF REGISTRY',
+      portOfRegistry
+        ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}`
+        : data.flagState?.toUpperCase() || ''
+    ),
+    bcDetailRow('IMO NUMBER', data.imoNumber)
   )
 
-  children.push(new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    margins: BC_TABLE_MARGINS,
-    columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
-    rows: vesselRows,
-  }) as unknown as Paragraph)
+  children.push(
+    new Table({
+      width: { size: 10000, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      margins: BC_TABLE_MARGINS,
+      columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
+      rows: vesselRows
+    }) as unknown as Paragraph
+  )
 
   children.push(bcSpacer(240))
 
   // 6. Owner block
   // 6+7. Owner block — no border
-  children.push(bcParagraph(
-    'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
-    { bold: false, spacingAfter: 80 }
-  ))
+  children.push(
+    bcParagraph(
+      'NAME AND FULL ADDRESS OF THE PRINCIPAL PLACE OF BUSINESS OF THE REGISTERED OWNER:',
+      { bold: false, spacingAfter: 80 }
+    )
+  )
   if (data.ownerName) {
     children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 20 }))
   }
   if (data.ownerAddress) {
-    const addrLines = data.ownerAddress.split('\n').filter(l => l.trim())
+    const addrLines = data.ownerAddress.split('\n').filter((l) => l.trim())
     for (let i = 0; i < addrLines.length; i++) {
-      children.push(bcParagraph(addrLines[i].trim().toUpperCase(), { bold: true, spacingAfter: i === addrLines.length - 1 ? 240 : 0 }))
+      children.push(
+        bcParagraph(addrLines[i].trim().toUpperCase(), {
+          bold: true,
+          spacingAfter: i === addrLines.length - 1 ? 240 : 0
+        })
+      )
     }
   } else {
     children.push(bcSpacer(240))
@@ -331,7 +424,7 @@ function buildBbcWrcPage(
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
       spacing: { after: 240 },
-      children: [bcText(settings[certifyKey])],
+      children: [bcText(settings[certifyKey])]
     })
   )
 
@@ -342,29 +435,41 @@ function buildBbcWrcPage(
   const pDateW = 3000
   const pTimeTzW = 10000 - pHeadW - pLabelW - pDateW
 
-  const bcPeriodCell = (text: string, w: number, bold: boolean) => new TableCell({
-    width: { size: w, type: WidthType.DXA }, borders: bcNoBorders(),
-    children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(text, { bold })] })]
-  })
-  const bcPeriodRow = (head: string, label: string, date: string, time: string | null | undefined) => new TableRow({
-    children: [
-      bcPeriodCell(head, pHeadW, false),
-      bcPeriodCell(label, pLabelW, false),
-      bcPeriodCell(date, pDateW, true),
-      bcPeriodCell(`${polFormatTime(time)} ${data.timezone || ''}`.trim(), pTimeTzW, true)
-    ]
-  })
+  const bcPeriodCell = (text: string, w: number, bold: boolean) =>
+    new TableCell({
+      width: { size: w, type: WidthType.DXA },
+      borders: bcNoBorders(),
+      children: [
+        new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(text, { bold })] })
+      ]
+    })
+  const bcPeriodRow = (
+    head: string,
+    label: string,
+    date: string,
+    time: string | null | undefined
+  ) =>
+    new TableRow({
+      children: [
+        bcPeriodCell(head, pHeadW, false),
+        bcPeriodCell(label, pLabelW, false),
+        bcPeriodCell(date, pDateW, true),
+        bcPeriodCell(`${polFormatTime(time)} ${data.timezone || ''}`.trim(), pTimeTzW, true)
+      ]
+    })
 
-  children.push(new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    margins: BC_TABLE_MARGINS,
-    columnWidths: [pHeadW, pLabelW, pDateW, pTimeTzW],
-    rows: [
-      bcPeriodRow('Period of the Insurance:', 'From:', inceptionFmt, data.inceptionTime),
-      bcPeriodRow('', 'To:', expiryFmt, data.expiryTime)
-    ],
-  }) as unknown as Paragraph)
+  children.push(
+    new Table({
+      width: { size: 10000, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      margins: BC_TABLE_MARGINS,
+      columnWidths: [pHeadW, pLabelW, pDateW, pTimeTzW],
+      rows: [
+        bcPeriodRow('Period of the Insurance:', 'From:', inceptionFmt, data.inceptionTime),
+        bcPeriodRow('', 'To:', expiryFmt, data.expiryTime)
+      ]
+    }) as unknown as Paragraph
+  )
 
   children.push(bcSpacer(200))
 
@@ -373,7 +478,7 @@ function buildBbcWrcPage(
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
       spacing: { after: 300 },
-      children: [bcText(settings[cancelKey])],
+      children: [bcText(settings[cancelKey])]
     })
   )
 
@@ -381,10 +486,7 @@ function buildBbcWrcPage(
   children.push(
     new Paragraph({
       spacing: { after: 0 },
-      children: [
-        bcText('PLACE & DATE: '),
-        bcText(`${city}${city ? ', ' : ''}${today}`),
-      ],
+      children: [bcText('PLACE & DATE: '), bcText(`${city}${city ? ', ' : ''}${today}`)]
     })
   )
 
@@ -395,7 +497,7 @@ function buildBbcWrcPage(
       new Paragraph({
         alignment: AlignmentType.LEFT,
         spacing: { after: 0 },
-        children: [bcText(data.cancelReplaceText, { bold: true })],
+        children: [bcText(data.cancelReplaceText, { bold: true })]
       })
     )
   }
@@ -437,99 +539,147 @@ function buildMlcPage(
   const children: Paragraph[] = []
 
   // 1. REF line — bold, right-aligned
-  children.push(bcParagraph(`REF: ${ref}`, { bold: true, alignment: AlignmentType.RIGHT, spacingAfter: 300 }))
+  children.push(
+    bcParagraph(`REF: ${ref}`, { bold: true, alignment: AlignmentType.RIGHT, spacingAfter: 300 })
+  )
 
   // 2. Full title — bold, centered (from settings)
-  children.push(bcParagraph(settings[titleKey], {
-    bold: true,
-    alignment: AlignmentType.CENTER,
-    spacingAfter: 300,
-  }))
+  children.push(
+    bcParagraph(settings[titleKey], {
+      bold: true,
+      alignment: AlignmentType.CENTER,
+      spacingAfter: 300
+    })
+  )
 
   // 3. Vessel details table — same design as BBC/WRC (reuse bcDetailRow)
   const vesselRows = [
     bcDetailRow('NAME OF SHIP', data.vesselName),
     bcDetailRow('IMO NUMBER', data.imoNumber),
     bcDetailRow('DISTINCTIVE NUMBER OR LETTERS', data.callSign || ''),
-    bcDetailRow('PORT OF REGISTRY', portOfRegistry ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}` : data.flagState?.toUpperCase() || ''),
-    bcDetailRow('PERIOD OF INSURANCE', `FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`),
+    bcDetailRow(
+      'PORT OF REGISTRY',
+      portOfRegistry
+        ? `${portOfRegistry.toUpperCase()}${data.flagState ? ' / ' + data.flagState.toUpperCase() : ''}`
+        : data.flagState?.toUpperCase() || ''
+    ),
+    bcDetailRow(
+      'PERIOD OF INSURANCE',
+      `FROM ${inceptionFmt.toUpperCase()} TO ${expiryFmt.toUpperCase()}`
+    )
   ]
 
-  children.push(new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    margins: BC_TABLE_MARGINS,
-    columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
-    rows: vesselRows,
-  }) as unknown as Paragraph)
+  children.push(
+    new Table({
+      width: { size: 10000, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      margins: BC_TABLE_MARGINS,
+      columnWidths: [BC_LABEL_W, BC_SEP_W, BC_VALUE_W],
+      rows: vesselRows
+    }) as unknown as Paragraph
+  )
 
   children.push(bcSpacer(200))
 
   // 5. Shipowner block — label NOT bold, entity bold + uppercase
-  children.push(bcParagraph(
-    'NAME OF THE SHIPOWNER ON WHOSE BEHALF FINANCIAL SECURITY HAS BEEN PROVIDED:',
-    { bold: false, spacingAfter: 80 }
-  ))
+  children.push(
+    bcParagraph('NAME OF THE SHIPOWNER ON WHOSE BEHALF FINANCIAL SECURITY HAS BEEN PROVIDED:', {
+      bold: false,
+      spacingAfter: 80
+    })
+  )
   if (data.ownerName) {
     children.push(bcParagraph(data.ownerName.toUpperCase(), { bold: true, spacingAfter: 40 }))
   }
   if (data.ownerAddress) {
-    children.push(...bcAddressBlock(data.ownerAddress.split('\n').map(l => l.toUpperCase()), 240, true))
+    children.push(
+      ...bcAddressBlock(
+        data.ownerAddress.split('\n').map((l) => l.toUpperCase()),
+        240,
+        true
+      )
+    )
   } else {
     children.push(bcSpacer(200))
   }
 
   // 6. Provider block — label NOT bold, entity from settings
-  children.push(bcParagraph(
-    'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY:',
-    { bold: false, spacingAfter: 80 }
-  ))
+  children.push(
+    bcParagraph(
+      'NAME, FULL ADDRESS AND WEBSITE OF THE PROVIDER OF INSURANCE OR OTHER FINANCIAL SECURITY:',
+      { bold: false, spacingAfter: 80 }
+    )
+  )
   // The MLC company-address setting usually already leads with the provider name (which may
   // differ from data.companyName only by punctuation/hyphenation), so avoid printing it twice.
-  const providerAddrLines = (mlcCompanyAddress || '').split('\n').map(l => l.trim()).filter(Boolean)
+  const providerAddrLines = (mlcCompanyAddress || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
   const normProvider = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
   const includeCompanyName =
     !!data.companyName &&
-    (providerAddrLines.length === 0 || normProvider(providerAddrLines[0]) !== normProvider(data.companyName))
+    (providerAddrLines.length === 0 ||
+      normProvider(providerAddrLines[0]) !== normProvider(data.companyName))
   const providerLines = [
     ...(includeCompanyName ? [data.companyName] : []),
     ...providerAddrLines,
     mlcWebsite
   ].filter(Boolean)
   for (let i = 0; i < providerLines.length; i++) {
-    children.push(new Paragraph({
-      spacing: { after: i === providerLines.length - 1 ? 240 : 0 },
-      children: [bcText(providerLines[i], { bold: true })]
-    }))
+    children.push(
+      new Paragraph({
+        spacing: { after: i === providerLines.length - 1 ? 240 : 0 },
+        children: [bcText(providerLines[i], { bold: true })]
+      })
+    )
   }
 
   // 7. Contact details — label NOT bold, values bold
-  children.push(bcParagraph(
-    'CONTACT DETAILS OF THE PERSONS OR ENTITY RESPONSIBLE FOR HANDLING SEAFARERS\u2019 REQUEST FOR RELIEF:',
-    { bold: false, spacingAfter: 80 }
-  ))
+  children.push(
+    bcParagraph(
+      'CONTACT DETAILS OF THE PERSONS OR ENTITY RESPONSIBLE FOR HANDLING SEAFARERS\u2019 REQUEST FOR RELIEF:',
+      { bold: false, spacingAfter: 80 }
+    )
+  )
   const contactRows: TableRow[] = []
   const cLabelW = 800
   const cValueW = 9200
-  const cRow = (label: string, value: string) => new TableRow({
-    children: [
-      new TableCell({ width: { size: cLabelW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(label)] })] }),
-      new TableCell({ width: { size: cValueW, type: WidthType.DXA }, borders: bcNoBorders(), children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(value, { bold: true })] })] })
-    ]
-  })
+  const cRow = (label: string, value: string) =>
+    new TableRow({
+      children: [
+        new TableCell({
+          width: { size: cLabelW, type: WidthType.DXA },
+          borders: bcNoBorders(),
+          children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [bcText(label)] })]
+        }),
+        new TableCell({
+          width: { size: cValueW, type: WidthType.DXA },
+          borders: bcNoBorders(),
+          children: [
+            new Paragraph({
+              spacing: { before: 0, after: 0 },
+              children: [bcText(value, { bold: true })]
+            })
+          ]
+        })
+      ]
+    })
   if (mlcEmail) contactRows.push(cRow('Email', mlcEmail))
   if (mlcPhone) {
     const phoneLines = mlcPhone.split('\n').filter(Boolean)
     phoneLines.forEach((line, i) => contactRows.push(cRow(i === 0 ? 'Tel' : '', line.trim())))
   }
   if (contactRows.length > 0) {
-    children.push(new Table({
-      width: { size: 10000, type: WidthType.DXA },
-      layout: TableLayoutType.FIXED,
-      margins: BC_TABLE_MARGINS,
-      columnWidths: [cLabelW, cValueW],
-      rows: contactRows,
-    }) as unknown as Paragraph)
+    children.push(
+      new Table({
+        width: { size: 10000, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        margins: BC_TABLE_MARGINS,
+        columnWidths: [cLabelW, cValueW],
+        rows: contactRows
+      }) as unknown as Paragraph
+    )
     children.push(bcSpacer(200))
   } else {
     children.push(bcSpacer(100))
@@ -540,7 +690,7 @@ function buildMlcPage(
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
       spacing: { after: 200 },
-      children: [bcText(settings[certifyKey])],
+      children: [bcText(settings[certifyKey])]
     })
   )
 
@@ -549,7 +699,7 @@ function buildMlcPage(
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
       spacing: { after: 300 },
-      children: [bcText(settings[cancelKey])],
+      children: [bcText(settings[cancelKey])]
     })
   )
 
@@ -557,10 +707,7 @@ function buildMlcPage(
   children.push(
     new Paragraph({
       spacing: { after: 0 },
-      children: [
-        bcText('PLACE & DATE: '),
-        bcText(`${city}${city ? ', ' : ''}${today}`),
-      ],
+      children: [bcText('PLACE & DATE: '), bcText(`${city}${city ? ', ' : ''}${today}`)]
     })
   )
 
@@ -571,7 +718,7 @@ function buildMlcPage(
       new Paragraph({
         alignment: AlignmentType.LEFT,
         spacing: { after: 0 },
-        children: [bcText(data.cancelReplaceText, { bold: true })],
+        children: [bcText(data.cancelReplaceText, { bold: true })]
       })
     )
   }
@@ -609,21 +756,42 @@ const POL_MIME: Record<string, string> = {
   pdf: 'application/pdf'
 }
 
-async function polStoredFile(policyId: string, docKey: string): Promise<{ blob: Blob; fileName: string } | null> {
+async function polStoredFile(
+  policyId: string,
+  docKey: string
+): Promise<{ blob: Blob; fileName: string } | null> {
   try {
     const f = await window.api.policyGetExportFile(policyId, docKey)
     if (f && f.data && f.data.byteLength > 0) {
       const ext = (f.fileName.split('.').pop() || '').toLowerCase()
-      return { blob: new Blob([new Uint8Array(f.data)], { type: POL_MIME[ext] || 'application/octet-stream' }), fileName: f.fileName }
+      return {
+        blob: new Blob([new Uint8Array(f.data)], {
+          type: POL_MIME[ext] || 'application/octet-stream'
+        }),
+        fileName: f.fileName
+      }
     }
-  } catch (e) { console.warn('[PolicyExport] stored file read failed; building fresh', e) }
+  } catch (e) {
+    console.warn('[PolicyExport] stored file read failed; building fresh', e)
+  }
   return null
 }
 
-async function polStoreFile(policyId: string, docKey: string, built: { blob: Blob; fileName: string }): Promise<void> {
+async function polStoreFile(
+  policyId: string,
+  docKey: string,
+  built: { blob: Blob; fileName: string }
+): Promise<void> {
   try {
-    await window.api.policySaveExportFile(policyId, docKey, built.fileName, new Uint8Array(await built.blob.arrayBuffer()))
-  } catch (e) { console.warn('[PolicyExport] storing the signed file failed', e) }
+    await window.api.policySaveExportFile(
+      policyId,
+      docKey,
+      built.fileName,
+      new Uint8Array(await built.blob.arrayBuffer())
+    )
+  } catch (e) {
+    console.warn('[PolicyExport] storing the signed file failed', e)
+  }
 }
 
 /** Stored file when there is one, otherwise build it (and store it if the policy is signed). */
@@ -645,7 +813,9 @@ async function buildBlueCardBlob(
   policyId?: string
 ): Promise<{ blob: Blob; fileName: string }> {
   if (!policyId) return buildBlueCardBlobFresh(data, cardType)
-  return polFrozenFile(policyId, `bc:${cardType}:${data.policyNumber}`, () => buildBlueCardBlobFresh(data, cardType, policyId))
+  return polFrozenFile(policyId, `bc:${cardType}:${data.policyNumber}`, () =>
+    buildBlueCardBlobFresh(data, cardType, policyId)
+  )
 }
 
 async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
@@ -696,52 +866,76 @@ async function buildBlueCardBlobFresh(
       const st = await window.api.piGetSectionTexts()
       headerHtml = st?.docHeader || ''
       headerSpacing = (st as any)?.docHeaderSpacing || undefined
-    } catch { /* no header */ }
+    } catch {
+      /* no header */
+    }
     try {
       const raw = await window.api.getSetting('policyExportSettings')
       footerSettings = raw ? JSON.parse(raw) : null
-    } catch { /* no footer */ }
+    } catch {
+      /* no footer */
+    }
   }
   const children = await buildBlueCardPage(data, cardType, true, settings)
 
   // Build header + footer matching policy style
   const headerParas: Paragraph[] = []
   if (headerHtml) {
-    headerParas.push(...parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing, spacingAfter: 0 }))
+    headerParas.push(
+      ...parseHtmlToParagraphs(headerHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: headerSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   // No policy/vessel line in header — shown in body REF line instead
 
   // Footer text (no page number for blue cards)
   const footerParas: Paragraph[] = []
   if (footerSettings?.footerText) {
-    const plainFt = footerSettings.footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    const plainFt = footerSettings.footerText
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
     for (const line of plainFt.split('\n')) {
       if (line.trim()) {
-        footerParas.push(new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999' })],
-        }))
+        footerParas.push(
+          new Paragraph({
+            alignment: AlignmentType.LEFT,
+            spacing: { before: 0, after: 0 },
+            children: [new TextRun({ text: line.trim(), size: 18, font: BC_FONT, color: '999999' })]
+          })
+        )
       }
     }
   }
 
   const document = new Document({
-    sections: [{
-      properties: {
-        page: {
-          margin: {
-            top: 1200,
-            bottom: 1000,
-            left: 900,
-            right: 900,
-          },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 1200,
+              bottom: 1000,
+              left: 900,
+              right: 900
+            }
+          }
         },
-      },
-      headers: headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
-      footers: footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
-      children: children as any[],
-    }],
+        headers:
+          headerParas.length > 0 ? { default: new Header({ children: headerParas }) } : undefined,
+        footers:
+          footerParas.length > 0 ? { default: new Footer({ children: footerParas }) } : undefined,
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
@@ -777,7 +971,7 @@ const POL_MARGIN_BOT = 850
 const POL_HEADER_DXA = 450
 const POL_FOOTER_DXA = 450
 const POL_CONTENT_W = POL_PAGE_W_DXA - 2 * POL_MARGIN_LR
-const POL_TITLE_W = Math.round(POL_CONTENT_W * 0.20)
+const POL_TITLE_W = Math.round(POL_CONTENT_W * 0.2)
 const POL_BODY_W = POL_CONTENT_W - POL_TITLE_W
 // makeRow body cell has left/right margins of 80 twips. Nested tables ignore the
 // parent cell's left margin and hug the cell border, so they render ~80 twips left
@@ -879,20 +1073,33 @@ interface PolicyExportData {
   subLimits: QuotationSubLimit[]
   selectedClauseIds: string[]
   allClauses: PIClause[]
-  additionalClauses: { id: string; piAdditionalClauseId?: string; customText?: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
+  additionalClauses: {
+    id: string
+    piAdditionalClauseId?: string
+    customText?: string
+    order: number
+    vesselScope?: string[] | null
+    alternativeId?: string | null
+  }[]
   allAdditionalClauses: PIAdditionalClause[]
   selectedWarrantyIds: string[]
   allWarranties: PIWarranty[]
   customWarranties: QuotationCustomWarranty[]
   deductibles: QuotationDeductible[]
   textDeductibles: QuotationTextDeductible[]
-  selectedExclusions: { id: string; piExclusionId?: string; customText?: string; vesselScope?: string[] | null; alternativeId?: string | null }[]
+  selectedExclusions: {
+    id: string
+    piExclusionId?: string
+    customText?: string
+    vesselScope?: string[] | null
+    alternativeId?: string | null
+  }[]
   allExclusions: PIExclusion[]
   customExclusions: QuotationCustomExclusion[]
   excludedCountries: QuotationExcludedCountry[]
   subjectivities: QuotationSubjectivity[]
   subjectivityDays: number
-  subjectivitiesNil: boolean   // true when the converter explicitly kept none → render "NIL"
+  subjectivitiesNil: boolean // true when the converter explicitly kept none → render "NIL"
   sectionTexts: PISectionTexts
   sanctionsVersions: PISanctionsVersion[]
   clauseOverrides: Record<string, string>
@@ -908,12 +1115,25 @@ interface PolicyExportData {
   warConditions: QuotationWarCondition[]
   allWarConditions: WarCondition[]
   warSettings: WarSettings | null
-  surveyWarranties: { id: string; text: string; order: number; vesselScope?: string[] | null; alternativeId?: string | null }[]
+  surveyWarranties: {
+    id: string
+    text: string
+    order: number
+    vesselScope?: string[] | null
+    alternativeId?: string | null
+  }[]
   tradingIntros: { id: string; text: string; vesselScope: string[] | null; order: number }[]
   companyName: string
   assuredGroups: QuotationAssuredGroup[]
   customSections: { id: string; title: string; text?: string; order: number }[]
-  lolOptions: { id: string; label: string | null; amount: number; currency: string; premiumAmount: number | null; order: number }[]
+  lolOptions: {
+    id: string
+    label: string | null
+    amount: number
+    currency: string
+    premiumAmount: number | null
+    order: number
+  }[]
   agreedValueOptions: QuotationAgreedValueOption[]
   fleets: { id: string; name: string }[]
   vesselClassificationNames: Record<string, string>
@@ -927,9 +1147,9 @@ interface PolicyExportData {
 }
 
 interface FrozenExportSettings {
-  exportSettings: any                 // parsed policyExportSettings (footer, header titles, intros…)
-  bcSettings: Record<string, string>  // blue-card title/certify/cancel + MLC contact block
-  docHeader: string                   // company letterhead HTML
+  exportSettings: any // parsed policyExportSettings (footer, header titles, intros…)
+  bcSettings: Record<string, string> // blue-card title/certify/cancel + MLC contact block
+  docHeader: string // company letterhead HTML
   docHeaderSpacing?: number
   fontSize?: number | null
   qrBase?: string | null
@@ -937,9 +1157,9 @@ interface FrozenExportSettings {
   brokerEntity?: { id: string; name: string; email?: string; phone?: string } | null
   brokerAddress?: { addressLine1?: string; city?: string; country?: string } | null
   logoPath?: string | null
-  declarationSettings?: any            // per-year War declaration config (UMR/Amlin/risk code)
+  declarationSettings?: any // per-year War declaration config (UMR/Amlin/risk code)
   endorsementClosingText?: string | null
-  policyClosingText?: string | null    // per-type policy closing section text (policy_text_{code}_closingText)
+  policyClosingText?: string | null // per-type policy closing section text (policy_text_{code}_closingText)
 }
 
 interface PolVesselInfo {
@@ -958,37 +1178,71 @@ interface PolVesselInfo {
 
 /** Load every live render setting the builders would otherwise read via getSetting, so it
  * can be frozen into the snapshot. Reused for fresh loads and to backfill legacy snapshots. */
-async function loadFrozenSettings(quotation: Quotation, sectionTextsRaw?: any): Promise<FrozenExportSettings> {
+async function loadFrozenSettings(
+  quotation: Quotation,
+  sectionTextsRaw?: any
+): Promise<FrozenExportSettings> {
   let exportSettings: any = {}
   try {
     const raw = await window.api.getSetting('policyExportSettings')
     if (raw) exportSettings = JSON.parse(raw)
-  } catch { /* keep {} */ }
+  } catch {
+    /* keep {} */
+  }
   const bcSettings = await loadBcSettings()
   const fontRaw = await window.api.getSetting('policy_font_size')
   let sectionOrderDefault: string[] | null = null
   try {
-    const rawSec = await window.api.getSetting(`policy_section_order_defaults_${quotation.quotationTypeCode}`)
+    const rawSec = await window.api.getSetting(
+      `policy_section_order_defaults_${quotation.quotationTypeCode}`
+    )
     if (rawSec) sectionOrderDefault = JSON.parse(rawSec)
-  } catch { /* null */ }
-  const qrBase = quotation.quotationTypeCode === 'P' ? (await window.api.getSetting('qr_verification_url')) : null
+  } catch {
+    /* null */
+  }
+  const qrBase =
+    quotation.quotationTypeCode === 'P' ? await window.api.getSetting('qr_verification_url') : null
   const logoPath = await window.api.piGetQuotationLogoPath()
   let declarationSettings: any = null
-  try { const rawDec = await window.api.getSetting('declaration_settings'); if (rawDec) declarationSettings = JSON.parse(rawDec) } catch { /* null */ }
-  const endorsementClosingText = (await window.api.getSetting('endorsement_closing_text').catch(() => null)) || null
-  const policyClosingText = (await window.api.getSetting(`policy_text_${quotation.quotationTypeCode}_closingText`).catch(() => null)) || null
+  try {
+    const rawDec = await window.api.getSetting('declaration_settings')
+    if (rawDec) declarationSettings = JSON.parse(rawDec)
+  } catch {
+    /* null */
+  }
+  const endorsementClosingText =
+    (await window.api.getSetting('endorsement_closing_text').catch(() => null)) || null
+  const policyClosingText =
+    (await window.api
+      .getSetting(`policy_text_${quotation.quotationTypeCode}_closingText`)
+      .catch(() => null)) || null
   let st: any = sectionTextsRaw
-  if (!st) { try { st = await window.api.piGetSectionTexts() } catch { st = null } }
+  if (!st) {
+    try {
+      st = await window.api.piGetSectionTexts()
+    } catch {
+      st = null
+    }
+  }
   let brokerEntity: FrozenExportSettings['brokerEntity'] = null
   let brokerAddress: FrozenExportSettings['brokerAddress'] = null
   if (quotation.customerEntityId && quotation.customerType === 'broker') {
     try {
       const ents = await window.api.getEntities()
-      const be = (Array.isArray(ents) ? ents : []).find((e: any) => e.id === quotation.customerEntityId)
+      const be = (Array.isArray(ents) ? ents : []).find(
+        (e: any) => e.id === quotation.customerEntityId
+      )
       if (be) brokerEntity = { id: be.id, name: be.name, email: be.email, phone: be.phone }
       const addrs = await window.api.getEntityAddresses(quotation.customerEntityId)
-      if (Array.isArray(addrs) && addrs.length > 0) brokerAddress = { addressLine1: addrs[0].addressLine1, city: addrs[0].city, country: addrs[0].country }
-    } catch { /* no broker */ }
+      if (Array.isArray(addrs) && addrs.length > 0)
+        brokerAddress = {
+          addressLine1: addrs[0].addressLine1,
+          city: addrs[0].city,
+          country: addrs[0].country
+        }
+    } catch {
+      /* no broker */
+    }
   }
   return {
     exportSettings,
@@ -1021,7 +1275,11 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
       // Legacy snapshots (captured before the freeze-everything change) have no `frozen`
       // bundle — backfill it from current settings so footer/titles/etc. aren't blank.
       if (!snapshot.frozen && snapshot.quotation) {
-        try { snapshot.frozen = await loadFrozenSettings(snapshot.quotation) } catch { /* leave undefined */ }
+        try {
+          snapshot.frozen = await loadFrozenSettings(snapshot.quotation)
+        } catch {
+          /* leave undefined */
+        }
       }
       return snapshot
     } catch {
@@ -1034,20 +1292,50 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   const quotation: Quotation = quotationOrNull
 
   const [
-    instalments, addresses, blueCards,
-    quotationVessels, allVessels, assureds, subLimits,
-    clauseRows, allClauses, additionalClauses, allAdditionalClauses,
-    warrantyRows, allWarranties, customWarranties,
-    deductibles, textDeductibles,
-    selectedExclusions, allExclusions, customExclusions,
-    excludedCountries, subjectivities,
-    sectionTexts, sanctionsVersions, clauseOverridesArr,
-    hullAgreedValueItems, hullClausesRaw, hullConditionsRaw, allHullConditionsRaw,
-    hullAdditionalConditionsRaw, allHullAdditionalConditionsRaw, hullAlternativesRaw, hullCustomConditionsRaw,
-    warConditionsRaw, allWarConditionsRaw, warSettingsRaw,
-    flagStatesRaw, surveyWarrantiesRaw, banks,
-    assuredGroupsRaw, customSectionsRaw, agreedValueOptionsRaw, fleetsRaw,
-    tradingIntrosRaw, assuredRolesRaw
+    instalments,
+    addresses,
+    blueCards,
+    quotationVessels,
+    allVessels,
+    assureds,
+    subLimits,
+    clauseRows,
+    allClauses,
+    additionalClauses,
+    allAdditionalClauses,
+    warrantyRows,
+    allWarranties,
+    customWarranties,
+    deductibles,
+    textDeductibles,
+    selectedExclusions,
+    allExclusions,
+    customExclusions,
+    excludedCountries,
+    subjectivities,
+    sectionTexts,
+    sanctionsVersions,
+    clauseOverridesArr,
+    hullAgreedValueItems,
+    hullClausesRaw,
+    hullConditionsRaw,
+    allHullConditionsRaw,
+    hullAdditionalConditionsRaw,
+    allHullAdditionalConditionsRaw,
+    hullAlternativesRaw,
+    hullCustomConditionsRaw,
+    warConditionsRaw,
+    allWarConditionsRaw,
+    warSettingsRaw,
+    flagStatesRaw,
+    surveyWarrantiesRaw,
+    banks,
+    assuredGroupsRaw,
+    customSectionsRaw,
+    agreedValueOptionsRaw,
+    fleetsRaw,
+    tradingIntrosRaw,
+    assuredRolesRaw
   ] = await Promise.all([
     window.api.policyGetInstalments(policyId),
     window.api.policyGetAddresses(policyId),
@@ -1098,15 +1386,20 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   // Sort assureds by the configured role order (Registered Owners → Managers → …) so the
   // Insured section renders them in role order within each vessel.
   const assuredRoleOrder = new Map(
-    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [r.name?.toLowerCase(), r.order ?? idx])
+    (Array.isArray(assuredRolesRaw) ? assuredRolesRaw : []).map((r: any, idx: number) => [
+      r.name?.toLowerCase(),
+      r.order ?? idx
+    ])
   )
   const assuredsSorted = [...(Array.isArray(assureds) ? assureds : [])].sort(
-    (a: any, b: any) => (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) - (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
+    (a: any, b: any) =>
+      (assuredRoleOrder.get(a.role?.toLowerCase()) ?? 999) -
+      (assuredRoleOrder.get(b.role?.toLowerCase()) ?? 999)
   )
 
   // Resolve the target vessel up-front — filterByAlt (below) references these.
   const safeQVessels = Array.isArray(quotationVessels) ? quotationVessels : []
-  const vessel = safeQVessels.find(v => v.vesselId === policy.vesselId) || safeQVessels[0] || null
+  const vessel = safeQVessels.find((v) => v.vesselId === policy.vesselId) || safeQVessels[0] || null
 
   // Filter by selected alternative and vessel scope
   const altId = policy.selectedAlternativeId || null
@@ -1118,7 +1411,8 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     // Also filter by vessel scope if multi-vessel quotation
     if (vessel && safeQVessels.length > 1) {
       result = result.filter((item: any) => {
-        if (!item.vesselScope || !Array.isArray(item.vesselScope) || item.vesselScope.length === 0) return true
+        if (!item.vesselScope || !Array.isArray(item.vesselScope) || item.vesselScope.length === 0)
+          return true
         return item.vesselScope.includes(vessel!.id)
       })
     }
@@ -1127,20 +1421,23 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
 
   const safeClauseRows = filterByAlt(Array.isArray(clauseRows) ? clauseRows : [])
   const selectedClauseIds = safeClauseRows.map((r: any) => r.piClauseId)
-  const clauseOverrides: Record<string, string> = (clauseOverridesArr && typeof clauseOverridesArr === 'object' && !Array.isArray(clauseOverridesArr))
-    ? clauseOverridesArr as Record<string, string>
-    : {}
+  const clauseOverrides: Record<string, string> =
+    clauseOverridesArr &&
+    typeof clauseOverridesArr === 'object' &&
+    !Array.isArray(clauseOverridesArr)
+      ? (clauseOverridesArr as Record<string, string>)
+      : {}
 
   const safeWarrantyRows = filterByAlt(Array.isArray(warrantyRows) ? warrantyRows : [])
   const selectedWarrantyIds = safeWarrantyRows.map((r: any) => r.piWarrantyId)
 
-  const piAlternativesRaw = quotation.quotationTypeCode === 'P'
-    ? await window.api.piGetQuotationAlternatives(policy.quotationId)
-    : []
+  const piAlternativesRaw =
+    quotation.quotationTypeCode === 'P'
+      ? await window.api.piGetQuotationAlternatives(policy.quotationId)
+      : []
 
-  const lolOptionsRaw = quotation.quotationTypeCode === 'P'
-    ? await window.api.lolGetOptions(policy.quotationId)
-    : []
+  const lolOptionsRaw =
+    quotation.quotationTypeCode === 'P' ? await window.api.lolGetOptions(policy.quotationId) : []
 
   // Resolve IACS classification from junction table
   let vesselClassificationNames: Record<string, string> = {}
@@ -1159,39 +1456,59 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
             const bId = typeof b === 'string' ? b : b.classificationSocietyId
             return (iacsIds.has(bId) ? 1 : 0) - (iacsIds.has(aId) ? 1 : 0)
           })
-          const names = sorted.map((c: any) => {
-            const cid = typeof c === 'string' ? c : c.classificationSocietyId
-            const cs = classSocieties.find((s: any) => s.id === cid)
-            if (!cs) return null
-            return cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
-          }).filter(Boolean)
+          const names = sorted
+            .map((c: any) => {
+              const cid = typeof c === 'string' ? c : c.classificationSocietyId
+              const cs = classSocieties.find((s: any) => s.id === cid)
+              if (!cs) return null
+              return cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
+            })
+            .filter(Boolean)
           if (names.length > 0) vesselClassificationNames[qv.id] = names.join(' / ')
         }
       } catch {}
       // Fallback: if junction table empty, resolve classificationSociety ID from vessel
       if (!vesselClassificationNames[qv.id] && qv.vesselId) {
-        const realV = (Array.isArray(quotationVessels) ? quotationVessels : []).find(v => v.id === qv.id)
-        const classId = realV?.classification || (safeQV.find(v => v.id === qv.id) as any)?.classification
+        const realV = (Array.isArray(quotationVessels) ? quotationVessels : []).find(
+          (v) => v.id === qv.id
+        )
+        const classId =
+          realV?.classification || (safeQV.find((v) => v.id === qv.id) as any)?.classification
         if (classId) {
-          const cs = classSocieties.find((s: any) => s.id === classId || s.name === classId || s.abbreviation === classId)
-          if (cs) vesselClassificationNames[qv.id] = cs.abbreviation ? `${cs.name} (${cs.abbreviation})` : cs.name
+          const cs = classSocieties.find(
+            (s: any) => s.id === classId || s.name === classId || s.abbreviation === classId
+          )
+          if (cs)
+            vesselClassificationNames[qv.id] = cs.abbreviation
+              ? `${cs.name} (${cs.abbreviation})`
+              : cs.name
         }
       }
     }
   } catch {}
 
-  const mergedTexts: PISectionTexts = { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}), ...(quotation.sectionTextsOverride || {}) }
+  const mergedTexts: PISectionTexts = {
+    ...DEFAULT_SECTION_TEXTS,
+    ...(sectionTexts || {}),
+    ...(quotation.sectionTextsOverride || {})
+  }
 
-  const safeFlagStates: { id: string; name: string }[] = Array.isArray(flagStatesRaw) ? flagStatesRaw : []
+  const safeFlagStates: { id: string; name: string }[] = Array.isArray(flagStatesRaw)
+    ? flagStatesRaw
+    : []
   const safeAllVessels: Vessel[] = Array.isArray(allVessels) ? allVessels : []
 
   // Try quotation vessel first, then fall back to real vessel data from the policy JOIN
-  let vesselInfo: PolVesselInfo = vessel ? polGetVesselInfo(vessel, safeAllVessels, safeFlagStates) : { name: 'Unknown' }
+  let vesselInfo: PolVesselInfo = vessel
+    ? polGetVesselInfo(vessel, safeAllVessels, safeFlagStates)
+    : { name: 'Unknown' }
   // If vessel info is empty/dashes, try loading directly from the vessels table
   if (policy.vesselId && (!vesselInfo.type || !vesselInfo.flag)) {
-    const realVessel = safeAllVessels.find(v => v.id === policy.vesselId)
+    const realVessel = safeAllVessels.find((v) => v.id === policy.vesselId)
     if (realVessel) {
-      const flagName = realVessel.flagStateId ? (safeFlagStates.find(f => f.id === realVessel.flagStateId)?.name || vesselInfo.flag) : vesselInfo.flag
+      const flagName = realVessel.flagStateId
+        ? safeFlagStates.find((f) => f.id === realVessel.flagStateId)?.name || vesselInfo.flag
+        : vesselInfo.flag
       vesselInfo = {
         name: realVessel.name || vesselInfo.name,
         imo: realVessel.imoNumber || vesselInfo.imo,
@@ -1207,7 +1524,7 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   }
 
   const safeBanks: BankRecord[] = Array.isArray(banks) ? banks : []
-  const bank = policy.bankId ? safeBanks.find(b => b.id === policy.bankId) || null : null
+  const bank = policy.bankId ? safeBanks.find((b) => b.id === policy.bankId) || null : null
 
   const reportSettings = await getReportSettings()
 
@@ -1221,16 +1538,19 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   const scopedSubjectivities = (Array.isArray(subjectivities) ? subjectivities : []).filter(
     (s: QuotationSubjectivity) => !s.vesselScope || !vessel || s.vesselScope.includes(vessel.id)
   )
-  const finalSubjectivities = selSubjIds != null
-    ? scopedSubjectivities.filter((s: any) => selSubjIds.includes(s.id))
-    : scopedSubjectivities
+  const finalSubjectivities =
+    selSubjIds != null
+      ? scopedSubjectivities.filter((s: any) => selSubjIds.includes(s.id))
+      : scopedSubjectivities
   const subjectivitiesNil = selSubjIds != null && finalSubjectivities.length === 0
 
   let discounts: QuotationDiscount[] = []
   try {
     const dRes = await window.api.quotationDiscountGetByQuotation(policy.quotationId)
     if (Array.isArray(dRes)) discounts = dRes
-  } catch { /* no extra discounts */ }
+  } catch {
+    /* no extra discounts */
+  }
 
   return {
     policy,
@@ -1285,28 +1605,38 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     hullClauses: Array.isArray(hullClausesRaw) ? hullClausesRaw : [],
     hullConditions: Array.isArray(hullConditionsRaw) ? hullConditionsRaw : [],
     allHullConditions: Array.isArray(allHullConditionsRaw) ? allHullConditionsRaw : [],
-    hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw) ? hullAdditionalConditionsRaw : [],
-    allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw) ? allHullAdditionalConditionsRaw : [],
+    hullAdditionalConditions: Array.isArray(hullAdditionalConditionsRaw)
+      ? hullAdditionalConditionsRaw
+      : [],
+    allHullAdditionalConditions: Array.isArray(allHullAdditionalConditionsRaw)
+      ? allHullAdditionalConditionsRaw
+      : [],
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
-    hullCustomConditions: filterByAlt(Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : []),
+    hullCustomConditions: filterByAlt(
+      Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : []
+    ),
     warConditions: Array.isArray(warConditionsRaw) ? warConditionsRaw : [],
     allWarConditions: Array.isArray(allWarConditionsRaw) ? allWarConditionsRaw : [],
-    warSettings: (warSettingsRaw && !(warSettingsRaw as any).error) ? warSettingsRaw : null,
-    surveyWarranties: filterByAlt((Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
-      .filter((sw: any) => {
-        // Filter by vessel scope: null/empty = all vessels, array = specific vessels
-        if (!sw.vesselScope || !Array.isArray(sw.vesselScope) || sw.vesselScope.length === 0) return true
-        return vessel ? sw.vesselScope.includes(vessel.id) : true
-      })
-      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)).map((sw: any) => ({
-      ...sw,
-      text: (sw.text || '')
-        .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
-        .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
-        .replace(/\{event\}/g, sw.eventValue || '{event}')
-        .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
-        .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
-    }))),
+    warSettings: warSettingsRaw && !(warSettingsRaw as any).error ? warSettingsRaw : null,
+    surveyWarranties: filterByAlt(
+      (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
+        .filter((sw: any) => {
+          // Filter by vessel scope: null/empty = all vessels, array = specific vessels
+          if (!sw.vesselScope || !Array.isArray(sw.vesselScope) || sw.vesselScope.length === 0)
+            return true
+          return vessel ? sw.vesselScope.includes(vessel.id) : true
+        })
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+        .map((sw: any) => ({
+          ...sw,
+          text: (sw.text || '')
+            .replace(/\{days\}/g, sw.daysValue != null ? String(sw.daysValue) : '{days}')
+            .replace(/\{deadline\}/g, sw.deadlineValue || '{deadline}')
+            .replace(/\{event\}/g, sw.eventValue || '{event}')
+            .replace(/\{surveyor\}/g, sw.surveyorValue || '{surveyor}')
+            .replace(/\{dateofsurvey\}/g, sw.dateOfSurveyValue || '{dateofsurvey}')
+        }))
+    ),
     tradingIntros: Array.isArray(tradingIntrosRaw) ? tradingIntrosRaw : [],
     companyName: reportSettings.companyName || 'Insurance Company',
     assuredGroups: (() => {
@@ -1331,22 +1661,30 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
  * re-export. Called on the FIRST export of a policy and again at signing (to add the
  * signature). A new revision is a new policy row with no snapshot and re-freezes.
  */
-async function capturePolicyExportSnapshotFromData(policyId: string, data: PolicyExportData): Promise<void> {
+async function capturePolicyExportSnapshotFromData(
+  policyId: string,
+  data: PolicyExportData
+): Promise<void> {
   // Strip the exportSnapshot field from the nested policy to avoid storing a snapshot-of-a-snapshot
   const snapshotPolicy = { ...data.policy }
   delete snapshotPolicy.exportSnapshot
 
   // Capture the signature image so it's frozen with the policy
-  let signatureSnapshot: { imageData: number[]; signerName: string } | null = (data as any).signatureSnapshot || null
+  let signatureSnapshot: { imageData: number[]; signerName: string } | null =
+    (data as any).signatureSnapshot || null
   try {
     const sigData = await window.api.policyGetSignature(policyId)
     if (sigData && sigData.imageData) {
       signatureSnapshot = {
-        imageData: Array.isArray(sigData.imageData) ? sigData.imageData : Array.from(sigData.imageData as any),
+        imageData: Array.isArray(sigData.imageData)
+          ? sigData.imageData
+          : Array.from(sigData.imageData as any),
         signerName: sigData.signerName || ''
       }
     }
-  } catch { /* no signature */ }
+  } catch {
+    /* no signature */
+  }
 
   const snapshot = {
     ...data,
@@ -1389,8 +1727,20 @@ function polFormatDateUS(dateStr: string | null | undefined): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
-  const months = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December']
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ]
   return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
@@ -1410,16 +1760,46 @@ function polFormatCurrency(amount: number | undefined, currency: string | undefi
 function polFormatAmountOnly(amount: number | undefined): string {
   if (amount == null) return '-'
   const isWhole = Number.isInteger(amount)
-  return amount.toLocaleString('en-US', { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })
+  return amount.toLocaleString('en-US', {
+    minimumFractionDigits: isWhole ? 0 : 2,
+    maximumFractionDigits: 2
+  })
 }
 
-function polGetVesselInfo(qv: QuotationVessel, allVessels: Vessel[], flagStates?: { id: string; name: string }[]): PolVesselInfo {
-  const reg = qv.vesselId ? allVessels.find(v => v.id === qv.vesselId) : null
+function polGetVesselInfo(
+  qv: QuotationVessel,
+  allVessels: Vessel[],
+  flagStates?: { id: string; name: string }[]
+): PolVesselInfo {
+  const reg = qv.vesselId ? allVessels.find((v) => v.id === qv.vesselId) : null
   if (reg) {
-    const flagName = reg.flagStateId && flagStates ? (flagStates.find(f => f.id === reg.flagStateId)?.name || qv.flag) : qv.flag
-    return { name: reg.name, imo: reg.imoNumber, built: reg.builtYear, rebuilt: reg.rebuiltYear, gt: reg.grossTonnage, type: reg.vesselType, flag: flagName, classification: reg.classificationSociety, callSign: reg.callSign }
+    const flagName =
+      reg.flagStateId && flagStates
+        ? flagStates.find((f) => f.id === reg.flagStateId)?.name || qv.flag
+        : qv.flag
+    return {
+      name: reg.name,
+      imo: reg.imoNumber,
+      built: reg.builtYear,
+      rebuilt: reg.rebuiltYear,
+      gt: reg.grossTonnage,
+      type: reg.vesselType,
+      flag: flagName,
+      classification: reg.classificationSociety,
+      callSign: reg.callSign
+    }
   }
-  return { name: qv.name || 'Unknown', imo: qv.imoNumber, built: qv.builtYear, rebuilt: qv.rebuiltYear, gt: qv.grossTonnage, type: qv.vesselType, flag: qv.flag, classification: qv.classification, callSign: qv.callSign }
+  return {
+    name: qv.name || 'Unknown',
+    imo: qv.imoNumber,
+    built: qv.builtYear,
+    rebuilt: qv.rebuiltYear,
+    gt: qv.grossTonnage,
+    type: qv.vesselType,
+    flag: qv.flag,
+    classification: qv.classification,
+    callSign: qv.callSign
+  }
 }
 
 function polOrdinal(n: number): string {
@@ -1434,7 +1814,9 @@ function polIsHtml(text: string): boolean {
 
 function polSt(data: PolicyExportData, key: keyof PISectionTexts): string {
   const raw = String(data.sectionTexts[key] || '')
-  return decodeHtmlEntities(raw.replace(/\{quotation_type\}/g, data.quotation.quotationTypeName || 'P&I'))
+  return decodeHtmlEntities(
+    raw.replace(/\{quotation_type\}/g, data.quotation.quotationTypeName || 'P&I')
+  )
 }
 
 function polFmtPct(val: number | string): string {
@@ -1458,7 +1840,7 @@ function polGetSanctionsText(data: PolicyExportData): string {
   if (data.quotation.sanctionsTextOverride) return data.quotation.sanctionsTextOverride
   const versionKey = data.quotation.sanctionsClauseVersion
   if (!versionKey) return ''
-  const version = data.sanctionsVersions.find(v => v.key === versionKey)
+  const version = data.sanctionsVersions.find((v) => v.key === versionKey)
   return version?.text || ''
 }
 
@@ -1475,7 +1857,9 @@ async function loadPolicyFontSize(): Promise<void> {
         BC_SIZE = pt * 2
       }
     }
-  } catch { /* use default */ }
+  } catch {
+    /* use default */
+  }
 }
 
 /** Override the live font size with the policy's frozen value (from the snapshot). */
@@ -1499,7 +1883,9 @@ function polBp(text: string) {
   return new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
+    children: [
+      new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })
+    ]
   })
 }
 
@@ -1513,7 +1899,9 @@ function polPremiumPaymentTime(data: PolicyExportData): string {
     if (es && typeof es.premiumPaymentTime === 'string' && es.premiumPaymentTime.trim()) {
       return es.premiumPaymentTime.trim()
     }
-  } catch { /* default */ }
+  } catch {
+    /* default */
+  }
   return 'Noon Lebanon LST'
 }
 
@@ -1533,7 +1921,13 @@ function polAmountWordsP(amountText: string, wordsText: string) {
     alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80, line: 240, lineRule: 'auto' as any },
     children: [
-      new TextRun({ text: amountText, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
+      new TextRun({
+        text: amountText,
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        bold: true
+      }),
       new TextRun({ text: ` (${wordsText})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
     ]
   })
@@ -1544,7 +1938,16 @@ function polAmountWordsP(amountText: string, wordsText: string) {
 function polBupTight(text: string) {
   return new Paragraph({
     spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })]
+    children: [
+      new TextRun({
+        text,
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        bold: true,
+        underline: {}
+      })
+    ]
   })
 }
 
@@ -1574,7 +1977,10 @@ function polHtmlToLines(html: string): string {
 // Blank-line paragraphs are tagged so a section can be cleaned up by polCollapseEmpty
 const polEmptyParas = new WeakSet<object>()
 function polEmptyP() {
-  const p = new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
+  const p = new Paragraph({
+    spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+    children: []
+  })
   polEmptyParas.add(p as unknown as object)
   return p
 }
@@ -1597,16 +2003,23 @@ function polCollapseEmpty(items: (Paragraph | Table)[]): (Paragraph | Table)[] {
 // A precise, tiny vertical gap (exact line height in points) — used where a full blank line
 // is too much, e.g. a 3pt gap between a paragraph and a following block.
 function polSpacerPts(pts: number) {
-  return new Paragraph({ spacing: { before: 0, after: 0, line: Math.round(pts * 20), lineRule: 'exact' as any }, children: [] })
+  return new Paragraph({
+    spacing: { before: 0, after: 0, line: Math.round(pts * 20), lineRule: 'exact' as any },
+    children: []
+  })
 }
 
 function polMp(text: string): Paragraph[] {
   if (!text) return []
   const decoded = decodeHtmlEntities(text)
-  if (polIsHtml(decoded)) return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
-  return decoded.split('\n').map(p =>
-    p.trim() ? polNp(p) : polEmptyP()
-  )
+  if (polIsHtml(decoded))
+    return parseHtmlToParagraphs(decoded, {
+      size: POL_FONT_SIZE,
+      font: 'Arial',
+      color: '000000',
+      alignment: AlignmentType.JUSTIFIED
+    })
+  return decoded.split('\n').map((p) => (p.trim() ? polNp(p) : polEmptyP()))
 }
 
 // Like polMp but the last text paragraph carries no trailing `after`, so a following
@@ -1618,15 +2031,25 @@ function polMpTight(text: string): Paragraph[] {
   if (polIsHtml(decoded)) return polMp(text) // HTML paths keep their own spacing
   const lines = decoded.split('\n')
   let lastNonEmpty = -1
-  for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim()) { lastNonEmpty = i; break } }
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].trim()) {
+      lastNonEmpty = i
+      break
+    }
+  }
   const out: Paragraph[] = []
   lines.forEach((p, i) => {
-    if (!p.trim()) { if (i < lastNonEmpty) out.push(polEmptyP()); return }
-    out.push(new Paragraph({
-      alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: i === lastNonEmpty ? 0 : 80, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: p, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-    }))
+    if (!p.trim()) {
+      if (i < lastNonEmpty) out.push(polEmptyP())
+      return
+    }
+    out.push(
+      new Paragraph({
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: i === lastNonEmpty ? 0 : 80, line: 240, lineRule: 'auto' as any },
+        children: [new TextRun({ text: p, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+      })
+    )
   })
   return out
 }
@@ -1638,9 +2061,18 @@ function polMpUniform(text: string): Paragraph[] {
   if (!text) return []
   const decoded = decodeHtmlEntities(text)
   if (polIsHtml(decoded)) {
-    return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED, collapseEmpty: true })
+    return parseHtmlToParagraphs(decoded, {
+      size: POL_FONT_SIZE,
+      font: 'Arial',
+      color: '000000',
+      alignment: AlignmentType.JUSTIFIED,
+      collapseEmpty: true
+    })
   }
-  return decoded.split('\n').filter(l => l.trim()).map(p => polNp(p))
+  return decoded
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((p) => polNp(p))
 }
 
 // Aligned "Section A / Section B / Total" amount breakdown, shared by the Debit Advice
@@ -1660,25 +2092,69 @@ function polBuildAmountBreakdown(
     left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
     right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   }
-  const brRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) => new TableRow({
-    children: [
-      new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] }),
-      new TableCell({ width: { size: amtW, type: WidthType.DXA }, borders: opts?.total ? totalTop : polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 20, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(amount, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: !!opts?.bold })] })] })
-    ]
-  })
+  const brRow = (label: string, amount: number, opts?: { bold?: boolean; total?: boolean }) =>
+    new TableRow({
+      children: [
+        new TableCell({
+          width: { size: labelW, type: WidthType.DXA },
+          borders: opts?.total ? totalTop : polNoBorders(),
+          children: [
+            new Paragraph({
+              spacing: { after: 20, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: label,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000',
+                  bold: !!opts?.bold
+                })
+              ]
+            })
+          ]
+        }),
+        new TableCell({
+          width: { size: amtW, type: WidthType.DXA },
+          borders: opts?.total ? totalTop : polNoBorders(),
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 20, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: polFormatCurrency(amount, currency),
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000',
+                  bold: !!opts?.bold
+                })
+              ]
+            })
+          ]
+        })
+      ]
+    })
   return [
     new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      margins: POL_TABLE_MARGINS,
       layout: TableLayoutType.FIXED,
       columnWidths: [labelW, amtW],
       rows: [
-        ...sections.map(s => brRow(s.label, s.amount)),
+        ...sections.map((s) => brRow(s.label, s.amount)),
         brRow(totalLabel, total, { bold: true, total: true })
       ]
     }),
     new Paragraph({
       spacing: { before: 40, after: 40, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: `(${numberToWords(total, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+      children: [
+        new TextRun({
+          text: `(${numberToWords(total, currency)})`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
     })
   ]
 }
@@ -1697,16 +2173,32 @@ function polMpBullet(text: string): Paragraph[] {
         if (/<p\b/i.test(lead)) {
           // Intro as the SAME native dash-bullet as plain conditions; sub-list + closing nest under it.
           const introText = stripHtml(lead).trim()
-          const baseOpt = { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED, spacingAfter: 40 }
+          const baseOpt = {
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            alignment: AlignmentType.JUSTIFIED,
+            spacingAfter: 40
+          }
           const introParas = introText ? [polBulletP(introText)] : []
           const restParas = parseHtmlToParagraphs(rest, { ...baseOpt, indentOffset: 280 })
           return [...introParas, ...restParas]
         }
       }
-      return parseHtmlToParagraphs(decoded, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+      return parseHtmlToParagraphs(decoded, {
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        alignment: AlignmentType.JUSTIFIED
+      })
     }
     const bulletHtml = decoded.replace(/<p\b/gi, '<li').replace(/<\/p>/gi, '</li>')
-    return parseHtmlToParagraphs(`<ul>${bulletHtml}</ul>`, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+    return parseHtmlToParagraphs(`<ul>${bulletHtml}</ul>`, {
+      size: POL_FONT_SIZE,
+      font: 'Arial',
+      color: '000000',
+      alignment: AlignmentType.JUSTIFIED
+    })
   }
   return [polBulletP(decoded)]
 }
@@ -1734,48 +2226,63 @@ function polNoBorders() {
 
 function polMakeDocxNumbering() {
   return {
-    config: [{
-      reference: 'dash-bullet',
-      levels: [{
-        level: 0,
-        format: LevelFormat.BULLET,
-        text: '-',
-        alignment: AlignmentType.LEFT,
-        style: { paragraph: { indent: { left: 280, hanging: 200 } } }
-      }]
-    }, {
-      reference: 'trading-numbered',
-      levels: [{
-        level: 0,
-        format: LevelFormat.DECIMAL,
-        text: '%1)',
-        alignment: AlignmentType.LEFT,
-        style: {
-          run: { font: 'Arial', size: POL_FONT_SIZE },
-          paragraph: { indent: { left: 240, hanging: 240 } }
-        }
-      }, {
-        level: 1,
-        format: LevelFormat.LOWER_LETTER,
-        text: '%2)',
-        alignment: AlignmentType.LEFT,
-        style: {
-          run: { font: 'Arial', size: POL_FONT_SIZE },
-          paragraph: { indent: { left: 720, hanging: 360 } }
-        }
-      }]
-    }]
+    config: [
+      {
+        reference: 'dash-bullet',
+        levels: [
+          {
+            level: 0,
+            format: LevelFormat.BULLET,
+            text: '-',
+            alignment: AlignmentType.LEFT,
+            style: { paragraph: { indent: { left: 280, hanging: 200 } } }
+          }
+        ]
+      },
+      {
+        reference: 'trading-numbered',
+        levels: [
+          {
+            level: 0,
+            format: LevelFormat.DECIMAL,
+            text: '%1)',
+            alignment: AlignmentType.LEFT,
+            style: {
+              run: { font: 'Arial', size: POL_FONT_SIZE },
+              paragraph: { indent: { left: 240, hanging: 240 } }
+            }
+          },
+          {
+            level: 1,
+            format: LevelFormat.LOWER_LETTER,
+            text: '%2)',
+            alignment: AlignmentType.LEFT,
+            style: {
+              run: { font: 'Arial', size: POL_FONT_SIZE },
+              paragraph: { indent: { left: 720, hanging: 360 } }
+            }
+          }
+        ]
+      }
+    ]
   }
 }
 
 function polMakePageProperties() {
   return {
     page: {
-      size: { width: POL_PAGE_W_DXA, height: POL_PAGE_H_DXA, orientation: PageOrientation.PORTRAIT },
+      size: {
+        width: POL_PAGE_W_DXA,
+        height: POL_PAGE_H_DXA,
+        orientation: PageOrientation.PORTRAIT
+      },
       margin: {
-        top: POL_MARGIN_TOP, bottom: POL_MARGIN_BOT,
-        left: POL_MARGIN_LR, right: POL_MARGIN_LR,
-        header: POL_HEADER_DXA, footer: POL_FOOTER_DXA
+        top: POL_MARGIN_TOP,
+        bottom: POL_MARGIN_BOT,
+        left: POL_MARGIN_LR,
+        right: POL_MARGIN_LR,
+        header: POL_HEADER_DXA,
+        footer: POL_FOOTER_DXA
       }
     }
   }
@@ -1798,7 +2305,9 @@ function polDownloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-async function polLoadLogoAsBuffer(logoPath: string): Promise<{ buffer: ArrayBuffer; width: number; height: number } | null> {
+async function polLoadLogoAsBuffer(
+  logoPath: string
+): Promise<{ buffer: ArrayBuffer; width: number; height: number } | null> {
   try {
     const resp = await fetch(`safe-file://${logoPath}`)
     const blob = await resp.blob()
@@ -1844,21 +2353,59 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
     for (const addr of sortedAddrs) {
       // Left: entity name – country
       const leftChildren: Paragraph[] = []
-      const nameRuns: TextRun[] = [new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-      if (addr.country) nameRuns.push(new TextRun({ text: ` \u2013 ${addr.country}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' }))
-      leftChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: nameRuns }))
+      const nameRuns: TextRun[] = [
+        new TextRun({ text: addr.entityName, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+      ]
+      if (addr.country)
+        nameRuns.push(
+          new TextRun({
+            text: ` \u2013 ${addr.country}`,
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000'
+          })
+        )
+      leftChildren.push(
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: nameRuns
+        })
+      )
 
       // Right: role only ("As <role>") — the address goes on its own full-width row below
       const rightChildren: Paragraph[] = []
-      if (addr.role) rightChildren.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `"as ${addr.role}"`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      if (addr.role)
+        rightChildren.push(
+          new Paragraph({
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({
+                text: `"as ${addr.role}"`,
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
       if (rightChildren.length === 0) rightChildren.push(polEmptyP())
 
-      tableRows.push(new TableRow({
-        children: [
-          new TableCell({ borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: leftChildren }),
-          new TableCell({ borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: rightChildren })
-        ]
-      }))
+      tableRows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              borders: polNoBorders(),
+              verticalAlign: VerticalAlign.TOP,
+              children: leftChildren
+            }),
+            new TableCell({
+              borders: polNoBorders(),
+              verticalAlign: VerticalAlign.TOP,
+              children: rightChildren
+            })
+          ]
+        })
+      )
 
       // Address as a full-width row (spanning both columns) directly under the insured
       const addrText = addr.addressText || addr.address || ''
@@ -1866,32 +2413,86 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
         const addrParas: Paragraph[] = []
         const addrLines = addrText.split('\n').filter((l: string) => l.trim())
         for (let li = 0; li < addrLines.length; li++) {
-          addrParas.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: addrLines[li].trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+          addrParas.push(
+            new Paragraph({
+              spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: addrLines[li].trim(),
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          )
         }
-        tableRows.push(new TableRow({
-          children: [
-            new TableCell({ columnSpan: 2, borders: polNoBorders(), verticalAlign: VerticalAlign.TOP, children: addrParas })
-          ]
-        }))
+        tableRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                columnSpan: 2,
+                borders: polNoBorders(),
+                verticalAlign: VerticalAlign.TOP,
+                children: addrParas
+              })
+            ]
+          })
+        )
       }
     }
   } else if (data.assureds.length > 0) {
     for (const a of data.assureds) {
-      tableRows.push(new TableRow({
-        children: [
-          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.name, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: a.role ? `"as ${a.role}"` : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-        ]
-      }))
+      tableRows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  children: [
+                    new TextRun({
+                      text: a.name,
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  children: [
+                    new TextRun({
+                      text: a.role ? `"as ${a.role}"` : '',
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
+        })
+      )
     }
   }
 
   if (tableRows.length > 0) {
-    content.push(new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-      layout: TableLayoutType.AUTOFIT,
-      rows: tableRows
-    }))
+    content.push(
+      new Table({
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        margins: POL_TABLE_MARGINS,
+        layout: TableLayoutType.AUTOFIT,
+        rows: tableRows
+      })
+    )
   }
 
   // "For their respective rights…" follows the insured block directly (no blank line).
@@ -1902,7 +2503,9 @@ function polBuildInsuredSection(data: PolicyExportData): (Paragraph | Table)[] {
   // Broker (c/o …) comes just after the footer with a tiny 3pt gap — unless suppressed.
   // Only a broker business has a c/o line: a policy issued to a DIRECT client never shows one
   // (even if a c/o name was typed on the quotation). Customer type not set = legacy, kept as before.
-  const brokerName = data.quotation.coName || data.assureds.find(a => a.role?.toLowerCase().includes('broker'))?.name
+  const brokerName =
+    data.quotation.coName ||
+    data.assureds.find((a) => a.role?.toLowerCase().includes('broker'))?.name
   const isDirectClient = data.quotation.customerType === 'direct'
   if (brokerName && !isDirectClient && !(data.policy as any).hideBroker) {
     content.push(polSpacerPts(3))
@@ -1918,10 +2521,16 @@ function polBuildVesselTable(data: PolicyExportData): Table {
     ['Vessel Name', vi.name.toUpperCase()],
     ['Vessel Type', vi.type || '-'],
     ['Flag', vi.flag || '-'],
-    ['Year Built', vi.built ? (vi.rebuilt ? `${vi.built} - Rebuilt: ${vi.rebuilt}` : String(vi.built)) : '-'],
+    [
+      'Year Built',
+      vi.built ? (vi.rebuilt ? `${vi.built} - Rebuilt: ${vi.rebuilt}` : String(vi.built)) : '-'
+    ],
     ['GT', vi.gt ? Number(vi.gt).toLocaleString() : '-'],
     ['IMO Number', vi.imo || '-'],
-    ['Classification', (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || '-']
+    [
+      'Classification',
+      (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || '-'
+    ]
   ]
   // Call sign is intentionally omitted from policy documents — it only appears on blue cards.
 
@@ -1930,45 +2539,112 @@ function polBuildVesselTable(data: PolicyExportData): Table {
   const valW = POL_BODY_INNER_W - labelW - sepW
 
   return new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
+    width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+    margins: POL_TABLE_MARGINS,
     layout: TableLayoutType.FIXED,
     columnWidths: [labelW, sepW, valW],
-    rows: rows.map(([label, value]) => new TableRow({
-      children: [
-        new TableCell({ width: { size: labelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: sepW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: ':', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-        new TableCell({ width: { size: valW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: value, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] })
-      ]
-    }))
+    rows: rows.map(
+      ([label, value]) =>
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: labelW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: label,
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: sepW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: ':', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: valW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: value,
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000',
+                      bold: true
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
+        })
+    )
   })
 }
 
 function polBuildPeriodSection(data: PolicyExportData): (Paragraph | Table)[] {
   const { inceptionDate, inceptionTime, expiryDate, expiryTime, timezone } = data.policy
-  const labelW = Math.round(POL_BODY_INNER_W * 0.10)
-  const dateW = Math.round(POL_BODY_INNER_W * 0.30)
+  const labelW = Math.round(POL_BODY_INNER_W * 0.1)
+  const dateW = Math.round(POL_BODY_INNER_W * 0.3)
   const timeTzW = POL_BODY_INNER_W - labelW - dateW
 
-  const makeCell = (text: string, bold = false) => new TableCell({
-    width: { size: 0, type: WidthType.AUTO },
-    borders: polNoBorders(),
-    children: [new Paragraph({ children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })] })]
-  })
+  const makeCell = (text: string, bold = false) =>
+    new TableCell({
+      width: { size: 0, type: WidthType.AUTO },
+      borders: polNoBorders(),
+      children: [
+        new Paragraph({
+          children: [
+            new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold })
+          ]
+        })
+      ]
+    })
 
   const fmtTimeTz = (time: string | null | undefined, tz: string | null | undefined) => {
     const parts = [polFormatTime(time), tz || ''].filter(Boolean)
     return parts.join(' ')
   }
 
-  return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-    layout: TableLayoutType.FIXED,
-    columnWidths: [labelW, dateW, timeTzW],
-    rows: [
-      new TableRow({ children: [makeCell('From'), makeCell(polFormatDateUS(inceptionDate)), makeCell(fmtTimeTz(inceptionTime, timezone))] }),
-      new TableRow({ children: [makeCell('To'), makeCell(polFormatDateUS(expiryDate)), makeCell(fmtTimeTz(expiryTime, timezone))] })
-    ]
-  })]
+  return [
+    new Table({
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      margins: POL_TABLE_MARGINS,
+      layout: TableLayoutType.FIXED,
+      columnWidths: [labelW, dateW, timeTzW],
+      rows: [
+        new TableRow({
+          children: [
+            makeCell('From'),
+            makeCell(polFormatDateUS(inceptionDate)),
+            makeCell(fmtTimeTz(inceptionTime, timezone))
+          ]
+        }),
+        new TableRow({
+          children: [
+            makeCell('To'),
+            makeCell(polFormatDateUS(expiryDate)),
+            makeCell(fmtTimeTz(expiryTime, timezone))
+          ]
+        })
+      ]
+    })
+  ]
 }
 
 function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[] {
@@ -1976,40 +2652,87 @@ function polBuildPeriodParagraphs(data: PolicyExportData): (Paragraph | Table)[]
   const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
-  const pCell = (text: string, w: number) => new TableCell({
-    width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
-    children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
-  })
-  return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-    layout: TableLayoutType.FIXED,
-    columnWidths: [labelW, dateW, timeW],
-    rows: [
-      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(inceptionDate), dateW), pCell(`${polFormatTime(inceptionTime)} ${timezone || ''}`.trim(), timeW)] }),
-      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)] })
-    ]
-  })]
+  const pCell = (text: string, w: number) =>
+    new TableCell({
+      width: { size: w, type: WidthType.DXA },
+      borders: polNoBorders(),
+      children: [
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        })
+      ]
+    })
+  return [
+    new Table({
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      margins: POL_TABLE_MARGINS,
+      layout: TableLayoutType.FIXED,
+      columnWidths: [labelW, dateW, timeW],
+      rows: [
+        new TableRow({
+          children: [
+            pCell('From', labelW),
+            pCell(polFormatDateUS(inceptionDate), dateW),
+            pCell(`${polFormatTime(inceptionTime)} ${timezone || ''}`.trim(), timeW)
+          ]
+        }),
+        new TableRow({
+          children: [
+            pCell('To', labelW),
+            pCell(polFormatDateUS(expiryDate), dateW),
+            pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)
+          ]
+        })
+      ]
+    })
+  ]
 }
 
 /** Period for endorsement DA/CA: from endorsement effective date to policy expiry */
-function polBuildEndorsementPeriod(effectiveDate: string, data: PolicyExportData): (Paragraph | Table)[] {
+function polBuildEndorsementPeriod(
+  effectiveDate: string,
+  data: PolicyExportData
+): (Paragraph | Table)[] {
   const { expiryDate, expiryTime, timezone } = data.policy
   const labelW = Math.round(POL_BODY_INNER_W * 0.08)
   const dateW = Math.round(POL_BODY_INNER_W * 0.33)
   const timeW = POL_BODY_INNER_W - labelW - dateW
-  const pCell = (text: string, w: number) => new TableCell({
-    width: { size: w, type: WidthType.DXA }, borders: polNoBorders(),
-    children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })]
-  })
-  return [new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-    layout: TableLayoutType.FIXED,
-    columnWidths: [labelW, dateW, timeW],
-    rows: [
-      new TableRow({ children: [pCell('From', labelW), pCell(polFormatDateUS(effectiveDate), dateW), pCell(`${polFormatTime(data.policy.inceptionTime)} ${timezone || ''}`.trim(), timeW)] }),
-      new TableRow({ children: [pCell('To', labelW), pCell(polFormatDateUS(expiryDate), dateW), pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)] })
-    ]
-  })]
+  const pCell = (text: string, w: number) =>
+    new TableCell({
+      width: { size: w, type: WidthType.DXA },
+      borders: polNoBorders(),
+      children: [
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+        })
+      ]
+    })
+  return [
+    new Table({
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      margins: POL_TABLE_MARGINS,
+      layout: TableLayoutType.FIXED,
+      columnWidths: [labelW, dateW, timeW],
+      rows: [
+        new TableRow({
+          children: [
+            pCell('From', labelW),
+            pCell(polFormatDateUS(effectiveDate), dateW),
+            pCell(`${polFormatTime(data.policy.inceptionTime)} ${timezone || ''}`.trim(), timeW)
+          ]
+        }),
+        new TableRow({
+          children: [
+            pCell('To', labelW),
+            pCell(polFormatDateUS(expiryDate), dateW),
+            pCell(`${polFormatTime(expiryTime)} ${timezone || ''}`.trim(), timeW)
+          ]
+        })
+      ]
+    })
+  ]
 }
 
 function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[] {
@@ -2017,44 +2740,95 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
   const content: (Paragraph | Table)[] = []
 
   if (typeCode === 'P') {
-    const selectedClauses = data.allClauses.filter(c => data.selectedClauseIds.includes(c.id))
+    const selectedClauses = data.allClauses.filter((c) => data.selectedClauseIds.includes(c.id))
     if (polSt(data, 'conditionsIntro')) content.push(...polMp(polSt(data, 'conditionsIntro')))
     if (selectedClauses.length > 0) {
       const clauseRefW = Math.round(POL_BODY_INNER_W * 0.32)
       const clauseDescW = POL_BODY_INNER_W - clauseRefW
-      content.push(new Table({
-        width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-        layout: TableLayoutType.FIXED,
-        columnWidths: [clauseRefW, clauseDescW],
-        rows: selectedClauses.map(c => {
-          const desc = data.clauseOverrides[c.id] || c.description
-          const clauseDesc = desc ? ` \u2013 ${desc}` : ''
-          const displayName = (c.name || '').replace(/^Section\s*B\s*Cl\.?\s*\d+\s*[-\u2013\u2014]?\s*/i, '').trim()
-          const rightText = displayName ? `${displayName}${clauseDesc}` : (desc || '')
-          return new TableRow({
-            children: [
-              new TableCell({ width: { size: clauseRefW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: `Section B Cl.${c.clauseNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-              new TableCell({ width: { size: clauseDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: rightText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-            ]
+      content.push(
+        new Table({
+          width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+          margins: POL_TABLE_MARGINS,
+          layout: TableLayoutType.FIXED,
+          columnWidths: [clauseRefW, clauseDescW],
+          rows: selectedClauses.map((c) => {
+            const desc = data.clauseOverrides[c.id] || c.description
+            const clauseDesc = desc ? ` \u2013 ${desc}` : ''
+            const displayName = (c.name || '')
+              .replace(/^Section\s*B\s*Cl\.?\s*\d+\s*[-\u2013\u2014]?\s*/i, '')
+              .trim()
+            const rightText = displayName ? `${displayName}${clauseDesc}` : desc || ''
+            return new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: clauseRefW, type: WidthType.DXA },
+                  borders: polNoBorders(),
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: `Section B Cl.${c.clauseNumber}`,
+                          size: POL_FONT_SIZE,
+                          font: 'Arial',
+                          color: '000000'
+                        })
+                      ]
+                    })
+                  ]
+                }),
+                new TableCell({
+                  width: { size: clauseDescW, type: WidthType.DXA },
+                  borders: polNoBorders(),
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: rightText,
+                          size: POL_FONT_SIZE,
+                          font: 'Arial',
+                          color: '000000'
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            })
           })
         })
-      }))
+      )
     }
     if (data.additionalClauses.length > 0) {
       content.push(polEmptyP())
       for (const ac of data.additionalClauses) {
-        const def = data.allAdditionalClauses.find(a => a.id === ac.piAdditionalClauseId)
+        const def = data.allAdditionalClauses.find((a) => a.id === ac.piAdditionalClauseId)
         const code = def?.code || ''
         const text = ac.customText || def?.text || ''
         if (!text) continue
-        content.push(new Paragraph({
-          numbering: { reference: 'dash-bullet', level: 0 },
-          spacing: { after: 100 },
-          children: [
-            ...(code ? [new TextRun({ text: decodeHtmlEntities(code) + ' ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] : []),
-            new TextRun({ text: decodeHtmlEntities(text), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
-          ]
-        }))
+        content.push(
+          new Paragraph({
+            numbering: { reference: 'dash-bullet', level: 0 },
+            spacing: { after: 100 },
+            children: [
+              ...(code
+                ? [
+                    new TextRun({
+                      text: decodeHtmlEntities(code) + ' ',
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                : []),
+              new TextRun({
+                text: decodeHtmlEntities(text),
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
       }
     }
   } else if (typeCode === 'H') {
@@ -2066,7 +2840,10 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
   return content
 }
 
-function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragraph | Table)[]): void {
+function polBuildHullConditionsContent(
+  data: PolicyExportData,
+  content: (Paragraph | Table)[]
+): void {
   const hc = data.hullConditions
   const ha = data.hullAdditionalConditions
   const dAlts = data.hullAlternatives
@@ -2076,91 +2853,132 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   if (!altId && dAlts.length > 1) {
     // If there's a selected alternative stored on the quotation, use that
     const qAltId = (data.quotation as any).selectedAlternativeId
-    if (qAltId && dAlts.some(a => a.id === qAltId)) altId = qAltId
+    if (qAltId && dAlts.some((a) => a.id === qAltId)) altId = qAltId
   }
   const currency = data.quotation.premiumCurrency || 'USD'
   if (hc.length === 0 && ha.length === 0) return
 
-  const condCol1W = Math.round(POL_BODY_INNER_W * 0.20)
+  const condCol1W = Math.round(POL_BODY_INNER_W * 0.2)
   const condCol2W = POL_BODY_INNER_W - condCol1W
 
   // Resolve amount: check vesselAmounts for this vessel first, then the condition itself, then any sibling
   const policyVesselId = data.vessel?.id || null
-  const resolveAmount = (qc: typeof hc[0]): number | null | undefined => {
+  const resolveAmount = (qc: (typeof hc)[0]): number | null | undefined => {
     if (policyVesselId && qc.vesselAmounts && qc.vesselAmounts[policyVesselId] != null) {
       return qc.vesselAmounts[policyVesselId]
     }
     if (qc.amount != null) return qc.amount
-    const sibling = hc.find(c => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null)
+    const sibling = hc.find(
+      (c) => c.hullConditionId === qc.hullConditionId && c.id !== qc.id && c.amount != null
+    )
     return sibling?.amount
   }
 
-  const makeCondTable = (conds: typeof hc) => new Table({
-    width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-    layout: TableLayoutType.FIXED,
-    columnWidths: [condCol1W, condCol2W],
-    rows: conds.map(qc => {
-      const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
-      if (!def) return null
-      let text = qc.textOverride || def.text
-      const amount = resolveAmount(qc)
-      if (def.hasAmount && amount != null) {
-        if (def.amountPlaceholder && text.includes(def.amountPlaceholder)) {
-          const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
-        } else if (!text.includes('{amount}')) {
-          // Placeholder not present in the text — append the amount (mirrors the quotation
-          // export) so conditions like "Deductible of" still show their value in the policy.
-          text = text.trimEnd() + ' ' + polFormatCurrency(amount, currency)
-        }
-      }
-      // Issue 3: resolve generic {currency} and {amount} placeholders
-      text = text.replace(new RegExp(`\\{currency\\}\\s*${currency}`, 'gi'), currency).replace(/\{currency\}/g, currency).replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
-      return new TableRow({
-        children: [
-          new TableCell({ width: { size: condCol1W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: decodeHtmlEntities(`Cl. ${def.conditionNumber}`), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: condCol2W, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: decodeHtmlEntities(text), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-        ]
-      })
-    }).filter(Boolean) as TableRow[]
-  })
+  const makeCondTable = (conds: typeof hc) =>
+    new Table({
+      width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+      margins: POL_TABLE_MARGINS,
+      layout: TableLayoutType.FIXED,
+      columnWidths: [condCol1W, condCol2W],
+      rows: conds
+        .map((qc) => {
+          const def = data.allHullConditions.find((c) => c.id === qc.hullConditionId)
+          if (!def) return null
+          let text = qc.textOverride || def.text
+          const amount = resolveAmount(qc)
+          if (def.hasAmount && amount != null) {
+            if (def.amountPlaceholder && text.includes(def.amountPlaceholder)) {
+              const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              text = text.replace(new RegExp(escaped, 'g'), polFormatCurrency(amount, currency))
+            } else if (!text.includes('{amount}')) {
+              // Placeholder not present in the text — append the amount (mirrors the quotation
+              // export) so conditions like "Deductible of" still show their value in the policy.
+              text = text.trimEnd() + ' ' + polFormatCurrency(amount, currency)
+            }
+          }
+          // Issue 3: resolve generic {currency} and {amount} placeholders
+          text = text
+            .replace(new RegExp(`\\{currency\\}\\s*${currency}`, 'gi'), currency)
+            .replace(/\{currency\}/g, currency)
+            .replace(/\{amount\}/g, amount != null ? polFormatCurrency(amount, currency) : '')
+          return new TableRow({
+            children: [
+              new TableCell({
+                width: { size: condCol1W, type: WidthType.DXA },
+                borders: polNoBorders(),
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: decodeHtmlEntities(`Cl. ${def.conditionNumber}`),
+                        size: POL_FONT_SIZE,
+                        font: 'Arial',
+                        color: '000000'
+                      })
+                    ]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: condCol2W, type: WidthType.DXA },
+                borders: polNoBorders(),
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: decodeHtmlEntities(text),
+                        size: POL_FONT_SIZE,
+                        font: 'Arial',
+                        color: '000000'
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        })
+        .filter(Boolean) as TableRow[]
+    })
 
   // Helper: get which hull clause a condition belongs to
-  const getCondClauseId = (qc: typeof hc[0]): string | null => {
-    const def = data.allHullConditions.find(c => c.id === qc.hullConditionId)
+  const getCondClauseId = (qc: (typeof hc)[0]): string | null => {
+    const def = data.allHullConditions.find((c) => c.id === qc.hullConditionId)
     return def?.hullClauseId || null
   }
   const ivClauseId = data.quotation.ivClauseId || null
 
   // Dedup helper: merge alt-specific + null, prefer alt-specific
   const dedupConds = (conds: typeof hc) => {
-    const seen = new Map<string, typeof hc[0]>()
+    const seen = new Map<string, (typeof hc)[0]>()
     // Alt-specific first
-    for (const c of conds.filter(x => x.alternativeId)) {
+    for (const c of conds.filter((x) => x.alternativeId)) {
       seen.set(c.hullConditionId, c)
     }
     // Then null-scoped (only if not already present)
-    for (const c of conds.filter(x => !x.alternativeId)) {
+    for (const c of conds.filter((x) => !x.alternativeId)) {
       if (!seen.has(c.hullConditionId)) seen.set(c.hullConditionId, c)
     }
     return Array.from(seen.values()).sort((a, b) => {
-      const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
-      const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+      const da = data.allHullConditions.find((c) => c.id === a.hullConditionId)
+      const db = data.allHullConditions.find((c) => c.id === b.hullConditionId)
       return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
     })
   }
 
-  const selectedAlt = altId ? dAlts.find(a => a.id === altId) : null
+  const selectedAlt = altId ? dAlts.find((a) => a.id === altId) : null
   if (selectedAlt) {
     // === Selected alternative: separate main clause from IV ===
     const mainClauseId = selectedAlt.hullClauseId
-    const clause = data.hullClauses.find(c => c.id === mainClauseId)
+    const clause = data.hullClauses.find((c) => c.id === mainClauseId)
 
     // Main clause conditions (not IV)
-    const mainConds = hc.filter(qc => {
-      const clauseId = getCondClauseId(qc)
-      return clauseId === mainClauseId || (!clauseId && !ivClauseId)
-    }).filter(qc => qc.alternativeId === selectedAlt.id || !qc.alternativeId)
+    const mainConds = hc
+      .filter((qc) => {
+        const clauseId = getCondClauseId(qc)
+        return clauseId === mainClauseId || (!clauseId && !ivClauseId)
+      })
+      .filter((qc) => qc.alternativeId === selectedAlt.id || !qc.alternativeId)
     const dedupedMain = dedupConds(mainConds)
 
     // "Hull and Machinery" sub-heading when IV exists
@@ -2176,9 +2994,9 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
 
     // IV conditions (separate section)
     if (data.quotation.ivEnabled && ivClauseId) {
-      const ivConds = hc.filter(qc => getCondClauseId(qc) === ivClauseId)
+      const ivConds = hc.filter((qc) => getCondClauseId(qc) === ivClauseId)
       const dedupedIV = dedupConds(ivConds)
-      const ivClause = data.hullClauses.find(c => c.id === ivClauseId)
+      const ivClause = data.hullClauses.find((c) => c.id === ivClauseId)
       content.push(polEmptyP())
       content.push(polBupTight('Increased Value'))
       content.push(polEmptyP())
@@ -2191,30 +3009,39 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   } else if (dAlts.length > 1) {
     for (let i = 0; i < dAlts.length; i++) {
       const alt = dAlts[i]
-      const clause = data.hullClauses.find(c => c.id === alt.hullClauseId)
+      const clause = data.hullClauses.find((c) => c.id === alt.hullClauseId)
       // Dedup conditions per alternative
-      const ownConds = hc.filter(qc => qc.alternativeId === alt.id)
-      const nullConds = hc.filter(qc => !qc.alternativeId)
+      const ownConds = hc.filter((qc) => qc.alternativeId === alt.id)
+      const nullConds = hc.filter((qc) => !qc.alternativeId)
       const altMerged = [...ownConds]
       for (const nc of nullConds) {
-        if (!altMerged.some(c => c.hullConditionId === nc.hullConditionId)) altMerged.push(nc)
+        if (!altMerged.some((c) => c.hullConditionId === nc.hullConditionId)) altMerged.push(nc)
       }
       altMerged.sort((a, b) => {
-        const da = data.allHullConditions.find(c => c.id === a.hullConditionId)
-        const db = data.allHullConditions.find(c => c.id === b.hullConditionId)
+        const da = data.allHullConditions.find((c) => c.id === a.hullConditionId)
+        const db = data.allHullConditions.find((c) => c.id === b.hullConditionId)
         return parseFloat(da?.conditionNumber || '0') - parseFloat(db?.conditionNumber || '0')
       })
       content.push(polBupTight(`Alternative ${i + 1}`))
       content.push(polEmptyP())
-      if (clause) { content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name))); content.push(polEmptyP()) }
+      if (clause) {
+        content.push(polNpTight(decodeHtmlEntities(clause.description || clause.name)))
+        content.push(polEmptyP())
+      }
       if (altMerged.length > 0) content.push(makeCondTable(altMerged))
       content.push(polEmptyP())
     }
   } else {
     const singleAlt = dAlts[0]
-    const selectedClause = singleAlt ? data.hullClauses.find(c => c.id === singleAlt.hullClauseId) : (data.quotation.hullClauseId ? data.hullClauses.find(c => c.id === data.quotation.hullClauseId) : null)
+    const selectedClause = singleAlt
+      ? data.hullClauses.find((c) => c.id === singleAlt.hullClauseId)
+      : data.quotation.hullClauseId
+        ? data.hullClauses.find((c) => c.id === data.quotation.hullClauseId)
+        : null
     if (selectedClause) {
-      content.push(polNpTight(decodeHtmlEntities(selectedClause.description || selectedClause.name)))
+      content.push(
+        polNpTight(decodeHtmlEntities(selectedClause.description || selectedClause.name))
+      )
       content.push(polEmptyP())
     }
     if (hc.length > 0) content.push(makeCondTable(hc))
@@ -2223,11 +3050,12 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   // Shared additional conditions ("Applicable to all sections")
   const filteredHa = altId
     ? (() => {
-        const ownAddls = ha.filter(qa => qa.alternativeId === altId)
-        const nullAddls = ha.filter(qa => !qa.alternativeId)
+        const ownAddls = ha.filter((qa) => qa.alternativeId === altId)
+        const nullAddls = ha.filter((qa) => !qa.alternativeId)
         const merged = [...ownAddls]
         for (const nc of nullAddls) {
-          if (!merged.some(c => c.hullAdditionalConditionId === nc.hullAdditionalConditionId)) merged.push(nc)
+          if (!merged.some((c) => c.hullAdditionalConditionId === nc.hullAdditionalConditionId))
+            merged.push(nc)
         }
         return merged
       })()
@@ -2237,26 +3065,30 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   // (linked only to clauses no active alternative/IV uses), mirroring the quotation export.
   const activeClauseIds: string[] = []
   if (selectedAlt) activeClauseIds.push(selectedAlt.hullClauseId)
-  else if (dAlts.length > 1) activeClauseIds.push(...dAlts.map(a => a.hullClauseId))
+  else if (dAlts.length > 1) activeClauseIds.push(...dAlts.map((a) => a.hullClauseId))
   else {
     const sc = dAlts[0]?.hullClauseId || data.quotation.hullClauseId
     if (sc) activeClauseIds.push(sc)
   }
   if (data.quotation.ivEnabled && ivClauseId) activeClauseIds.push(ivClauseId)
 
-  const visibleHa = filteredHa.filter(qa => {
-    const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+  const visibleHa = filteredHa.filter((qa) => {
+    const def = data.allHullAdditionalConditions.find((c) => c.id === qa.hullAdditionalConditionId)
     if (!def) return false
     const linked = def.hullClauseIds || []
     // No links = applies to all; links present = keep only if at least one matches an active clause
-    return linked.length === 0 || linked.some(id => activeClauseIds.includes(id))
+    return linked.length === 0 || linked.some((id) => activeClauseIds.includes(id))
   })
 
   // Merge additional + custom conditions by the shared order_index so they interleave
   // as bullets (matching the quotation export), instead of a separate trailing block.
   const mergedAddl: { order: number; kind: 'addl' | 'custom'; qa?: any; cc?: any }[] = [
-    ...visibleHa.map(qa => ({ order: (qa as any).order ?? 0, kind: 'addl' as const, qa })),
-    ...data.hullCustomConditions.map(cc => ({ order: (cc as any).order ?? 0, kind: 'custom' as const, cc }))
+    ...visibleHa.map((qa) => ({ order: (qa as any).order ?? 0, kind: 'addl' as const, qa })),
+    ...data.hullCustomConditions.map((cc) => ({
+      order: (cc as any).order ?? 0,
+      kind: 'custom' as const,
+      cc
+    }))
   ].sort((a, b) => a.order - b.order)
 
   if (mergedAddl.length > 0) {
@@ -2268,14 +3100,21 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
     for (const it of mergedAddl) {
       if (it.kind === 'addl') {
         const qa = it.qa
-        const def = data.allHullAdditionalConditions.find(c => c.id === qa.hullAdditionalConditionId)
+        const def = data.allHullAdditionalConditions.find(
+          (c) => c.id === qa.hullAdditionalConditionId
+        )
         if (!def) continue
         let condText = qa.textOverride || def.text
         if (def.hasAmount && def.amountPlaceholder && qa.amount != null) {
           const escaped = def.amountPlaceholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          condText = condText.replace(new RegExp(escaped, 'g'), polFormatCurrency(qa.amount, currency))
+          condText = condText.replace(
+            new RegExp(escaped, 'g'),
+            polFormatCurrency(qa.amount, currency)
+          )
         }
-        condText = condText.replace(/\{currency\}/g, currency).replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
+        condText = condText
+          .replace(/\{currency\}/g, currency)
+          .replace(/\{amount\}/g, qa.amount != null ? polFormatCurrency(qa.amount, currency) : '')
         content.push(...polMpBullet(condText))
       } else {
         const cc = it.cc
@@ -2285,7 +3124,10 @@ function polBuildHullConditionsContent(data: PolicyExportData, content: (Paragra
   }
 }
 
-function polBuildWarConditionsContent(data: PolicyExportData, content: (Paragraph | Table)[]): void {
+function polBuildWarConditionsContent(
+  data: PolicyExportData,
+  content: (Paragraph | Table)[]
+): void {
   const wc = data.warConditions
   if (wc.length === 0) return
 
@@ -2298,7 +3140,7 @@ function polBuildWarConditionsContent(data: PolicyExportData, content: (Paragrap
   }
 
   for (const qc of wc) {
-    const def = data.allWarConditions.find(c => c.id === qc.warConditionId)
+    const def = data.allWarConditions.find((c) => c.id === qc.warConditionId)
     if (!def) continue
     content.push(polBulletP(decodeHtmlEntities(resolveWarText(qc.textOverride || def.text))))
   }
@@ -2315,26 +3157,30 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     let resolvedLolAmount = data.quotation.limitOfLiabilityAmount
     let resolvedLolCurrency = data.quotation.limitOfLiabilityCurrency || 'USD'
     if (data.policy.selectedLolOptionId && data.lolOptions.length > 0) {
-      const selLol = data.lolOptions.find(o => o.id === data.policy.selectedLolOptionId)
+      const selLol = data.lolOptions.find((o) => o.id === data.policy.selectedLolOptionId)
       if (selLol) {
         resolvedLolAmount = selLol.amount
         resolvedLolCurrency = selLol.currency || resolvedLolCurrency
       }
     } else if (data.piAlternatives.length > 0 && data.policy.selectedAlternativeId) {
-      const selAlt = data.piAlternatives.find(a => a.id === data.policy.selectedAlternativeId)
+      const selAlt = data.piAlternatives.find((a) => a.id === data.policy.selectedAlternativeId)
       if (selAlt && (selAlt as any).lolAmount != null) {
         resolvedLolAmount = (selAlt as any).lolAmount
         if ((selAlt as any).lolCurrency) resolvedLolCurrency = (selAlt as any).lolCurrency
       }
-    } else if (data.vessel && data.quotation.limitOfLiabilityVesselAmounts?.[data.vessel.id] != null) {
+    } else if (
+      data.vessel &&
+      data.quotation.limitOfLiabilityVesselAmounts?.[data.vessel.id] != null
+    ) {
       // Fleet quotation with a per-vessel limit — this policy covers just this vessel
       resolvedLolAmount = data.quotation.limitOfLiabilityVesselAmounts[data.vessel.id]
     }
 
     // Amount rendered with its wording in parentheses, e.g. "50,000,000 (US Dollars Fifty Million Only)"
-    const lolAmountWithWords = resolvedLolAmount != null
-      ? `${polFormatAmountOnly(resolvedLolAmount)} (${numberToWords(resolvedLolAmount, resolvedLolCurrency)})`
-      : '___'
+    const lolAmountWithWords =
+      resolvedLolAmount != null
+        ? `${polFormatAmountOnly(resolvedLolAmount)} (${numberToWords(resolvedLolAmount, resolvedLolCurrency)})`
+        : '___'
     let lolText = ''
     if (data.quotation.limitOfLiabilityText) {
       const rawLol = decodeHtmlEntities(data.quotation.limitOfLiabilityText)
@@ -2345,7 +3191,9 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       // Preserve paragraph breaks (e.g. the "Under no circumstances…" sentence sits in its own
       // <p>) — htmlToPlainText uses textContent which would otherwise concatenate them.
       lolText = htmlToPlainText(
-        polSt(data, 'limitOfLiabilityDefaultText').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n')
+        polSt(data, 'limitOfLiabilityDefaultText')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/p>/gi, '\n')
       )
         .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
@@ -2354,15 +3202,28 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     }
     // Layout matches the quotation export: intro → sub-limits → "Under no circumstances…", each
     // block separated by exactly ONE blank line; sub-limit lines are a tight group (no gap).
-    const subLimitParas = data.subLimits.map(sl => new Paragraph({
-      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({
-        text: sl.text.replace(/\{amount\}/g, polFormatAmountOnly(sl.amount)).replace(/\{currency\}/g, sl.currency || 'USD'),
-        size: POL_FONT_SIZE, font: 'Arial', color: '000000'
-      })]
-    }))
+    const subLimitParas = data.subLimits.map(
+      (sl) =>
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: [
+            new TextRun({
+              text: sl.text
+                .replace(/\{amount\}/g, polFormatAmountOnly(sl.amount))
+                .replace(/\{currency\}/g, sl.currency || 'USD'),
+              size: POL_FONT_SIZE,
+              font: 'Arial',
+              color: '000000'
+            })
+          ]
+        })
+    )
     const lolParas = (text: string): Paragraph[] =>
-      text.split('\n').map(l => l.trim()).filter(Boolean).map(l => polNp(l))
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => polNp(l))
     const pushBlock = (paras: Paragraph[]) => {
       if (paras.length === 0) return
       if (content.length > 0) content.push(polEmptyP())
@@ -2381,35 +3242,56 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       pushBlock(lolParas(intro))
       pushBlock(subLimitParas)
       if (underNo) pushBlock(lolParas(underNo[1]))
-      else if (subLimitParas.length > 0) pushBlock([polNp('Under no circumstances is the Combined Single Limit detailed above to be exceeded.')])
+      else if (subLimitParas.length > 0)
+        pushBlock([
+          polNp(
+            'Under no circumstances is the Combined Single Limit detailed above to be exceeded.'
+          )
+        ])
     }
   } else if (typeCode === 'H') {
     const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
     const hmCurrency = vesselCur || data.quotation.agreedValueCurrency || 'USD'
     const ivCurrency = vesselCur || data.quotation.ivCurrency || hmCurrency
-    const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
-    const ivItems = data.quotation.ivEnabled ? data.hullAgreedValueItems.filter(it => it.section === 'iv') : []
+    const hmItems = data.hullAgreedValueItems.filter((it) => (it.section || 'hm') === 'hm')
+    const ivItems = data.quotation.ivEnabled
+      ? data.hullAgreedValueItems.filter((it) => it.section === 'iv')
+      : []
     // Use per-vessel agreed value if available, falling back to quotation-level
-    const vesselAgreedValue = data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
-    const vesselIvValue = data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
+    const vesselAgreedValue =
+      data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    const vesselIvValue =
+      data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
 
     if (data.quotation.ivEnabled && vesselIvValue != null) {
       // Section A / Section B format
       if (vesselAgreedValue != null) {
-        content.push(polBp(`Section A: ${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`))
+        content.push(
+          polBp(
+            `Section A: ${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`
+          )
+        )
       }
       if (hmItems.length > 0) {
         for (const it of hmItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
       content.push(polEmptyP())
-      content.push(polBp(`Section B: ${polFormatCurrency(vesselIvValue, ivCurrency)} (${numberToWords(vesselIvValue, ivCurrency)})`))
+      content.push(
+        polBp(
+          `Section B: ${polFormatCurrency(vesselIvValue, ivCurrency)} (${numberToWords(vesselIvValue, ivCurrency)})`
+        )
+      )
       if (ivItems.length > 0) {
         for (const it of ivItems) content.push(polNp(decodeHtmlEntities(it.text)))
       }
     } else {
       // Single value format (no IV)
       if (vesselAgreedValue != null) {
-        content.push(polBp(`${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`))
+        content.push(
+          polBp(
+            `${polFormatCurrency(vesselAgreedValue, hmCurrency)} (${numberToWords(vesselAgreedValue, hmCurrency)})`
+          )
+        )
       }
       if (hmItems.length > 0) {
         content.push(polEmptyP())
@@ -2425,22 +3307,43 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       const sec2Amt = (data.vessel as any)?.warExcessAmount ?? data.quotation.warExcessAmount ?? 0
       if (vIsS2Only) {
         // Section 2 only: "USD X in excess of USD Y primary war P&I risks"
-        content.push(polNp(`${polFormatCurrency(sec2Amt, wCurrency)} in excess of ${polFormatCurrency(vesselAV, wCurrency)} primary war P&I risks.`))
+        content.push(
+          polNp(
+            `${polFormatCurrency(sec2Amt, wCurrency)} in excess of ${polFormatCurrency(vesselAV, wCurrency)} primary war P&I risks.`
+          )
+        )
       } else {
         content.push(polBp('Section 1'))
-        content.push(polNpTight(`${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`))
+        content.push(
+          polNpTight(
+            `${polFormatCurrency(vesselAV, wCurrency)} (${numberToWords(vesselAV, wCurrency)})`
+          )
+        )
         content.push(polEmptyP())
         content.push(polBp('Section 2'))
-        content.push(polNpTight(`${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`))
+        content.push(
+          polNpTight(
+            `${polFormatCurrency(sec2Amt, wCurrency)} (${numberToWords(sec2Amt, wCurrency)})`
+          )
+        )
       }
       if (data.quotation.warCombinedLimitText) {
         content.push(polEmptyP())
-        content.push(polNp(data.quotation.warCombinedLimitText.replace(/\{amount\}/g, polFormatCurrency(sec2Amt, wCurrency))))
+        content.push(
+          polNp(
+            data.quotation.warCombinedLimitText.replace(
+              /\{amount\}/g,
+              polFormatCurrency(sec2Amt, wCurrency)
+            )
+          )
+        )
       }
     } else {
       const warAV = data.vessel?.agreedValue ?? data.quotation.agreedValue
       if (warAV != null) {
-        content.push(polAmountWordsP(polFormatCurrency(warAV, wCurrency), numberToWords(warAV, wCurrency)))
+        content.push(
+          polAmountWordsP(polFormatCurrency(warAV, wCurrency), numberToWords(warAV, wCurrency))
+        )
       }
     }
   }
@@ -2450,30 +3353,42 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
 
 function polGetValueSectionTitle(typeCode: string | undefined): string {
   switch (typeCode) {
-    case 'P': return 'Limit of Liability'
-    case 'H': return 'Agreed Insured Value'
-    case 'W': return 'Sum Insured'
-    default: return 'Limit of Liability'
+    case 'P':
+      return 'Limit of Liability'
+    case 'H':
+      return 'Agreed Insured Value'
+    case 'W':
+      return 'Sum Insured'
+    default:
+      return 'Limit of Liability'
   }
 }
 
 // Section-order key for the generic value/limit section (mirrors quotationSettingsConstants keys)
 function polGetValueSectionKey(typeCode: string | undefined): string {
   switch (typeCode) {
-    case 'H': return 'agreedValue'
-    case 'W': return 'sumInsured'
-    case 'C': return 'insuredValue'
-    default: return 'liability'
+    case 'H':
+      return 'agreedValue'
+    case 'W':
+      return 'sumInsured'
+    case 'C':
+      return 'insuredValue'
+    default:
+      return 'liability'
   }
 }
 
 // Section-order key for the conditions section, per type
 function polGetConditionsKey(typeCode: string | undefined): string {
   switch (typeCode) {
-    case 'H': return 'hullConditions'
-    case 'W': return 'warConditions'
-    case 'C': return 'cargoConditions'
-    default: return 'conditions'
+    case 'H':
+      return 'hullConditions'
+    case 'W':
+      return 'warConditions'
+    case 'C':
+      return 'cargoConditions'
+    default:
+      return 'conditions'
   }
 }
 
@@ -2482,24 +3397,29 @@ function polGetConditionsKey(typeCode: string | undefined): string {
 function resolvePolicySectionOrder(data: PolicyExportData, settingsDefault?: string[]): string[] {
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const hardcoded = getDefaultSectionOrder(typeCode)
-  const def = (settingsDefault && settingsDefault.length > 0) ? settingsDefault : hardcoded
+  const def = settingsDefault && settingsDefault.length > 0 ? settingsDefault : hardcoded
   const saved = (data.policy as any).sectionOrder
   const order = Array.isArray(saved) && saved.length > 0 ? [...saved] : [...def]
   for (const k of hardcoded) if (!order.includes(k)) order.push(k)
-  for (const cs of data.customSections) { const key = `custom:${cs.id}`; if (!order.includes(key)) order.push(key) }
+  for (const cs of data.customSections) {
+    const key = `custom:${cs.id}`
+    if (!order.includes(key)) order.push(key)
+  }
   return order
 }
 
 function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
   const wq = data.quotation
-  const excCountries = data.excludedCountries.filter(c => c.listType === 'excluded')
-  const ddqCountries = data.excludedCountries.filter(c => c.listType === 'ddq')
+  const excCountries = data.excludedCountries.filter((c) => c.listType === 'excluded')
+  const ddqCountries = data.excludedCountries.filter((c) => c.listType === 'ddq')
 
   // Per-vessel trading intro: find the intro scoped to this vessel, falling back to quotation-level intro
   const policyVesselQvId = data.vessel?.id || null
   const perVesselIntro = policyVesselQvId
-    ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(policyVesselQvId))
+    ? (data.tradingIntros || []).find(
+        (ti) => ti.vesselScope && ti.vesselScope.includes(policyVesselQvId)
+      )
     : null
   const effectiveIntro = perVesselIntro ? perVesselIntro.text : wq.tradingWarrantyIntro
   if (effectiveIntro) content.push(...polMpUniform(effectiveIntro))
@@ -2507,61 +3427,124 @@ function polBuildTradingSection(data: PolicyExportData): (Paragraph | Table)[] {
     content.push(polEmptyP())
     content.push(...polMp(wq.tradingCustomWording))
   } else {
-    if (wq.tradingCustomText) { content.push(polEmptyP()); content.push(...polMpTight(wq.tradingCustomText)) }
-    if (wq.tradingShowExcluded !== false && excCountries.length > 0) { content.push(polEmptyP()); content.push(polNpTight('Excluding ' + excCountries.map(c => c.name).join(', ') + '.')) }
+    if (wq.tradingCustomText) {
+      content.push(polEmptyP())
+      content.push(...polMpTight(wq.tradingCustomText))
+    }
+    if (wq.tradingShowExcluded !== false && excCountries.length > 0) {
+      content.push(polEmptyP())
+      content.push(polNpTight('Excluding ' + excCountries.map((c) => c.name).join(', ') + '.'))
+    }
     if (wq.tradingShowDdqList && ddqCountries.length > 0) {
-      const ddqList = [...ddqCountries].sort((a, b) => a.name.localeCompare(b.name)).map(c => c.name).join(', ')
-      const ddqIntro = stripHtml(polSt(data, 'ddqCountriesIntro') || 'Due Diligence Questionnaire required for trading with the following countries:')
+      const ddqList = [...ddqCountries]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((c) => c.name)
+        .join(', ')
+      const ddqIntro = stripHtml(
+        polSt(data, 'ddqCountriesIntro') ||
+          'Due Diligence Questionnaire required for trading with the following countries:'
+      )
       content.push(polSpacerPts(3))
       if (ddqIntro.includes('{ddq_countries}')) {
-        content.push(new Paragraph({
-          numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
-          children: [new TextRun({ text: ddqIntro.replace(/\{ddq_countries\}/g, ddqList), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-        }))
+        content.push(
+          new Paragraph({
+            numbering: { reference: 'trading-numbered', level: 0 },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({
+                text: ddqIntro.replace(/\{ddq_countries\}/g, ddqList),
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
       } else {
-        content.push(new Paragraph({
-          numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
-          children: [new TextRun({ text: ddqIntro, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-        }))
+        content.push(
+          new Paragraph({
+            numbering: { reference: 'trading-numbered', level: 0 },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({ text: ddqIntro, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+            ]
+          })
+        )
         // Country list indented to align under the numbered item's text (240 = numbering indent)
-        content.push(new Paragraph({
-          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-          indent: { left: 240 },
-          children: [new TextRun({ text: ddqList, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-        }))
+        content.push(
+          new Paragraph({
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            indent: { left: 240 },
+            children: [
+              new TextRun({ text: ddqList, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+            ]
+          })
+        )
       }
     }
     if (wq.tradingShowDdqWarranties) {
       const intro = polSt(data, 'tradingConditionA')
       if (intro) {
         content.push(polSpacerPts(3))
-        content.push(new Paragraph({
-          numbering: { reference: 'trading-numbered', level: 0 },
-          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
-          children: [new TextRun({ text: stripHtml(intro), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-        }))
+        content.push(
+          new Paragraph({
+            numbering: { reference: 'trading-numbered', level: 0 },
+            spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({
+                text: stripHtml(intro),
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
       }
-      const condKeys: (keyof PISectionTexts)[] = ['tradingConditionB', 'tradingConditionC', 'tradingConditionD', 'tradingConditionE', 'tradingConditionF', 'tradingConditionG']
+      const condKeys: (keyof PISectionTexts)[] = [
+        'tradingConditionB',
+        'tradingConditionC',
+        'tradingConditionD',
+        'tradingConditionE',
+        'tradingConditionF',
+        'tradingConditionG'
+      ]
       for (const key of condKeys) {
         const txt = polSt(data, key)
         if (txt) {
-          content.push(new Paragraph({
-            numbering: { reference: 'trading-numbered', level: 1 },
-            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-            children: [new TextRun({ text: stripHtml(txt), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-          }))
+          content.push(
+            new Paragraph({
+              numbering: { reference: 'trading-numbered', level: 1 },
+              spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: stripHtml(txt),
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          )
         }
       }
     }
     if (wq.tradingShowIsrael && polSt(data, 'tradingIsrael')) {
       content.push(polSpacerPts(3))
-      content.push(new Paragraph({
-        numbering: { reference: 'trading-numbered', level: 0 },
-        spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
-        children: [new TextRun({ text: stripHtml(polSt(data, 'tradingIsrael')), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-      }))
+      content.push(
+        new Paragraph({
+          numbering: { reference: 'trading-numbered', level: 0 },
+          spacing: { before: 60, after: 40, line: 240, lineRule: 'auto' as any },
+          children: [
+            new TextRun({
+              text: stripHtml(polSt(data, 'tradingIsrael')),
+              size: POL_FONT_SIZE,
+              font: 'Arial',
+              color: '000000'
+            })
+          ]
+        })
+      )
     }
   }
 
@@ -2572,7 +3555,7 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
   const content: (Paragraph | Table)[] = []
 
   for (const wid of data.selectedWarrantyIds) {
-    const w = data.allWarranties.find(ww => ww.id === wid)
+    const w = data.allWarranties.find((ww) => ww.id === wid)
     if (w) content.push(polBulletP(decodeHtmlEntities(w.text)))
   }
   for (const cw of [...data.customWarranties].sort((a, b) => a.order - b.order)) {
@@ -2581,13 +3564,20 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
   if (data.quotation.quotationTypeCode !== 'W') {
     for (const sw of data.surveyWarranties) content.push(polBulletP(decodeHtmlEntities(sw.text)))
   }
-  if (polSt(data, 'warrantiesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpUniform(polSt(data, 'warrantiesAdditionalText'))) }
-  if (polSt(data, 'warrantiesBreach')) { content.push(polEmptyP()); content.push(...polMpUniform(polSt(data, 'warrantiesBreach'))) }
+  if (polSt(data, 'warrantiesAdditionalText')) {
+    content.push(polEmptyP())
+    content.push(...polMpUniform(polSt(data, 'warrantiesAdditionalText')))
+  }
+  if (polSt(data, 'warrantiesBreach')) {
+    content.push(polEmptyP())
+    content.push(...polMpUniform(polSt(data, 'warrantiesBreach')))
+  }
 
   // H&M warranty NOTE — from warrantiesNote section text or hardcoded default
   if (data.quotation.quotationTypeCode === 'H') {
     const noteText = polSt(data, 'warrantiesNote')
-    const defaultNote = 'NOTE: The Insured\'s attention is drawn to the provisions of the H&M Terms and Conditions, which also include Warranties.'
+    const defaultNote =
+      "NOTE: The Insured's attention is drawn to the provisions of the H&M Terms and Conditions, which also include Warranties."
     content.push(polEmptyP())
     if (noteText) {
       content.push(...polMp(noteText))
@@ -2601,66 +3591,157 @@ function polBuildWarrantiesSection(data: PolicyExportData): (Paragraph | Table)[
 
 function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)[] {
   const content: (Paragraph | Table)[] = []
-  const dedAmtW = Math.round(POL_BODY_INNER_W * 0.20)
+  const dedAmtW = Math.round(POL_BODY_INNER_W * 0.2)
   const dedDescW = POL_BODY_INNER_W - dedAmtW
 
   if (data.deductibles.length > 0) {
     const policyVesselId = data.vessel?.id || null
     const dedRows: TableRow[] = []
     for (const d of data.deductibles) {
-      const resolvedAmount = (policyVesselId && d.vesselAmounts && d.vesselAmounts[policyVesselId] != null)
-        ? d.vesselAmounts[policyVesselId]
-        : d.amount
+      const resolvedAmount =
+        policyVesselId && d.vesselAmounts && d.vesselAmounts[policyVesselId] != null
+          ? d.vesselAmounts[policyVesselId]
+          : d.amount
       // Per-vessel secondary amount (fleet quotes) — falls back to the deductible's own value
-      const resolvedSecondary = (policyVesselId && d.vesselSecondaryAmounts && d.vesselSecondaryAmounts[policyVesselId] != null)
-        ? d.vesselSecondaryAmounts[policyVesselId]
-        : d.secondaryAmount
-      const replDed = (text: string, cur: string, amt: number | undefined | null) => { const a = amt != null ? polFormatCurrency(amt, cur) : '___'; return text.replace(/\{currency\}\s*\{amount\}/g, a).replace(/\{currency\}/g, cur).replace(/\{amount\}/g, a) }
+      const resolvedSecondary =
+        policyVesselId &&
+        d.vesselSecondaryAmounts &&
+        d.vesselSecondaryAmounts[policyVesselId] != null
+          ? d.vesselSecondaryAmounts[policyVesselId]
+          : d.secondaryAmount
+      const replDed = (text: string, cur: string, amt: number | undefined | null) => {
+        const a = amt != null ? polFormatCurrency(amt, cur) : '___'
+        return text
+          .replace(/\{currency\}\s*\{amount\}/g, a)
+          .replace(/\{currency\}/g, cur)
+          .replace(/\{amount\}/g, a)
+      }
       const mainDesc = replDed(d.description, d.currency, resolvedSecondary)
-      dedRows.push(new TableRow({
-        children: [
-          new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: polFormatCurrency(resolvedAmount, d.currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: mainDesc, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-        ]
-      }))
+      dedRows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: dedAmtW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: polFormatCurrency(resolvedAmount, d.currency),
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: dedDescW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: mainDesc,
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
+        })
+      )
       if (d.secondaryDescription) {
         const secDesc = replDed(d.secondaryDescription, d.currency, resolvedSecondary)
-        dedRows.push(new TableRow({
-          children: [
-            new TableCell({ width: { size: dedAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: resolvedSecondary != null ? polFormatCurrency(resolvedSecondary, d.currency) : '', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: dedDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ children: [new TextRun({ text: secDesc, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
-          ]
-        }))
+        dedRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: dedAmtW, type: WidthType.DXA },
+                borders: polNoBorders(),
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text:
+                          resolvedSecondary != null
+                            ? polFormatCurrency(resolvedSecondary, d.currency)
+                            : '',
+                        size: POL_FONT_SIZE,
+                        font: 'Arial',
+                        color: '000000'
+                      })
+                    ]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: dedDescW, type: WidthType.DXA },
+                borders: polNoBorders(),
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: secDesc,
+                        size: POL_FONT_SIZE,
+                        font: 'Arial',
+                        color: '000000'
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        )
       }
     }
-    content.push(new Table({
-      width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS,
-      layout: TableLayoutType.FIXED,
-      columnWidths: [dedAmtW, dedDescW],
-      rows: dedRows
-    }))
+    content.push(
+      new Table({
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        margins: POL_TABLE_MARGINS,
+        layout: TableLayoutType.FIXED,
+        columnWidths: [dedAmtW, dedDescW],
+        rows: dedRows
+      })
+    )
   }
   // Aggregate clause ("When one incident gives rise to...") comes immediately after the
   // deductibles table, before any text deductibles (matches the quotation export order).
   const dedAggText = data.quotation.deductibleAggregateEnabled
-    ? (data.quotation.deductibleAggregateText || (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : ''))
+    ? data.quotation.deductibleAggregateText ||
+      (polSt(data, 'deductiblesAggregate') ? stripHtml(polSt(data, 'deductiblesAggregate')) : '')
     : ''
-  if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
+  if (dedAggText) {
+    content.push(polEmptyP())
+    content.push(...polMp(dedAggText))
+  }
 
   if (data.textDeductibles.length > 0) {
     // One blank line after the table / aggregate clause (as in the quotation)
     content.push(polEmptyP())
     data.textDeductibles.forEach((td, i) => {
-      content.push(...(i === data.textDeductibles.length - 1 ? polMpTight(td.text) : polMp(td.text)))
+      content.push(
+        ...(i === data.textDeductibles.length - 1 ? polMpTight(td.text) : polMp(td.text))
+      )
     })
   }
 
-  if (polSt(data, 'deductiblesAdditionalText')) { content.push(polEmptyP()); content.push(...polMpTight(polSt(data, 'deductiblesAdditionalText'))) }
+  if (polSt(data, 'deductiblesAdditionalText')) {
+    content.push(polEmptyP())
+    content.push(...polMpTight(polSt(data, 'deductiblesAdditionalText')))
+  }
 
   return content
 }
 
-async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(Paragraph | Table)[]> {
+async function polBuildPremiumPaymentSection(
+  data: PolicyExportData
+): Promise<(Paragraph | Table)[]> {
   const content: (Paragraph | Table)[] = []
   const { instalments } = data
   const numInst = instalments.length || 1
@@ -2669,10 +3750,21 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
   const polNr = (data.policy as any).nonRefundableType
   const nrType = polNr != null ? (polNr === 'none' ? null : polNr) : wq.nonRefundableType
-  const nrPct = (data.policy as any).nonRefundablePercent != null ? (data.policy as any).nonRefundablePercent : wq.nonRefundablePercent
+  const nrPct =
+    (data.policy as any).nonRefundablePercent != null
+      ? (data.policy as any).nonRefundablePercent
+      : wq.nonRefundablePercent
   // Priority: instalment sum (most accurate) → policy premium → quotation premium
-  const instalmentSum = instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0)
-  const totalPremium = instalmentSum > 0 ? instalmentSum : (data.policy.premiumAmount != null && data.policy.premiumAmount > 0 ? data.policy.premiumAmount : (wq.premiumAmount || 0))
+  const instalmentSum = instalments.reduce(
+    (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
+    0
+  )
+  const totalPremium =
+    instalmentSum > 0
+      ? instalmentSum
+      : data.policy.premiumAmount != null && data.policy.premiumAmount > 0
+        ? data.policy.premiumAmount
+        : wq.premiumAmount || 0
   const ppTime = polPremiumPaymentTime(data)
 
   // Load policy export settings
@@ -2685,34 +3777,62 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       if (p.premiumIntroText) premIntroTemplate = p.premiumIntroText
       if (p.premiumIntroSingleText) premIntroSingleTemplate = p.premiumIntroSingleText
     }
-  } catch { /* default */ }
+  } catch {
+    /* default */
+  }
 
   if (numInst === 1 && instalments.length === 1) {
     // Single instalment: "Premium of {currency} {amount} shall be payable on {date}..."
-    const singleTemplate = premIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
-    const singleIntro = polApplyPremiumTime(singleTemplate
-      .replace(/\{currency\}/g, currency)
-      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate)), ppTime)
+    const singleTemplate =
+      premIntroSingleTemplate ||
+      'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
+    const singleIntro = polApplyPremiumTime(
+      singleTemplate
+        .replace(/\{currency\}/g, currency)
+        .replace(
+          /\{amount\}/g,
+          polFormatCurrency(totalPremium, currency).replace(`${currency} `, '')
+        )
+        .replace(/\{date\}/g, polFormatDateUS(instalments[0].dueDate)),
+      ppTime
+    )
     content.push(polNpTight(singleIntro))
     content.push(polSpacerPts(3))
 
     // Non-refundable text for single instalment
-    if (nrType === 'first_instalment' || (instalments[0].isNonRefundable)) {
-      content.push(polNpTight('Non-refundable in case of cancellation, whether before or after inception.'))
+    if (nrType === 'first_instalment' || instalments[0].isNonRefundable) {
+      content.push(
+        polNpTight('Non-refundable in case of cancellation, whether before or after inception.')
+      )
       content.push(polSpacerPts(6))
     }
     if (nrType === 'percentage' && nrPct) {
-      const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
-      if (nrText) { content.push(polNpTight(nrText)); content.push(polSpacerPts(6)) }
+      const nrText = stripHtml(
+        (
+          polSt(data, 'nonRefundablePercentText') ||
+          '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.'
+        ).replace(/\{percent\}/g, polFmtPct(nrPct))
+      )
+      if (nrText) {
+        content.push(polNpTight(nrText))
+        content.push(polSpacerPts(6))
+      }
     }
   } else {
     // Multiple instalments
-    const multiTemplate = premIntroTemplate || 'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
-    const premIntro = polApplyPremiumTime(multiTemplate
-      .replace(/\{currency\}/g, currency)
-      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{instalments\}/g, String(numInst)), ppTime)
+    const multiTemplate =
+      premIntroTemplate ||
+      'Premium {currency} {amount} shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+    const premIntro = polApplyPremiumTime(
+      multiTemplate
+        .replace(/\{currency\}/g, currency)
+        .replace(
+          /\{amount\}/g,
+          polFormatCurrency(totalPremium, currency).replace(`${currency} `, '')
+        )
+        .replace(/\{instalments\}/g, String(numInst)),
+      ppTime
+    )
     content.push(polNpTight(premIntro))
     content.push(polSpacerPts(3))
 
@@ -2731,29 +3851,45 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
       content.push(polSpacerPts(6))
 
       if (nrType === 'percentage' && nrPct) {
-        const nrText = stripHtml((polSt(data, 'nonRefundablePercentText') || '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.').replace(/\{percent\}/g, polFmtPct(nrPct)))
-        if (nrText) { content.push(polNpTight(nrText)); content.push(polSpacerPts(6)) }
+        const nrText = stripHtml(
+          (
+            polSt(data, 'nonRefundablePercentText') ||
+            '{percent}% of premium is non-refundable in case of cancellation, whether before or after inception.'
+          ).replace(/\{percent\}/g, polFmtPct(nrPct))
+        )
+        if (nrText) {
+          content.push(polNpTight(nrText))
+          content.push(polSpacerPts(6))
+        }
       }
     }
   }
 
   // 2b. Outstanding premium notice — policy override (set in the conversion wizard) wins over the quotation
-  const outstandingEnabled = (data.policy as any).outstandingPremiumEnabled != null
-    ? (data.policy as any).outstandingPremiumEnabled
-    : wq.outstandingPremiumEnabled
-  const outstandingText = (data.policy as any).outstandingPremiumText != null
-    ? (data.policy as any).outstandingPremiumText
-    : wq.outstandingPremiumText
+  const outstandingEnabled =
+    (data.policy as any).outstandingPremiumEnabled != null
+      ? (data.policy as any).outstandingPremiumEnabled
+      : wq.outstandingPremiumEnabled
+  const outstandingText =
+    (data.policy as any).outstandingPremiumText != null
+      ? (data.policy as any).outstandingPremiumText
+      : wq.outstandingPremiumText
   if (outstandingEnabled && outstandingText) {
-    content.push(new Paragraph({
-      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({
-        text: outstandingText,
-        size: POL_FONT_SIZE, font: 'Arial', color: '000000',
-        bold: wq.outstandingPremiumBold !== false,
-        underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
-      })]
-    }))
+    content.push(
+      new Paragraph({
+        spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+        children: [
+          new TextRun({
+            text: outstandingText,
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            bold: wq.outstandingPremiumBold !== false,
+            underline: wq.outstandingPremiumUnderline !== false ? {} : undefined
+          })
+        ]
+      })
+    )
     content.push(polSpacerPts(6))
   }
 
@@ -2764,13 +3900,21 @@ async function polBuildPremiumPaymentSection(data: PolicyExportData): Promise<(P
   }
 
   // 3. Additional premium text
-  if (wq.premiumAdditionalText) { content.push(...polMpTight(wq.premiumAdditionalText)); content.push(polSpacerPts(6)) }
+  if (wq.premiumAdditionalText) {
+    content.push(...polMpTight(wq.premiumAdditionalText))
+    content.push(polSpacerPts(6))
+  }
 
   // 4. Condition precedent text
-  if (polSt(data, 'premiumCondition')) { content.push(...polMpTight(polSt(data, 'premiumCondition'))); content.push(polEmptyP()) }
+  if (polSt(data, 'premiumCondition')) {
+    content.push(...polMpTight(polSt(data, 'premiumCondition')))
+    content.push(polEmptyP())
+  }
 
   // 5. Premium earned text
-  if (polSt(data, 'premiumEarned')) { content.push(...polMp(polSt(data, 'premiumEarned'))) }
+  if (polSt(data, 'premiumEarned')) {
+    content.push(...polMp(polSt(data, 'premiumEarned')))
+  }
 
   return content
 }
@@ -2784,11 +3928,18 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 
 // ==================== Policy Document Export ====================
 
-export async function exportPolicyDocx(policyId: string, totalPages?: number, includeTC?: boolean): Promise<void> {
+export async function exportPolicyDocx(
+  policyId: string,
+  totalPages?: number,
+  includeTC?: boolean
+): Promise<void> {
   const storable = !totalPages && !includeTC
   if (storable) {
     const stored = await polStoredFile(policyId, 'policy')
-    if (stored) { polDownloadBlob(stored.blob, stored.fileName); return }
+    if (stored) {
+      polDownloadBlob(stored.blob, stored.fileName)
+      return
+    }
   }
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
@@ -2799,30 +3950,43 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   let tcHtml: string | null = null
   if (includeTC) {
     try {
-      const tcTpl = await window.api.tcGetTemplate(typeCode) as any
-      if (tcTpl && !tcTpl.error && tcTpl.kind === 'html' && tcTpl.contentHtml) tcHtml = tcTpl.contentHtml
-    } catch { /* no T&C */ }
+      const tcTpl = (await window.api.tcGetTemplate(typeCode)) as any
+      if (tcTpl && !tcTpl.error && tcTpl.kind === 'html' && tcTpl.contentHtml)
+        tcHtml = tcTpl.contentHtml
+    } catch {
+      /* no T&C */
+    }
   }
 
   const children: (Paragraph | Table)[] = []
 
   // Logo — frozen path from the snapshot (falls back to live if an older snapshot lacks it)
-  const logoPath = data.frozen?.logoPath !== undefined ? data.frozen.logoPath : await window.api.piGetQuotationLogoPath()
+  const logoPath =
+    data.frozen?.logoPath !== undefined
+      ? data.frozen.logoPath
+      : await window.api.piGetQuotationLogoPath()
   if (logoPath) {
     const logoData = await polLoadLogoAsBuffer(logoPath)
     if (logoData) {
       const maxW = 200
       const maxH = 80
       const scale = Math.min(maxW / logoData.width, maxH / logoData.height)
-      children.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 100 },
-        children: [new ImageRun({
-          data: logoData.buffer,
-          transformation: { width: Math.round(logoData.width * scale), height: Math.round(logoData.height * scale) },
-          type: 'png'
-        })]
-      }))
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+          children: [
+            new ImageRun({
+              data: logoData.buffer,
+              transformation: {
+                width: Math.round(logoData.width * scale),
+                height: Math.round(logoData.height * scale)
+              },
+              type: 'png'
+            })
+          ]
+        })
+      )
     }
   }
 
@@ -2857,18 +4021,28 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
-          children: [new Paragraph({
-            keepLines: true,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-          })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              spacing: { before: 0, after: 0 },
+              children: [
+                new TextRun({
+                  text: title.toUpperCase(),
+                  bold: true,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 200, left: 80, right: 80 },
-          children: (c => c.length > 0 ? c : [polEmptyP()])(polCollapseEmpty(content))
+          children: ((c) => (c.length > 0 ? c : [polEmptyP()]))(polCollapseEmpty(content))
         })
       ]
     })
@@ -2888,16 +4062,23 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // VALUE / LIMIT — Hull with IV gets split into Interest + Agreed Insured Value
   {
     // Use per-vessel agreed value if available, falling back to quotation-level
-    const polVesselAv = data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
+    const polVesselAv =
+      data.vessel?.agreedValue != null ? data.vessel.agreedValue : data.quotation.agreedValue
     const polVesselIv = data.vessel?.ivValue != null ? data.vessel.ivValue : data.quotation.ivValue
     if (typeCode === 'H' && data.quotation.ivEnabled && polVesselIv != null) {
-      const hmItems = data.hullAgreedValueItems.filter(it => (it.section || 'hm') === 'hm')
-      const ivItems = data.hullAgreedValueItems.filter(it => it.section === 'iv')
+      const hmItems = data.hullAgreedValueItems.filter((it) => (it.section || 'hm') === 'hm')
+      const ivItems = data.hullAgreedValueItems.filter((it) => it.section === 'iv')
       // Interest section (text descriptions)
       if (hmItems.length > 0 || ivItems.length > 0) {
         const intContent: (Paragraph | Table)[] = []
-        if (hmItems.length > 0) intContent.push(polNp('A) ' + hmItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
-        if (ivItems.length > 0) intContent.push(polNp('B) ' + ivItems.map(it => decodeHtmlEntities(it.text)).join('\n')))
+        if (hmItems.length > 0)
+          intContent.push(
+            polNp('A) ' + hmItems.map((it) => decodeHtmlEntities(it.text)).join('\n'))
+          )
+        if (ivItems.length > 0)
+          intContent.push(
+            polNp('B) ' + ivItems.map((it) => decodeHtmlEntities(it.text)).join('\n'))
+          )
         addRow('interest', makeRow('Interest', intContent))
       }
       // Agreed Insured Value (amounts) — Section A / Section B / Total (bold), Total in words
@@ -2909,11 +4090,27 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
         const avSections: { label: string; amount: number }[] = []
         if (polVesselAv != null) avSections.push({ label: 'Section A', amount: polVesselAv })
         avSections.push({ label: 'Section B', amount: polVesselIv })
-        avContent.push(...polBuildAmountBreakdown(avSections, 'Total', (polVesselAv || 0) + polVesselIv, hmCurrency))
+        avContent.push(
+          ...polBuildAmountBreakdown(
+            avSections,
+            'Total',
+            (polVesselAv || 0) + polVesselIv,
+            hmCurrency
+          )
+        )
       } else {
         // Mixed currencies — a combined total isn't meaningful; keep the per-section lines
-        if (polVesselAv != null) avContent.push(polNp(`Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`))
-        avContent.push(polNp(`Section B: ${polFormatCurrency(polVesselIv, ivCurrency)} (${numberToWords(polVesselIv, ivCurrency)})`))
+        if (polVesselAv != null)
+          avContent.push(
+            polNp(
+              `Section A: ${polFormatCurrency(polVesselAv, hmCurrency)} (${numberToWords(polVesselAv, hmCurrency)})`
+            )
+          )
+        avContent.push(
+          polNp(
+            `Section B: ${polFormatCurrency(polVesselIv, ivCurrency)} (${numberToWords(polVesselIv, ivCurrency)})`
+          )
+        )
       }
       addRow('agreedValue', makeRow('Agreed Insured\nValue', avContent))
     } else if (typeCode === 'W' && data.quotation.warExcessEnabled) {
@@ -2921,8 +4118,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
       // War P&I Excess: Interest section
       const intContent: (Paragraph | Table)[] = []
-      const sec1Text = data.quotation.warSection1Text || data.warSettings?.section1Text || 'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
-      const sec2Text = data.quotation.warSection2Text || data.warSettings?.section2Text || 'War P&I in excess of Hull value'
+      const sec1Text =
+        data.quotation.warSection1Text ||
+        data.warSettings?.section1Text ||
+        'Hull, Material, Machinery and Outfit Including War Protection and Indemnity and War Crew Liability up to Sum Insured'
+      const sec2Text =
+        data.quotation.warSection2Text ||
+        data.warSettings?.section2Text ||
+        'War P&I in excess of Hull value'
       if (polIsS2Only) {
         intContent.push(polNp(sec2Text))
       } else {
@@ -2934,10 +4137,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       }
       if (intContent.length > 0) addRow('interest', makeRow('Interest', intContent))
       const valueContent = polBuildValueSection(data)
-      if (valueContent.length > 0) addRow('sumInsured', makeRow('Sum Insured / Limits', valueContent))
+      if (valueContent.length > 0)
+        addRow('sumInsured', makeRow('Sum Insured / Limits', valueContent))
     } else {
       const valueContent = polBuildValueSection(data)
-      if (valueContent.length > 0) addRow(polGetValueSectionKey(typeCode), makeRow(polGetValueSectionTitle(typeCode), valueContent))
+      if (valueContent.length > 0)
+        addRow(
+          polGetValueSectionKey(typeCode),
+          makeRow(polGetValueSectionTitle(typeCode), valueContent)
+        )
     }
   }
 
@@ -2947,7 +4155,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   // CONDITIONS
   const conditionsContent = polBuildConditionsSection(data)
-  if (conditionsContent.length > 0) addRow(polGetConditionsKey(typeCode), makeRow('Conditions', conditionsContent))
+  if (conditionsContent.length > 0)
+    addRow(polGetConditionsKey(typeCode), makeRow('Conditions', conditionsContent))
 
   // CLASSIFICATION — shown in vessel table, not as separate section
 
@@ -2959,7 +4168,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     // War: use per-vessel intro or quotation-level intro
     const warVesselQvId = data.vessel?.id || null
     const warPerVIntro = warVesselQvId
-      ? (data.tradingIntros || []).find(ti => ti.vesselScope && ti.vesselScope.includes(warVesselQvId))
+      ? (data.tradingIntros || []).find(
+          (ti) => ti.vesselScope && ti.vesselScope.includes(warVesselQvId)
+        )
       : null
     const warEffIntro = warPerVIntro ? warPerVIntro.text : data.quotation.tradingWarrantyIntro
     if (warEffIntro) addRow('warTrading', makeRow('Trading Warranty', polMpUniform(warEffIntro)))
@@ -2977,24 +4188,30 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
 
   // SANCTIONS
   const sanctionsText = polGetSanctionsText(data)
-  if (sanctionsText) addRow('sanctions', makeRow('Sanction Limitation and Exclusion Clause', polMp(decodeHtmlEntities(sanctionsText))))
+  if (sanctionsText)
+    addRow(
+      'sanctions',
+      makeRow('Sanction Limitation and Exclusion Clause', polMp(decodeHtmlEntities(sanctionsText)))
+    )
 
   // EXCLUSIONS
   const exclusionsContent: Paragraph[] = []
   // Exclusions are already narrowed to the policy's selected alternative at load time.
   // Only legacy policies with no recorded alternative fall back to the first one.
   const hasAltExclusions = data.piAlternatives.length > 0
-  const exclAltId = data.policy.selectedAlternativeId || (hasAltExclusions ? data.piAlternatives[0].id : null)
+  const exclAltId =
+    data.policy.selectedAlternativeId || (hasAltExclusions ? data.piAlternatives[0].id : null)
   for (const se of data.selectedExclusions) {
     if (hasAltExclusions && se.alternativeId && se.alternativeId !== exclAltId) continue
     if (se.customText) exclusionsContent.push(polBulletP(decodeHtmlEntities(se.customText)))
     else if (se.piExclusionId) {
-      const found = data.allExclusions.find(e => e.id === se.piExclusionId)
+      const found = data.allExclusions.find((e) => e.id === se.piExclusionId)
       if (found) exclusionsContent.push(polBulletP(decodeHtmlEntities(found.text)))
     }
   }
   for (const ce of data.customExclusions) {
-    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== exclAltId) continue
+    if (hasAltExclusions && (ce as any).alternativeId && (ce as any).alternativeId !== exclAltId)
+      continue
     exclusionsContent.push(polBulletP(decodeHtmlEntities(ce.text)))
   }
   if (exclusionsContent.length > 0) addRow('exclusions', makeRow('Exclusions', exclusionsContent))
@@ -3017,13 +4234,18 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       if (psIntroFixed.includes('{subjectivity_days}')) {
         psIntroFixed = psIntroFixed.replace(/\{subjectivity_days\}/g, psTiming)
       } else {
-        psIntroFixed = psIntroFixed.replace(/within \d+ days?\s*(of|prior)?\s*inception/i, psTiming)
-                                   .replace(/prior\s+inception/i, psTiming)
+        psIntroFixed = psIntroFixed
+          .replace(/within \d+ days?\s*(of|prior)?\s*inception/i, psTiming)
+          .replace(/prior\s+inception/i, psTiming)
       }
       subjContent.push(...polMp(psIntroFixed))
     }
-    for (const sub of data.subjectivities) subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
-    if (polSt(data, 'subjectivitiesNote')) { subjContent.push(polEmptyP()); subjContent.push(...polMp(polSt(data, 'subjectivitiesNote'))) }
+    for (const sub of data.subjectivities)
+      subjContent.push(polBulletP(decodeHtmlEntities(sub.text)))
+    if (polSt(data, 'subjectivitiesNote')) {
+      subjContent.push(polEmptyP())
+      subjContent.push(...polMp(polSt(data, 'subjectivitiesNote')))
+    }
     addRow('subjectivities', makeRow('Subjectivities', subjContent))
   } else if (data.subjectivitiesNil) {
     // Converter kept no subjectivities for this policy → explicit NIL
@@ -3040,10 +4262,17 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     const ncbAmt = data.quotation.ncbDiscountAmount
     const ncbIsAmount = data.quotation.ncbDiscountType === 'amount'
     if (ncbPct != null) ncbText = ncbText.replace(/\{ncb_percent\}/g, String(ncbPct))
-    if (ncbIsAmount && ncbAmt != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
-    else if (!ncbIsAmount && ncbPct != null) ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
+    if (ncbIsAmount && ncbAmt != null)
+      ncbText = ncbText.replace(/\{ncb_amount\}/g, polFormatAmountOnly(ncbAmt))
+    else if (!ncbIsAmount && ncbPct != null)
+      ncbText = ncbText.replace(/\{ncb_amount\}/g, `${ncbPct}%`)
     ncbText = ncbText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
-    ncbContent.push(...ncbText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
+    ncbContent.push(
+      ...ncbText
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => polNp(l))
+    )
     addRow('ncb', makeRow('No Claims\nBonus (NCB)', ncbContent))
   }
 
@@ -3052,11 +4281,22 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     const upccContent: (Paragraph | Table)[] = []
     let upccText = decodeHtmlEntities(polHtmlToLines(data.quotation.upccText))
     const upccIsAmount = data.quotation.upccDiscountType === 'amount'
-    if (data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
-    if (upccIsAmount && data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
-    else if (!upccIsAmount && data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_amount\}/g, `${data.quotation.upccDiscountPercent}%`)
+    if (data.quotation.upccDiscountPercent != null)
+      upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
+    if (upccIsAmount && data.quotation.upccDiscountAmount != null)
+      upccText = upccText.replace(
+        /\{upcc_amount\}/g,
+        polFormatAmountOnly(data.quotation.upccDiscountAmount)
+      )
+    else if (!upccIsAmount && data.quotation.upccDiscountPercent != null)
+      upccText = upccText.replace(/\{upcc_amount\}/g, `${data.quotation.upccDiscountPercent}%`)
     upccText = upccText.replace(/\{currency\}/g, data.quotation.premiumCurrency || 'USD')
-    upccContent.push(...upccText.split('\n').filter(l => l.trim()).map(l => polNp(l)))
+    upccContent.push(
+      ...upccText
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => polNp(l))
+    )
     addRow('upcc', makeRow('Upfront\nContinuity\nCredit (UPCC)', upccContent))
   }
 
@@ -3070,7 +4310,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     // Base after NCB/UPCC (no extra discounts), then each discount reduces it in order
     let base = computePayablePremium(tech, q, [], data.vessel)
     for (const d of data.discounts || []) {
-      const ded = d.discountType === 'amount' ? (d.amount || 0) : base * (d.percent || 0) / 100
+      const ded = d.discountType === 'amount' ? d.amount || 0 : (base * (d.percent || 0)) / 100
       base -= ded
       if (!d.text) continue
       const pctStr = `${d.percent || 0}%`
@@ -3079,16 +4319,21 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
         .replace(/\{percentage\}/g, pctStr)
         .replace(/\{percent\}/g, pctStr)
         .replace(/\{currency\}/g, cur)
-      const dContent = resolved.split('\n').filter(l => l.trim()).map(l => polNp(l))
+      const dContent = resolved
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => polNp(l))
       if (dContent.length === 0) continue
-      if (d.targetSection) targetedDiscountRows.push({ target: d.targetSection, row: makeRow('', dContent) })
+      if (d.targetSection)
+        targetedDiscountRows.push({ target: d.targetSection, row: makeRow('', dContent) })
       else addRow(`discount:${d.id}`, makeRow(d.label || 'Discount', dContent))
     }
   }
 
   // PREMIUM PAYMENT
   const premiumContent = await polBuildPremiumPaymentSection(data)
-  if (premiumContent.length > 0) addRow('premium', makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
+  if (premiumContent.length > 0)
+    addRow('premium', makeRow('Premium\nPayment\nCondition\nPrecedent', premiumContent))
 
   // Emit sections in the configured order. Any section whose key isn't in the configured
   // order (e.g. a War policy's sanctions section) is anchored right after its original
@@ -3096,7 +4341,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Targeted discounts: insert directly after their target section (untitled, so they read as
   // the end of that section); unknown target → appended at the end
   for (const td of targetedDiscountRows) {
-    const at = secList.findIndex(s => s.key === td.target)
+    const at = secList.findIndex((s) => s.key === td.target)
     const entry = { key: `discount-in:${td.target}:${at}`, row: td.row }
     if (at >= 0) secList.splice(at + 1, 0, entry)
     else secList.push(entry)
@@ -3106,7 +4351,10 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   const inOrder = new Set(secOrder)
   let lastKnownIdx = -1
   for (const { key } of secList) {
-    if (inOrder.has(key)) { lastKnownIdx = secOrder.indexOf(key); continue }
+    if (inOrder.has(key)) {
+      lastKnownIdx = secOrder.indexOf(key)
+      continue
+    }
     const insertAt = lastKnownIdx + 1
     secOrder.splice(insertAt, 0, key)
     inOrder.add(key)
@@ -3115,8 +4363,8 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   const secIndex = (k: string) => secOrder.indexOf(k)
   const rows = secList
     .map((s, i) => ({ s, i }))
-    .sort((a, b) => (secIndex(a.s.key) - secIndex(b.s.key)) || (a.i - b.i))
-    .map(x => x.s.row)
+    .sort((a, b) => secIndex(a.s.key) - secIndex(b.s.key) || a.i - b.i)
+    .map((x) => x.s.row)
 
   // Build main table
   const mainTable = new Table({
@@ -3124,8 +4372,12 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     columnWidths: [POL_TITLE_W, POL_BODY_W],
     layout: TableLayoutType.FIXED,
     borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
+      top: noBorder,
+      bottom: noBorder,
+      left: noBorder,
+      right: noBorder,
+      insideHorizontal: noBorder,
+      insideVertical: noBorder
     },
     rows
   })
@@ -3136,9 +4388,12 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // placeholders, resolved from War Settings (same as war conditions / declaration).
   children.push(polEmptyP())
   const isWarPolicy = (data.quotation.quotationTypeCode || '') === 'W'
-  let policyClosingText = data.frozen?.policyClosingText || (isWarPolicy && data.warSettings?.tcText
-    ? 'The said Vessel is covered subject to {tc_text}' + (data.warSettings.jwlaCode ? ' - {jwla_code}' : '')
-    : 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.')
+  let policyClosingText =
+    data.frozen?.policyClosingText ||
+    (isWarPolicy && data.warSettings?.tcText
+      ? 'The said Vessel is covered subject to {tc_text}' +
+        (data.warSettings.jwlaCode ? ' - {jwla_code}' : '')
+      : 'The said Vessel is covered subject to the terms, clauses, conditions, and warranties as herein set out.')
   if (data.warSettings) {
     policyClosingText = policyClosingText
       .replace(/\{tc_text\}/g, data.warSettings.tcText)
@@ -3146,7 +4401,14 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       .replace(/\{jwla_date\}/g, data.warSettings.jwlaDate)
   }
   if (polIsHtml(policyClosingText)) {
-    children.push(...parseHtmlToParagraphs(policyClosingText, { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED }))
+    children.push(
+      ...parseHtmlToParagraphs(policyClosingText, {
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        alignment: AlignmentType.JUSTIFIED
+      })
+    )
   } else {
     children.push(polNpTight(policyClosingText))
   }
@@ -3157,75 +4419,133 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   if (importantNotice) {
     // Replace type-specific references if not P&I
     if (typeCode === 'H') {
-      importantNotice = importantNotice.replace(/P&I Terms and Conditions/gi, 'H&M Terms and Conditions')
+      importantNotice = importantNotice
+        .replace(/P&I Terms and Conditions/gi, 'H&M Terms and Conditions')
         .replace(/P&I terms and conditions/gi, 'H&M Terms and Conditions')
     } else if (typeCode === 'W') {
-      importantNotice = importantNotice.replace(/P&I Terms and Conditions/gi, 'War Terms and Conditions')
+      importantNotice = importantNotice
+        .replace(/P&I Terms and Conditions/gi, 'War Terms and Conditions')
         .replace(/P&I terms and conditions/gi, 'War Terms and Conditions')
     }
     const plainNotice = htmlToPlainText(importantNotice)
     if (plainNotice.startsWith('IMPORTANT NOTICE')) {
       children.push(polCenteredP('IMPORTANT NOTICE', true))
-      children.push(...parseHtmlToParagraphs(importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''), {
-        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED
-      }))
+      children.push(
+        ...parseHtmlToParagraphs(
+          importantNotice.replace(/^(<p>)?IMPORTANT NOTICE(<\/p>)?\n*/i, ''),
+          {
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            alignment: AlignmentType.JUSTIFIED
+          }
+        )
+      )
     } else {
-      children.push(...parseHtmlToParagraphs(importantNotice, {
-        size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED
-      }))
+      children.push(
+        ...parseHtmlToParagraphs(importantNotice, {
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          alignment: AlignmentType.JUSTIFIED
+        })
+      )
     }
     children.push(polEmptyP())
   }
 
   // Resolve cancel/replace text for both body and footer
   let cancelReplaceResolved = ''
-  if ((data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) || data.policy.cancelReplaceText) {
+  if (
+    (data.policy.revisionNumber > 0 && data.policy.previousPolicyNumber) ||
+    data.policy.cancelReplaceText
+  ) {
     cancelReplaceResolved = data.policy.cancelReplaceText || ''
     if (!cancelReplaceResolved && data.policy.previousPolicyNumber) {
       cancelReplaceResolved = `This policy ${data.policy.policyNumber} cancels and replaces policy ${data.policy.previousPolicyNumber}`
-      if (data.policy.previousPolicyDate) cancelReplaceResolved += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
+      if (data.policy.previousPolicyDate)
+        cancelReplaceResolved += ` dated ${polFormatDateUS(data.policy.previousPolicyDate)}`
     }
   }
 
   // QR Verification — P&I only, and only when enabled for this policy (wizard toggle, default off)
   try {
     const qrEnabled = (data.policy as any).qrEnabled === true
-    const qrBase = (data.quotation.quotationTypeCode === 'P' && qrEnabled) ? (data.frozen?.qrBase || null) : null
+    const qrBase =
+      data.quotation.quotationTypeCode === 'P' && qrEnabled ? data.frozen?.qrBase || null : null
     if (qrBase && data.vesselInfo.imo) {
       const qrFullUrl = `${qrBase}${data.vesselInfo.imo}`
       // Generate QR code as PNG buffer
       try {
         const QRCode = await import('qrcode')
-        const qrDataUrl = await QRCode.toDataURL(qrFullUrl, { width: 120, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        const qrDataUrl = await QRCode.toDataURL(qrFullUrl, {
+          width: 120,
+          margin: 1,
+          color: { dark: '#000000', light: '#ffffff' }
+        })
         const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '')
-        const qrBuffer = Uint8Array.from(atob(qrBase64), c => c.charCodeAt(0))
+        const qrBuffer = Uint8Array.from(atob(qrBase64), (c) => c.charCodeAt(0))
         children.push(polEmptyP())
-        children.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 40 },
-          children: [new ImageRun({ data: qrBuffer, transformation: { width: 80, height: 80 }, type: 'png' })]
-        }))
-        children.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 60 },
-          children: [new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 4, font: 'Arial', color: '666666', italics: true })]
-        }))
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 40 },
+            children: [
+              new ImageRun({
+                data: qrBuffer,
+                transformation: { width: 80, height: 80 },
+                type: 'png'
+              })
+            ]
+          })
+        )
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 60 },
+            children: [
+              new TextRun({
+                text: qrFullUrl,
+                size: POL_FONT_SIZE - 4,
+                font: 'Arial',
+                color: '666666',
+                italics: true
+              })
+            ]
+          })
+        )
         children.push(polEmptyP())
       } catch {
         // Fallback: just show URL text if QR generation fails
         children.push(polEmptyP())
-        children.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 60 },
-          children: [
-            new TextRun({ text: 'Verify: ', size: POL_FONT_SIZE - 2, font: 'Arial', color: '666666', italics: true }),
-            new TextRun({ text: qrFullUrl, size: POL_FONT_SIZE - 2, font: 'Arial', color: '0066CC', italics: true })
-          ]
-        }))
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 60 },
+            children: [
+              new TextRun({
+                text: 'Verify: ',
+                size: POL_FONT_SIZE - 2,
+                font: 'Arial',
+                color: '666666',
+                italics: true
+              }),
+              new TextRun({
+                text: qrFullUrl,
+                size: POL_FONT_SIZE - 2,
+                font: 'Arial',
+                color: '0066CC',
+                italics: true
+              })
+            ]
+          })
+        )
         children.push(polEmptyP())
       }
     }
-  } catch { /* no QR url configured */ }
+  } catch {
+    /* no QR url configured */
+  }
 
   // Closing
   const closingCity = data.policy.closingCity || 'Beirut'
@@ -3248,7 +4568,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       if (sigData) imageData = sigData.imageData
     }
     if (imageData) {
-      const arr = Array.isArray(imageData) ? imageData : (imageData.data || Object.values(imageData))
+      const arr = Array.isArray(imageData) ? imageData : imageData.data || Object.values(imageData)
       sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
@@ -3261,7 +4581,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
         type: 'png'
       })
     }
-  } catch { /* no signature */ }
+  } catch {
+    /* no signature */
+  }
 
   const sigLabelW = Math.round(POL_CONTENT_W * 0.45)
   const sigGapW = POL_CONTENT_W - 2 * sigLabelW
@@ -3269,30 +4591,72 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Build insurer cell children: signature image (if present) + label
   const insurerCellChildren: Paragraph[] = []
   if (signatureImageRun) {
-    insurerCellChildren.push(new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 40 },
-      children: [signatureImageRun]
-    }))
+    insurerCellChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 40 },
+        children: [signatureImageRun]
+      })
+    )
   }
-  insurerCellChildren.push(new Paragraph({
-    alignment: AlignmentType.RIGHT,
-    spacing: { after: 80, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'THE INSURER', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
-
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    columnWidths: [sigLabelW, sigGapW, sigLabelW],
-    rows: [new TableRow({
+  insurerCellChildren.push(
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 80, line: 240, lineRule: 'auto' as any },
       children: [
-        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'THE INSURED', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })] }),
-        new TableCell({ width: { size: sigGapW, type: WidthType.DXA }, borders: polNoBorders(), children: [polEmptyP()] }),
-        new TableCell({ width: { size: sigLabelW, type: WidthType.DXA }, borders: polNoBorders(), children: insurerCellChildren })
+        new TextRun({
+          text: 'THE INSURER',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
       ]
-    })]
-  }))
+    })
+  )
+
+  children.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [sigLabelW, sigGapW, sigLabelW],
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: sigLabelW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.LEFT,
+                  spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+                  children: [
+                    new TextRun({
+                      text: 'THE INSURED',
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000',
+                      bold: true
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: sigGapW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [polEmptyP()]
+            }),
+            new TableCell({
+              width: { size: sigLabelW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: insurerCellChildren
+            })
+          ]
+        })
+      ]
+    })
+  )
 
   // (cancelReplaceResolved declared above, before body content)
 
@@ -3300,7 +4664,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   const headerHtml = polSt(data, 'docHeader')
   const headerSpacing = (data.sectionTexts as any).docHeaderSpacing || undefined
   const headerParas = headerHtml
-    ? parseHtmlToParagraphs(headerHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: headerSpacing, spacingAfter: 0 })
+    ? parseHtmlToParagraphs(headerHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: headerSpacing,
+        spacingAfter: 0
+      })
     : []
   // Load policy export settings
   let footerText = ''
@@ -3323,7 +4693,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       if (parsed.tcTitleLine != null && parsed.tcTitleLine !== '') tcTitleLine = parsed.tcTitleLine
       if (parsed.tcShowPageNumbers != null) tcShowPageNumbers = parsed.tcShowPageNumbers !== false
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Total pages: use the passed-in value (computed by the two-pass T&C pipeline) when present,
   // otherwise fall back to Word's live NUMPAGES field (PageNumber.TOTAL_PAGES) at render time.
@@ -3331,34 +4703,64 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Add policy title (configurable per type)
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
   const vesselName = data.vesselInfo?.name || ''
-  headerParas.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0 },
-    children: [
-      new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })
-    ]
-  }))
-  if (vesselName) {
-    headerParas.push(new Paragraph({
+  headerParas.push(
+    new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 0, after: 0 },
       children: [
-        new TextRun({ text: `M/V ${vesselName.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })
+        new TextRun({
+          text: `${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true,
+          underline: {}
+        })
       ]
-    }))
+    })
+  )
+  if (vesselName) {
+    headerParas.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [
+          new TextRun({
+            text: `M/V ${vesselName.toUpperCase()}`,
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            bold: true,
+            underline: {}
+          })
+        ]
+      })
+    )
   }
   // Add spacing after vessel name line before header ends
   headerParas.push(new Paragraph({ spacing: { after: 60 }, children: [] }))
-  const defaultHeader = new Header({ children: headerParas.length > 0 ? headerParas : [polEmptyP()] })
+  const defaultHeader = new Header({
+    children: headerParas.length > 0 ? headerParas : [polEmptyP()]
+  })
 
   const footerChildren: (Paragraph | Table)[] = []
   // Cancel and replace on every page (in footer) — uses cancelReplaceResolved from above
   if (cancelReplaceResolved) {
-    footerChildren.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 20 },
-      children: [new TextRun({ text: cancelReplaceResolved, size: 16, font: 'Arial', color: '000000', italics: true })]
-    }))
+    footerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 20 },
+        children: [
+          new TextRun({
+            text: cancelReplaceResolved,
+            size: 16,
+            font: 'Arial',
+            color: '000000',
+            italics: true
+          })
+        ]
+      })
+    )
   }
   // Page number paragraph (consistent styling — all runs use identical rPr)
   const pnStyle = { size: 16, font: 'Arial', color: '999999', bold: false, italics: false } as const
@@ -3378,7 +4780,13 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // Parse footer text lines
   const footerTextLines: string[] = []
   if (footerText) {
-    const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    const plainFooter = footerText
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
     for (const line of plainFooter.split('\n')) {
       if (line.trim()) footerTextLines.push(line.trim())
     }
@@ -3390,36 +4798,50 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
     const leftW = Math.round(footerW * 0.75)
     const rightW = footerW - leftW
     // Left column: stamps/registration text
-    const leftParas: Paragraph[] = footerTextLines.length > 0
-      ? footerTextLines.map(line => new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
-        }))
-      : [new Paragraph({ spacing: { after: 0 }, children: [] })]
-    footerChildren.push(new Table({
-      width: { size: footerW, type: WidthType.DXA },
-      layout: TableLayoutType.FIXED,
-      columnWidths: [leftW, rightW],
-      rows: [new TableRow({
-        children: [
-          new TableCell({
-            width: { size: leftW, type: WidthType.DXA },
-            borders: polNoBorders(),
-            verticalAlign: VerticalAlign.BOTTOM,
-            children: leftParas
-          }),
-          new TableCell({
-            width: { size: rightW, type: WidthType.DXA },
-            borders: polNoBorders(),
-            verticalAlign: VerticalAlign.BOTTOM,
-            children: signatureFooterRun
-              ? [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [signatureFooterRun] })]
-              : [new Paragraph({ spacing: { after: 0 }, children: [] })]
+    const leftParas: Paragraph[] =
+      footerTextLines.length > 0
+        ? footerTextLines.map(
+            (line) =>
+              new Paragraph({
+                alignment: AlignmentType.LEFT,
+                spacing: { before: 0, after: 0 },
+                children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
+              })
+          )
+        : [new Paragraph({ spacing: { after: 0 }, children: [] })]
+    footerChildren.push(
+      new Table({
+        width: { size: footerW, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        columnWidths: [leftW, rightW],
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: leftW, type: WidthType.DXA },
+                borders: polNoBorders(),
+                verticalAlign: VerticalAlign.BOTTOM,
+                children: leftParas
+              }),
+              new TableCell({
+                width: { size: rightW, type: WidthType.DXA },
+                borders: polNoBorders(),
+                verticalAlign: VerticalAlign.BOTTOM,
+                children: signatureFooterRun
+                  ? [
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { after: 0 },
+                        children: [signatureFooterRun]
+                      })
+                    ]
+                  : [new Paragraph({ spacing: { after: 0 }, children: [] })]
+              })
+            ]
           })
         ]
-      })]
-    }))
+      })
+    )
     footerChildren.push(pageNumPara)
   } else {
     // No signature or footer text — just centered page number
@@ -3427,32 +4849,89 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   }
   const policyFooter = new Footer({ children: footerChildren })
 
-  const docSections: any[] = [{
-    properties: polMakePageProperties(),
-    headers: { default: defaultHeader },
-    footers: { default: policyFooter },
-    children: children as any[]
-  }]
+  const docSections: any[] = [
+    {
+      properties: polMakePageProperties(),
+      headers: { default: defaultHeader },
+      footers: { default: policyFooter },
+      children: children as any[]
+    }
+  ]
 
   // Append the rich-text T&C as a new section (starts on a fresh page, own footer,
   // continuous page numbering — no separate merge needed)
   if (tcHtml) {
     const tcChildren: (Paragraph | Table)[] = [
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 160 }, children: [new TextRun({ text: 'TERMS AND CONDITIONS', size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true, underline: {} })] }),
-      ...parseHtmlToParagraphs(decodeHtmlEntities(tcHtml), { size: POL_FONT_SIZE, font: 'Arial', color: '000000', alignment: AlignmentType.JUSTIFIED })
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 160 },
+        children: [
+          new TextRun({
+            text: 'TERMS AND CONDITIONS',
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            bold: true,
+            underline: {}
+          })
+        ]
+      }),
+      ...parseHtmlToParagraphs(decodeHtmlEntities(tcHtml), {
+        size: POL_FONT_SIZE,
+        font: 'Arial',
+        color: '000000',
+        alignment: AlignmentType.JUSTIFIED
+      })
     ]
     // T&C footer: configurable title line + optional page numbers
-    const tcTitleResolved = tcTitleLine.replace(/\{type\}/gi, headerTitle).replace(/\{number\}/gi, data.policy.policyNumber)
+    const tcTitleResolved = tcTitleLine
+      .replace(/\{type\}/gi, headerTitle)
+      .replace(/\{number\}/gi, data.policy.policyNumber)
     const tcFooterChildren: Paragraph[] = []
-    const tcFooterLines = tcFooterText ? tcFooterText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').split('\n').filter(l => l.trim()) : []
-    if (tcTitleResolved.trim()) tcFooterChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: tcTitleResolved.trim(), size: 16, font: 'Arial', color: '999999' })] }))
-    for (const l of tcFooterLines) tcFooterChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: l.trim(), size: 16, font: 'Arial', color: '999999' })] }))
-    if (tcShowPageNumbers) tcFooterChildren.push(new Paragraph({
-      alignment: AlignmentType.CENTER, spacing: { before: 40, after: 0 },
-      children: [new TextRun({ text: 'Page ', ...pnStyle }), new TextRun({ children: [PageNumber.CURRENT], ...pnStyle }), new TextRun({ text: ' of ', ...pnStyle }),
-        ...(configTotalPages ? [new TextRun({ text: String(configTotalPages), ...pnStyle })] : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])]
-    }))
-    if (tcFooterChildren.length === 0) tcFooterChildren.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
+    const tcFooterLines = tcFooterText
+      ? tcFooterText
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&nbsp;/g, ' ')
+          .split('\n')
+          .filter((l) => l.trim())
+      : []
+    if (tcTitleResolved.trim())
+      tcFooterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 0 },
+          children: [
+            new TextRun({ text: tcTitleResolved.trim(), size: 16, font: 'Arial', color: '999999' })
+          ]
+        })
+      )
+    for (const l of tcFooterLines)
+      tcFooterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: l.trim(), size: 16, font: 'Arial', color: '999999' })]
+        })
+      )
+    if (tcShowPageNumbers)
+      tcFooterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 40, after: 0 },
+          children: [
+            new TextRun({ text: 'Page ', ...pnStyle }),
+            new TextRun({ children: [PageNumber.CURRENT], ...pnStyle }),
+            new TextRun({ text: ' of ', ...pnStyle }),
+            ...(configTotalPages
+              ? [new TextRun({ text: String(configTotalPages), ...pnStyle })]
+              : [new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pnStyle })])
+          ]
+        })
+      )
+    if (tcFooterChildren.length === 0)
+      tcFooterChildren.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
     docSections.push({
       properties: polMakePageProperties(),
       headers: { default: new Header({ children: [polEmptyP()] }) },
@@ -3474,7 +4953,15 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   polDownloadBlob(blob, polFileName)
 
   // Mark policy as exported
-  try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
+  try {
+    ok(
+      await window.api.policyUpdate(policyId, {
+        exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      })
+    )
+  } catch {
+    /* non-critical */
+  }
 }
 
 /**
@@ -3482,7 +4969,11 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
  * Uses capture mode to intercept the blob from exportPolicyDocx.
  * @param totalPages - if provided, hardcodes "Page X of N" instead of using auto NUMPAGES
  */
-async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, includeTC?: boolean): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
+async function generatePolicyDocxBuffer(
+  policyId: string,
+  totalPages?: number,
+  includeTC?: boolean
+): Promise<{ buffer: ArrayBuffer; fileName: string; typeCode: string }> {
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -3514,32 +5005,58 @@ async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, i
  */
 export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   const storedPdf = await polStoredFile(policyId, 'policy-pdf')
-  if (storedPdf) { polDownloadBlob(storedPdf.blob, storedPdf.fileName); return }
+  if (storedPdf) {
+    polDownloadBlob(storedPdf.blob, storedPdf.fileName)
+    return
+  }
   // Check if T&C template exists for this policy type
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
   const typeCode = data.quotation.quotationTypeCode || 'P'
 
-  const tcTemplate = await window.api.tcGetTemplate(typeCode) as any
+  const tcTemplate = (await window.api.tcGetTemplate(typeCode)) as any
   if (!tcTemplate || tcTemplate.error) {
-    throw new Error('No T&C template set for this policy type. Add one in Policy Settings → T&C Templates.')
+    throw new Error(
+      'No T&C template set for this policy type. Add one in Policy Settings → T&C Templates.'
+    )
   }
 
   // Rich-text (html) T&C: build ONE combined DOCX (policy + T&C section) and convert once.
   if (tcTemplate.kind === 'html' && tcTemplate.contentHtml) {
     const { buffer, fileName } = await generatePolicyDocxBuffer(policyId, undefined, true)
-    const res = await window.api.convertDocxBufferToPdf({ docxData: Array.from(new Uint8Array(buffer)), fileName }) as any
+    const res = (await window.api.convertDocxBufferToPdf({
+      docxData: Array.from(new Uint8Array(buffer)),
+      fileName
+    })) as any
     if (!res || res.error) throw new Error(res?.message || 'PDF conversion failed')
-    const htmlPdf = { blob: new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }), fileName: res.fileName }
+    const htmlPdf = {
+      blob: new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }),
+      fileName: res.fileName
+    }
     await polStoreFile(policyId, 'policy-pdf', htmlPdf)
     polDownloadBlob(htmlPdf.blob, htmlPdf.fileName)
-    try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
+    try {
+      ok(
+        await window.api.policyUpdate(policyId, {
+          exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        })
+      )
+    } catch {
+      /* non-critical */
+    }
     return
   }
 
   // Legacy DOCX T&C: merge policy PDF + T&C PDF via the two-pass page-number pipeline.
   // Resolve policy type title for T&C footer
-  const typeTitleMap: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War Risk', F: 'FDD', L: 'Loss of Hire', C: 'Cargo' }
+  const typeTitleMap: Record<string, string> = {
+    P: 'P&I',
+    H: 'Hull',
+    W: 'War Risk',
+    F: 'FDD',
+    L: 'Loss of Hire',
+    C: 'Cargo'
+  }
   const policyTypeTitle = typeTitleMap[typeCode] || data.quotation.quotationTypeName || 'Insurance'
   const policyNumber = data.policy.policyNumber
 
@@ -3578,7 +5095,15 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
   polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
-  try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
+  try {
+    ok(
+      await window.api.policyUpdate(policyId, {
+        exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      })
+    )
+  } catch {
+    /* non-critical */
+  }
 }
 
 // ==================== Shared DA/CA Helpers ====================
@@ -3594,12 +5119,20 @@ async function polBuildAdviceFooter(
   try {
     const parsed = frozenSettings || {}
     if (parsed.footerText) footerText = parsed.footerText
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Parse footer text lines
   const footerLines: string[] = []
   if (footerText) {
-    const plainFooter = footerText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    const plainFooter = footerText
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
     for (const line of plainFooter.split('\n')) {
       if (line.trim()) footerLines.push(line.trim())
     }
@@ -3611,24 +5144,32 @@ async function polBuildAdviceFooter(
     const fColLeft = Math.round(footerW * 0.67)
     const fColRight = footerW - fColLeft
 
-    const leftParas: Paragraph[] = footerLines.map(line => new Paragraph({
-      alignment: AlignmentType.LEFT,
-      spacing: { before: 0, after: 0 },
-      children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
-    }))
-    if (leftParas.length === 0) leftParas.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
+    const leftParas: Paragraph[] = footerLines.map(
+      (line) =>
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { before: 0, after: 0 },
+          children: [new TextRun({ text: line, size: 18, font: 'Arial', color: '999999' })]
+        })
+    )
+    if (leftParas.length === 0)
+      leftParas.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
 
     const rightParas: Paragraph[] = []
     if (sigBuf) {
-      rightParas.push(new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 0 },
-        children: [new ImageRun({
-          data: sigBuf,
-          transformation: { width: 120, height: 60 },
-          type: 'png'
-        })]
-      }))
+      rightParas.push(
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { after: 0 },
+          children: [
+            new ImageRun({
+              data: sigBuf,
+              transformation: { width: 120, height: 60 },
+              type: 'png'
+            })
+          ]
+        })
+      )
     } else {
       rightParas.push(new Paragraph({ spacing: { after: 0 }, children: [] }))
     }
@@ -3637,22 +5178,24 @@ async function polBuildAdviceFooter(
       width: { size: footerW, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
       columnWidths: [fColLeft, fColRight],
-      rows: [new TableRow({
-        children: [
-          new TableCell({
-            width: { size: fColLeft, type: WidthType.DXA },
-            borders: polNoBorders(),
-            verticalAlign: VerticalAlign.BOTTOM,
-            children: leftParas
-          }),
-          new TableCell({
-            width: { size: fColRight, type: WidthType.DXA },
-            borders: polNoBorders(),
-            verticalAlign: VerticalAlign.BOTTOM,
-            children: rightParas
-          })
-        ]
-      })]
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: fColLeft, type: WidthType.DXA },
+              borders: polNoBorders(),
+              verticalAlign: VerticalAlign.BOTTOM,
+              children: leftParas
+            }),
+            new TableCell({
+              width: { size: fColRight, type: WidthType.DXA },
+              borders: polNoBorders(),
+              verticalAlign: VerticalAlign.BOTTOM,
+              children: rightParas
+            })
+          ]
+        })
+      ]
     })
 
     return new Footer({ children: [footerTable] })
@@ -3672,7 +5215,9 @@ function polBuildAdviceClosing(
   // The "Subject to the terms..." line is shown on the DA but suppressed on the CA.
   if (!omitSubjectLine) {
     content.push(polEmptyP())
-    content.push(polNp('Subject to the terms, clauses, conditions, and warranties of cover afforded.'))
+    content.push(
+      polNp('Subject to the terms, clauses, conditions, and warranties of cover afforded.')
+    )
   }
   content.push(polEmptyP())
 
@@ -3685,38 +5230,57 @@ function polBuildAdviceClosing(
   const reportSettings = data.companyName
   const closingRuns: Paragraph[] = []
   if (signatureImageRun) {
-    closingRuns.push(new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 40 },
-      children: [signatureImageRun]
-    }))
+    closingRuns.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 40 },
+        children: [signatureImageRun]
+      })
+    )
   }
-  closingRuns.push(new Paragraph({
-    alignment: AlignmentType.RIGHT,
-    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: reportSettings, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
-
-  content.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    columnWidths: [POL_CONTENT_W],
-    rows: [new TableRow({
+  closingRuns.push(
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
       children: [
-        new TableCell({
-          width: { size: POL_CONTENT_W, type: WidthType.DXA },
-          borders: polNoBorders(),
-          children: closingRuns
+        new TextRun({
+          text: reportSettings,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
         })
       ]
-    })]
-  }))
+    })
+  )
+
+  content.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [POL_CONTENT_W],
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: POL_CONTENT_W, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: closingRuns
+            })
+          ]
+        })
+      ]
+    })
+  )
 
   return content
 }
 
 /** Load digital signature for closing + footer */
-async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ sigBuf: Uint8Array | null; signatureImageRun: ImageRun | null }> {
+async function polLoadSignature(
+  policyId: string,
+  snapshotSig?: any
+): Promise<{ sigBuf: Uint8Array | null; signatureImageRun: ImageRun | null }> {
   let sigBuf: Uint8Array | null = null
   let signatureImageRun: ImageRun | null = null
   try {
@@ -3729,7 +5293,7 @@ async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ 
       if (sigData) imageData = sigData.imageData
     }
     if (imageData) {
-      const arr = Array.isArray(imageData) ? imageData : (imageData.data || Object.values(imageData))
+      const arr = Array.isArray(imageData) ? imageData : imageData.data || Object.values(imageData)
       sigBuf = new Uint8Array(arr)
       signatureImageRun = new ImageRun({
         data: sigBuf,
@@ -3737,7 +5301,9 @@ async function polLoadSignature(policyId: string, snapshotSig?: any): Promise<{ 
         type: 'png'
       })
     }
-  } catch { /* no signature */ }
+  } catch {
+    /* no signature */
+  }
   return { sigBuf, signatureImageRun }
 }
 
@@ -3749,7 +5315,9 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   polDownloadBlob(blob, fileName)
 }
 
-async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+async function buildDebitAdviceBlobFresh(
+  policyId: string
+): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3768,7 +5336,9 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   // Title Case (not upper) for the Debit Advice heading + attachment sentence
   const headerTitle = headerTitles[typeCode] || 'Certificate'
 
@@ -3780,28 +5350,87 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
   const daHeaderHtml = polSt(data, 'docHeader')
   const daHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (daHeaderHtml) {
-    daHeaderParas.push(...parseHtmlToParagraphs(daHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: daHeaderSpacing, spacingAfter: 0 }))
+    daHeaderParas.push(
+      ...parseHtmlToParagraphs(daHeaderHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: daHeaderSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
   // Title block — centered, compact spacing
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'DEBIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
-  }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'DEBIT ADVICE',
+          size: 20,
+          font: 'Arial',
+          color: '000000',
+          bold: true,
+          underline: {}
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'In connection with',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
 
   // Attachment sentence — this DA forms an integral part of the policy
-  children.push(polNp(`This Debit Advice shall be deemed to be attached to and forming an integral part of ${headerTitle} ${data.policy.policyNumber}`))
+  children.push(
+    polNp(
+      `This Debit Advice shall be deemed to be attached to and forming an integral part of ${headerTitle} ${data.policy.policyNumber}`
+    )
+  )
   children.push(polEmptyP())
 
   // Build main two-column table (same pattern as policy)
@@ -3818,11 +5447,21 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
-          children: [new Paragraph({
-            keepLines: true,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-          })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              spacing: { before: 0, after: 0 },
+              children: [
+                new TextRun({
+                  text: title.toUpperCase(),
+                  bold: true,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -3842,7 +5481,14 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
   // PREMIUM — amount bold + words on same line: "USD 45,000 (US Dollars Forty-Five Thousand Only)"
-  const totalPremium = data.instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
+  const totalPremium =
+    data.instalments.reduce(
+      (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
+      0
+    ) ||
+    data.policy.premiumAmount ||
+    data.quotation.premiumAmount ||
+    0
   // Increased Value (Hull): split the premium into Section A (H&M) + Section B (IV) + Total.
   // IV payable = ivPremium after NCB/UPCC discounts (mirrors the wizard); H&M = Total − IV.
   const ivPremRaw = data.quotation.ivPremiumAmount || 0
@@ -3853,22 +5499,46 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
     // (in proportion to the vessels' own premiums, evenly if none are set)
     const qvs = data.quotationVessels
     const sumVP = qvs.reduce((s, v) => s + (v.premiumAmount || 0), 0)
-    const ivShare = qvs.length <= 1 || !data.vessel ? ivPremRaw
-      : (sumVP > 0 ? ivPremRaw * (data.vessel.premiumAmount || 0) / sumVP : ivPremRaw / qvs.length)
+    const ivShare =
+      qvs.length <= 1 || !data.vessel
+        ? ivPremRaw
+        : sumVP > 0
+          ? (ivPremRaw * (data.vessel.premiumAmount || 0)) / sumVP
+          : ivPremRaw / qvs.length
     const ivPay = computePayablePremium(ivShare, data.quotation, data.discounts || [], data.vessel)
     const hmPay = Math.round((totalPremium - ivPay) * 100) / 100
-    premiumContent.push(...polBuildAmountBreakdown(
-      [{ label: 'Section A: H&M', amount: hmPay }, { label: 'Section B: IV', amount: ivPay }],
-      'Total', totalPremium, currency
-    ))
+    premiumContent.push(
+      ...polBuildAmountBreakdown(
+        [
+          { label: 'Section A: H&M', amount: hmPay },
+          { label: 'Section B: IV', amount: ivPay }
+        ],
+        'Total',
+        totalPremium,
+        currency
+      )
+    )
   } else {
-    premiumContent.push(new Paragraph({
-      spacing: { after: 40, line: 240, lineRule: 'auto' as any },
-      children: [
-        new TextRun({ text: polFormatCurrency(totalPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: ` (${numberToWords(totalPremium, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
-      ]
-    }))
+    premiumContent.push(
+      new Paragraph({
+        spacing: { after: 40, line: 240, lineRule: 'auto' as any },
+        children: [
+          new TextRun({
+            text: polFormatCurrency(totalPremium, currency),
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            bold: true
+          }),
+          new TextRun({
+            text: ` (${numberToWords(totalPremium, currency)})`,
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000'
+          })
+        ]
+      })
+    )
   }
   rows.push(makeRow('Premium', premiumContent))
 
@@ -3890,44 +5560,109 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
 
   const ppTime = polPremiumPaymentTime(data)
   if (numInst === 1 && data.instalments.length === 1) {
-    const singleTpl = daIntroSingleTemplate || 'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
-    ppcpContent.push(polNpTight(polApplyPremiumTime(singleTpl
-      .replace(/\{currency\}/g, currency)
-      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate)), ppTime)))
+    const singleTpl =
+      daIntroSingleTemplate ||
+      'Premium of {currency} {amount} shall be payable on {date} as per attached debit advice, at {time} {timezone}, time being of the essence.'
+    ppcpContent.push(
+      polNpTight(
+        polApplyPremiumTime(
+          singleTpl
+            .replace(/\{currency\}/g, currency)
+            .replace(
+              /\{amount\}/g,
+              polFormatCurrency(totalPremium, currency).replace(`${currency} `, '')
+            )
+            .replace(/\{date\}/g, polFormatDateUS(data.instalments[0].dueDate)),
+          ppTime
+        )
+      )
+    )
   } else {
     // DA multi-instalment intro: drop the total premium amount (per-instalment amounts stay in the list below)
-    const multiTpl = daIntroTemplate || 'Premium shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
-    ppcpContent.push(polNpTight(polApplyPremiumTime(multiTpl
-      .replace(/\{currency\}\s*\{amount\}\s*/g, '')
-      .replace(/\{currency\}/g, currency)
-      .replace(/\{amount\}/g, polFormatCurrency(totalPremium, currency).replace(`${currency} `, ''))
-      .replace(/\{instalments\}/g, String(numInst)), ppTime)))
+    const multiTpl =
+      daIntroTemplate ||
+      'Premium shall be payable in {instalments} Instalments on the following dates, at {time} {timezone}, time being of the essence:'
+    ppcpContent.push(
+      polNpTight(
+        polApplyPremiumTime(
+          multiTpl
+            .replace(/\{currency\}\s*\{amount\}\s*/g, '')
+            .replace(/\{currency\}/g, currency)
+            .replace(
+              /\{amount\}/g,
+              polFormatCurrency(totalPremium, currency).replace(`${currency} `, '')
+            )
+            .replace(/\{instalments\}/g, String(numInst)),
+          ppTime
+        )
+      )
+    )
   }
   // 3pt gap between the intro line and the instalment list
   ppcpContent.push(polSpacerPts(3))
 
   // Non-refundable: policy override wins ('none' = explicitly none; NULL = inherit from quotation)
   const daPolNr = (data.policy as any).nonRefundableType
-  const daNrType = daPolNr != null ? (daPolNr === 'none' ? null : daPolNr) : data.quotation.nonRefundableType
-  const daNrPct = (data.policy as any).nonRefundablePercent != null ? (data.policy as any).nonRefundablePercent : data.quotation.nonRefundablePercent
+  const daNrType =
+    daPolNr != null ? (daPolNr === 'none' ? null : daPolNr) : data.quotation.nonRefundableType
+  const daNrPct =
+    (data.policy as any).nonRefundablePercent != null
+      ? (data.policy as any).nonRefundablePercent
+      : data.quotation.nonRefundablePercent
   // Instalment table — 2 columns: "Xth Instalment due {date}" | "USD X (non-refundable)"
   if (data.instalments.length > 0) {
     const isFirstInstNr = daNrType === 'first_instalment'
     const instDescW = Math.round(POL_BODY_INNER_W * 0.55)
     const instAmtW = POL_BODY_INNER_W - instDescW
-    const instRows = data.instalments.map(inst => {
+    const instRows = data.instalments.map((inst) => {
       const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       const isNR = inst.isNonRefundable || (isFirstInstNr && inst.instalmentNumber === 1)
-      const amtText = polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency) + (isNR ? ' (non-refundable)' : '')
+      const amtText =
+        polFormatCurrency((inst as any).premiumAmount || (inst as any).amount || 0, currency) +
+        (isNR ? ' (non-refundable)' : '')
       return new TableRow({
         children: [
-          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({
+            width: { size: instDescW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            children: [
+              new Paragraph({
+                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                children: [
+                  new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+                ]
+              })
+            ]
+          }),
+          new TableCell({
+            width: { size: instAmtW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            children: [
+              new Paragraph({
+                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                children: [
+                  new TextRun({
+                    text: amtText,
+                    size: POL_FONT_SIZE,
+                    font: 'Arial',
+                    color: '000000'
+                  })
+                ]
+              })
+            ]
+          })
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(
+      new Table({
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        margins: POL_TABLE_MARGINS,
+        layout: TableLayoutType.FIXED,
+        columnWidths: [instDescW, instAmtW],
+        rows: instRows
+      })
+    )
     ppcpContent.push(polEmptyP())
   }
 
@@ -3945,40 +5680,68 @@ async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob
   if (data.bank) {
     const bankContent: (Paragraph | Table)[] = []
     for (const line of data.bank.details.split('\n')) {
-      if (line.trim()) bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      if (line.trim())
+        bankContent.push(
+          new Paragraph({
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({
+                text: line.trim(),
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
     }
     rows.push(makeRow('Bank Details', bankContent))
   }
 
   // Build main table
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    columnWidths: [POL_TITLE_W, POL_BODY_W],
-    layout: TableLayoutType.FIXED,
-    borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
-    },
-    rows
-  }))
+  children.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      columnWidths: [POL_TITLE_W, POL_BODY_W],
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: noBorder,
+        bottom: noBorder,
+        left: noBorder,
+        right: noBorder,
+        insideHorizontal: noBorder,
+        insideVertical: noBorder
+      },
+      rows
+    })
+  )
 
   // Closing block
   children.push(...polBuildAdviceClosing(data, signatureImageRun))
 
   const document = new Document({
     numbering: polMakeDocxNumbering(),
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: { default: new Header({ children: daHeaderParas.length > 0 ? daHeaderParas : [polEmptyP()] }) },
-      footers: { default: adviceFooter },
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: polMakePageProperties(),
+        headers: {
+          default: new Header({
+            children: daHeaderParas.length > 0 ? daHeaderParas : [polEmptyP()]
+          })
+        },
+        footers: { default: adviceFooter },
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
   const daVName = data.vesselInfo?.name || ''
   const daRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  return { blob, fileName: `${data.policy.policyNumber} - ${daVName} - Debit Advice${daRevSuffix}.docx` }
+  return {
+    blob,
+    fileName: `${data.policy.policyNumber} - ${daVName} - Debit Advice${daRevSuffix}.docx`
+  }
 }
 
 // ==================== Credit Advice Export ====================
@@ -3988,7 +5751,9 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   polDownloadBlob(blob, fileName)
 }
 
-async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+async function buildCreditAdviceBlobFresh(
+  policyId: string
+): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -4007,7 +5772,9 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature (for closing section — not in footer for CA)
@@ -4018,7 +5785,15 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
   const caHeaderHtml = polSt(data, 'docHeader')
   const caHeaderSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (caHeaderHtml) {
-    caHeaderParas.push(...parseHtmlToParagraphs(caHeaderHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: caHeaderSpacing, spacingAfter: 0 }))
+    caHeaderParas.push(
+      ...parseHtmlToParagraphs(caHeaderHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: caHeaderSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
@@ -4026,13 +5801,19 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
   let caCommissionMultiText = 'Commission payable in {instalments} instalments:'
   let caCommissionSingleText = 'Commission payable on {date}.'
   try {
-    const caSettingsRaw = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
+    const caSettingsRaw = data.frozen?.exportSettings
+      ? JSON.stringify(data.frozen.exportSettings)
+      : null
     if (caSettingsRaw) {
       const caParsed = JSON.parse(caSettingsRaw)
-      if (caParsed.creditAdviceCommissionText) caCommissionMultiText = caParsed.creditAdviceCommissionText
-      if (caParsed.creditAdviceCommissionSingleText) caCommissionSingleText = caParsed.creditAdviceCommissionSingleText
+      if (caParsed.creditAdviceCommissionText)
+        caCommissionMultiText = caParsed.creditAdviceCommissionText
+      if (caParsed.creditAdviceCommissionSingleText)
+        caCommissionSingleText = caParsed.creditAdviceCommissionSingleText
     }
-  } catch { /* use defaults */ }
+  } catch {
+    /* use defaults */
+  }
 
   const children: (Paragraph | Table)[] = []
 
@@ -4040,7 +5821,11 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
   // The hide-broker toggle intentionally does NOT apply here: the CA is the broker's document.
   const brokerEntityId = data.quotation.customerEntityId
   const isBroker = data.quotation.customerType === 'broker'
-  const caZeroP = (text: string) => new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })
+  const caZeroP = (text: string) =>
+    new Paragraph({
+      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({ text, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
+    })
   if (brokerEntityId && isBroker) {
     try {
       // Broker entity + address are frozen on the policy snapshot (first export).
@@ -4063,22 +5848,71 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
         if (brokerEntity.phone) children.push(caZeroP(`Phone: ${brokerEntity.phone}`))
         children.push(polEmptyP())
       }
-    } catch { /* ignore broker load errors */ }
+    } catch {
+      /* ignore broker load errors */
+    }
   }
 
   // Title block — centered, compact spacing
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'CREDIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
-  }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'CREDIT ADVICE',
+          size: 20,
+          font: 'Arial',
+          color: '000000',
+          bold: true,
+          underline: {}
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'In connection with',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
 
   // Build main two-column table (same pattern as policy)
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -4094,11 +5928,21 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
-          children: [new Paragraph({
-            keepLines: true,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title.toUpperCase(), bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-          })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              spacing: { before: 0, after: 0 },
+              children: [
+                new TextRun({
+                  text: title.toUpperCase(),
+                  bold: true,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -4115,21 +5959,44 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
 
   // INSURED — exclude broker entity and c/o line (broker already shown at top of CA)
   const caFilteredData = brokerEntityId
-    ? { ...data, quotation: { ...data.quotation, coName: '' }, addresses: data.addresses.filter(a => a.entityId !== brokerEntityId), assureds: data.assureds.filter(a => (a as any).entityId !== brokerEntityId) }
+    ? {
+        ...data,
+        quotation: { ...data.quotation, coName: '' },
+        addresses: data.addresses.filter((a) => a.entityId !== brokerEntityId),
+        assureds: data.assureds.filter((a) => (a as any).entityId !== brokerEntityId)
+      }
     : data
   const insuredContent = polBuildInsuredSection(caFilteredData)
   if (insuredContent.length > 0) rows.push(makeRow('Insured', insuredContent))
 
   // CREDIT AMOUNT — amount + words on same line
-  const totalPremium = data.instalments.reduce((sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0), 0) || data.policy.premiumAmount || data.quotation.premiumAmount || 0
+  const totalPremium =
+    data.instalments.reduce(
+      (sum, i) => sum + ((i as any).premiumAmount || (i as any).amount || 0),
+      0
+    ) ||
+    data.policy.premiumAmount ||
+    data.quotation.premiumAmount ||
+    0
   const commissionPercent = data.policy.commissionPercent || 0
-  const commissionAmount = totalPremium * commissionPercent / 100
+  const commissionAmount = (totalPremium * commissionPercent) / 100
   const creditContent: (Paragraph | Table)[] = [
     new Paragraph({
       spacing: { after: 120, line: 240, lineRule: 'auto' as any },
       children: [
-        new TextRun({ text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({
+          text: polFormatCurrency(Math.round(commissionAmount * 100) / 100, currency),
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        }),
+        new TextRun({
+          text: ` (${numberToWords(Math.round(commissionAmount * 100) / 100, currency)})`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
       ]
     })
   ]
@@ -4137,36 +6004,113 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
 
   // DETAILS
   const detailsContent: (Paragraph | Table)[] = []
-  detailsContent.push(new Paragraph({
-    spacing: { after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `Being ${polFmtPct(commissionPercent)}% Commission on Premium ${polFormatCurrency(totalPremium, currency)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
+  detailsContent.push(
+    new Paragraph({
+      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `Being ${polFmtPct(commissionPercent)}% Commission on Premium ${polFormatCurrency(totalPremium, currency)}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
 
   if (data.instalments.length > 0) {
     const numInst = data.instalments.length
     if (numInst === 1) {
-      const singleText = caCommissionSingleText.replace('{date}', polFormatDateUS(data.instalments[0].dueDate)).replace('{instalments}', '1')
-      detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: singleText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      const singleText = caCommissionSingleText
+        .replace('{date}', polFormatDateUS(data.instalments[0].dueDate))
+        .replace('{instalments}', '1')
+      detailsContent.push(
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: [
+            new TextRun({ text: singleText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+          ]
+        })
+      )
     } else {
       const multiText = caCommissionMultiText.replace('{instalments}', String(numInst))
-      detailsContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      detailsContent.push(
+        new Paragraph({
+          spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+          children: [
+            new TextRun({ text: multiText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+          ]
+        })
+      )
     }
     if (numInst > 1) {
       // 3pt gap between the commission intro line and the instalment list (matches DA)
       detailsContent.push(polSpacerPts(3))
       const caInstDescW = Math.round(POL_BODY_INNER_W * 0.55)
       const caInstAmtW = POL_BODY_INNER_W - caInstDescW
-      const caInstRows = data.instalments.map(inst => {
-        const commAmt = inst.commissionAmount != null ? inst.commissionAmount : Math.round(((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent / 100 * 100) / 100
+      const caInstRows = data.instalments.map((inst) => {
+        const commAmt =
+          inst.commissionAmount != null
+            ? inst.commissionAmount
+            : Math.round(
+                ((((inst as any).premiumAmount || (inst as any).amount || 0) * commissionPercent) /
+                  100) *
+                  100
+              ) / 100
         return new TableRow({
           children: [
-            new TableCell({ width: { size: caInstDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-            new TableCell({ width: { size: caInstAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: polFormatCurrency(commAmt, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+            new TableCell({
+              width: { size: caInstDescW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  children: [
+                    new TextRun({
+                      text: `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`,
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: caInstAmtW, type: WidthType.DXA },
+              borders: polNoBorders(),
+              children: [
+                new Paragraph({
+                  spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                  children: [
+                    new TextRun({
+                      text: polFormatCurrency(commAmt, currency),
+                      size: POL_FONT_SIZE,
+                      font: 'Arial',
+                      color: '000000'
+                    })
+                  ]
+                })
+              ]
+            })
           ]
         })
       })
-      detailsContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [caInstDescW, caInstAmtW], rows: caInstRows }))
-      detailsContent.push(new Paragraph({ spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })] }))
+      detailsContent.push(
+        new Table({
+          width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+          margins: POL_TABLE_MARGINS,
+          layout: TableLayoutType.FIXED,
+          columnWidths: [caInstDescW, caInstAmtW],
+          rows: caInstRows
+        })
+      )
+      detailsContent.push(
+        new Paragraph({
+          spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+          children: [new TextRun({ text: ' ', size: POL_FONT_SIZE, font: 'Arial' })]
+        })
+      )
     }
   }
   rows.push(makeRow('Details', detailsContent))
@@ -4175,34 +6119,49 @@ async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blo
   rows.push(makeRow('Period', polBuildPeriodParagraphs(data)))
 
   // Build main table
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    columnWidths: [POL_TITLE_W, POL_BODY_W],
-    layout: TableLayoutType.FIXED,
-    borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
-    },
-    rows
-  }))
+  children.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      columnWidths: [POL_TITLE_W, POL_BODY_W],
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: noBorder,
+        bottom: noBorder,
+        left: noBorder,
+        right: noBorder,
+        insideHorizontal: noBorder,
+        insideVertical: noBorder
+      },
+      rows
+    })
+  )
 
   // Closing block — CA omits the "Subject to the terms..." line
   children.push(...polBuildAdviceClosing(data, signatureImageRun, true))
 
   const document = new Document({
     numbering: polMakeDocxNumbering(),
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: { default: new Header({ children: caHeaderParas.length > 0 ? caHeaderParas : [polEmptyP()] }) },
-      footers: { default: adviceFooter },
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: polMakePageProperties(),
+        headers: {
+          default: new Header({
+            children: caHeaderParas.length > 0 ? caHeaderParas : [polEmptyP()]
+          })
+        },
+        footers: { default: adviceFooter },
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
   const caVName = data.vesselInfo?.name || ''
   const caRevSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  return { blob, fileName: `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx` }
+  return {
+    blob,
+    fileName: `${data.policy.policyNumber} - ${caVName} - Credit Advice${caRevSuffix}.docx`
+  }
 }
 
 // ==================== Policy Bundle (ZIP) Export ====================
@@ -4271,11 +6230,14 @@ export interface DeclarationFields {
 export async function loadDeclarationFields(policyId: string): Promise<DeclarationFields> {
   const data = await loadPolicyExportData(policyId)
   const q = data.quotation
-  const currency = (data.vessel as any)?.agreedValueCurrency || q.agreedValueCurrency || q.premiumCurrency || 'USD'
+  const currency =
+    (data.vessel as any)?.agreedValueCurrency || q.agreedValueCurrency || q.premiumCurrency || 'USD'
   const curSymbol = currency === 'USD' ? 'US$' : currency
 
   // Year from inception
-  const year = data.policy.inceptionDate ? data.policy.inceptionDate.split('-')[0] : String(new Date().getFullYear())
+  const year = data.policy.inceptionDate
+    ? data.policy.inceptionDate.split('-')[0]
+    : String(new Date().getFullYear())
 
   // Load declaration settings
   let umr = ''
@@ -4306,7 +6268,8 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   const totalValue = hasIV ? vesselAV + vesselIV : vesselAV
 
   // Classification
-  const classification = (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || ''
+  const classification =
+    (data.vessel && data.vesselClassificationNames[data.vessel.id]) || vi.classification || ''
 
   // Period
   const periodFrom = `${polFormatDateUS(data.policy.inceptionDate)}\t\t${polFormatTime(data.policy.inceptionTime)} ${data.policy.timezone || ''}`
@@ -4324,14 +6287,14 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   // Wording from war conditions
   const wordingLines: string[] = []
   for (const wc of data.warConditions) {
-    const def = data.allWarConditions.find(c => c.id === wc.warConditionId)
+    const def = data.allWarConditions.find((c) => c.id === wc.warConditionId)
     if (def) wordingLines.push(resolveWarPh(wc.textOverride || def.text))
   }
 
   // Warranties
   const warrantyLines: string[] = []
   for (const wid of data.selectedWarrantyIds) {
-    const w = data.allWarranties.find(aw => aw.id === wid)
+    const w = data.allWarranties.find((aw) => aw.id === wid)
     if (w) warrantyLines.push(resolveWarPh(w.text || (w as any).name))
   }
   for (const cw of data.customWarranties) warrantyLines.push(resolveWarPh(cw.text))
@@ -4347,8 +6310,12 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
     assuredText: assuredLines.join('\n'),
     vesselName: vi.name,
     vesselImo: vi.imo || '',
-    vesselSumInsured: hasIV ? `A)\tAgreed Insured Value\t\t${curSymbol} ${vesselAV.toLocaleString()}` : `${curSymbol} ${vesselAV.toLocaleString()}`,
-    vesselSumInsuredIV: hasIV ? `B)\tAgreed Increased Value\t\t${curSymbol} ${vesselIV!.toLocaleString()}` : '',
+    vesselSumInsured: hasIV
+      ? `A)\tAgreed Insured Value\t\t${curSymbol} ${vesselAV.toLocaleString()}`
+      : `${curSymbol} ${vesselAV.toLocaleString()}`,
+    vesselSumInsuredIV: hasIV
+      ? `B)\tAgreed Increased Value\t\t${curSymbol} ${vesselIV!.toLocaleString()}`
+      : '',
     vesselTotalValue: hasIV ? `${curSymbol} ${totalValue.toLocaleString()}` : '',
     vesselBuilt: vi.built ? String(vi.built) : '',
     vesselGT: vi.gt ? vi.gt.toLocaleString() : '',
@@ -4366,12 +6333,18 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
   }
 }
 
-export async function exportDeclarationDocx(policyId: string, fields: DeclarationFields): Promise<void> {
+export async function exportDeclarationDocx(
+  policyId: string,
+  fields: DeclarationFields
+): Promise<void> {
   // A declaration is issued once per policy: a signed policy re-exports its stored declaration
   // (field edits are ignored). A changed declaration needs a policy revision (new policy row).
   const declKey = 'decl'
   const storedDecl = await polStoredFile(policyId, declKey)
-  if (storedDecl) { polDownloadBlob(storedDecl.blob, storedDecl.fileName); return }
+  if (storedDecl) {
+    polDownloadBlob(storedDecl.blob, storedDecl.fileName)
+    return
+  }
   const data = await loadFrozenExportData(policyId)
 
   const FONT = 'Arial'
@@ -4385,42 +6358,74 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   // Extra top/bottom cell padding to space the sections apart a little more
   const SECTION_MARGINS = { top: 90, bottom: 90, left: 0, right: 0 }
 
-  const labelCell = (text: string) => new TableCell({
-    width: { size: LABEL_W, type: WidthType.DXA },
-    borders: polNoBorders(),
-    verticalAlign: VerticalAlign.TOP,
-    margins: SECTION_MARGINS,
-    children: [new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, size: SIZE, font: FONT, bold: true })] })]
-  })
+  const labelCell = (text: string) =>
+    new TableCell({
+      width: { size: LABEL_W, type: WidthType.DXA },
+      borders: polNoBorders(),
+      verticalAlign: VerticalAlign.TOP,
+      margins: SECTION_MARGINS,
+      children: [
+        new Paragraph({
+          spacing: { after: 0 },
+          children: [new TextRun({ text, size: SIZE, font: FONT, bold: true })]
+        })
+      ]
+    })
 
-  const valueCell = (lines: string[]) => new TableCell({
-    width: { size: VALUE_W, type: WidthType.DXA },
-    borders: polNoBorders(),
-    verticalAlign: VerticalAlign.TOP,
-    margins: SECTION_MARGINS,
-    children: lines.length > 0 ? lines.map(l => new Paragraph({
-      spacing: { after: 60, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: l, size: SIZE, font: FONT })]
-    })) : [emptyP()]
-  })
+  const valueCell = (lines: string[]) =>
+    new TableCell({
+      width: { size: VALUE_W, type: WidthType.DXA },
+      borders: polNoBorders(),
+      verticalAlign: VerticalAlign.TOP,
+      margins: SECTION_MARGINS,
+      children:
+        lines.length > 0
+          ? lines.map(
+              (l) =>
+                new Paragraph({
+                  spacing: { after: 60, line: 240, lineRule: 'auto' as any },
+                  children: [new TextRun({ text: l, size: SIZE, font: FONT })]
+                })
+            )
+          : [emptyP()]
+    })
 
-  const makeRow = (label: string, lines: string[]) => new TableRow({
-    children: [labelCell(label), valueCell(lines)]
-  })
+  const makeRow = (label: string, lines: string[]) =>
+    new TableRow({
+      children: [labelCell(label), valueCell(lines)]
+    })
 
   const children: (Paragraph | Table)[] = []
 
   // Title \u2014 two centered bold caps lines (name/declaration + year of account)
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 40 },
-    children: [new TextRun({ text: `${data.companyName.toUpperCase()} WAR COVER \u2013 DECLARATION`, size: SIZE, font: FONT, bold: true })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 200 },
-    children: [new TextRun({ text: `YEAR OF ACCOUNT ${fields.yearOfAccount}`, size: SIZE, font: FONT, bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 40 },
+      children: [
+        new TextRun({
+          text: `${data.companyName.toUpperCase()} WAR COVER \u2013 DECLARATION`,
+          size: SIZE,
+          font: FONT,
+          bold: true
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({
+          text: `YEAR OF ACCOUNT ${fields.yearOfAccount}`,
+          size: SIZE,
+          font: FONT,
+          bold: true
+        })
+      ]
+    })
+  )
   children.push(emptyP())
 
   // Main table \u2014 UMR is the first section (year of account moved into the title)
@@ -4450,10 +6455,20 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   rows.push(makeRow('PERIOD:', [`From ${fields.periodFrom}`, `To     ${fields.periodTo}`]))
 
   // Wording
-  rows.push(makeRow('WORDING', fields.wording.split('\n').filter(l => l.trim())))
+  rows.push(
+    makeRow(
+      'WORDING',
+      fields.wording.split('\n').filter((l) => l.trim())
+    )
+  )
 
   // Warranties
-  rows.push(makeRow('WARRANTIES', fields.warranties.split('\n').filter(l => l.trim())))
+  rows.push(
+    makeRow(
+      'WARRANTIES',
+      fields.warranties.split('\n').filter((l) => l.trim())
+    )
+  )
 
   // Annual Rate
   rows.push(makeRow('ANNUAL\nRATE:', [fields.annualRate]))
@@ -4462,27 +6477,48 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
   rows.push(makeRow('OUR\nSHARE:', [fields.ourShare]))
 
   // Trading
-  rows.push(makeRow('TRADING:', fields.trading.split('\n').filter(l => l.trim())))
+  rows.push(
+    makeRow(
+      'TRADING:',
+      fields.trading.split('\n').filter((l) => l.trim())
+    )
+  )
 
   // Risk Code
-  rows.push(makeRow('RISK CODE:', fields.riskCode.split('\n').filter(l => l.trim())))
+  rows.push(
+    makeRow(
+      'RISK CODE:',
+      fields.riskCode.split('\n').filter((l) => l.trim())
+    )
+  )
 
   // Amlin Ref
   rows.push(makeRow('AMLIN\nREF:', [fields.amlinRef]))
 
-  children.push(new Table({
-    width: { size: 10000, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED,
-    columnWidths: [LABEL_W, VALUE_W],
-    borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } },
-    rows
-  }))
+  children.push(
+    new Table({
+      width: { size: 10000, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [LABEL_W, VALUE_W],
+      borders: {
+        top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+      },
+      rows
+    })
+  )
 
   const document = new Document({
-    sections: [{
-      properties: { page: { margin: { top: 900, bottom: 900, left: 900, right: 900 } } },
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: { page: { margin: { top: 900, bottom: 900, left: 900, right: 900 } } },
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
@@ -4502,13 +6538,24 @@ async function loadEndorsementExportData(policyId: string, endorsementId: string
   if (!endorsement) throw new Error('Endorsement not found')
   const sections = await window.api.endorsementGetSections(endorsementId)
   const instalments = await window.api.endorsementGetInstalments(endorsementId)
-  return { data, endorsement, sections: Array.isArray(sections) ? sections : [], instalments: Array.isArray(instalments) ? instalments : [] }
+  return {
+    data,
+    endorsement,
+    sections: Array.isArray(sections) ? sections : [],
+    instalments: Array.isArray(instalments) ? instalments : []
+  }
 }
 
-export async function exportEndorsementDocx(policyId: string, endorsementId: string): Promise<void> {
+export async function exportEndorsementDocx(
+  policyId: string,
+  endorsementId: string
+): Promise<void> {
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end:${endorsementId}`)
-  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
+  if (storedEnd) {
+    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    return
+  }
   await loadPolicyFontSize()
   const { data, endorsement, sections } = await loadEndorsementExportData(policyId, endorsementId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -4524,51 +6571,107 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   // Load signature
-  const { sigBuf, signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
+  const { sigBuf, signatureImageRun } = await polLoadSignature(
+    policyId,
+    (data as any).signatureSnapshot
+  )
 
   // Build header + footer
   const hdrParas: Paragraph[] = []
   const hdrHtml = polSt(data, 'docHeader')
   const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (hdrHtml) {
-    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+    hdrParas.push(
+      ...parseHtmlToParagraphs(hdrHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: hdrSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   const adviceFooter = await polBuildAdviceFooter(sigBuf)
 
   const children: (Paragraph | Table)[] = []
 
   // ── Centered header ──
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `Endorsement No. ${endorsement.endorsementNumber}`, size: 22, font: 'Arial', color: '000000', bold: true })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'in connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: headerTitle, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
-  if (endorsement.affectsDebitAdvice) {
-    children.push(new Paragraph({
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `Endorsement No. ${endorsement.endorsementNumber}`,
+          size: 22,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-      children: [new TextRun({ text: '— and the relative Debit Advice —', size: POL_FONT_SIZE, font: 'Arial', color: '000000', italics: true })]
-    }))
+      children: [
+        new TextRun({
+          text: 'in connection with',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({ text: headerTitle, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+      ]
+    })
+  )
+  if (endorsement.affectsDebitAdvice) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+        children: [
+          new TextRun({
+            text: '— and the relative Debit Advice —',
+            size: POL_FONT_SIZE,
+            font: 'Arial',
+            color: '000000',
+            italics: true
+          })
+        ]
+      })
+    )
   }
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: data.policy.policyNumber, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: data.policy.policyNumber,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
 
   // ── Two-column table layout (same as policy) ──
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -4583,13 +6686,28 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: [new Paragraph({ keepLines: true, alignment: AlignmentType.JUSTIFIED, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: title, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: title,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000',
+                  bold: true
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: (c => c.length > 0 ? c : [polEmptyP()])(polCollapseEmpty(content))
+          children: ((c) => (c.length > 0 ? c : [polEmptyP()]))(polCollapseEmpty(content))
         })
       ]
     })
@@ -4616,16 +6734,22 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
   // Split into groups: consecutive two-column sections form a table, full-width sections are standalone
   const flushRows = () => {
     if (rows.length > 0) {
-      children.push(new Table({
-        width: { size: POL_CONTENT_W, type: WidthType.DXA },
-        columnWidths: [POL_TITLE_W, POL_BODY_W],
-        layout: TableLayoutType.FIXED,
-        borders: {
-          top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-          insideHorizontal: noBorder, insideVertical: noBorder
-        },
-        rows: [...rows]
-      }))
+      children.push(
+        new Table({
+          width: { size: POL_CONTENT_W, type: WidthType.DXA },
+          columnWidths: [POL_TITLE_W, POL_BODY_W],
+          layout: TableLayoutType.FIXED,
+          borders: {
+            top: noBorder,
+            bottom: noBorder,
+            left: noBorder,
+            right: noBorder,
+            insideHorizontal: noBorder,
+            insideVertical: noBorder
+          },
+          rows: [...rows]
+        })
+      )
       rows.length = 0
     }
   }
@@ -4633,7 +6757,9 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
   for (const sec of enabledSections) {
     const sectionContent: (Paragraph | Table)[] = []
     if (sec.content && polIsHtml(sec.content)) {
-      sectionContent.push(...parseHtmlToParagraphs(sec.content, { size: POL_FONT_SIZE, font: 'Arial' }))
+      sectionContent.push(
+        ...parseHtmlToParagraphs(sec.content, { size: POL_FONT_SIZE, font: 'Arial' })
+      )
     } else if (sec.content) {
       sectionContent.push(...polMp(sec.content))
     }
@@ -4666,7 +6792,11 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   // Date
   children.push(polEmptyP())
-  children.push(polNp(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })))
+  children.push(
+    polNp(
+      new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    )
+  )
 
   // Signature
   if (signatureImageRun) {
@@ -4675,27 +6805,41 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
   }
 
   const document = new Document({
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
-      footers: adviceFooter ? { default: adviceFooter } : undefined,
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: polMakePageProperties(),
+        headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+        footers: adviceFooter ? { default: adviceFooter } : undefined,
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx` }
+  const endFile = {
+    blob,
+    fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx`
+  }
   await polStoreFile(policyId, `end:${endorsementId}`, endFile)
   polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
-export async function exportEndorsementDADocx(policyId: string, endorsementId: string): Promise<void> {
+export async function exportEndorsementDADocx(
+  policyId: string,
+  endorsementId: string
+): Promise<void> {
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end-da:${endorsementId}`)
-  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
+  if (storedEnd) {
+    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    return
+  }
   await loadPolicyFontSize()
-  const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
+  const { data, endorsement, instalments } = await loadEndorsementExportData(
+    policyId,
+    endorsementId
+  )
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const currency = endorsement.premiumCurrency || data.quotation.premiumCurrency || 'USD'
 
@@ -4710,7 +6854,9 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -4719,32 +6865,109 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   const hdrHtml = polSt(data, 'docHeader')
   const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (hdrHtml) {
-    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+    hdrParas.push(
+      ...parseHtmlToParagraphs(hdrHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: hdrSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
   // Title block — matches screenshot layout
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'DEBIT ADVICE', size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
-  }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `Endorsement N° ${endorsement.endorsementNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'DEBIT ADVICE',
+          size: 20,
+          font: 'Arial',
+          color: '000000',
+          bold: true,
+          underline: {}
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'In connection with',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `Endorsement N° ${endorsement.endorsementNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
 
   // Preamble
-  children.push(new Paragraph({
-    spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `This Debit Advice shall be deemed to be attached to and forming an integral part of Endorsement N° ${endorsement.endorsementNumber} - ${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
+  children.push(
+    new Paragraph({
+      spacing: { before: 0, after: 120, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `This Debit Advice shall be deemed to be attached to and forming an integral part of Endorsement N° ${endorsement.endorsementNumber} - ${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
@@ -4759,11 +6982,21 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
-          children: [new Paragraph({
-            keepLines: true,
-            spacing: { before: 0, after: 0 },
-            children: [new TextRun({ text: title, bold: true, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-          })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              spacing: { before: 0, after: 0 },
+              children: [
+                new TextRun({
+                  text: title,
+                  bold: true,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000'
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -4790,14 +7023,27 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
     new Paragraph({
       spacing: { after: 40, line: 240, lineRule: 'auto' as any },
       children: [
-        new TextRun({ text: polFormatCurrency(absPremium, currency), size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true }),
-        new TextRun({ text: ` (${numberToWords(absPremium, currency)})`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+        new TextRun({
+          text: polFormatCurrency(absPremium, currency),
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        }),
+        new TextRun({
+          text: ` (${numberToWords(absPremium, currency)})`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
       ]
     })
   ]
   // Pro-rata line if endorsement is pro-rata
   if (endorsement.isProRata && endorsement.annualPremium) {
-    premiumContent.push(polNp(`Pro-rata ${polFormatCurrency(Number(endorsement.annualPremium), currency)} per annum`))
+    premiumContent.push(
+      polNp(`Pro-rata ${polFormatCurrency(Number(endorsement.annualPremium), currency)} per annum`)
+    )
   }
   rows.push(makeRow(premLabel, premiumContent))
 
@@ -4806,29 +7052,68 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   const ppTime = polPremiumPaymentTime(data)
 
   if (instalments.length === 1) {
-    ppcpContent.push(polNp(
-      `Additional Premium shall be payable on ${polFormatDateUS(instalments[0].dueDate)} at ${ppTime}, time being of the essence.`
-    ))
+    ppcpContent.push(
+      polNp(
+        `Additional Premium shall be payable on ${polFormatDateUS(instalments[0].dueDate)} at ${ppTime}, time being of the essence.`
+      )
+    )
   } else if (instalments.length > 1) {
-    ppcpContent.push(polNp(
-      `Additional Premium ${polFormatCurrency(absPremium, currency)} shall be payable in ${instalments.length} Instalments on the following dates, at ${ppTime}, time being of the essence:`
-    ))
+    ppcpContent.push(
+      polNp(
+        `Additional Premium ${polFormatCurrency(absPremium, currency)} shall be payable in ${instalments.length} Instalments on the following dates, at ${ppTime}, time being of the essence:`
+      )
+    )
     ppcpContent.push(polEmptyP())
 
     // Instalment table — same pattern as policy DA
     const instDescW = Math.round(POL_BODY_INNER_W * 0.55)
     const instAmtW = POL_BODY_INNER_W - instDescW
-    const instRows = instalments.map(inst => {
+    const instRows = instalments.map((inst) => {
       const label = `${polOrdinal(inst.instalmentNumber)} Instalment due ${polFormatDateUS(inst.dueDate)}`
       const amtText = polFormatCurrency(Number(inst.premiumAmount) || 0, currency)
       return new TableRow({
         children: [
-          new TableCell({ width: { size: instDescW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] }),
-          new TableCell({ width: { size: instAmtW, type: WidthType.DXA }, borders: polNoBorders(), children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: amtText, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] })] })
+          new TableCell({
+            width: { size: instDescW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            children: [
+              new Paragraph({
+                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                children: [
+                  new TextRun({ text: label, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
+                ]
+              })
+            ]
+          }),
+          new TableCell({
+            width: { size: instAmtW, type: WidthType.DXA },
+            borders: polNoBorders(),
+            children: [
+              new Paragraph({
+                spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+                children: [
+                  new TextRun({
+                    text: amtText,
+                    size: POL_FONT_SIZE,
+                    font: 'Arial',
+                    color: '000000'
+                  })
+                ]
+              })
+            ]
+          })
         ]
       })
     })
-    ppcpContent.push(new Table({ width: { size: POL_BODY_INNER_W, type: WidthType.DXA }, margins: POL_TABLE_MARGINS, layout: TableLayoutType.FIXED, columnWidths: [instDescW, instAmtW], rows: instRows }))
+    ppcpContent.push(
+      new Table({
+        width: { size: POL_BODY_INNER_W, type: WidthType.DXA },
+        margins: POL_TABLE_MARGINS,
+        layout: TableLayoutType.FIXED,
+        columnWidths: [instDescW, instAmtW],
+        rows: instRows
+      })
+    )
     ppcpContent.push(polEmptyP())
   }
 
@@ -4843,51 +7128,87 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
   if (data.bank) {
     const bankContent: (Paragraph | Table)[] = []
     for (const line of data.bank.details.split('\n')) {
-      if (line.trim()) bankContent.push(new Paragraph({ spacing: { after: 0, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: line.trim(), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] }))
+      if (line.trim())
+        bankContent.push(
+          new Paragraph({
+            spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+            children: [
+              new TextRun({
+                text: line.trim(),
+                size: POL_FONT_SIZE,
+                font: 'Arial',
+                color: '000000'
+              })
+            ]
+          })
+        )
     }
     rows.push(makeRow('Bank Details', bankContent))
   }
 
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    columnWidths: [POL_TITLE_W, POL_BODY_W],
-    layout: TableLayoutType.FIXED,
-    borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
-    },
-    rows
-  }))
+  children.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      columnWidths: [POL_TITLE_W, POL_BODY_W],
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: noBorder,
+        bottom: noBorder,
+        left: noBorder,
+        right: noBorder,
+        insideHorizontal: noBorder,
+        insideVertical: noBorder
+      },
+      rows
+    })
+  )
 
   // Closing
   children.push(...polBuildAdviceClosing(data, signatureImageRun))
 
   const document = new Document({
     numbering: polMakeDocxNumbering(),
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: { default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] }) },
-      footers: { default: adviceFooter },
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: polMakePageProperties(),
+        headers: {
+          default: new Header({ children: hdrParas.length > 0 ? hdrParas : [polEmptyP()] })
+        },
+        footers: { default: adviceFooter },
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx` }
+  const endFile = {
+    blob,
+    fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx`
+  }
   await polStoreFile(policyId, `end-da:${endorsementId}`, endFile)
   polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
-export async function exportEndorsementCADocx(policyId: string, endorsementId: string): Promise<void> {
+export async function exportEndorsementCADocx(
+  policyId: string,
+  endorsementId: string
+): Promise<void> {
   // A signed endorsement re-exports its stored file (see polFrozenFile)
   const storedEnd = await polStoredFile(policyId, `end-ca:${endorsementId}`)
-  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
+  if (storedEnd) {
+    polDownloadBlob(storedEnd.blob, storedEnd.fileName)
+    return
+  }
   await loadPolicyFontSize()
-  const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
+  const { data, endorsement, instalments } = await loadEndorsementExportData(
+    policyId,
+    endorsementId
+  )
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const currency = endorsement.premiumCurrency || data.quotation.premiumCurrency || 'USD'
-  const commPct = Number(endorsement.commissionPercent) || Number(data.policy.commissionPercent) || 0
+  const commPct =
+    Number(endorsement.commissionPercent) || Number(data.policy.commissionPercent) || 0
 
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
@@ -4900,7 +7221,9 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
       const parsed = JSON.parse(settings)
       if (parsed.headerTitles) headerTitles = { ...headerTitles, ...parsed.headerTitles }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   const headerTitle = (headerTitles[typeCode] || 'Certificate').toUpperCase()
 
   const { signatureImageRun } = await polLoadSignature(policyId, (data as any).signatureSnapshot)
@@ -4909,33 +7232,80 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   const hdrHtml = polSt(data, 'docHeader')
   const hdrSpacing = (data.sectionTexts as any).docHeaderSpacing || 220
   if (hdrHtml) {
-    hdrParas.push(...parseHtmlToParagraphs(hdrHtml, { size: 18, font: 'Times New Roman', color: '666666', lineSpacing: hdrSpacing, spacingAfter: 0 }))
+    hdrParas.push(
+      ...parseHtmlToParagraphs(hdrHtml, {
+        size: 18,
+        font: 'Times New Roman',
+        color: '666666',
+        lineSpacing: hdrSpacing,
+        spacingAfter: 0
+      })
+    )
   }
   const adviceFooter = await polBuildAdviceFooter(null, data.frozen?.exportSettings)
 
   const children: (Paragraph | Table)[] = []
 
   // Title
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `CREDIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`, size: 20, font: 'Arial', color: '000000', bold: true, underline: {} })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: 'In connection with', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `${headerTitle} ${data.policy.policyNumber}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000' })]
-  }))
-  children.push(new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
-    children: [new TextRun({ text: `M/V ${data.vesselInfo.name.toUpperCase()}`, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })]
-  }))
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 20, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `CREDIT ADVICE — Endorsement No. ${endorsement.endorsementNumber}`,
+          size: 20,
+          font: 'Arial',
+          color: '000000',
+          bold: true,
+          underline: {}
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: 'In connection with',
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 0, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `${headerTitle} ${data.policy.policyNumber}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000'
+        })
+      ]
+    })
+  )
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 240, line: 240, lineRule: 'auto' as any },
+      children: [
+        new TextRun({
+          text: `M/V ${data.vesselInfo.name.toUpperCase()}`,
+          size: POL_FONT_SIZE,
+          font: 'Arial',
+          color: '000000',
+          bold: true
+        })
+      ]
+    })
+  )
 
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
   const thinBorders = () => ({ top: noBorder, bottom: noBorder, left: noBorder, right: noBorder })
@@ -4949,7 +7319,22 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
           width: { size: POL_TITLE_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: [new Paragraph({ keepLines: true, alignment: AlignmentType.JUSTIFIED, spacing: { after: 80, line: 240, lineRule: 'auto' as any }, children: [new TextRun({ text: title, size: POL_FONT_SIZE, font: 'Arial', color: '000000', bold: true })] })]
+          children: [
+            new Paragraph({
+              keepLines: true,
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 80, line: 240, lineRule: 'auto' as any },
+              children: [
+                new TextRun({
+                  text: title,
+                  size: POL_FONT_SIZE,
+                  font: 'Arial',
+                  color: '000000',
+                  bold: true
+                })
+              ]
+            })
+          ]
         }),
         new TableCell({
           width: { size: POL_BODY_W, type: WidthType.DXA },
@@ -4965,15 +7350,25 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
 
   // Commission
   const premiumAmt = Math.abs(Number(endorsement.premiumAmount) || 0)
-  const totalComm = premiumAmt * commPct / 100
-  rows.push(makeRow('COMMISSION', [polNp(`${commPct}% of ${currency} ${premiumAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} = ${currency} ${totalComm.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)]))
+  const totalComm = (premiumAmt * commPct) / 100
+  rows.push(
+    makeRow('COMMISSION', [
+      polNp(
+        `${commPct}% of ${currency} ${premiumAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} = ${currency} ${totalComm.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      )
+    ])
+  )
 
   // Commission per instalment
   if (instalments.length > 0) {
     const instContent: (Paragraph | Table)[] = []
     for (const inst of instalments) {
       const commAmt = Number(inst.commissionAmount) || 0
-      instContent.push(polNp(`${polOrdinal(inst.instalmentNumber)} instalment: ${currency} ${commAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} due ${polFormatDateUS(inst.dueDate)}`))
+      instContent.push(
+        polNp(
+          `${polOrdinal(inst.instalmentNumber)} instalment: ${currency} ${commAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} due ${polFormatDateUS(inst.dueDate)}`
+        )
+      )
     }
     rows.push(makeRow('INSTALMENTS', instContent))
   }
@@ -4981,33 +7376,44 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
   // PERIOD — from endorsement effective date to policy expiry
   rows.push(makeRow('Period', polBuildEndorsementPeriod(endorsement.effectiveDate, data)))
 
-  children.push(new Table({
-    width: { size: POL_CONTENT_W, type: WidthType.DXA },
-    columnWidths: [POL_TITLE_W, POL_BODY_W],
-    layout: TableLayoutType.FIXED,
-    borders: {
-      top: noBorder, bottom: noBorder, left: noBorder, right: noBorder,
-      insideHorizontal: noBorder, insideVertical: noBorder
-    },
-    rows
-  }))
+  children.push(
+    new Table({
+      width: { size: POL_CONTENT_W, type: WidthType.DXA },
+      columnWidths: [POL_TITLE_W, POL_BODY_W],
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: noBorder,
+        bottom: noBorder,
+        left: noBorder,
+        right: noBorder,
+        insideHorizontal: noBorder,
+        insideVertical: noBorder
+      },
+      rows
+    })
+  )
 
   // Closing — endorsement CA omits the "Subject to the terms..." line
   const closingParas = polBuildAdviceClosing(data, signatureImageRun, true)
   children.push(...closingParas)
 
   const document = new Document({
-    sections: [{
-      properties: polMakePageProperties(),
-      headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
-      footers: adviceFooter ? { default: adviceFooter } : undefined,
-      children: children as any[]
-    }]
+    sections: [
+      {
+        properties: polMakePageProperties(),
+        headers: hdrParas.length > 0 ? { default: new Header({ children: hdrParas }) } : undefined,
+        footers: adviceFooter ? { default: adviceFooter } : undefined,
+        children: children as any[]
+      }
+    ]
   })
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx` }
+  const endFile = {
+    blob,
+    fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx`
+  }
   await polStoreFile(policyId, `end-ca:${endorsementId}`, endFile)
   polDownloadBlob(endFile.blob, endFile.fileName)
 }

@@ -1,7 +1,40 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRequestedSubTab, SubTabProps } from '../utils/useRequestedSubTab'
-import { AlertCircle, Clock, CheckCircle, ShieldAlert, Shield, Eye, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileWarning, Database, RefreshCw, ChevronDown as ChevronDownIcon, Settings, Plus, Pencil, Trash2, List, Layers, Search, FileText } from 'lucide-react'
-import { Vessel, VesselDocument, DocumentType, ComplianceCheckLog, ComplianceCheckResult, CustomValidationRule, EntityDocumentType, EntityDocument } from '../../../shared/types'
+import {
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  ShieldAlert,
+  Shield,
+  Eye,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FileWarning,
+  Database,
+  RefreshCw,
+  ChevronDown as ChevronDownIcon,
+  Settings,
+  Plus,
+  Pencil,
+  Trash2,
+  List,
+  Layers,
+  Search,
+  FileText
+} from 'lucide-react'
+import {
+  Vessel,
+  VesselDocument,
+  DocumentType,
+  ComplianceCheckLog,
+  ComplianceCheckResult,
+  CustomValidationRule,
+  EntityDocumentType,
+  EntityDocument
+} from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,1544 +44,3029 @@ import { confirmDialog } from './DialogHost'
 import { PageHeader, Tabs, Badge } from './ui'
 
 const STATIC_RULES = [
-    { id: 'vessels_no_customer', name: 'Vessels without customer', description: 'Active vessels with no customer assigned' },
-    { id: 'vessels_no_fleet', name: 'Vessels without fleet', description: 'Active vessels not assigned to any fleet' },
-    { id: 'entities_no_email', name: 'Entities without email', description: 'Entities missing email address' },
-    { id: 'entities_no_phone', name: 'Entities without phone', description: 'Entities missing phone number' },
-    { id: 'policies_no_premium', name: 'Policies without premium', description: 'Active policies with no premium amount' },
-    { id: 'vessels_no_policies', name: 'Vessels without policies', description: 'Active vessels with no active policies' },
-    { id: 'orphaned_entities', name: 'Orphaned entities', description: 'Entities not linked to any vessel' },
-    { id: 'empty_fleets', name: 'Empty fleets', description: 'Fleets with no vessels assigned' },
+  {
+    id: 'vessels_no_customer',
+    name: 'Vessels without customer',
+    description: 'Active vessels with no customer assigned'
+  },
+  {
+    id: 'vessels_no_fleet',
+    name: 'Vessels without fleet',
+    description: 'Active vessels not assigned to any fleet'
+  },
+  {
+    id: 'entities_no_email',
+    name: 'Entities without email',
+    description: 'Entities missing email address'
+  },
+  {
+    id: 'entities_no_phone',
+    name: 'Entities without phone',
+    description: 'Entities missing phone number'
+  },
+  {
+    id: 'policies_no_premium',
+    name: 'Policies without premium',
+    description: 'Active policies with no premium amount'
+  },
+  {
+    id: 'vessels_no_policies',
+    name: 'Vessels without policies',
+    description: 'Active vessels with no active policies'
+  },
+  {
+    id: 'orphaned_entities',
+    name: 'Orphaned entities',
+    description: 'Entities not linked to any vessel'
+  },
+  { id: 'empty_fleets', name: 'Empty fleets', description: 'Fleets with no vessels assigned' }
 ]
 
-const RULE_FIELDS: Record<string, { key: string; label: string; type: 'text' | 'number' | 'boolean' }[]> = {
-    vessel: [
-        { key: 'name', label: 'Name', type: 'text' },
-        { key: 'imo_number', label: 'IMO Number', type: 'text' },
-        { key: 'vessel_type', label: 'Vessel Type', type: 'text' },
-        { key: 'flag_state_id', label: 'Flag State', type: 'text' },
-        { key: 'built_year', label: 'Built Year', type: 'number' },
-        { key: 'gross_tonnage', label: 'Gross Tonnage', type: 'number' },
-        { key: 'customer_id', label: 'Customer', type: 'text' },
-        { key: 'fleet_id', label: 'Fleet', type: 'text' },
-        { key: 'classification_society', label: 'Classification', type: 'text' },
-        { key: 'is_active', label: 'Active Status', type: 'boolean' },
-    ],
-    entity: [
-        { key: 'name', label: 'Name', type: 'text' },
-        { key: 'type', label: 'Type', type: 'text' },
-        { key: 'email', label: 'Email', type: 'text' },
-        { key: 'phone', label: 'Phone', type: 'text' },
-        { key: 'identifier', label: 'Identifier', type: 'text' },
-    ],
-    policy: [
-        { key: 'policy_number', label: 'Policy Number', type: 'text' },
-        { key: 'status', label: 'Status', type: 'text' },
-        { key: 'premium_amount', label: 'Premium', type: 'number' },
-        { key: 'commission_percent', label: 'Commission %', type: 'number' },
-    ],
-    fleet: [
-        { key: 'name', label: 'Name', type: 'text' },
-    ],
+const RULE_FIELDS: Record<
+  string,
+  { key: string; label: string; type: 'text' | 'number' | 'boolean' }[]
+> = {
+  vessel: [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'imo_number', label: 'IMO Number', type: 'text' },
+    { key: 'vessel_type', label: 'Vessel Type', type: 'text' },
+    { key: 'flag_state_id', label: 'Flag State', type: 'text' },
+    { key: 'built_year', label: 'Built Year', type: 'number' },
+    { key: 'gross_tonnage', label: 'Gross Tonnage', type: 'number' },
+    { key: 'customer_id', label: 'Customer', type: 'text' },
+    { key: 'fleet_id', label: 'Fleet', type: 'text' },
+    { key: 'classification_society', label: 'Classification', type: 'text' },
+    { key: 'is_active', label: 'Active Status', type: 'boolean' }
+  ],
+  entity: [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'type', label: 'Type', type: 'text' },
+    { key: 'email', label: 'Email', type: 'text' },
+    { key: 'phone', label: 'Phone', type: 'text' },
+    { key: 'identifier', label: 'Identifier', type: 'text' }
+  ],
+  policy: [
+    { key: 'policy_number', label: 'Policy Number', type: 'text' },
+    { key: 'status', label: 'Status', type: 'text' },
+    { key: 'premium_amount', label: 'Premium', type: 'number' },
+    { key: 'commission_percent', label: 'Commission %', type: 'number' }
+  ],
+  fleet: [{ key: 'name', label: 'Name', type: 'text' }]
 }
 
 const OPERATORS = [
-    { key: 'is_null', label: 'Is Null', needsValue: false },
-    { key: 'is_empty', label: 'Is Empty', needsValue: false },
-    { key: 'equals', label: 'Equals', needsValue: true },
-    { key: 'not_equals', label: 'Not Equals', needsValue: true },
-    { key: 'less_than', label: 'Less Than', needsValue: true },
-    { key: 'greater_than', label: 'Greater Than', needsValue: true },
-    { key: 'contains', label: 'Contains', needsValue: true },
-    { key: 'not_contains', label: 'Not Contains', needsValue: true },
+  { key: 'is_null', label: 'Is Null', needsValue: false },
+  { key: 'is_empty', label: 'Is Empty', needsValue: false },
+  { key: 'equals', label: 'Equals', needsValue: true },
+  { key: 'not_equals', label: 'Not Equals', needsValue: true },
+  { key: 'less_than', label: 'Less Than', needsValue: true },
+  { key: 'greater_than', label: 'Greater Than', needsValue: true },
+  { key: 'contains', label: 'Contains', needsValue: true },
+  { key: 'not_contains', label: 'Not Contains', needsValue: true }
 ]
 
 const ENTITY_TYPES = [
-    { key: 'vessel', label: 'Vessel' },
-    { key: 'entity', label: 'Entity' },
-    { key: 'policy', label: 'Policy' },
-    { key: 'fleet', label: 'Fleet' },
+  { key: 'vessel', label: 'Vessel' },
+  { key: 'entity', label: 'Entity' },
+  { key: 'policy', label: 'Policy' },
+  { key: 'fleet', label: 'Fleet' }
 ]
 
 const SEVERITIES = [
-    { key: 'warning', label: 'Warning', color: '#f59e0b' },
-    { key: 'error', label: 'Error', color: '#ff4d4d' },
-    { key: 'info', label: 'Info', color: '#00aac8' },
+  { key: 'warning', label: 'Warning', color: '#f59e0b' },
+  { key: 'error', label: 'Error', color: '#ff4d4d' },
+  { key: 'info', label: 'Info', color: '#00aac8' }
 ]
 
 const EMPTY_RULE_FORM = {
-    name: '',
-    description: '',
-    entityType: 'vessel',
-    fieldName: '',
-    operator: 'is_null',
-    value: '',
-    severity: 'warning',
+  name: '',
+  description: '',
+  entityType: 'vessel',
+  fieldName: '',
+  operator: 'is_null',
+  value: '',
+  severity: 'warning'
 }
 
 interface ComplianceCenterProps extends SubTabProps {
-    onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
-    initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
-    onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
+  onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
+  initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
+  onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
 }
 
-export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTabChange, subTab, subTabNonce }: ComplianceCenterProps) {
-    const [vessels, setVessels] = useState<Vessel[]>([])
-    const [docs, setDocs] = useState<VesselDocument[]>([])
-    const [docTypes, setDocTypes] = useState<DocumentType[]>([])
-    const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
-    const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
-    const [allAssureds, setAllAssureds] = useState<any[]>([])
-    const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
-    const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
-    const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
-    const [docSearch, setDocSearch] = useState('')
-    const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
-    const [activeTab, setActiveTabRaw] = useState<'documents' | 'policies' | 'sanctions' | 'dataQuality'>(initialTab || 'documents')
-    const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
-        setActiveTabRaw(tab)
-        onTabChange?.(tab)
+export default function ComplianceCenter({
+  onNavigateToVessel,
+  initialTab,
+  onTabChange,
+  subTab,
+  subTabNonce
+}: ComplianceCenterProps) {
+  const [vessels, setVessels] = useState<Vessel[]>([])
+  const [docs, setDocs] = useState<VesselDocument[]>([])
+  const [docTypes, setDocTypes] = useState<DocumentType[]>([])
+  const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
+  const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
+  const [allAssureds, setAllAssureds] = useState<any[]>([])
+  const [filter, setFilter] = useState<'all' | 'missing' | 'expired' | 'soon'>('all')
+  const [docViewMode, setDocViewMode] = useState<'vessel' | 'document' | 'flat'>('vessel')
+  const [expandedVessels, setExpandedVessels] = useState<Set<string>>(new Set())
+  const [docSearch, setDocSearch] = useState('')
+  const [endorsementsDue, setEndorsementsDue] = useState<any[]>([])
+  const [activeTab, setActiveTabRaw] = useState<
+    'documents' | 'policies' | 'sanctions' | 'dataQuality'
+  >(initialTab || 'documents')
+  const setActiveTab = (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => {
+    setActiveTabRaw(tab)
+    onTabChange?.(tab)
+  }
+  useRequestedSubTab(
+    subTab,
+    subTabNonce,
+    ['documents', 'policies', 'sanctions', 'dataQuality'] as const,
+    (k) => {
+      setActiveTab(k)
+      if (k === 'dataQuality') loadDataValidation()
     }
-    useRequestedSubTab(subTab, subTabNonce, ['documents', 'policies', 'sanctions', 'dataQuality'] as const, k => { setActiveTab(k); if (k === 'dataQuality') loadDataValidation() })
-    const { showSuccess, showError } = useToast()
-    const { theme } = useTheme()
-    const { hasPermission } = useAuth()
-    const isLight = theme === 'light' || theme === 'aurora'
-    const canReview = hasPermission('compliance:review')
+  )
+  const { showSuccess, showError } = useToast()
+  const { theme } = useTheme()
+  const { hasPermission } = useAuth()
+  const isLight = theme === 'light' || theme === 'aurora'
+  const canReview = hasPermission('compliance:review')
 
-    // Sanctions compliance state
-    const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
-    const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
-    const [policyAlerts, setPolicyAlerts] = useState<any[]>([])
-    const [policyExpiringSoon, setPolicyExpiringSoon] = useState<any[]>([])
-    const [policyFilter, setPolicyFilter] = useState<'expired' | 'expiring'>('expired')
-    const [selectedSanctions, setSelectedSanctions] = useState<Set<string>>(new Set())
-    const [expandedResult, setExpandedResult] = useState<string | null>(null)
-    const [resultsPage, setResultsPage] = useState(1)
-    const [resultsLimit, setResultsLimit] = useState(10)
-    const [resultsTotal, setResultsTotal] = useState(0)
-    const [resultsTotalPages, setResultsTotalPages] = useState(0)
+  // Sanctions compliance state
+  const [pendingResults, setPendingResults] = useState<ComplianceCheckResult[]>([])
+  const [checkLogs, setCheckLogs] = useState<ComplianceCheckLog[]>([])
+  const [policyAlerts, setPolicyAlerts] = useState<any[]>([])
+  const [policyExpiringSoon, setPolicyExpiringSoon] = useState<any[]>([])
+  const [policyFilter, setPolicyFilter] = useState<'expired' | 'expiring'>('expired')
+  const [selectedSanctions, setSelectedSanctions] = useState<Set<string>>(new Set())
+  const [expandedResult, setExpandedResult] = useState<string | null>(null)
+  const [resultsPage, setResultsPage] = useState(1)
+  const [resultsLimit, setResultsLimit] = useState(10)
+  const [resultsTotal, setResultsTotal] = useState(0)
+  const [resultsTotalPages, setResultsTotalPages] = useState(0)
 
-    // Data Quality state
-    const [validationRules, setValidationRules] = useState<{
-        id: string; name: string; description: string; category: string
-        count: number; items: { id: string; name: string; type: string }[]
-    }[]>([])
-    const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set())
-    const [validationLoading, setValidationLoading] = useState(false)
-    const [showRuleSettings, setShowRuleSettings] = useState(false)
-    const [ruleToggles, setRuleToggles] = useState<Record<string, boolean>>({})
+  // Data Quality state
+  const [validationRules, setValidationRules] = useState<
+    {
+      id: string
+      name: string
+      description: string
+      category: string
+      count: number
+      items: { id: string; name: string; type: string }[]
+    }[]
+  >([])
+  const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set())
+  const [validationLoading, setValidationLoading] = useState(false)
+  const [showRuleSettings, setShowRuleSettings] = useState(false)
+  const [ruleToggles, setRuleToggles] = useState<Record<string, boolean>>({})
 
-    // Custom validation rules state
-    const [customRules, setCustomRules] = useState<CustomValidationRule[]>([])
-    const [customRuleViolations, setCustomRuleViolations] = useState<{ ruleId: string; ruleName: string; severity: string; count: number; items: { id: string; name: string }[] }[]>([])
-    const [showAddRule, setShowAddRule] = useState(false)
-    const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
-    const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM)
+  // Custom validation rules state
+  const [customRules, setCustomRules] = useState<CustomValidationRule[]>([])
+  const [customRuleViolations, setCustomRuleViolations] = useState<
+    {
+      ruleId: string
+      ruleName: string
+      severity: string
+      count: number
+      items: { id: string; name: string }[]
+    }[]
+  >([])
+  const [showAddRule, setShowAddRule] = useState(false)
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM)
 
-    useEffect(() => {
-        loadData()
-        loadSanctionsData()
-        loadPolicyAlerts()
-        loadCustomRules()
-        window.api.getSetting('data_validation_rules').then(raw => {
-            if (raw) {
-                try { setRuleToggles(JSON.parse(raw)) } catch { /* ignore */ }
-            }
-        })
-    }, [])
-
-    useEffect(() => { loadSanctionsData() }, [resultsPage, resultsLimit])
-
-    const loadData = async () => {
+  useEffect(() => {
+    loadData()
+    loadSanctionsData()
+    loadPolicyAlerts()
+    loadCustomRules()
+    window.api.getSetting('data_validation_rules').then((raw) => {
+      if (raw) {
         try {
-            const [vData, dData, tData, edtData, edData, assuredData, endorsements] = await Promise.all([
-                window.api.getVessels(),
-                window.api.getVesselDocuments(),
-                window.api.getDocumentTypes(),
-                window.api.getEntityDocumentTypes(),
-                window.api.getEntityDocuments(),
-                window.api.getVesselAssureds(),
-                window.api.surveyWarrantyGetEndorsementsDue().catch(() => [])
-            ])
-            setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
-            setDocs(Array.isArray(dData) ? dData : [])
-            setDocTypes(Array.isArray(tData) ? tData : [])
-            setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t: any) => t.isActive) : [])
-            setEntityDocs(Array.isArray(edData) ? edData : [])
-            setAllAssureds(Array.isArray(assuredData) ? assuredData : [])
-            setEndorsementsDue(Array.isArray(endorsements) ? endorsements : [])
-        } catch (error) {
-            console.error('ComplianceCenter: Failed to load data:', error)
-            setVessels([])
-            setDocs([])
-            setDocTypes([])
-        }
-    }
-
-    const loadSanctionsData = async () => {
-        try {
-            const [result, logs] = await Promise.all([
-                window.api.complianceGetCheckResultsPaginated({
-                    page: resultsPage,
-                    limit: resultsLimit,
-                    status: 'pending_review'
-                }),
-                window.api.complianceGetCheckLogs()
-            ])
-            setPendingResults(Array.isArray(result?.data) ? result.data : [])
-            setResultsTotal(result?.total ?? 0)
-            setResultsTotalPages(result?.totalPages ?? 0)
-            setCheckLogs(Array.isArray(logs) ? logs : [])
-        } catch (error) {
-            console.error('ComplianceCenter: Failed to load sanctions data:', error)
-            // Set empty arrays to prevent blank screen
-            setPendingResults([])
-            setResultsTotal(0)
-            setResultsTotalPages(0)
-            setCheckLogs([])
-        }
-    }
-
-    const loadPolicyAlerts = async () => {
-        try {
-            const [expired, expiring] = await Promise.all([
-                window.api.getExpiredActivePolicies(),
-                window.api.getExpiringSoonPolicies(90)
-            ])
-            setPolicyAlerts(Array.isArray(expired) ? expired : [])
-            setPolicyExpiringSoon(Array.isArray(expiring) ? expiring : [])
+          setRuleToggles(JSON.parse(raw))
         } catch {
-            setPolicyAlerts([])
-            setPolicyExpiringSoon([])
+          /* ignore */
         }
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    loadSanctionsData()
+  }, [resultsPage, resultsLimit])
+
+  const loadData = async () => {
+    try {
+      const [vData, dData, tData, edtData, edData, assuredData, endorsements] = await Promise.all([
+        window.api.getVessels(),
+        window.api.getVesselDocuments(),
+        window.api.getDocumentTypes(),
+        window.api.getEntityDocumentTypes(),
+        window.api.getEntityDocuments(),
+        window.api.getVesselAssureds(),
+        window.api.surveyWarrantyGetEndorsementsDue().catch(() => [])
+      ])
+      setVessels(Array.isArray(vData) ? vData.filter((v: any) => v.isActive !== false) : [])
+      setDocs(Array.isArray(dData) ? dData : [])
+      setDocTypes(Array.isArray(tData) ? tData : [])
+      setEntityDocTypes(Array.isArray(edtData) ? edtData.filter((t: any) => t.isActive) : [])
+      setEntityDocs(Array.isArray(edData) ? edData : [])
+      setAllAssureds(Array.isArray(assuredData) ? assuredData : [])
+      setEndorsementsDue(Array.isArray(endorsements) ? endorsements : [])
+    } catch (error) {
+      console.error('ComplianceCenter: Failed to load data:', error)
+      setVessels([])
+      setDocs([])
+      setDocTypes([])
+    }
+  }
+
+  const loadSanctionsData = async () => {
+    try {
+      const [result, logs] = await Promise.all([
+        window.api.complianceGetCheckResultsPaginated({
+          page: resultsPage,
+          limit: resultsLimit,
+          status: 'pending_review'
+        }),
+        window.api.complianceGetCheckLogs()
+      ])
+      setPendingResults(Array.isArray(result?.data) ? result.data : [])
+      setResultsTotal(result?.total ?? 0)
+      setResultsTotalPages(result?.totalPages ?? 0)
+      setCheckLogs(Array.isArray(logs) ? logs : [])
+    } catch (error) {
+      console.error('ComplianceCenter: Failed to load sanctions data:', error)
+      // Set empty arrays to prevent blank screen
+      setPendingResults([])
+      setResultsTotal(0)
+      setResultsTotalPages(0)
+      setCheckLogs([])
+    }
+  }
+
+  const loadPolicyAlerts = async () => {
+    try {
+      const [expired, expiring] = await Promise.all([
+        window.api.getExpiredActivePolicies(),
+        window.api.getExpiringSoonPolicies(90)
+      ])
+      setPolicyAlerts(Array.isArray(expired) ? expired : [])
+      setPolicyExpiringSoon(Array.isArray(expiring) ? expiring : [])
+    } catch {
+      setPolicyAlerts([])
+      setPolicyExpiringSoon([])
+    }
+  }
+
+  const loadDataValidation = async () => {
+    setValidationLoading(true)
+    try {
+      const [result, customResults] = await Promise.all([
+        window.api.complianceGetDataValidation(),
+        window.api.validationRulesRun()
+      ])
+      if (result && Array.isArray(result.rules)) {
+        setValidationRules(result.rules)
+      } else {
+        setValidationRules([])
+      }
+      if (Array.isArray(customResults)) {
+        setCustomRuleViolations(customResults)
+      }
+    } catch {
+      setValidationRules([])
+      setCustomRuleViolations([])
+    } finally {
+      setValidationLoading(false)
+    }
+  }
+
+  const toggleRule = (ruleId: string) => {
+    setExpandedRules((prev) => {
+      const next = new Set(prev)
+      if (next.has(ruleId)) next.delete(ruleId)
+      else next.add(ruleId)
+      return next
+    })
+  }
+
+  const toggleRuleEnabled = (ruleId: string) => {
+    const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
+    setRuleToggles(next)
+    window.api.setSetting('data_validation_rules', JSON.stringify(next)).then(ok)
+  }
+
+  const loadCustomRules = async () => {
+    try {
+      const rules = await window.api.validationRulesGetAll()
+      if (Array.isArray(rules)) setCustomRules(rules)
+    } catch {
+      setCustomRules([])
+    }
+  }
+
+  const handleSaveRule = async () => {
+    if (!ruleForm.name.trim()) {
+      showError('Rule name is required')
+      return
+    }
+    if (!ruleForm.fieldName) {
+      showError('Field is required')
+      return
+    }
+    const operatorDef = OPERATORS.find((o) => o.key === ruleForm.operator)
+    if (operatorDef?.needsValue && !ruleForm.value.trim()) {
+      showError('Value is required for this operator')
+      return
     }
 
-    const loadDataValidation = async () => {
-        setValidationLoading(true)
-        try {
-            const [result, customResults] = await Promise.all([
-                window.api.complianceGetDataValidation(),
-                window.api.validationRulesRun()
-            ])
-            if (result && Array.isArray(result.rules)) {
-                setValidationRules(result.rules)
-            } else {
-                setValidationRules([])
-            }
-            if (Array.isArray(customResults)) {
-                setCustomRuleViolations(customResults)
-            }
-        } catch {
-            setValidationRules([])
-            setCustomRuleViolations([])
-        } finally {
-            setValidationLoading(false)
-        }
-    }
-
-    const toggleRule = (ruleId: string) => {
-        setExpandedRules(prev => {
-            const next = new Set(prev)
-            if (next.has(ruleId)) next.delete(ruleId)
-            else next.add(ruleId)
-            return next
+    try {
+      if (editingRuleId) {
+        ok(
+          await window.api.validationRulesUpdate(editingRuleId, {
+            name: ruleForm.name,
+            description: ruleForm.description || null,
+            entityType: ruleForm.entityType,
+            fieldName: ruleForm.fieldName,
+            operator: ruleForm.operator,
+            value: operatorDef?.needsValue ? ruleForm.value : null,
+            severity: ruleForm.severity
+          })
+        )
+        showSuccess('Rule updated')
+      } else {
+        await window.api.validationRulesAdd({
+          name: ruleForm.name,
+          description: ruleForm.description || null,
+          entityType: ruleForm.entityType,
+          fieldName: ruleForm.fieldName,
+          operator: ruleForm.operator,
+          value: operatorDef?.needsValue ? ruleForm.value : null,
+          severity: ruleForm.severity,
+          isEnabled: true,
+          order: customRules.length
         })
+        showSuccess('Rule created')
+      }
+      setShowAddRule(false)
+      setEditingRuleId(null)
+      setRuleForm(EMPTY_RULE_FORM)
+      loadCustomRules()
+      loadDataValidation()
+    } catch (e: any) {
+      showError(e?.message || 'Failed to save rule')
     }
+  }
 
-    const toggleRuleEnabled = (ruleId: string) => {
-        const next = { ...ruleToggles, [ruleId]: !(ruleToggles[ruleId] !== false) }
-        setRuleToggles(next)
-        window.api.setSetting('data_validation_rules', JSON.stringify(next)).then(ok)
+  const handleDeleteRule = async (id: string) => {
+    try {
+      await window.api.validationRulesDelete(id)
+      showSuccess('Rule deleted')
+      loadCustomRules()
+      loadDataValidation()
+    } catch (e: any) {
+      showError(e?.message || 'Failed to delete rule')
     }
+  }
 
-    const loadCustomRules = async () => {
-        try {
-            const rules = await window.api.validationRulesGetAll()
-            if (Array.isArray(rules)) setCustomRules(rules)
-        } catch { setCustomRules([]) }
+  const handleToggleCustomRule = async (rule: CustomValidationRule) => {
+    try {
+      await window.api.validationRulesUpdate(rule.id, { isEnabled: !rule.isEnabled })
+      loadCustomRules()
+      loadDataValidation()
+    } catch (e: any) {
+      showError(e?.message || 'Failed to toggle rule')
     }
+  }
 
-    const handleSaveRule = async () => {
-        if (!ruleForm.name.trim()) { showError('Rule name is required'); return }
-        if (!ruleForm.fieldName) { showError('Field is required'); return }
-        const operatorDef = OPERATORS.find(o => o.key === ruleForm.operator)
-        if (operatorDef?.needsValue && !ruleForm.value.trim()) { showError('Value is required for this operator'); return }
+  const handleEditRule = (rule: CustomValidationRule) => {
+    setEditingRuleId(rule.id)
+    setRuleForm({
+      name: rule.name,
+      description: rule.description || '',
+      entityType: rule.entityType,
+      fieldName: rule.fieldName,
+      operator: rule.operator,
+      value: rule.value || '',
+      severity: rule.severity
+    })
+    setShowAddRule(true)
+  }
 
-        try {
-            if (editingRuleId) {
-                ok(await window.api.validationRulesUpdate(editingRuleId, {
-                    name: ruleForm.name,
-                    description: ruleForm.description || null,
-                    entityType: ruleForm.entityType,
-                    fieldName: ruleForm.fieldName,
-                    operator: ruleForm.operator,
-                    value: operatorDef?.needsValue ? ruleForm.value : null,
-                    severity: ruleForm.severity,
-                }))
-                showSuccess('Rule updated')
-            } else {
-                await window.api.validationRulesAdd({
-                    name: ruleForm.name,
-                    description: ruleForm.description || null,
-                    entityType: ruleForm.entityType,
-                    fieldName: ruleForm.fieldName,
-                    operator: ruleForm.operator,
-                    value: operatorDef?.needsValue ? ruleForm.value : null,
-                    severity: ruleForm.severity,
-                    isEnabled: true,
-                    order: customRules.length,
-                })
-                showSuccess('Rule created')
-            }
-            setShowAddRule(false)
-            setEditingRuleId(null)
-            setRuleForm(EMPTY_RULE_FORM)
-            loadCustomRules()
-            loadDataValidation()
-        } catch (e: any) {
-            showError(e?.message || 'Failed to save rule')
-        }
+  const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
+    try {
+      await window.api.complianceDecideResult(resultId, decision)
+      showSuccess(`Match marked as ${decision}`)
+      loadSanctionsData()
+    } catch (error: any) {
+      console.error('Failed to decide match:', error)
+      showError(error?.message || 'Failed to update the match')
     }
+  }
 
-    const handleDeleteRule = async (id: string) => {
-        try {
-            await window.api.validationRulesDelete(id)
-            showSuccess('Rule deleted')
-            loadCustomRules()
-            loadDataValidation()
-        } catch (e: any) {
-            showError(e?.message || 'Failed to delete rule')
-        }
-    }
-
-    const handleToggleCustomRule = async (rule: CustomValidationRule) => {
-        try {
-            await window.api.validationRulesUpdate(rule.id, { isEnabled: !rule.isEnabled })
-            loadCustomRules()
-            loadDataValidation()
-        } catch (e: any) {
-            showError(e?.message || 'Failed to toggle rule')
-        }
-    }
-
-    const handleEditRule = (rule: CustomValidationRule) => {
-        setEditingRuleId(rule.id)
-        setRuleForm({
-            name: rule.name,
-            description: rule.description || '',
-            entityType: rule.entityType,
-            fieldName: rule.fieldName,
-            operator: rule.operator,
-            value: rule.value || '',
-            severity: rule.severity,
-        })
-        setShowAddRule(true)
-    }
-
-    const handleDecideMatch = async (resultId: string, decision: 'sanctioned' | 'cleared') => {
-        try {
-            await window.api.complianceDecideResult(resultId, decision)
-            showSuccess(`Match marked as ${decision}`)
-            loadSanctionsData()
-        } catch (error: any) {
-            console.error('Failed to decide match:', error)
-            showError(error?.message || 'Failed to update the match')
-        }
-    }
-
-    // Bulk Clear / Sanction: confirm once, one call per result, ONE reload + summary toast.
-    // Guarded so a second click cannot start a parallel run over the same selection.
-    const bulkDecidingRef = useRef(false)
-    const [bulkDeciding, setBulkDeciding] = useState(false)
-    const handleBulkDecide = async (decision: 'sanctioned' | 'cleared') => {
-        if (bulkDecidingRef.current || selectedSanctions.size === 0) return
-        const n = selectedSanctions.size
-        const label = decision === 'cleared' ? 'Clear' : 'Sanction'
-        const confirmed = await confirmDialog(`${label} ${n} selected match${n === 1 ? '' : 'es'}? This updates each subject's sanctions status.`)
-        if (!confirmed) return
-        bulkDecidingRef.current = true
-        setBulkDeciding(true)
-        let failed = 0
-        try {
-            for (const id of selectedSanctions) {
-                try { ok(await window.api.complianceDecideResult(id, decision)) } catch { failed++ }
-            }
-            setSelectedSanctions(new Set())
-            if (failed === 0) showSuccess(`${n} match${n === 1 ? '' : 'es'} marked as ${decision}`)
-            else showError(`${n - failed} of ${n} updated — ${failed} failed`)
-            loadSanctionsData()
-        } finally {
-            bulkDecidingRef.current = false
-            setBulkDeciding(false)
-        }
-    }
-
-    const getAllAlerts = () => {
-        const today = new Date()
-        const thirtyDaysFromNow = new Date()
-        thirtyDaysFromNow.setDate(today.getDate() + 30)
-
-        const alerts: any[] = []
-
-        vessels.forEach(v => {
-            // Vessel document alerts
-            docTypes.forEach(t => {
-                const doc = docs.find(d => d.vesselId === v.id && d.documentTypeId === t.id)
-                const isRequired = doc ? doc.required : t.required
-                const hasFile = !!doc?.filePath
-
-                if (isRequired && !hasFile) {
-                    alerts.push({
-                        id: `${v.id}-${t.id}-missing`, vesselId: v.id, vessel: v.name,
-                        document: t.name, category: 'vessel',
-                        type: 'missing', severity: 'high', message: 'Required file missing', date: '-'
-                    })
-                }
-
-                if (hasFile && doc?.expiryDate) {
-                    const expiry = new Date(doc.expiryDate)
-                    if (expiry < today) {
-                        alerts.push({
-                            id: `${v.id}-${t.id}-expired`, vesselId: v.id, vessel: v.name,
-                            document: t.name, category: 'vessel',
-                            type: 'expired', severity: 'critical', message: 'Document expired', date: doc.expiryDate
-                        })
-                    } else if (expiry < thirtyDaysFromNow) {
-                        alerts.push({
-                            id: `${v.id}-${t.id}-soon`, vesselId: v.id, vessel: v.name,
-                            document: t.name, category: 'vessel',
-                            type: 'soon', severity: 'medium', message: 'Expiring soon', date: doc.expiryDate
-                        })
-                    }
-                }
-            })
-
-            // Entity document alerts for this vessel's assureds
-            const vesselAssureds = allAssureds.filter(a => a.vesselId === v.id)
-            const seenEntities = new Set<string>()
-            vesselAssureds.forEach(a => {
-                if (!a.entityId || seenEntities.has(a.entityId)) return
-                seenEntities.add(a.entityId)
-                const entityType = a.entityType === 'person' ? 'person' : 'company'
-                const applicableTypes = entityDocTypes.filter(t =>
-                    t.entityScope === 'both' || t.entityScope === entityType
-                )
-                applicableTypes.forEach(t => {
-                    if (!t.isRequired) return
-                    const ed = entityDocs.find(d => d.entityId === a.entityId && d.documentTypeId === t.id)
-                    const hasFile = !!ed?.filePath
-
-                    if (!hasFile) {
-                        alerts.push({
-                            id: `${v.id}-entity-${a.entityId}-${t.id}-missing`, vesselId: v.id, vessel: v.name,
-                            document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
-                            type: 'missing', severity: 'high', message: 'Required entity document missing', date: '-'
-                        })
-                    }
-
-                    if (hasFile && ed?.expiryDate) {
-                        const expiry = new Date(ed.expiryDate)
-                        if (expiry < today) {
-                            alerts.push({
-                                id: `${v.id}-entity-${a.entityId}-${t.id}-expired`, vesselId: v.id, vessel: v.name,
-                                document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
-                                type: 'expired', severity: 'critical', message: 'Entity document expired', date: ed.expiryDate
-                            })
-                        } else if (expiry < thirtyDaysFromNow) {
-                            alerts.push({
-                                id: `${v.id}-entity-${a.entityId}-${t.id}-soon`, vesselId: v.id, vessel: v.name,
-                                document: `${t.name} (${a.entityName || a.name})`, category: 'entity',
-                                type: 'soon', severity: 'medium', message: 'Entity document expiring soon', date: ed.expiryDate
-                            })
-                        }
-                    }
-                })
-            })
-        })
-
-        // Endorsement due alerts
-        for (const e of endorsementsDue) {
-            alerts.push({
-                id: `endorsement-${e.surveyId}`, vesselId: e.vesselId, vessel: e.vesselName || 'Unknown',
-                document: `Endorsement (${e.surveyType || 'Survey'} - ${e.surveyDate || ''})`, category: 'endorsement',
-                type: 'missing', severity: 'high', message: 'Endorsement not issued', date: e.endorsementReminderDate || '-'
-            })
-        }
-
-        let filtered = alerts.filter(a => filter === 'all' || a.type === filter)
-        if (docSearch.trim()) {
-            const q = docSearch.toLowerCase()
-            filtered = filtered.filter(a => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q))
-        }
-        return filtered
-    }
-
-    // Every document/entity alert across the fleet — recomputed only when its inputs change
-    // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const alerts = useMemo(() => getAllAlerts(), [vessels, docs, docTypes, entityDocTypes, entityDocs, allAssureds, filter, docSearch, endorsementsDue])
-
-    // Group alerts by vessel
-    const alertsByVessel = alerts.reduce<Record<string, { vesselId: string; vessel: string; alerts: any[] }>>((acc, a) => {
-        if (!acc[a.vesselId]) acc[a.vesselId] = { vesselId: a.vesselId, vessel: a.vessel, alerts: [] }
-        acc[a.vesselId].alerts.push(a)
-        return acc
-    }, {})
-    const vesselGroups = Object.values(alertsByVessel).sort((a, b) => b.alerts.length - a.alerts.length)
-
-    // Group alerts by document type
-    const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: any[] }>>((acc, a) => {
-        const docKey = a.document.replace(/\s*\(.*\)$/, '') // Strip entity name for grouping
-        if (!acc[docKey]) acc[docKey] = { document: docKey, alerts: [] }
-        acc[docKey].alerts.push(a)
-        return acc
-    }, {})
-    const documentGroups = Object.values(alertsByDocument).sort((a, b) => b.alerts.length - a.alerts.length)
-
-    const handleChangePolicyStatus = async (policyId: string, newStatus: string) => {
-        try {
-            await window.api.updateVesselDynamicPolicy(policyId, { status: newStatus } as any)
-            showSuccess(`Policy status changed to ${newStatus}`)
-            loadPolicyAlerts()
-        } catch (e: any) {
-            showError(e.message || 'Failed to update policy status')
-        }
-    }
-
-    return (
-        <div className="fade-in page">
-            <PageHeader
-                icon={<ShieldAlert size={26} />}
-                title="Compliance Center"
-                subtitle="Centralized monitoring for document alerts and sanctions screening."
-            />
-            <Tabs
-                style={{ marginBottom: '24px' }}
-                value={activeTab}
-                onChange={k => { setActiveTab(k); if (k === 'dataQuality') loadDataValidation() }}
-                items={[
-                    { key: 'documents', icon: <AlertCircle size={16} />, label: <>Document Alerts {alerts.length > 0 && <Badge tone="danger">{alerts.length}</Badge>}</> },
-                    { key: 'policies', icon: <FileWarning size={16} />, label: <>Policy Alerts {(policyAlerts.length + policyExpiringSoon.length) > 0 && <Badge tone="warning">{policyAlerts.length + policyExpiringSoon.length}</Badge>}</> },
-                    { key: 'sanctions', icon: <Shield size={16} />, label: <>Sanctions Screening {resultsTotal > 0 && <Badge tone="warning">{resultsTotal}</Badge>}</> },
-                    { key: 'dataQuality', icon: <Database size={16} />, label: 'Data Quality' }
-                ]}
-            />
-
-            {activeTab === 'documents' && (
-                <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
-                            <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={alerts.length} />
-                            <FilterButton active={filter === 'missing'} onClick={() => setFilter('missing')} label="Missing" color="var(--danger)" />
-                            <FilterButton active={filter === 'expired'} onClick={() => setFilter('expired')} label="Expired" color="#ff4d4d" />
-                            <FilterButton active={filter === 'soon'} onClick={() => setFilter('soon')} label="Expiring Soon" color="#ffcc00" />
-                        </div>
-                        <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px' }}>
-                            {(['vessel', 'document', 'flat'] as const).map(mode => (
-                                <button key={mode} onClick={() => setDocViewMode(mode)} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: docViewMode === mode ? 'var(--bg-card)' : 'transparent', color: docViewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: docViewMode === mode ? 600 : 400, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    {mode === 'vessel' && <><Layers size={13} /> Vessel</>}
-                                    {mode === 'document' && <><FileText size={13} /> Document</>}
-                                    {mode === 'flat' && <><List size={13} /> Flat</>}
-                                </button>
-                            ))}
-                        </div>
-                        <div style={{ position: 'relative', marginLeft: 'auto' }}>
-                            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input
-                                type="text" value={docSearch} onChange={e => setDocSearch(e.target.value)}
-                                placeholder="Search vessels or documents..."
-                                style={{ padding: '7px 12px 7px 30px', borderRadius: '8px', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', fontSize: '0.82rem', width: '240px' }}
-                            />
-                        </div>
-                    </div>
-
-                    {docViewMode === 'vessel' ? (
-                        /* Grouped by vessel view */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {vesselGroups.map(group => {
-                                const isExpanded = expandedVessels.has(group.vesselId)
-                                return (
-                                <div key={group.vesselId} className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                                    <div
-                                        style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none', background: 'var(--table-header-bg)', cursor: 'pointer' }}
-                                        onClick={() => setExpandedVessels(prev => { const next = new Set(prev); if (next.has(group.vesselId)) next.delete(group.vesselId); else next.add(group.vesselId); return next })}
-                                    >
-                                        <ChevronDownIcon size={14} style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--text-secondary)' }} />
-                                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.vessel}</span>
-                                        <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,77,77,0.15)', color: 'var(--danger)', marginLeft: 'auto' }}>{group.alerts.length}</span>
-                                    </div>
-                                    {isExpanded && <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <tbody>
-                                            {group.alerts.map(alert => {
-                                                const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
-                                                return (
-                                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
-                                                        <td style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
-                                                            {alert.category === 'entity' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: isLight ? '#7a3db8' : '#b464ff', marginRight: '6px' }}>Entity</span>}
-                                                            {alert.document}
-                                                        </td>
-                                                        <td style={{ padding: '10px 16px', width: '120px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-                                                                {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
-                                                                {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
-                                                                {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
-                                                                <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>
-                                                            {alert.date !== '-' && alert.date}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>}
-                                </div>
-                                )
-                            })}
-                            {vesselGroups.length === 0 && (
-                                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-                                    <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                    <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
-                                    <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : docViewMode === 'document' ? (
-                        /* Grouped by document type view */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {documentGroups.map(group => {
-                                const isExpanded = expandedVessels.has(group.document)
-                                return (
-                                <div key={group.document} className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                                    <div
-                                        style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none', background: 'var(--table-header-bg)', cursor: 'pointer' }}
-                                        onClick={() => setExpandedVessels(prev => { const next = new Set(prev); if (next.has(group.document)) next.delete(group.document); else next.add(group.document); return next })}
-                                    >
-                                        <ChevronDownIcon size={14} style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', flexShrink: 0, color: 'var(--text-secondary)' }} />
-                                        <FileText size={15} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.document}</span>
-                                        <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,77,77,0.15)', color: 'var(--danger)', marginLeft: 'auto' }}>{group.alerts.length}</span>
-                                    </div>
-                                    {isExpanded && <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <tbody>
-                                            {group.alerts.map(alert => {
-                                                const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
-                                                return (
-                                                    <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}`, cursor: 'pointer' }} onClick={() => onNavigateToVessel?.(alert.vesselId)}>
-                                                        <td style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vessel}</td>
-                                                        <td style={{ padding: '10px 16px', width: '120px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-                                                                {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
-                                                                {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
-                                                                {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
-                                                                <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>
-                                                            {alert.date !== '-' && alert.date}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>}
-                                </div>
-                                )
-                            })}
-                            {documentGroups.length === 0 && (
-                                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-                                    <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                    <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
-                                    <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        /* Flat list view */
-                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <caption className="sr-only">Document compliance alerts</caption>
-                                <thead>
-                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Vessel</th>
-                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Document</th>
-                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Type</th>
-                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Date</th>
-                                        <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>Severity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {alerts.map(alert => {
-                                        const rowBorder = alert.type === 'expired' || alert.type === 'missing' ? 'var(--danger)' : '#e6a800'
-                                        return (
-                                        <tr key={alert.id} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${rowBorder}` }}>
-                                            <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vessel}</td>
-                                            <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                                                {alert.category === 'entity' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(139,92,246,0.1)', color: isLight ? '#7a3db8' : '#b464ff', marginRight: '6px' }}>Entity</span>}
-                                                {alert.document}
-                                            </td>
-                                            <td style={{ padding: '12px 16px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                                                    {alert.type === 'missing' && <ShieldAlert size={14} color="var(--danger)" />}
-                                                    {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
-                                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
-                                                    <span style={{ textTransform: 'capitalize' }}>{alert.type === 'soon' ? 'Expiring' : alert.type}</span>
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                                                {alert.date !== '-' ? alert.date : ''}
-                                            </td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                                <span style={{
-                                                    padding: '3px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
-                                                    background: alert.severity === 'critical' ? 'rgba(255,77,77,0.15)' : alert.severity === 'high' ? 'rgba(255,120,77,0.15)' : 'rgba(255,204,0,0.12)',
-                                                    color: alert.severity === 'critical' ? 'var(--danger)' : alert.severity === 'high' ? '#ff784d' : '#e6a800'
-                                                }}>
-                                                    {alert.severity}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                        )
-                                    })}
-                                    {alerts.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
-                                                <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                                <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>Fleet is fully compliant</div>
-                                                <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'policies' && (() => {
-                const activePolicies = policyFilter === 'expired' ? policyAlerts : policyExpiringSoon
-                return (
-                <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies">
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--table-header-bg)', padding: '4px', borderRadius: '8px', marginBottom: '20px', width: 'fit-content' }}>
-                        <FilterButton active={policyFilter === 'expired'} onClick={() => setPolicyFilter('expired')} label="Expired" color="var(--danger)" count={policyAlerts.length} />
-                        <FilterButton active={policyFilter === 'expiring'} onClick={() => setPolicyFilter('expiring')} label="Expiring Soon (90 days)" color="#ffa500" count={policyExpiringSoon.length} />
-                    </div>
-                    <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <caption className="sr-only">Policy alerts</caption>
-                            <thead>
-                                <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Vessel</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Policy Type</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Policy Number</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>End Date</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'right' }}>{policyFilter === 'expired' ? 'Days Overdue' : 'Days Left'}</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Status</th>
-                                    <th scope="col" style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {activePolicies.map((alert: any, idx: number) => {
-                                    const endDate = alert.endDate ? new Date(alert.endDate) : null
-                                    const today = new Date()
-                                    const diffDays = endDate ? Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0
-                                    const isExpired = diffDays < 0
-                                    const absDays = Math.abs(diffDays)
-                                    return (
-                                        <tr key={alert.id || idx} style={{ borderBottom: '1px solid var(--table-border)', borderLeft: `4px solid ${isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'}` }}>
-                                            <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{alert.vesselName}</td>
-                                            <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{alert.policyTypeName}</td>
-                                            <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{alert.policyNumber || '-'}</td>
-                                            <td style={{ padding: '12px 16px', color: isExpired ? 'var(--danger)' : '#e6a800', fontSize: '0.85rem' }}>{formatDate(alert.endDate) || alert.endDate || '-'}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                                <span style={{
-                                                    padding: '3px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700,
-                                                    background: isExpired ? 'rgba(255,77,77,0.15)' : absDays <= 30 ? 'rgba(255,165,0,0.15)' : 'rgba(255,204,0,0.1)',
-                                                    color: isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'
-                                                }}>
-                                                    {isExpired ? `${absDays}d overdue` : absDays === 0 ? 'Today' : `${absDays}d left`}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                                <select
-                                                    value={alert.status || 'active'}
-                                                    onChange={e => handleChangePolicyStatus(alert.id, e.target.value)}
-                                                    style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'var(--input-bg, transparent)', color: 'var(--text-primary)', cursor: 'pointer' }}
-                                                >
-                                                    <option value="active">Active</option>
-                                                    <option value="expired">Expired</option>
-                                                    <option value="cancelled">Cancelled</option>
-                                                    <option value="inactive">Inactive</option>
-                                                </select>
-                                            </td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                                <button onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Eye size={13} /> View
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                                {activePolicies.length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} style={{ padding: '64px', textAlign: 'center' }}>
-                                            <CheckCircle size={48} color="var(--success)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                                            <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>No policy alerts</div>
-                                            <p style={{ color: 'var(--text-secondary)' }}>{policyFilter === 'expired' ? 'No expired active policies.' : 'No policies expiring within 90 days.'}</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                )
-            })()}
-
-            {activeTab === 'dataQuality' && (
-                <div role="tabpanel" id="panel-dataQuality" aria-labelledby="tab-dataQuality">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <Database size={20} color="var(--accent-primary)" />
-                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Data Quality</h3>
-                            {(validationRules.length > 0 || customRuleViolations.length > 0) && (() => {
-                                const builtInIssues = validationRules.filter(r => ruleToggles[r.id] !== false).reduce((sum, r) => sum + r.count, 0)
-                                const customIssues = customRuleViolations.reduce((sum, r) => sum + r.count, 0)
-                                const totalIssues = builtInIssues + customIssues
-                                return (
-                                    <span style={{
-                                        padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '700',
-                                        background: totalIssues > 0 ? 'rgba(255, 77, 77, 0.15)' : 'rgba(0, 255, 136, 0.15)',
-                                        color: totalIssues > 0 ? 'var(--danger)' : 'var(--success)'
-                                    }}>
-                                        {totalIssues} issue{totalIssues !== 1 ? 's' : ''}
-                                    </span>
-                                )
-                            })()}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                onClick={() => setShowRuleSettings(!showRuleSettings)}
-                                title="Validation Rules Settings"
-                                style={{
-                                    background: showRuleSettings ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
-                                    border: showRuleSettings ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                                    borderRadius: '6px', cursor: 'pointer', padding: '7px 10px',
-                                    display: 'flex', alignItems: 'center', gap: '6px',
-                                    color: showRuleSettings ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                    fontSize: '0.82rem'
-                                }}
-                                className="hover-effect"
-                            >
-                                <Settings size={14} />
-                            </button>
-                            <button
-                                onClick={loadDataValidation}
-                                disabled={validationLoading}
-                                className="btn-secondary"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
-                            >
-                                <RefreshCw size={14} style={{ animation: validationLoading ? 'spin 1s linear infinite' : 'none' }} />
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
-
-                    {showRuleSettings && (
-                        <div style={{
-                            marginBottom: '16px', padding: '16px 20px', borderRadius: '10px',
-                            background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
-                            border: '1px solid var(--glass-border-color)'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                                <Settings size={16} color="var(--accent-primary)" />
-                                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Validation Rules Settings</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {STATIC_RULES.map(rule => {
-                                    const enabled = ruleToggles[rule.id] !== false
-                                    return (
-                                        <div
-                                            key={rule.id}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                padding: '8px 12px', borderRadius: '8px',
-                                                background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
-                                                border: '1px solid var(--glass-border-color)',
-                                                opacity: enabled ? 1 : 0.5
-                                            }}
-                                        >
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontWeight: '600', fontSize: '0.84rem' }}>{rule.name}</div>
-                                                <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '1px' }}>{rule.description}</div>
-                                            </div>
-                                            <button
-                                                onClick={() => toggleRuleEnabled(rule.id)}
-                                                style={{
-                                                    width: '40px', height: '22px', borderRadius: '11px', border: 'none',
-                                                    background: enabled ? 'var(--accent-primary)' : (isLight ? '#ccc' : 'rgba(255,255,255,0.15)'),
-                                                    cursor: 'pointer', position: 'relative', flexShrink: 0,
-                                                    transition: 'background 0.2s'
-                                                }}
-                                                title={enabled ? 'Disable rule' : 'Enable rule'}
-                                            >
-                                                <span style={{
-                                                    position: 'absolute', top: '2px',
-                                                    left: enabled ? '20px' : '2px',
-                                                    width: '18px', height: '18px', borderRadius: '50%',
-                                                    background: '#fff', transition: 'left 0.2s',
-                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                                                }} />
-                                            </button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            {/* Divider */}
-                            <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
-
-                            {/* Custom Rules Section */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Custom Rules</span>
-                                {hasPermission('admin:settings') && (
-                                    <button
-                                        onClick={() => {
-                                            setEditingRuleId(null)
-                                            setRuleForm(EMPTY_RULE_FORM)
-                                            setShowAddRule(!showAddRule)
-                                        }}
-                                        className="hover-effect"
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '4px',
-                                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
-                                            background: 'rgba(var(--accent-primary-rgb), 0.1)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
-                                            color: 'var(--accent-primary)', cursor: 'pointer'
-                                        }}
-                                    >
-                                        <Plus size={13} />
-                                        Add Rule
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Add/Edit Rule Form */}
-                            {showAddRule && (
-                                <div style={{
-                                    padding: '14px', borderRadius: '8px', marginBottom: '12px',
-                                    background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
-                                    border: '1px solid var(--accent-primary)'
-                                }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Name</label>
-                                            <input
-                                                value={ruleForm.name}
-                                                onChange={e => setRuleForm(f => ({ ...f, name: e.target.value }))}
-                                                placeholder="Rule name"
-                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Entity Type</label>
-                                            <select
-                                                value={ruleForm.entityType}
-                                                onChange={e => setRuleForm(f => ({ ...f, entityType: e.target.value, fieldName: RULE_FIELDS[e.target.value]?.[0]?.key || '' }))}
-                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                            >
-                                                {ENTITY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Field</label>
-                                            <select
-                                                value={ruleForm.fieldName}
-                                                onChange={e => setRuleForm(f => ({ ...f, fieldName: e.target.value }))}
-                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                            >
-                                                <option value="">Select field...</option>
-                                                {(RULE_FIELDS[ruleForm.entityType] || []).map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Operator</label>
-                                            <select
-                                                value={ruleForm.operator}
-                                                onChange={e => setRuleForm(f => ({ ...f, operator: e.target.value }))}
-                                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                            >
-                                                {OPERATORS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Value</label>
-                                            <input
-                                                value={ruleForm.value}
-                                                onChange={e => setRuleForm(f => ({ ...f, value: e.target.value }))}
-                                                placeholder={OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue ? 'Value...' : '(not needed)'}
-                                                disabled={!OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue}
-                                                style={{
-                                                    width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--input-border)',
-                                                    background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box',
-                                                    opacity: OPERATORS.find(o => o.key === ruleForm.operator)?.needsValue ? 1 : 0.4
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px', display: 'block' }}>Severity</label>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                {SEVERITIES.map(s => (
-                                                    <button
-                                                        key={s.key}
-                                                        onClick={() => setRuleForm(f => ({ ...f, severity: s.key }))}
-                                                        style={{
-                                                            padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600',
-                                                            background: ruleForm.severity === s.key ? s.color + '22' : 'transparent',
-                                                            border: ruleForm.severity === s.key ? `2px solid ${s.color}` : '1px solid var(--glass-border-color)',
-                                                            color: ruleForm.severity === s.key ? s.color : 'var(--text-secondary)',
-                                                            cursor: 'pointer', textTransform: 'capitalize'
-                                                        }}
-                                                    >
-                                                        {s.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignSelf: 'flex-end' }}>
-                                            <button
-                                                onClick={() => { setShowAddRule(false); setEditingRuleId(null); setRuleForm(EMPTY_RULE_FORM) }}
-                                                className="btn-secondary"
-                                                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handleSaveRule}
-                                                className="btn-primary"
-                                                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                                            >
-                                                {editingRuleId ? 'Update' : 'Save'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Custom Rules List */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {customRules.length === 0 && !showAddRule && (
-                                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                                        No custom validation rules configured.
-                                    </div>
-                                )}
-                                {customRules.map(rule => {
-                                    const sevDef = SEVERITIES.find(s => s.key === rule.severity) || SEVERITIES[0]
-                                    const fieldDef = RULE_FIELDS[rule.entityType]?.find(f => f.key === rule.fieldName)
-                                    const opDef = OPERATORS.find(o => o.key === rule.operator)
-                                    return (
-                                        <div
-                                            key={rule.id}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                padding: '8px 12px', borderRadius: '8px',
-                                                background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
-                                                border: '1px solid var(--glass-border-color)',
-                                                opacity: rule.isEnabled ? 1 : 0.5
-                                            }}
-                                        >
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ fontWeight: '600', fontSize: '0.84rem' }}>{rule.name}</span>
-                                                    <span style={{
-                                                        padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '700',
-                                                        background: sevDef.color + '22', color: sevDef.color, textTransform: 'uppercase'
-                                                    }}>
-                                                        {rule.severity}
-                                                    </span>
-                                                </div>
-                                                <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                                                    {rule.entityType} &rarr; {fieldDef?.label || rule.fieldName} {opDef?.label.toLowerCase() || rule.operator}{opDef?.needsValue ? ` "${rule.value}"` : ''}
-                                                </div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                                {hasPermission('admin:settings') && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleEditRule(rule)}
-                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
-                                                            title="Edit rule"
-                                                        >
-                                                            <Pencil size={13} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteRule(rule.id)}
-                                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', display: 'flex' }}
-                                                            title="Delete rule"
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    </>
-                                                )}
-                                                <button
-                                                    onClick={() => handleToggleCustomRule(rule)}
-                                                    style={{
-                                                        width: '40px', height: '22px', borderRadius: '11px', border: 'none',
-                                                        background: rule.isEnabled ? 'var(--accent-primary)' : (isLight ? '#ccc' : 'rgba(255,255,255,0.15)'),
-                                                        cursor: 'pointer', position: 'relative', flexShrink: 0,
-                                                        transition: 'background 0.2s'
-                                                    }}
-                                                    title={rule.isEnabled ? 'Disable rule' : 'Enable rule'}
-                                                >
-                                                    <span style={{
-                                                        position: 'absolute', top: '2px',
-                                                        left: rule.isEnabled ? '20px' : '2px',
-                                                        width: '18px', height: '18px', borderRadius: '50%',
-                                                        background: '#fff', transition: 'left 0.2s',
-                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                                                    }} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {validationLoading && validationRules.length === 0 ? (
-                        <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
-                            <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite', opacity: 0.3, display: 'block', margin: '0 auto 14px' }} />
-                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Running validation checks...</div>
-                        </div>
-                    ) : (
-                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <caption className="sr-only">Data quality validation rules</caption>
-                                <thead>
-                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        <th scope="col" style={{ padding: '16px', width: '32px' }}></th>
-                                        <th scope="col" style={{ padding: '16px' }}>Rule</th>
-                                        <th scope="col" style={{ padding: '16px' }}>Category</th>
-                                        <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>Violations</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {validationRules.filter(r => ruleToggles[r.id] !== false).map(rule => {
-                                        const isExpanded = expandedRules.has(rule.id)
-                                        const hasIssues = rule.count > 0
-                                        return (
-                                            <>{/* Fragment wrapper for rule + expanded rows */}
-                                                <tr
-                                                    key={rule.id}
-                                                    onClick={() => hasIssues && toggleRule(rule.id)}
-                                                    style={{
-                                                        borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
-                                                        cursor: hasIssues ? 'pointer' : 'default',
-                                                        borderLeft: `4px solid ${hasIssues ? 'var(--danger)' : 'var(--success)'}`
-                                                    }}
-                                                >
-                                                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                                                        {hasIssues ? (
-                                                            <ChevronDownIcon size={16} color="var(--text-secondary)" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
-                                                        ) : (
-                                                            <CheckCircle size={16} color="var(--success)" />
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px' }}>
-                                                        <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>{rule.name}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{rule.description}</div>
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px' }}>
-                                                        <span style={{
-                                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
-                                                            background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', textTransform: 'uppercase'
-                                                        }}>
-                                                            {rule.category}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                                                        <span style={{
-                                                            padding: '4px 12px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '800',
-                                                            background: hasIssues ? 'rgba(255, 77, 77, 0.15)' : 'rgba(0, 255, 136, 0.15)',
-                                                            color: hasIssues ? 'var(--danger)' : 'var(--success)'
-                                                        }}>
-                                                            {rule.count}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                {isExpanded && rule.items.length > 0 && (
-                                                    <tr key={`${rule.id}-items`}>
-                                                        <td colSpan={4} style={{ padding: '0 16px 16px 48px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)', borderBottom: '1px solid var(--table-border)' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '240px', overflowY: 'auto' }}>
-                                                                {rule.items.map((item, idx) => (
-                                                                    <div
-                                                                        key={item.id}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation()
-                                                                            if (item.type === 'vessel' && onNavigateToVessel) onNavigateToVessel(item.id)
-                                                                        }}
-                                                                        style={{
-                                                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                                                            padding: '6px 10px', borderRadius: '6px',
-                                                                            background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
-                                                                            cursor: (item.type === 'vessel' && onNavigateToVessel) ? 'pointer' : 'default',
-                                                                            fontSize: '0.82rem'
-                                                                        }}
-                                                                    >
-                                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
-                                                                        <span style={{ fontWeight: '500' }}>{item.name}</span>
-                                                                        <span style={{
-                                                                            marginLeft: 'auto', fontSize: '0.68rem', fontWeight: '600',
-                                                                            padding: '1px 6px', borderRadius: '4px',
-                                                                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
-                                                                            color: 'var(--text-secondary)', textTransform: 'uppercase'
-                                                                        }}>
-                                                                            {item.type}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </>
-                                        )
-                                    })}
-                                    {/* Custom rule violations */}
-                                    {customRuleViolations.map(rule => {
-                                        const isExpanded = expandedRules.has(rule.ruleId)
-                                        const hasIssues = rule.count > 0
-                                        const sevDef = SEVERITIES.find(s => s.key === rule.severity) || SEVERITIES[0]
-                                        return (
-                                            <>{/* Fragment wrapper for custom rule + expanded rows */}
-                                                <tr
-                                                    key={rule.ruleId}
-                                                    onClick={() => hasIssues && toggleRule(rule.ruleId)}
-                                                    style={{
-                                                        borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
-                                                        cursor: hasIssues ? 'pointer' : 'default',
-                                                        borderLeft: `4px solid ${hasIssues ? sevDef.color : 'var(--success)'}`
-                                                    }}
-                                                >
-                                                    <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                                                        {hasIssues ? (
-                                                            <ChevronDownIcon size={16} color="var(--text-secondary)" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
-                                                        ) : (
-                                                            <CheckCircle size={16} color="var(--success)" />
-                                                        )}
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px' }}>
-                                                        <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>{rule.ruleName}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Custom rule</div>
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px' }}>
-                                                        <span style={{
-                                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
-                                                            background: sevDef.color + '1a', color: sevDef.color, textTransform: 'uppercase'
-                                                        }}>
-                                                            {rule.severity}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                                                        <span style={{
-                                                            padding: '4px 12px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '800',
-                                                            background: hasIssues ? sevDef.color + '26' : 'rgba(0, 255, 136, 0.15)',
-                                                            color: hasIssues ? sevDef.color : 'var(--success)'
-                                                        }}>
-                                                            {rule.count}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                {isExpanded && rule.items.length > 0 && (
-                                                    <tr key={`${rule.ruleId}-items`}>
-                                                        <td colSpan={4} style={{ padding: '0 16px 16px 48px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)', borderBottom: '1px solid var(--table-border)' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '240px', overflowY: 'auto' }}>
-                                                                {rule.items.map((item, idx) => (
-                                                                    <div
-                                                                        key={item.id}
-                                                                        style={{
-                                                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                                                            padding: '6px 10px', borderRadius: '6px',
-                                                                            background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
-                                                                            fontSize: '0.82rem'
-                                                                        }}
-                                                                    >
-                                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sevDef.color, flexShrink: 0 }} />
-                                                                        <span style={{ fontWeight: '500' }}>{item.name}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </>
-                                        )
-                                    })}
-                                    {validationRules.length === 0 && customRuleViolations.length === 0 && !validationLoading && (
-                                        <tr>
-                                            <td colSpan={4} style={{ padding: '64px', textAlign: 'center' }}>
-                                                <Database size={48} style={{ opacity: 0.15, marginBottom: '16px' }} />
-                                                <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>No validation data</div>
-                                                <p style={{ color: 'var(--text-secondary)' }}>Click Refresh to run data quality checks.</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'sanctions' && (() => {
-                return (
-                    <div role="tabpanel" id="panel-sanctions" aria-labelledby="tab-sanctions" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-                        {/* Pending Reviews */}
-                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <ShieldAlert size={20} color="#ffc107" />
-                                <h3 style={{ margin: 0 }}>Pending Review</h3>
-                                {resultsTotal > 0 && (
-                                    <span style={{ background: 'rgba(255, 193, 7, 0.2)', color: '#ffc107', padding: '2px 10px', borderRadius: '10px', fontSize: '0.8rem' }}>
-                                        {resultsTotal} pending
-                                    </span>
-                                )}
-                                {selectedSanctions.size > 0 && canReview && (
-                                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{selectedSanctions.size} selected</span>
-                                        <button disabled={bulkDeciding} onClick={() => handleBulkDecide('cleared')} style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <CheckCircle size={13} /> Clear All
-                                        </button>
-                                        <button disabled={bulkDeciding} onClick={() => handleBulkDecide('sanctioned')} style={{ background: 'rgba(255,77,77,0.1)', border: '1px solid rgba(255,77,77,0.3)', color: 'var(--danger)', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <ShieldAlert size={13} /> Sanction All
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <caption className="sr-only">Pending sanctions reviews</caption>
-                                <thead>
-                                    <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                                        {canReview && <th scope="col" style={{ padding: '12px 8px 12px 16px', width: '32px' }}>
-                                            <input type="checkbox" checked={pendingResults.length > 0 && selectedSanctions.size === pendingResults.length} onChange={e => {
-                                                if (e.target.checked) setSelectedSanctions(new Set(pendingResults.map(r => r.id)))
-                                                else setSelectedSanctions(new Set())
-                                            }} />
-                                        </th>}
-                                        <th scope="col" style={{ padding: '12px 16px' }}>Name</th>
-                                        <th scope="col" style={{ padding: '12px 16px' }}>Type</th>
-                                        <th scope="col" style={{ padding: '12px 16px' }}>Match Score</th>
-                                        <th scope="col" style={{ padding: '12px 16px' }}>Date</th>
-                                        <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {pendingResults.map(result => (
-                                        <>
-                                            <tr key={result.id} style={{ borderBottom: expandedResult === result.id ? 'none' : '1px solid var(--table-border)' }}>
-                                                {canReview && <td style={{ padding: '14px 8px 14px 16px', width: '32px' }}>
-                                                    <input type="checkbox" checked={selectedSanctions.has(result.id)} onChange={e => {
-                                                        const next = new Set(selectedSanctions)
-                                                        if (e.target.checked) next.add(result.id); else next.delete(result.id)
-                                                        setSelectedSanctions(next)
-                                                    }} />
-                                                </td>}
-                                                <td style={{ padding: '14px 16px', fontWeight: '600' }}>{result.entityName}</td>
-                                                <td style={{ padding: '14px 16px' }}>
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '0.75rem',
-                                                        background: result.entityType === 'vessel' ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(180, 140, 255, 0.1)',
-                                                        color: result.entityType === 'vessel' ? '#00d2ff' : '#b48cff',
-                                                        textTransform: 'capitalize'
-                                                    }}>
-                                                        {result.entityType}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: '14px 16px' }}>
-                                                    <span style={{
-                                                        fontWeight: '600',
-                                                        color: Number(result.matchScore) >= 90 ? 'var(--danger)' : Number(result.matchScore) >= 80 ? '#ffc107' : 'var(--text-secondary)'
-                                                    }}>
-                                                        {Number(result.matchScore || 0).toFixed(0)}%
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                                    {result.createdAt ? formatDate(result.createdAt) : '-'}
-                                                </td>
-                                                <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                        <button
-                                                            onClick={() => setExpandedResult(expandedResult === result.id ? null : result.id)}
-                                                            aria-expanded={expandedResult === result.id}
-                                                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
-                                                        >
-                                                            <Eye size={14} />
-                                                            {expandedResult === result.id ? 'Hide' : 'View'}
-                                                        </button>
-                                                        {canReview && (
-                                                            <button
-                                                                onClick={() => handleDecideMatch(result.id, 'cleared')}
-                                                                title="False positive - this entity is not sanctioned"
-                                                                style={{ background: 'rgba(0, 255, 136, 0.1)', border: '1px solid rgba(0, 255, 136, 0.3)', color: '#00ff88', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                                            >
-                                                                <CheckCircle size={14} />
-                                                                Cleared
-                                                            </button>
-                                                        )}
-                                                        {canReview && (
-                                                            <button
-                                                                onClick={() => handleDecideMatch(result.id, 'sanctioned')}
-                                                                title="True positive - this entity is sanctioned"
-                                                                style={{ background: 'rgba(255, 77, 77, 0.1)', border: '1px solid rgba(255, 77, 77, 0.3)', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}
-                                                            >
-                                                                <ShieldAlert size={14} />
-                                                                Sanctioned
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {expandedResult === result.id && (
-                                                <tr>
-                                                    <td colSpan={canReview ? 6 : 5} style={{ padding: '0 16px 16px 16px', background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)' }}>
-                                                        <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                                                            <div style={{ fontWeight: '600', marginBottom: '8px' }}>Match Details:</div>
-                                                            {(() => {
-                                                                try {
-                                                                    const matches = JSON.parse(result.matchDetails || '[]')
-                                                                    return matches.map((m: any, i: number) => (
-                                                                        <div key={i} style={{ marginBottom: '8px', padding: '8px', background: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.2)', borderRadius: '4px' }}>
-                                                                            <div><strong>Source:</strong> {m.source || 'Unknown'}</div>
-                                                                            <div><strong>Names:</strong> {(m.names || []).join(', ')}</div>
-                                                                            <div><strong>Score:</strong> {((m.score || 0) * 100).toFixed(0)}%</div>
-                                                                        </div>
-                                                                    ))
-                                                                } catch {
-                                                                    return <div>Unable to parse match details</div>
-                                                                }
-                                                            })()}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </>
-                                    ))}
-                                    {pendingResults.length === 0 && (
-                                        <tr>
-                                            <td colSpan={canReview ? 6 : 5} style={{ padding: '48px', textAlign: 'center' }}>
-                                                <CheckCircle size={40} color="var(--success)" style={{ marginBottom: '12px', opacity: 0.5 }} />
-                                                <div style={{ fontWeight: '600' }}>No pending reviews</div>
-                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>All sanctions matches have been reviewed.</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                            {resultsTotalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--table-border)' }}>
-                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                                        Showing {((resultsPage - 1) * resultsLimit) + 1} to {Math.min(resultsPage * resultsLimit, resultsTotal)} of {resultsTotal} results
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <button className="btn-secondary" disabled={resultsPage === 1} onClick={() => setResultsPage(1)} style={{ padding: '6px' }} aria-label="First page"><ChevronsLeft size={16} /></button>
-                                        <button className="btn-secondary" disabled={resultsPage === 1} onClick={() => setResultsPage(p => Math.max(1, p - 1))} style={{ padding: '6px' }} aria-label="Previous page"><ChevronLeft size={16} /></button>
-                                        <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>Page {resultsPage} of {resultsTotalPages}</span>
-                                        <button className="btn-secondary" disabled={resultsPage === resultsTotalPages} onClick={() => setResultsPage(p => Math.min(resultsTotalPages, p + 1))} style={{ padding: '6px' }} aria-label="Next page"><ChevronRight size={16} /></button>
-                                        <button className="btn-secondary" disabled={resultsPage === resultsTotalPages} onClick={() => setResultsPage(resultsTotalPages)} style={{ padding: '6px' }} aria-label="Last page"><ChevronsRight size={16} /></button>
-                                        <select value={resultsLimit} onChange={(e) => setResultsLimit(Number(e.target.value))} style={{ marginLeft: '16px', padding: '4px', borderRadius: '4px', fontSize: '0.9rem' }} aria-label="Results per page">
-                                            <option value="10">10 / page</option>
-                                            <option value="25">25 / page</option>
-                                            <option value="50">50 / page</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Recent Check History */}
-                        <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-                            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--table-border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <History size={20} color="var(--accent-primary)" />
-                                <h3 style={{ margin: 0 }}>Check History</h3>
-                            </div>
-                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                {checkLogs.map(log => (
-                                    <div key={log.id} style={{ padding: '14px 20px', borderBottom: '1px solid var(--table-border)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                {log.runAt ? formatDateTime(log.runAt) : '-'}
-                                            </span>
-                                            <span style={{
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '0.7rem',
-                                                fontWeight: '600',
-                                                background: log.status === 'completed' ? 'rgba(0, 255, 136, 0.1)' :
-                                                    log.status === 'failed' ? 'rgba(255, 77, 77, 0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)',
-                                                color: log.status === 'completed' ? 'var(--success)' :
-                                                    log.status === 'failed' ? 'var(--danger)' : '#00d2ff',
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {log.status}
-                                            </span>
-                                        </div>
-                                        <div style={{ fontSize: '0.9rem' }}>
-                                            <span style={{ color: 'var(--text-secondary)' }}>Checked:</span> {log.totalChecked} |{' '}
-                                            <span style={{ color: log.matchesFound > 0 ? '#ffc107' : 'var(--text-secondary)' }}>
-                                                Matches: {log.matchesFound}
-                                            </span>
-                                        </div>
-                                        {log.error && (
-                                            <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>
-                                                Error: {log.error}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                {checkLogs.length === 0 && (
-                                    <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                        No compliance checks have been run yet.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )
-            })()}
-        </div>
+  // Bulk Clear / Sanction: confirm once, one call per result, ONE reload + summary toast.
+  // Guarded so a second click cannot start a parallel run over the same selection.
+  const bulkDecidingRef = useRef(false)
+  const [bulkDeciding, setBulkDeciding] = useState(false)
+  const handleBulkDecide = async (decision: 'sanctioned' | 'cleared') => {
+    if (bulkDecidingRef.current || selectedSanctions.size === 0) return
+    const n = selectedSanctions.size
+    const label = decision === 'cleared' ? 'Clear' : 'Sanction'
+    const confirmed = await confirmDialog(
+      `${label} ${n} selected match${n === 1 ? '' : 'es'}? This updates each subject's sanctions status.`
     )
+    if (!confirmed) return
+    bulkDecidingRef.current = true
+    setBulkDeciding(true)
+    let failed = 0
+    try {
+      for (const id of selectedSanctions) {
+        try {
+          ok(await window.api.complianceDecideResult(id, decision))
+        } catch {
+          failed++
+        }
+      }
+      setSelectedSanctions(new Set())
+      if (failed === 0) showSuccess(`${n} match${n === 1 ? '' : 'es'} marked as ${decision}`)
+      else showError(`${n - failed} of ${n} updated — ${failed} failed`)
+      loadSanctionsData()
+    } finally {
+      bulkDecidingRef.current = false
+      setBulkDeciding(false)
+    }
+  }
+
+  const getAllAlerts = () => {
+    const today = new Date()
+    const thirtyDaysFromNow = new Date()
+    thirtyDaysFromNow.setDate(today.getDate() + 30)
+
+    const alerts: any[] = []
+
+    vessels.forEach((v) => {
+      // Vessel document alerts
+      docTypes.forEach((t) => {
+        const doc = docs.find((d) => d.vesselId === v.id && d.documentTypeId === t.id)
+        const isRequired = doc ? doc.required : t.required
+        const hasFile = !!doc?.filePath
+
+        if (isRequired && !hasFile) {
+          alerts.push({
+            id: `${v.id}-${t.id}-missing`,
+            vesselId: v.id,
+            vessel: v.name,
+            document: t.name,
+            category: 'vessel',
+            type: 'missing',
+            severity: 'high',
+            message: 'Required file missing',
+            date: '-'
+          })
+        }
+
+        if (hasFile && doc?.expiryDate) {
+          const expiry = new Date(doc.expiryDate)
+          if (expiry < today) {
+            alerts.push({
+              id: `${v.id}-${t.id}-expired`,
+              vesselId: v.id,
+              vessel: v.name,
+              document: t.name,
+              category: 'vessel',
+              type: 'expired',
+              severity: 'critical',
+              message: 'Document expired',
+              date: doc.expiryDate
+            })
+          } else if (expiry < thirtyDaysFromNow) {
+            alerts.push({
+              id: `${v.id}-${t.id}-soon`,
+              vesselId: v.id,
+              vessel: v.name,
+              document: t.name,
+              category: 'vessel',
+              type: 'soon',
+              severity: 'medium',
+              message: 'Expiring soon',
+              date: doc.expiryDate
+            })
+          }
+        }
+      })
+
+      // Entity document alerts for this vessel's assureds
+      const vesselAssureds = allAssureds.filter((a) => a.vesselId === v.id)
+      const seenEntities = new Set<string>()
+      vesselAssureds.forEach((a) => {
+        if (!a.entityId || seenEntities.has(a.entityId)) return
+        seenEntities.add(a.entityId)
+        const entityType = a.entityType === 'person' ? 'person' : 'company'
+        const applicableTypes = entityDocTypes.filter(
+          (t) => t.entityScope === 'both' || t.entityScope === entityType
+        )
+        applicableTypes.forEach((t) => {
+          if (!t.isRequired) return
+          const ed = entityDocs.find((d) => d.entityId === a.entityId && d.documentTypeId === t.id)
+          const hasFile = !!ed?.filePath
+
+          if (!hasFile) {
+            alerts.push({
+              id: `${v.id}-entity-${a.entityId}-${t.id}-missing`,
+              vesselId: v.id,
+              vessel: v.name,
+              document: `${t.name} (${a.entityName || a.name})`,
+              category: 'entity',
+              type: 'missing',
+              severity: 'high',
+              message: 'Required entity document missing',
+              date: '-'
+            })
+          }
+
+          if (hasFile && ed?.expiryDate) {
+            const expiry = new Date(ed.expiryDate)
+            if (expiry < today) {
+              alerts.push({
+                id: `${v.id}-entity-${a.entityId}-${t.id}-expired`,
+                vesselId: v.id,
+                vessel: v.name,
+                document: `${t.name} (${a.entityName || a.name})`,
+                category: 'entity',
+                type: 'expired',
+                severity: 'critical',
+                message: 'Entity document expired',
+                date: ed.expiryDate
+              })
+            } else if (expiry < thirtyDaysFromNow) {
+              alerts.push({
+                id: `${v.id}-entity-${a.entityId}-${t.id}-soon`,
+                vesselId: v.id,
+                vessel: v.name,
+                document: `${t.name} (${a.entityName || a.name})`,
+                category: 'entity',
+                type: 'soon',
+                severity: 'medium',
+                message: 'Entity document expiring soon',
+                date: ed.expiryDate
+              })
+            }
+          }
+        })
+      })
+    })
+
+    // Endorsement due alerts
+    for (const e of endorsementsDue) {
+      alerts.push({
+        id: `endorsement-${e.surveyId}`,
+        vesselId: e.vesselId,
+        vessel: e.vesselName || 'Unknown',
+        document: `Endorsement (${e.surveyType || 'Survey'} - ${e.surveyDate || ''})`,
+        category: 'endorsement',
+        type: 'missing',
+        severity: 'high',
+        message: 'Endorsement not issued',
+        date: e.endorsementReminderDate || '-'
+      })
+    }
+
+    let filtered = alerts.filter((a) => filter === 'all' || a.type === filter)
+    if (docSearch.trim()) {
+      const q = docSearch.toLowerCase()
+      filtered = filtered.filter(
+        (a) => a.vessel.toLowerCase().includes(q) || a.document.toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }
+
+  // Every document/entity alert across the fleet — recomputed only when its inputs change
+  // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const alerts = useMemo(
+    () => getAllAlerts(),
+    [
+      vessels,
+      docs,
+      docTypes,
+      entityDocTypes,
+      entityDocs,
+      allAssureds,
+      filter,
+      docSearch,
+      endorsementsDue
+    ]
+  )
+
+  // Group alerts by vessel
+  const alertsByVessel = alerts.reduce<
+    Record<string, { vesselId: string; vessel: string; alerts: any[] }>
+  >((acc, a) => {
+    if (!acc[a.vesselId]) acc[a.vesselId] = { vesselId: a.vesselId, vessel: a.vessel, alerts: [] }
+    acc[a.vesselId].alerts.push(a)
+    return acc
+  }, {})
+  const vesselGroups = Object.values(alertsByVessel).sort(
+    (a, b) => b.alerts.length - a.alerts.length
+  )
+
+  // Group alerts by document type
+  const alertsByDocument = alerts.reduce<Record<string, { document: string; alerts: any[] }>>(
+    (acc, a) => {
+      const docKey = a.document.replace(/\s*\(.*\)$/, '') // Strip entity name for grouping
+      if (!acc[docKey]) acc[docKey] = { document: docKey, alerts: [] }
+      acc[docKey].alerts.push(a)
+      return acc
+    },
+    {}
+  )
+  const documentGroups = Object.values(alertsByDocument).sort(
+    (a, b) => b.alerts.length - a.alerts.length
+  )
+
+  const handleChangePolicyStatus = async (policyId: string, newStatus: string) => {
+    try {
+      await window.api.updateVesselDynamicPolicy(policyId, { status: newStatus } as any)
+      showSuccess(`Policy status changed to ${newStatus}`)
+      loadPolicyAlerts()
+    } catch (e: any) {
+      showError(e.message || 'Failed to update policy status')
+    }
+  }
+
+  return (
+    <div className="fade-in page">
+      <PageHeader
+        icon={<ShieldAlert size={26} />}
+        title="Compliance Center"
+        subtitle="Centralized monitoring for document alerts and sanctions screening."
+      />
+      <Tabs
+        style={{ marginBottom: '24px' }}
+        value={activeTab}
+        onChange={(k) => {
+          setActiveTab(k)
+          if (k === 'dataQuality') loadDataValidation()
+        }}
+        items={[
+          {
+            key: 'documents',
+            icon: <AlertCircle size={16} />,
+            label: (
+              <>
+                Document Alerts {alerts.length > 0 && <Badge tone="danger">{alerts.length}</Badge>}
+              </>
+            )
+          },
+          {
+            key: 'policies',
+            icon: <FileWarning size={16} />,
+            label: (
+              <>
+                Policy Alerts{' '}
+                {policyAlerts.length + policyExpiringSoon.length > 0 && (
+                  <Badge tone="warning">{policyAlerts.length + policyExpiringSoon.length}</Badge>
+                )}
+              </>
+            )
+          },
+          {
+            key: 'sanctions',
+            icon: <Shield size={16} />,
+            label: (
+              <>
+                Sanctions Screening{' '}
+                {resultsTotal > 0 && <Badge tone="warning">{resultsTotal}</Badge>}
+              </>
+            )
+          },
+          { key: 'dataQuality', icon: <Database size={16} />, label: 'Data Quality' }
+        ]}
+      />
+
+      {activeTab === 'documents' && (
+        <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              marginBottom: '20px',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                gap: '4px',
+                background: 'var(--table-header-bg)',
+                padding: '4px',
+                borderRadius: '8px',
+                width: 'fit-content'
+              }}
+            >
+              <FilterButton
+                active={filter === 'all'}
+                onClick={() => setFilter('all')}
+                label="All"
+                count={alerts.length}
+              />
+              <FilterButton
+                active={filter === 'missing'}
+                onClick={() => setFilter('missing')}
+                label="Missing"
+                color="var(--danger)"
+              />
+              <FilterButton
+                active={filter === 'expired'}
+                onClick={() => setFilter('expired')}
+                label="Expired"
+                color="#ff4d4d"
+              />
+              <FilterButton
+                active={filter === 'soon'}
+                onClick={() => setFilter('soon')}
+                label="Expiring Soon"
+                color="#ffcc00"
+              />
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: '4px',
+                background: 'var(--table-header-bg)',
+                padding: '4px',
+                borderRadius: '8px'
+              }}
+            >
+              {(['vessel', 'document', 'flat'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setDocViewMode(mode)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: docViewMode === mode ? 'var(--bg-card)' : 'transparent',
+                    color: docViewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: docViewMode === mode ? 600 : 400,
+                    fontSize: '0.78rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  {mode === 'vessel' && (
+                    <>
+                      <Layers size={13} /> Vessel
+                    </>
+                  )}
+                  {mode === 'document' && (
+                    <>
+                      <FileText size={13} /> Document
+                    </>
+                  )}
+                  {mode === 'flat' && (
+                    <>
+                      <List size={13} /> Flat
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div style={{ position: 'relative', marginLeft: 'auto' }}>
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)'
+                }}
+              />
+              <input
+                type="text"
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+                placeholder="Search vessels or documents..."
+                style={{
+                  padding: '7px 12px 7px 30px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg, transparent)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.82rem',
+                  width: '240px'
+                }}
+              />
+            </div>
+          </div>
+
+          {docViewMode === 'vessel' ? (
+            /* Grouped by vessel view */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {vesselGroups.map((group) => {
+                const isExpanded = expandedVessels.has(group.vesselId)
+                return (
+                  <div
+                    key={group.vesselId}
+                    className="glass-card"
+                    style={{ padding: '0', overflow: 'hidden' }}
+                  >
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none',
+                        background: 'var(--table-header-bg)',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() =>
+                        setExpandedVessels((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(group.vesselId)) next.delete(group.vesselId)
+                          else next.add(group.vesselId)
+                          return next
+                        })
+                      }
+                    >
+                      <ChevronDownIcon
+                        size={14}
+                        style={{
+                          transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                          transition: 'transform 0.15s',
+                          flexShrink: 0,
+                          color: 'var(--text-secondary)'
+                        }}
+                      />
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.vessel}</span>
+                      <span
+                        style={{
+                          padding: '2px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: 'rgba(255,77,77,0.15)',
+                          color: 'var(--danger)',
+                          marginLeft: 'auto'
+                        }}
+                      >
+                        {group.alerts.length}
+                      </span>
+                    </div>
+                    {isExpanded && (
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {group.alerts.map((alert) => {
+                            const rowBorder =
+                              alert.type === 'expired' || alert.type === 'missing'
+                                ? 'var(--danger)'
+                                : '#e6a800'
+                            return (
+                              <tr
+                                key={alert.id}
+                                style={{
+                                  borderBottom: '1px solid var(--table-border)',
+                                  borderLeft: `4px solid ${rowBorder}`
+                                }}
+                              >
+                                <td style={{ padding: '10px 16px', fontSize: '0.85rem' }}>
+                                  {alert.category === 'entity' && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        background: 'rgba(139,92,246,0.1)',
+                                        color: isLight ? '#7a3db8' : '#b464ff',
+                                        marginRight: '6px'
+                                      }}
+                                    >
+                                      Entity
+                                    </span>
+                                  )}
+                                  {alert.document}
+                                </td>
+                                <td style={{ padding: '10px 16px', width: '120px' }}>
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    {alert.type === 'missing' && (
+                                      <ShieldAlert size={14} color="var(--danger)" />
+                                    )}
+                                    {alert.type === 'expired' && (
+                                      <AlertCircle size={14} color="#ff4d4d" />
+                                    )}
+                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                    <span style={{ textTransform: 'capitalize' }}>
+                                      {alert.type === 'soon' ? 'Expiring' : alert.type}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '10px 16px',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.8rem',
+                                    textAlign: 'right'
+                                  }}
+                                >
+                                  {alert.date !== '-' && alert.date}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )
+              })}
+              {vesselGroups.length === 0 && (
+                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+                  <CheckCircle
+                    size={48}
+                    color="var(--success)"
+                    style={{ marginBottom: '16px', opacity: 0.5 }}
+                  />
+                  <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                    Fleet is fully compliant
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                </div>
+              )}
+            </div>
+          ) : docViewMode === 'document' ? (
+            /* Grouped by document type view */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {documentGroups.map((group) => {
+                const isExpanded = expandedVessels.has(group.document)
+                return (
+                  <div
+                    key={group.document}
+                    className="glass-card"
+                    style={{ padding: '0', overflow: 'hidden' }}
+                  >
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        borderBottom: isExpanded ? '1px solid var(--table-border)' : 'none',
+                        background: 'var(--table-header-bg)',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() =>
+                        setExpandedVessels((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(group.document)) next.delete(group.document)
+                          else next.add(group.document)
+                          return next
+                        })
+                      }
+                    >
+                      <ChevronDownIcon
+                        size={14}
+                        style={{
+                          transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                          transition: 'transform 0.15s',
+                          flexShrink: 0,
+                          color: 'var(--text-secondary)'
+                        }}
+                      />
+                      <FileText
+                        size={15}
+                        style={{ color: 'var(--accent-primary)', flexShrink: 0 }}
+                      />
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{group.document}</span>
+                      <span
+                        style={{
+                          padding: '2px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: 'rgba(255,77,77,0.15)',
+                          color: 'var(--danger)',
+                          marginLeft: 'auto'
+                        }}
+                      >
+                        {group.alerts.length}
+                      </span>
+                    </div>
+                    {isExpanded && (
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {group.alerts.map((alert) => {
+                            const rowBorder =
+                              alert.type === 'expired' || alert.type === 'missing'
+                                ? 'var(--danger)'
+                                : '#e6a800'
+                            return (
+                              <tr
+                                key={alert.id}
+                                style={{
+                                  borderBottom: '1px solid var(--table-border)',
+                                  borderLeft: `4px solid ${rowBorder}`,
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => onNavigateToVessel?.(alert.vesselId)}
+                              >
+                                <td
+                                  style={{
+                                    padding: '10px 16px',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  {alert.vessel}
+                                </td>
+                                <td style={{ padding: '10px 16px', width: '120px' }}>
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    {alert.type === 'missing' && (
+                                      <ShieldAlert size={14} color="var(--danger)" />
+                                    )}
+                                    {alert.type === 'expired' && (
+                                      <AlertCircle size={14} color="#ff4d4d" />
+                                    )}
+                                    {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                                    <span style={{ textTransform: 'capitalize' }}>
+                                      {alert.type === 'soon' ? 'Expiring' : alert.type}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '10px 16px',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.8rem',
+                                    textAlign: 'right'
+                                  }}
+                                >
+                                  {alert.date !== '-' && alert.date}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )
+              })}
+              {documentGroups.length === 0 && (
+                <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+                  <CheckCircle
+                    size={48}
+                    color="var(--success)"
+                    style={{ marginBottom: '16px', opacity: 0.5 }}
+                  />
+                  <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                    Fleet is fully compliant
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Flat list view */
+            <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <caption className="sr-only">Document compliance alerts</caption>
+                <thead>
+                  <tr
+                    style={{
+                      textAlign: 'left',
+                      background: 'var(--table-header-bg)',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <th
+                      scope="col"
+                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                    >
+                      Vessel
+                    </th>
+                    <th
+                      scope="col"
+                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                    >
+                      Document
+                    </th>
+                    <th
+                      scope="col"
+                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                    >
+                      Type
+                    </th>
+                    <th
+                      scope="col"
+                      style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                    >
+                      Date
+                    </th>
+                    <th
+                      scope="col"
+                      style={{
+                        padding: '14px 16px',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        textAlign: 'right'
+                      }}
+                    >
+                      Severity
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.map((alert) => {
+                    const rowBorder =
+                      alert.type === 'expired' || alert.type === 'missing'
+                        ? 'var(--danger)'
+                        : '#e6a800'
+                    return (
+                      <tr
+                        key={alert.id}
+                        style={{
+                          borderBottom: '1px solid var(--table-border)',
+                          borderLeft: `4px solid ${rowBorder}`
+                        }}
+                      >
+                        <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>
+                          {alert.vessel}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                          {alert.category === 'entity' && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(139,92,246,0.1)',
+                                color: isLight ? '#7a3db8' : '#b464ff',
+                                marginRight: '6px'
+                              }}
+                            >
+                              Entity
+                            </span>
+                          )}
+                          {alert.document}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.82rem'
+                            }}
+                          >
+                            {alert.type === 'missing' && (
+                              <ShieldAlert size={14} color="var(--danger)" />
+                            )}
+                            {alert.type === 'expired' && <AlertCircle size={14} color="#ff4d4d" />}
+                            {alert.type === 'soon' && <Clock size={14} color="#ffcc00" />}
+                            <span style={{ textTransform: 'capitalize' }}>
+                              {alert.type === 'soon' ? 'Expiring' : alert.type}
+                            </span>
+                          </div>
+                        </td>
+                        <td
+                          style={{
+                            padding: '12px 16px',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.82rem'
+                          }}
+                        >
+                          {alert.date !== '-' ? alert.date : ''}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '10px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              background:
+                                alert.severity === 'critical'
+                                  ? 'rgba(255,77,77,0.15)'
+                                  : alert.severity === 'high'
+                                    ? 'rgba(255,120,77,0.15)'
+                                    : 'rgba(255,204,0,0.12)',
+                              color:
+                                alert.severity === 'critical'
+                                  ? 'var(--danger)'
+                                  : alert.severity === 'high'
+                                    ? '#ff784d'
+                                    : '#e6a800'
+                            }}
+                          >
+                            {alert.severity}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {alerts.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '64px', textAlign: 'center' }}>
+                        <CheckCircle
+                          size={48}
+                          color="var(--success)"
+                          style={{ marginBottom: '16px', opacity: 0.5 }}
+                        />
+                        <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                          Fleet is fully compliant
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)' }}>No document alerts found.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'policies' &&
+        (() => {
+          const activePolicies = policyFilter === 'expired' ? policyAlerts : policyExpiringSoon
+          return (
+            <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies">
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '4px',
+                  background: 'var(--table-header-bg)',
+                  padding: '4px',
+                  borderRadius: '8px',
+                  marginBottom: '20px',
+                  width: 'fit-content'
+                }}
+              >
+                <FilterButton
+                  active={policyFilter === 'expired'}
+                  onClick={() => setPolicyFilter('expired')}
+                  label="Expired"
+                  color="var(--danger)"
+                  count={policyAlerts.length}
+                />
+                <FilterButton
+                  active={policyFilter === 'expiring'}
+                  onClick={() => setPolicyFilter('expiring')}
+                  label="Expiring Soon (90 days)"
+                  color="#ffa500"
+                  count={policyExpiringSoon.length}
+                />
+              </div>
+              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <caption className="sr-only">Policy alerts</caption>
+                  <thead>
+                    <tr
+                      style={{
+                        textAlign: 'left',
+                        background: 'var(--table-header-bg)',
+                        borderBottom: '1px solid var(--table-border)'
+                      }}
+                    >
+                      <th
+                        scope="col"
+                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                      >
+                        Vessel
+                      </th>
+                      <th
+                        scope="col"
+                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                      >
+                        Policy Type
+                      </th>
+                      <th
+                        scope="col"
+                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                      >
+                        Policy Number
+                      </th>
+                      <th
+                        scope="col"
+                        style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}
+                      >
+                        End Date
+                      </th>
+                      <th
+                        scope="col"
+                        style={{
+                          padding: '14px 16px',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          textAlign: 'right'
+                        }}
+                      >
+                        {policyFilter === 'expired' ? 'Days Overdue' : 'Days Left'}
+                      </th>
+                      <th
+                        scope="col"
+                        style={{
+                          padding: '14px 16px',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        Status
+                      </th>
+                      <th
+                        scope="col"
+                        style={{
+                          padding: '14px 16px',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activePolicies.map((alert: any, idx: number) => {
+                      const endDate = alert.endDate ? new Date(alert.endDate) : null
+                      const today = new Date()
+                      const diffDays = endDate
+                        ? Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                        : 0
+                      const isExpired = diffDays < 0
+                      const absDays = Math.abs(diffDays)
+                      return (
+                        <tr
+                          key={alert.id || idx}
+                          style={{
+                            borderBottom: '1px solid var(--table-border)',
+                            borderLeft: `4px solid ${isExpired ? 'var(--danger)' : absDays <= 30 ? '#ffa500' : '#e6a800'}`
+                          }}
+                        >
+                          <td
+                            style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}
+                          >
+                            {alert.vesselName}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                            {alert.policyTypeName}
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 16px',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {alert.policyNumber || '-'}
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 16px',
+                              color: isExpired ? 'var(--danger)' : '#e6a800',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {formatDate(alert.endDate) || alert.endDate || '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <span
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '10px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: isExpired
+                                  ? 'rgba(255,77,77,0.15)'
+                                  : absDays <= 30
+                                    ? 'rgba(255,165,0,0.15)'
+                                    : 'rgba(255,204,0,0.1)',
+                                color: isExpired
+                                  ? 'var(--danger)'
+                                  : absDays <= 30
+                                    ? '#ffa500'
+                                    : '#e6a800'
+                              }}
+                            >
+                              {isExpired
+                                ? `${absDays}d overdue`
+                                : absDays === 0
+                                  ? 'Today'
+                                  : `${absDays}d left`}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <select
+                              value={alert.status || 'active'}
+                              onChange={(e) => handleChangePolicyStatus(alert.id, e.target.value)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.78rem',
+                                border: '1px solid var(--input-border)',
+                                background: 'var(--input-bg, transparent)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="active">Active</option>
+                              <option value="expired">Expired</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => onNavigateToVessel?.(alert.vesselId, 'policies')}
+                              className="btn-secondary"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.78rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Eye size={13} /> View
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {activePolicies.length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '64px', textAlign: 'center' }}>
+                          <CheckCircle
+                            size={48}
+                            color="var(--success)"
+                            style={{ marginBottom: '16px', opacity: 0.5 }}
+                          />
+                          <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                            No policy alerts
+                          </div>
+                          <p style={{ color: 'var(--text-secondary)' }}>
+                            {policyFilter === 'expired'
+                              ? 'No expired active policies.'
+                              : 'No policies expiring within 90 days.'}
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })()}
+
+      {activeTab === 'dataQuality' && (
+        <div role="tabpanel" id="panel-dataQuality" aria-labelledby="tab-dataQuality">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Database size={20} color="var(--accent-primary)" />
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Data Quality</h3>
+              {(validationRules.length > 0 || customRuleViolations.length > 0) &&
+                (() => {
+                  const builtInIssues = validationRules
+                    .filter((r) => ruleToggles[r.id] !== false)
+                    .reduce((sum, r) => sum + r.count, 0)
+                  const customIssues = customRuleViolations.reduce((sum, r) => sum + r.count, 0)
+                  const totalIssues = builtInIssues + customIssues
+                  return (
+                    <span
+                      style={{
+                        padding: '2px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        background:
+                          totalIssues > 0 ? 'rgba(255, 77, 77, 0.15)' : 'rgba(0, 255, 136, 0.15)',
+                        color: totalIssues > 0 ? 'var(--danger)' : 'var(--success)'
+                      }}
+                    >
+                      {totalIssues} issue{totalIssues !== 1 ? 's' : ''}
+                    </span>
+                  )
+                })()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setShowRuleSettings(!showRuleSettings)}
+                title="Validation Rules Settings"
+                style={{
+                  background: showRuleSettings
+                    ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                    : 'transparent',
+                  border: showRuleSettings
+                    ? '1px solid var(--accent-primary)'
+                    : '1px solid var(--glass-border-color)',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  padding: '7px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: showRuleSettings ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  fontSize: '0.82rem'
+                }}
+                className="hover-effect"
+              >
+                <Settings size={14} />
+              </button>
+              <button
+                onClick={loadDataValidation}
+                disabled={validationLoading}
+                className="btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.82rem',
+                  padding: '7px 14px'
+                }}
+              >
+                <RefreshCw
+                  size={14}
+                  style={{ animation: validationLoading ? 'spin 1s linear infinite' : 'none' }}
+                />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {showRuleSettings && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '16px 20px',
+                borderRadius: '10px',
+                background: isLight ? '#f8f9fb' : 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--glass-border-color)'
+              }}
+            >
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}
+              >
+                <Settings size={16} color="var(--accent-primary)" />
+                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>
+                  Validation Rules Settings
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {STATIC_RULES.map((rule) => {
+                  const enabled = ruleToggles[rule.id] !== false
+                  return (
+                    <div
+                      key={rule.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                        border: '1px solid var(--glass-border-color)',
+                        opacity: enabled ? 1 : 0.5
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '600', fontSize: '0.84rem' }}>{rule.name}</div>
+                        <div
+                          style={{
+                            fontSize: '0.73rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: '1px'
+                          }}
+                        >
+                          {rule.description}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => toggleRuleEnabled(rule.id)}
+                        style={{
+                          width: '40px',
+                          height: '22px',
+                          borderRadius: '11px',
+                          border: 'none',
+                          background: enabled
+                            ? 'var(--accent-primary)'
+                            : isLight
+                              ? '#ccc'
+                              : 'rgba(255,255,255,0.15)',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          flexShrink: 0,
+                          transition: 'background 0.2s'
+                        }}
+                        title={enabled ? 'Disable rule' : 'Enable rule'}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            left: enabled ? '20px' : '2px',
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            transition: 'left 0.2s',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                          }}
+                        />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Divider */}
+              <div style={{ height: '1px', background: 'var(--glass-border)', margin: '16px 0' }} />
+
+              {/* Custom Rules Section */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '12px'
+                }}
+              >
+                <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Custom Rules</span>
+                {hasPermission('admin:settings') && (
+                  <button
+                    onClick={() => {
+                      setEditingRuleId(null)
+                      setRuleForm(EMPTY_RULE_FORM)
+                      setShowAddRule(!showAddRule)
+                    }}
+                    className="hover-effect"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                      border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+                      color: 'var(--accent-primary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={13} />
+                    Add Rule
+                  </button>
+                )}
+              </div>
+
+              {/* Add/Edit Rule Form */}
+              {showAddRule && (
+                <div
+                  style={{
+                    padding: '14px',
+                    borderRadius: '8px',
+                    marginBottom: '12px',
+                    background: isLight ? '#fff' : 'rgba(255,255,255,0.04)',
+                    border: '1px solid var(--accent-primary)'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '10px',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Name
+                      </label>
+                      <input
+                        value={ruleForm.name}
+                        onChange={(e) => setRuleForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Rule name"
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Entity Type
+                      </label>
+                      <select
+                        value={ruleForm.entityType}
+                        onChange={(e) =>
+                          setRuleForm((f) => ({
+                            ...f,
+                            entityType: e.target.value,
+                            fieldName: RULE_FIELDS[e.target.value]?.[0]?.key || ''
+                          }))
+                        }
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {ENTITY_TYPES.map((t) => (
+                          <option key={t.key} value={t.key}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1fr',
+                      gap: '10px',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Field
+                      </label>
+                      <select
+                        value={ruleForm.fieldName}
+                        onChange={(e) => setRuleForm((f) => ({ ...f, fieldName: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <option value="">Select field...</option>
+                        {(RULE_FIELDS[ruleForm.entityType] || []).map((f) => (
+                          <option key={f.key} value={f.key}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Operator
+                      </label>
+                      <select
+                        value={ruleForm.operator}
+                        onChange={(e) => setRuleForm((f) => ({ ...f, operator: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {OPERATORS.map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Value
+                      </label>
+                      <input
+                        value={ruleForm.value}
+                        onChange={(e) => setRuleForm((f) => ({ ...f, value: e.target.value }))}
+                        placeholder={
+                          OPERATORS.find((o) => o.key === ruleForm.operator)?.needsValue
+                            ? 'Value...'
+                            : '(not needed)'
+                        }
+                        disabled={!OPERATORS.find((o) => o.key === ruleForm.operator)?.needsValue}
+                        style={{
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--input-border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box',
+                          opacity: OPERATORS.find((o) => o.key === ruleForm.operator)?.needsValue
+                            ? 1
+                            : 0.4
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          color: 'var(--text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          marginBottom: '4px',
+                          display: 'block'
+                        }}
+                      >
+                        Severity
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {SEVERITIES.map((s) => (
+                          <button
+                            key={s.key}
+                            onClick={() => setRuleForm((f) => ({ ...f, severity: s.key }))}
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: '600',
+                              background:
+                                ruleForm.severity === s.key ? s.color + '22' : 'transparent',
+                              border:
+                                ruleForm.severity === s.key
+                                  ? `2px solid ${s.color}`
+                                  : '1px solid var(--glass-border-color)',
+                              color:
+                                ruleForm.severity === s.key ? s.color : 'var(--text-secondary)',
+                              cursor: 'pointer',
+                              textTransform: 'capitalize'
+                            }}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginLeft: 'auto',
+                        display: 'flex',
+                        gap: '8px',
+                        alignSelf: 'flex-end'
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowAddRule(false)
+                          setEditingRuleId(null)
+                          setRuleForm(EMPTY_RULE_FORM)
+                        }}
+                        className="btn-secondary"
+                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveRule}
+                        className="btn-primary"
+                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                      >
+                        {editingRuleId ? 'Update' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Rules List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {customRules.length === 0 && !showAddRule && (
+                  <div
+                    style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    No custom validation rules configured.
+                  </div>
+                )}
+                {customRules.map((rule) => {
+                  const sevDef = SEVERITIES.find((s) => s.key === rule.severity) || SEVERITIES[0]
+                  const fieldDef = RULE_FIELDS[rule.entityType]?.find(
+                    (f) => f.key === rule.fieldName
+                  )
+                  const opDef = OPERATORS.find((o) => o.key === rule.operator)
+                  return (
+                    <div
+                      key={rule.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: isLight ? '#fff' : 'rgba(255,255,255,0.02)',
+                        border: '1px solid var(--glass-border-color)',
+                        opacity: rule.isEnabled ? 1 : 0.5
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '0.84rem' }}>
+                            {rule.name}
+                          </span>
+                          <span
+                            style={{
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.65rem',
+                              fontWeight: '700',
+                              background: sevDef.color + '22',
+                              color: sevDef.color,
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            {rule.severity}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.73rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: '1px'
+                          }}
+                        >
+                          {rule.entityType} &rarr; {fieldDef?.label || rule.fieldName}{' '}
+                          {opDef?.label.toLowerCase() || rule.operator}
+                          {opDef?.needsValue ? ` "${rule.value}"` : ''}
+                        </div>
+                      </div>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                      >
+                        {hasPermission('admin:settings') && (
+                          <>
+                            <button
+                              onClick={() => handleEditRule(rule)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-secondary)',
+                                padding: '4px',
+                                display: 'flex'
+                              }}
+                              title="Edit rule"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRule(rule.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--danger)',
+                                padding: '4px',
+                                display: 'flex'
+                              }}
+                              title="Delete rule"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => handleToggleCustomRule(rule)}
+                          style={{
+                            width: '40px',
+                            height: '22px',
+                            borderRadius: '11px',
+                            border: 'none',
+                            background: rule.isEnabled
+                              ? 'var(--accent-primary)'
+                              : isLight
+                                ? '#ccc'
+                                : 'rgba(255,255,255,0.15)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            flexShrink: 0,
+                            transition: 'background 0.2s'
+                          }}
+                          title={rule.isEnabled ? 'Disable rule' : 'Enable rule'}
+                        >
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: rule.isEnabled ? '20px' : '2px',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: '#fff',
+                              transition: 'left 0.2s',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                            }}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {validationLoading && validationRules.length === 0 ? (
+            <div className="glass-card" style={{ padding: '64px', textAlign: 'center' }}>
+              <RefreshCw
+                size={32}
+                style={{
+                  animation: 'spin 1s linear infinite',
+                  opacity: 0.3,
+                  display: 'block',
+                  margin: '0 auto 14px'
+                }}
+              />
+              <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                Running validation checks...
+              </div>
+            </div>
+          ) : (
+            <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <caption className="sr-only">Data quality validation rules</caption>
+                <thead>
+                  <tr
+                    style={{
+                      textAlign: 'left',
+                      background: 'var(--table-header-bg)',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <th scope="col" style={{ padding: '16px', width: '32px' }}></th>
+                    <th scope="col" style={{ padding: '16px' }}>
+                      Rule
+                    </th>
+                    <th scope="col" style={{ padding: '16px' }}>
+                      Category
+                    </th>
+                    <th scope="col" style={{ padding: '16px', textAlign: 'right' }}>
+                      Violations
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validationRules
+                    .filter((r) => ruleToggles[r.id] !== false)
+                    .map((rule) => {
+                      const isExpanded = expandedRules.has(rule.id)
+                      const hasIssues = rule.count > 0
+                      return (
+                        <>
+                          {/* Fragment wrapper for rule + expanded rows */}
+                          <tr
+                            key={rule.id}
+                            onClick={() => hasIssues && toggleRule(rule.id)}
+                            style={{
+                              borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
+                              cursor: hasIssues ? 'pointer' : 'default',
+                              borderLeft: `4px solid ${hasIssues ? 'var(--danger)' : 'var(--success)'}`
+                            }}
+                          >
+                            <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                              {hasIssues ? (
+                                <ChevronDownIcon
+                                  size={16}
+                                  color="var(--text-secondary)"
+                                  style={{
+                                    transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                                    transition: 'transform 0.15s'
+                                  }}
+                                />
+                              ) : (
+                                <CheckCircle size={16} color="var(--success)" />
+                              )}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>
+                                {rule.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                  marginTop: '2px'
+                                }}
+                              >
+                                {rule.description}
+                              </div>
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: '600',
+                                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                                  color: 'var(--accent-primary)',
+                                  textTransform: 'uppercase'
+                                }}
+                              >
+                                {rule.category}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                              <span
+                                style={{
+                                  padding: '4px 12px',
+                                  borderRadius: '20px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '800',
+                                  background: hasIssues
+                                    ? 'rgba(255, 77, 77, 0.15)'
+                                    : 'rgba(0, 255, 136, 0.15)',
+                                  color: hasIssues ? 'var(--danger)' : 'var(--success)'
+                                }}
+                              >
+                                {rule.count}
+                              </span>
+                            </td>
+                          </tr>
+                          {isExpanded && rule.items.length > 0 && (
+                            <tr key={`${rule.id}-items`}>
+                              <td
+                                colSpan={4}
+                                style={{
+                                  padding: '0 16px 16px 48px',
+                                  background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)',
+                                  borderBottom: '1px solid var(--table-border)'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    maxHeight: '240px',
+                                    overflowY: 'auto'
+                                  }}
+                                >
+                                  {rule.items.map((item, idx) => (
+                                    <div
+                                      key={item.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (item.type === 'vessel' && onNavigateToVessel)
+                                          onNavigateToVessel(item.id)
+                                      }}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '6px 10px',
+                                        borderRadius: '6px',
+                                        background:
+                                          idx % 2 === 0
+                                            ? 'transparent'
+                                            : isLight
+                                              ? 'rgba(0,0,0,0.02)'
+                                              : 'rgba(255,255,255,0.02)',
+                                        cursor:
+                                          item.type === 'vessel' && onNavigateToVessel
+                                            ? 'pointer'
+                                            : 'default',
+                                        fontSize: '0.82rem'
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          width: '6px',
+                                          height: '6px',
+                                          borderRadius: '50%',
+                                          background: 'var(--danger)',
+                                          flexShrink: 0
+                                        }}
+                                      />
+                                      <span style={{ fontWeight: '500' }}>{item.name}</span>
+                                      <span
+                                        style={{
+                                          marginLeft: 'auto',
+                                          fontSize: '0.68rem',
+                                          fontWeight: '600',
+                                          padding: '1px 6px',
+                                          borderRadius: '4px',
+                                          background: isLight
+                                            ? 'rgba(0,0,0,0.05)'
+                                            : 'rgba(255,255,255,0.08)',
+                                          color: 'var(--text-secondary)',
+                                          textTransform: 'uppercase'
+                                        }}
+                                      >
+                                        {item.type}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      )
+                    })}
+                  {/* Custom rule violations */}
+                  {customRuleViolations.map((rule) => {
+                    const isExpanded = expandedRules.has(rule.ruleId)
+                    const hasIssues = rule.count > 0
+                    const sevDef = SEVERITIES.find((s) => s.key === rule.severity) || SEVERITIES[0]
+                    return (
+                      <>
+                        {/* Fragment wrapper for custom rule + expanded rows */}
+                        <tr
+                          key={rule.ruleId}
+                          onClick={() => hasIssues && toggleRule(rule.ruleId)}
+                          style={{
+                            borderBottom: isExpanded ? 'none' : '1px solid var(--table-border)',
+                            cursor: hasIssues ? 'pointer' : 'default',
+                            borderLeft: `4px solid ${hasIssues ? sevDef.color : 'var(--success)'}`
+                          }}
+                        >
+                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            {hasIssues ? (
+                              <ChevronDownIcon
+                                size={16}
+                                color="var(--text-secondary)"
+                                style={{
+                                  transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                                  transition: 'transform 0.15s'
+                                }}
+                              />
+                            ) : (
+                              <CheckCircle size={16} color="var(--success)" />
+                            )}
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ fontWeight: '600', fontSize: '0.88rem' }}>
+                              {rule.ruleName}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--text-secondary)',
+                                marginTop: '2px'
+                              }}
+                            >
+                              Custom rule
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: '600',
+                                background: sevDef.color + '1a',
+                                color: sevDef.color,
+                                textTransform: 'uppercase'
+                              }}
+                            >
+                              {rule.severity}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                fontSize: '0.82rem',
+                                fontWeight: '800',
+                                background: hasIssues
+                                  ? sevDef.color + '26'
+                                  : 'rgba(0, 255, 136, 0.15)',
+                                color: hasIssues ? sevDef.color : 'var(--success)'
+                              }}
+                            >
+                              {rule.count}
+                            </span>
+                          </td>
+                        </tr>
+                        {isExpanded && rule.items.length > 0 && (
+                          <tr key={`${rule.ruleId}-items`}>
+                            <td
+                              colSpan={4}
+                              style={{
+                                padding: '0 16px 16px 48px',
+                                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.1)',
+                                borderBottom: '1px solid var(--table-border)'
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px',
+                                  maxHeight: '240px',
+                                  overflowY: 'auto'
+                                }}
+                              >
+                                {rule.items.map((item, idx) => (
+                                  <div
+                                    key={item.id}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      background:
+                                        idx % 2 === 0
+                                          ? 'transparent'
+                                          : isLight
+                                            ? 'rgba(0,0,0,0.02)'
+                                            : 'rgba(255,255,255,0.02)',
+                                      fontSize: '0.82rem'
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: '6px',
+                                        height: '6px',
+                                        borderRadius: '50%',
+                                        background: sevDef.color,
+                                        flexShrink: 0
+                                      }}
+                                    />
+                                    <span style={{ fontWeight: '500' }}>{item.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )
+                  })}
+                  {validationRules.length === 0 &&
+                    customRuleViolations.length === 0 &&
+                    !validationLoading && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '64px', textAlign: 'center' }}>
+                          <Database size={48} style={{ opacity: 0.15, marginBottom: '16px' }} />
+                          <div style={{ fontSize: '1.2rem', fontWeight: '600' }}>
+                            No validation data
+                          </div>
+                          <p style={{ color: 'var(--text-secondary)' }}>
+                            Click Refresh to run data quality checks.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'sanctions' &&
+        (() => {
+          return (
+            <div
+              role="tabpanel"
+              id="panel-sanctions"
+              aria-labelledby="tab-sanctions"
+              style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}
+            >
+              {/* Pending Reviews */}
+              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--table-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <ShieldAlert size={20} color="#ffc107" />
+                  <h3 style={{ margin: 0 }}>Pending Review</h3>
+                  {resultsTotal > 0 && (
+                    <span
+                      style={{
+                        background: 'rgba(255, 193, 7, 0.2)',
+                        color: '#ffc107',
+                        padding: '2px 10px',
+                        borderRadius: '10px',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      {resultsTotal} pending
+                    </span>
+                  )}
+                  {selectedSanctions.size > 0 && canReview && (
+                    <div
+                      style={{
+                        marginLeft: 'auto',
+                        display: 'flex',
+                        gap: '6px',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        {selectedSanctions.size} selected
+                      </span>
+                      <button
+                        disabled={bulkDeciding}
+                        onClick={() => handleBulkDecide('cleared')}
+                        style={{
+                          background: 'rgba(0,255,136,0.1)',
+                          border: '1px solid rgba(0,255,136,0.3)',
+                          color: '#00ff88',
+                          cursor: 'pointer',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <CheckCircle size={13} /> Clear All
+                      </button>
+                      <button
+                        disabled={bulkDeciding}
+                        onClick={() => handleBulkDecide('sanctioned')}
+                        style={{
+                          background: 'rgba(255,77,77,0.1)',
+                          border: '1px solid rgba(255,77,77,0.3)',
+                          color: 'var(--danger)',
+                          cursor: 'pointer',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <ShieldAlert size={13} /> Sanction All
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <caption className="sr-only">Pending sanctions reviews</caption>
+                  <thead>
+                    <tr
+                      style={{
+                        textAlign: 'left',
+                        background: 'var(--table-header-bg)',
+                        borderBottom: '1px solid var(--table-border)'
+                      }}
+                    >
+                      {canReview && (
+                        <th scope="col" style={{ padding: '12px 8px 12px 16px', width: '32px' }}>
+                          <input
+                            type="checkbox"
+                            checked={
+                              pendingResults.length > 0 &&
+                              selectedSanctions.size === pendingResults.length
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked)
+                                setSelectedSanctions(new Set(pendingResults.map((r) => r.id)))
+                              else setSelectedSanctions(new Set())
+                            }}
+                          />
+                        </th>
+                      )}
+                      <th scope="col" style={{ padding: '12px 16px' }}>
+                        Name
+                      </th>
+                      <th scope="col" style={{ padding: '12px 16px' }}>
+                        Type
+                      </th>
+                      <th scope="col" style={{ padding: '12px 16px' }}>
+                        Match Score
+                      </th>
+                      <th scope="col" style={{ padding: '12px 16px' }}>
+                        Date
+                      </th>
+                      <th scope="col" style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingResults.map((result) => (
+                      <>
+                        <tr
+                          key={result.id}
+                          style={{
+                            borderBottom:
+                              expandedResult === result.id
+                                ? 'none'
+                                : '1px solid var(--table-border)'
+                          }}
+                        >
+                          {canReview && (
+                            <td style={{ padding: '14px 8px 14px 16px', width: '32px' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedSanctions.has(result.id)}
+                                onChange={(e) => {
+                                  const next = new Set(selectedSanctions)
+                                  if (e.target.checked) next.add(result.id)
+                                  else next.delete(result.id)
+                                  setSelectedSanctions(next)
+                                }}
+                              />
+                            </td>
+                          )}
+                          <td style={{ padding: '14px 16px', fontWeight: '600' }}>
+                            {result.entityName}
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                background:
+                                  result.entityType === 'vessel'
+                                    ? 'rgba(var(--accent-primary-rgb), 0.1)'
+                                    : 'rgba(180, 140, 255, 0.1)',
+                                color: result.entityType === 'vessel' ? '#00d2ff' : '#b48cff',
+                                textTransform: 'capitalize'
+                              }}
+                            >
+                              {result.entityType}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span
+                              style={{
+                                fontWeight: '600',
+                                color:
+                                  Number(result.matchScore) >= 90
+                                    ? 'var(--danger)'
+                                    : Number(result.matchScore) >= 80
+                                      ? '#ffc107'
+                                      : 'var(--text-secondary)'
+                              }}
+                            >
+                              {Number(result.matchScore || 0).toFixed(0)}%
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: '14px 16px',
+                              color: 'var(--text-secondary)',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            {result.createdAt ? formatDate(result.createdAt) : '-'}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            <div
+                              style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
+                            >
+                              <button
+                                onClick={() =>
+                                  setExpandedResult(expandedResult === result.id ? null : result.id)
+                                }
+                                aria-expanded={expandedResult === result.id}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.85rem'
+                                }}
+                              >
+                                <Eye size={14} />
+                                {expandedResult === result.id ? 'Hide' : 'View'}
+                              </button>
+                              {canReview && (
+                                <button
+                                  onClick={() => handleDecideMatch(result.id, 'cleared')}
+                                  title="False positive - this entity is not sanctioned"
+                                  style={{
+                                    background: 'rgba(0, 255, 136, 0.1)',
+                                    border: '1px solid rgba(0, 255, 136, 0.3)',
+                                    color: '#00ff88',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  <CheckCircle size={14} />
+                                  Cleared
+                                </button>
+                              )}
+                              {canReview && (
+                                <button
+                                  onClick={() => handleDecideMatch(result.id, 'sanctioned')}
+                                  title="True positive - this entity is sanctioned"
+                                  style={{
+                                    background: 'rgba(255, 77, 77, 0.1)',
+                                    border: '1px solid rgba(255, 77, 77, 0.3)',
+                                    color: 'var(--danger)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  <ShieldAlert size={14} />
+                                  Sanctioned
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedResult === result.id && (
+                          <tr>
+                            <td
+                              colSpan={canReview ? 6 : 5}
+                              style={{
+                                padding: '0 16px 16px 16px',
+                                background: isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.1)'
+                              }}
+                            >
+                              <div
+                                style={{
+                                  padding: '12px',
+                                  background: 'var(--bg-card)',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem'
+                                }}
+                              >
+                                <div style={{ fontWeight: '600', marginBottom: '8px' }}>
+                                  Match Details:
+                                </div>
+                                {(() => {
+                                  try {
+                                    const matches = JSON.parse(result.matchDetails || '[]')
+                                    return matches.map((m: any, i: number) => (
+                                      <div
+                                        key={i}
+                                        style={{
+                                          marginBottom: '8px',
+                                          padding: '8px',
+                                          background: isLight
+                                            ? 'rgba(0, 0, 0, 0.05)'
+                                            : 'rgba(0, 0, 0, 0.2)',
+                                          borderRadius: '4px'
+                                        }}
+                                      >
+                                        <div>
+                                          <strong>Source:</strong> {m.source || 'Unknown'}
+                                        </div>
+                                        <div>
+                                          <strong>Names:</strong> {(m.names || []).join(', ')}
+                                        </div>
+                                        <div>
+                                          <strong>Score:</strong>{' '}
+                                          {((m.score || 0) * 100).toFixed(0)}%
+                                        </div>
+                                      </div>
+                                    ))
+                                  } catch {
+                                    return <div>Unable to parse match details</div>
+                                  }
+                                })()}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ))}
+                    {pendingResults.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={canReview ? 6 : 5}
+                          style={{ padding: '48px', textAlign: 'center' }}
+                        >
+                          <CheckCircle
+                            size={40}
+                            color="var(--success)"
+                            style={{ marginBottom: '12px', opacity: 0.5 }}
+                          />
+                          <div style={{ fontWeight: '600' }}>No pending reviews</div>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                            All sanctions matches have been reviewed.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {resultsTotalPages > 1 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '16px',
+                      borderTop: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      Showing {(resultsPage - 1) * resultsLimit + 1} to{' '}
+                      {Math.min(resultsPage * resultsLimit, resultsTotal)} of {resultsTotal} results
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button
+                        className="btn-secondary"
+                        disabled={resultsPage === 1}
+                        onClick={() => setResultsPage(1)}
+                        style={{ padding: '6px' }}
+                        aria-label="First page"
+                      >
+                        <ChevronsLeft size={16} />
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        disabled={resultsPage === 1}
+                        onClick={() => setResultsPage((p) => Math.max(1, p - 1))}
+                        style={{ padding: '6px' }}
+                        aria-label="Previous page"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span style={{ margin: '0 8px', fontSize: '0.9rem' }}>
+                        Page {resultsPage} of {resultsTotalPages}
+                      </span>
+                      <button
+                        className="btn-secondary"
+                        disabled={resultsPage === resultsTotalPages}
+                        onClick={() => setResultsPage((p) => Math.min(resultsTotalPages, p + 1))}
+                        style={{ padding: '6px' }}
+                        aria-label="Next page"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        disabled={resultsPage === resultsTotalPages}
+                        onClick={() => setResultsPage(resultsTotalPages)}
+                        style={{ padding: '6px' }}
+                        aria-label="Last page"
+                      >
+                        <ChevronsRight size={16} />
+                      </button>
+                      <select
+                        value={resultsLimit}
+                        onChange={(e) => setResultsLimit(Number(e.target.value))}
+                        style={{
+                          marginLeft: '16px',
+                          padding: '4px',
+                          borderRadius: '4px',
+                          fontSize: '0.9rem'
+                        }}
+                        aria-label="Results per page"
+                      >
+                        <option value="10">10 / page</option>
+                        <option value="25">25 / page</option>
+                        <option value="50">50 / page</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Check History */}
+              <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: '1px solid var(--table-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <History size={20} color="var(--accent-primary)" />
+                  <h3 style={{ margin: 0 }}>Check History</h3>
+                </div>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {checkLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      style={{
+                        padding: '14px 20px',
+                        borderBottom: '1px solid var(--table-border)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {log.runAt ? formatDateTime(log.runAt) : '-'}
+                        </span>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: '600',
+                            background:
+                              log.status === 'completed'
+                                ? 'rgba(0, 255, 136, 0.1)'
+                                : log.status === 'failed'
+                                  ? 'rgba(255, 77, 77, 0.1)'
+                                  : 'rgba(var(--accent-primary-rgb), 0.1)',
+                            color:
+                              log.status === 'completed'
+                                ? 'var(--success)'
+                                : log.status === 'failed'
+                                  ? 'var(--danger)'
+                                  : '#00d2ff',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {log.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.9rem' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Checked:</span>{' '}
+                        {log.totalChecked} |{' '}
+                        <span
+                          style={{
+                            color: log.matchesFound > 0 ? '#ffc107' : 'var(--text-secondary)'
+                          }}
+                        >
+                          Matches: {log.matchesFound}
+                        </span>
+                      </div>
+                      {log.error && (
+                        <div
+                          style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}
+                        >
+                          Error: {log.error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {checkLogs.length === 0 && (
+                    <div
+                      style={{
+                        padding: '32px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      No compliance checks have been run yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+    </div>
+  )
 }
 
 function FilterButton({ active, onClick, label, color, count }: any) {
-    return (
-        <button
-            onClick={onClick}
-            style={{
-                padding: '6px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                background: active ? 'var(--bg-card-hover)' : 'transparent',
-                color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'var(--transition)'
-            }}
-        >
-            {color && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }}></div>}
-            {label}
-            {count !== undefined && <span style={{ opacity: 0.5 }}>({count})</span>}
-        </button>
-    )
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 16px',
+        borderRadius: '6px',
+        border: 'none',
+        background: active ? 'var(--bg-card-hover)' : 'transparent',
+        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+        cursor: 'pointer',
+        fontSize: '0.85rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        transition: 'var(--transition)'
+      }}
+    >
+      {color && (
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }}></div>
+      )}
+      {label}
+      {count !== undefined && <span style={{ opacity: 0.5 }}>({count})</span>}
+    </button>
+  )
 }

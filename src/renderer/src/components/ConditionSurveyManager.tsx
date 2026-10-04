@@ -1,7 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, X, Download, FileUp, Edit, Save, AlertTriangle } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Trash2,
+  Upload,
+  FileText,
+  X,
+  Download,
+  FileUp,
+  Edit,
+  Save,
+  AlertTriangle
+} from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Vessel, ConditionSurvey, SurveyAttachment, Surveyor, ConditionSurveyType } from '../../../shared/types'
+import {
+  Vessel,
+  ConditionSurvey,
+  SurveyAttachment,
+  Surveyor,
+  ConditionSurveyType
+} from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
@@ -39,10 +58,12 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     message: string
     onConfirm: () => void
     isDangerous?: boolean
-  }>({ show: false, title: '', message: '', onConfirm: () => { } })
+  }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
   // Defect counts per survey
-  const [defectCounts, setDefectCounts] = useState<Record<string, { open: number; closed: number; overdue: number }>>({})
+  const [defectCounts, setDefectCounts] = useState<
+    Record<string, { open: number; closed: number; overdue: number }>
+  >({})
   // Bump this to force DefectManager to reload its data (e.g. after importing defects)
   const [defectRefreshKey, setDefectRefreshKey] = useState(0)
 
@@ -93,9 +114,10 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
         const defects = await window.api.getSurveyDefects(survey.id)
         const safeDefects = Array.isArray(defects) ? defects : []
         counts[survey.id] = {
-          open: safeDefects.filter(d => d.status === 'OPEN').length,
-          closed: safeDefects.filter(d => d.status === 'CLOSED').length,
-          overdue: safeDefects.filter(d => d.status === 'OPEN' && d.dueDate && d.dueDate < today).length
+          open: safeDefects.filter((d) => d.status === 'OPEN').length,
+          closed: safeDefects.filter((d) => d.status === 'CLOSED').length,
+          overdue: safeDefects.filter((d) => d.status === 'OPEN' && d.dueDate && d.dueDate < today)
+            .length
         }
       }
       setDefectCounts(counts)
@@ -111,9 +133,9 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     for (const survey of surveys) {
       const defects = await window.api.getSurveyDefects(survey.id)
       counts[survey.id] = {
-        open: defects.filter(d => d.status === 'OPEN').length,
-        closed: defects.filter(d => d.status === 'CLOSED').length,
-        overdue: defects.filter(d => d.status === 'OPEN' && d.dueDate && d.dueDate < today).length
+        open: defects.filter((d) => d.status === 'OPEN').length,
+        closed: defects.filter((d) => d.status === 'CLOSED').length,
+        overdue: defects.filter((d) => d.status === 'OPEN' && d.dueDate && d.dueDate < today).length
       }
     }
     setDefectCounts(counts)
@@ -213,10 +235,11 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   const handleDeleteSurvey = async (survey: ConditionSurvey) => {
     const defectsRaw = await window.api.getSurveyDefects(survey.id)
     const defects = Array.isArray(defectsRaw) ? defectsRaw : []
-    const attachs = attachments.filter(a => a.surveyId === survey.id)
-    const msg = defects.length > 0 || attachs.length > 0
-      ? `Delete survey? This will also delete ${defects.length} defect(s) and ${attachs.length} attachment(s).`
-      : 'Delete this survey?'
+    const attachs = attachments.filter((a) => a.surveyId === survey.id)
+    const msg =
+      defects.length > 0 || attachs.length > 0
+        ? `Delete survey? This will also delete ${defects.length} defect(s) and ${attachs.length} attachment(s).`
+        : 'Delete this survey?'
 
     setConfirmation({
       show: true,
@@ -224,7 +247,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       message: msg,
       isDangerous: true,
       onConfirm: async () => {
-        setConfirmation(prev => ({ ...prev, show: false }))
+        setConfirmation((prev) => ({ ...prev, show: false }))
         await window.api.deleteConditionSurvey(survey.id)
         loadData()
       }
@@ -245,7 +268,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }
 
   const getSurveyorName = (surveyorId: string): string => {
-    const surveyor = surveyors.find(s => s.id === surveyorId)
+    const surveyor = surveyors.find((s) => s.id === surveyorId)
     return surveyor ? `${surveyor.companyName} (${surveyor.country})` : 'Unknown Surveyor'
   }
 
@@ -307,7 +330,7 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
       message: 'Delete this attachment?',
       isDangerous: true,
       onConfirm: async () => {
-        setConfirmation(prev => ({ ...prev, show: false }))
+        setConfirmation((prev) => ({ ...prev, show: false }))
         await window.api.deleteSurveyAttachment(attachmentId)
         loadData()
       }
@@ -330,9 +353,11 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     try {
       const result = await window.api.importDefectsFromWord(surveyId, filePath)
       if (result.success) {
-        const skippedNote = result.skipped ? ` (${result.skipped} already on this survey, skipped)` : ''
+        const skippedNote = result.skipped
+          ? ` (${result.skipped} already on this survey, skipped)`
+          : ''
         showSuccess(`Imported ${result.count} defect${result.count === 1 ? '' : 's'}${skippedNote}`)
-        setDefectRefreshKey(k => k + 1)
+        setDefectRefreshKey((k) => k + 1)
         refreshDefectCounts()
       } else {
         showError(`Import failed: ${result.message}`)
@@ -344,16 +369,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
   const exportSurveyHistory = async () => {
     const data = await window.api.getSurveyHistory(vessel.id)
-    const rows = data.map(s => ({
+    const rows = data.map((s) => ({
       'Survey Date': s.surveyDate,
-      'Reference': s.reference || '',
-      'Surveyor': s.surveyorName,
-      'Company': s.surveyorCompany || '',
-      'Type': s.surveyType,
-      'Location': s.location || '',
+      Reference: s.reference || '',
+      Surveyor: s.surveyorName,
+      Company: s.surveyorCompany || '',
+      Type: s.surveyType,
+      Location: s.location || '',
       'Total Defects': s.totalDefects,
-      'Open': s.openDefects,
-      'Closed': s.closedDefects
+      Open: s.openDefects,
+      Closed: s.closedDefects
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
@@ -362,14 +387,29 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
   }
 
   const getSurveyAttachments = (surveyId: string) => {
-    return attachments.filter(a => a.surveyId === surveyId)
+    return attachments.filter((a) => a.surveyId === surveyId)
   }
 
   return (
     <>
       <section className="fade-in" style={{ marginTop: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}
+          >
             <FileText size={24} />
             Condition Surveys
           </h3>
@@ -396,10 +436,36 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
         </div>
 
         {showAddForm && (
-          <form onSubmit={handleAddSurvey} style={{ marginBottom: '20px', padding: '20px', background: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--input-border)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+          <form
+            onSubmit={handleAddSurvey}
+            style={{
+              marginBottom: '20px',
+              padding: '20px',
+              background: 'var(--input-bg)',
+              borderRadius: '12px',
+              border: '1px solid var(--input-border)'
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '150px 1fr 1fr 1fr',
+                gap: '15px',
+                marginBottom: '15px'
+              }}
+            >
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Date *</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Survey Date *
+                </label>
                 <input
                   type="date"
                   value={newDate}
@@ -411,22 +477,51 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Type *</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Survey Type *
+                </label>
                 <select
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
                   required
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--input-border)'
+                  }}
                   aria-label="Survey type"
                 >
                   <option value="">-- Select Type --</option>
-                  {surveyTypes.map(t => (
-                    <option key={t.id} value={t.name}>{t.name}</option>
+                  {surveyTypes.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Reference</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Reference
+                </label>
                 <input
                   type="text"
                   value={newReference}
@@ -436,7 +531,17 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Location</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Location
+                </label>
                 <input
                   type="text"
                   value={newLocation}
@@ -447,7 +552,17 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               </div>
             </div>
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Surveyor *</label>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '5px',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Surveyor *
+              </label>
               <select
                 value={newSurveyorId}
                 onChange={(e) => {
@@ -459,18 +574,46 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                 aria-label="Surveyor"
               >
                 <option value="">-- Select Surveyor --</option>
-                {surveyors.map(s => (
-                  <option key={s.id} value={s.id}>{s.companyName} ({s.country})</option>
+                {surveyors.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.companyName} ({s.country})
+                  </option>
                 ))}
                 <option value="new">+ Add New Surveyor</option>
               </select>
             </div>
             {showNewSurveyorForm && (
-              <div style={{ padding: '15px', background: 'var(--bg-card)', borderRadius: '8px', marginBottom: '15px', border: '1px solid var(--input-border)' }}>
-                <h4 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--text-primary)' }}>New Surveyor Details</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div
+                style={{
+                  padding: '15px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '8px',
+                  marginBottom: '15px',
+                  border: '1px solid var(--input-border)'
+                }}
+              >
+                <h4 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--text-primary)' }}>
+                  New Surveyor Details
+                </h4>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '10px',
+                    marginBottom: '10px'
+                  }}
+                >
                   <div>
-                    <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px' }}>Company Name *</label>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '5px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Company Name *
+                    </label>
                     <input
                       type="text"
                       value={newSurveyorCompany}
@@ -481,7 +624,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px' }}>Country *</label>
+                    <label
+                      style={{
+                        display: 'block',
+                        marginBottom: '5px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Country *
+                    </label>
                     <input
                       type="text"
                       value={newSurveyorCountry}
@@ -493,7 +645,16 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px' }}>Contact Person</label>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: '5px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Contact Person
+                  </label>
                   <input
                     type="text"
                     value={newSurveyorContactPerson}
@@ -506,7 +667,17 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
               </div>
             )}
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Notes</label>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '5px',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Notes
+              </label>
               <textarea
                 value={newNotes}
                 onChange={(e) => setNewNotes(e.target.value)}
@@ -522,7 +693,9 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
         )}
 
         {surveys.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No condition surveys recorded</p>
+          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            No condition surveys recorded
+          </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {surveys.map((survey) => {
@@ -539,7 +712,11 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                   key={survey.id}
                   style={{
                     borderRadius: '12px',
-                    border: isDragOver ? '2px dashed var(--accent-primary)' : isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
+                    border: isDragOver
+                      ? '2px dashed var(--accent-primary)'
+                      : isLight
+                        ? '1px solid rgba(0,0,0,0.08)'
+                        : '1px solid rgba(255,255,255,0.06)',
                     overflow: 'hidden',
                     transition: 'all 0.2s ease',
                     background: 'var(--bg-card)'
@@ -554,7 +731,9 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                       alignItems: 'flex-start',
                       cursor: isEditing ? 'default' : 'pointer',
                       background: isExpanded
-                        ? isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                        ? isLight
+                          ? 'rgba(0,0,0,0.02)'
+                          : 'rgba(255,255,255,0.02)'
                         : 'transparent',
                       transition: 'background 0.2s ease'
                     }}
@@ -562,47 +741,72 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                   >
                     <div style={{ flex: 1 }}>
                       {/* Top row: Type + Date + Status badge */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                        <span style={{
-                          fontWeight: '700',
-                          fontSize: '1rem',
-                          color: 'var(--text-primary)'
-                        }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          marginBottom: '6px'
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: '700',
+                            fontSize: '1rem',
+                            color: 'var(--text-primary)'
+                          }}
+                        >
                           {survey.surveyType}
                         </span>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                           {formatDate(survey.surveyDate) || survey.surveyDate}
                         </span>
                         {survey.reference && (
-                          <span style={{
-                            color: 'var(--text-secondary)',
-                            padding: '2px 8px',
-                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
-                            borderRadius: '4px',
-                            fontSize: '0.8rem',
-                            fontFamily: 'monospace'
-                          }}>
+                          <span
+                            style={{
+                              color: 'var(--text-secondary)',
+                              padding: '2px 8px',
+                              background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                              borderRadius: '4px',
+                              fontSize: '0.8rem',
+                              fontFamily: 'monospace'
+                            }}
+                          >
                             {survey.reference}
                           </span>
                         )}
                         {allClosed && (
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: isLight ? 'rgba(0, 140, 70, 0.1)' : 'rgba(0, 255, 136, 0.08)',
-                            border: isLight ? '1px solid rgba(0, 140, 70, 0.3)' : '1px solid rgba(0, 255, 136, 0.2)',
-                            color: isLight ? '#008c46' : '#00ff88',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
-                          }}>
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: isLight
+                                ? 'rgba(0, 140, 70, 0.1)'
+                                : 'rgba(0, 255, 136, 0.08)',
+                              border: isLight
+                                ? '1px solid rgba(0, 140, 70, 0.3)'
+                                : '1px solid rgba(0, 255, 136, 0.2)',
+                              color: isLight ? '#008c46' : '#00ff88',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                          >
                             ALL CLOSED
                           </span>
                         )}
                       </div>
                       {/* Bottom row: Surveyor, Location, Counts */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '16px',
+                          fontSize: '0.8rem',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
                         <span>{getSurveyorName(survey.surveyorId)}</span>
                         {survey.location && (
                           <>
@@ -618,12 +822,22 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             </span>
                           )}
                           {counts.closed > 0 && (
-                            <span style={{ color: isLight ? '#008c46' : '#00ff88', fontWeight: '500' }}>
+                            <span
+                              style={{ color: isLight ? '#008c46' : '#00ff88', fontWeight: '500' }}
+                            >
                               {counts.closed} closed
                             </span>
                           )}
                           {counts.overdue > 0 && (
-                            <span style={{ color: '#ffa726', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span
+                              style={{
+                                color: '#ffa726',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                            >
                               <AlertTriangle size={12} /> {counts.overdue} overdue
                             </span>
                           )}
@@ -632,24 +846,46 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                         {surveyAttachments.length > 0 && (
                           <>
                             <span style={{ opacity: 0.3 }}>|</span>
-                            <span>{surveyAttachments.length} file{surveyAttachments.length !== 1 ? 's' : ''}</span>
+                            <span>
+                              {surveyAttachments.length} file
+                              {surveyAttachments.length !== 1 ? 's' : ''}
+                            </span>
                           </>
                         )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginLeft: '12px'
+                      }}
+                    >
                       {isEditing ? (
                         <>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleSaveEdit(survey.id) }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSaveEdit(survey.id)
+                            }}
                             className="btn-primary"
-                            style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                            style={{
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.8rem'
+                            }}
                           >
                             <Save size={14} />
                             Save
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleCancelEdit() }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancelEdit()
+                            }}
                             className="btn-secondary"
                             style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                           >
@@ -659,18 +895,25 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                       ) : (
                         <>
                           {survey.completedAt && (
-                            <span style={{
-                              padding: '2px 8px',
-                              borderRadius: 4,
-                              background: 'rgba(0,148,74,0.15)',
-                              color: 'var(--success, #00944a)',
-                              fontSize: 11,
-                              fontWeight: 600,
-                            }}>Survey Closed</span>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                background: 'rgba(0,148,74,0.15)',
+                                color: 'var(--success, #00944a)',
+                                fontSize: 11,
+                                fontWeight: 600
+                              }}
+                            >
+                              Survey Closed
+                            </span>
                           )}
                           {canManage && !survey.completedAt && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); setClosingSurveyId(survey.id) }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setClosingSurveyId(survey.id)
+                              }}
                               style={{
                                 padding: '5px 10px',
                                 borderRadius: 6,
@@ -678,44 +921,111 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                                 background: 'var(--input-bg)',
                                 color: 'var(--text-primary)',
                                 cursor: 'pointer',
-                                fontSize: 12,
+                                fontSize: 12
                               }}
                             >
                               Close Survey
                             </button>
                           )}
                           {canManage && (
-                            <button title="Edit" aria-label="Edit"
-                              onClick={(e) => { e.stopPropagation(); handleEditSurvey(survey) }}
+                            <button
+                              title="Edit"
+                              aria-label="Edit"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditSurvey(survey)
+                              }}
                               className="btn-secondary"
-                              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                              style={{
+                                padding: '6px 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.8rem'
+                              }}
                             >
                               <Edit size={14} />
                             </button>
                           )}
                           {canManage && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteSurvey(survey) }}
-                              style={{ padding: '6px 12px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteSurvey(survey)
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                background: 'transparent',
+                                color: 'var(--danger)',
+                                border: '1px solid var(--danger)',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
                               title="Delete survey"
                             >
                               <Trash2 size={14} />
                             </button>
                           )}
-                          {isExpanded ? <ChevronUp size={18} color="var(--text-secondary)" /> : <ChevronDown size={18} color="var(--text-secondary)" />}
+                          {isExpanded ? (
+                            <ChevronUp size={18} color="var(--text-secondary)" />
+                          ) : (
+                            <ChevronDown size={18} color="var(--text-secondary)" />
+                          )}
                         </>
                       )}
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div style={{ padding: '20px', borderTop: isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)' }}>
+                    <div
+                      style={{
+                        padding: '20px',
+                        borderTop: isLight
+                          ? '1px solid rgba(0,0,0,0.06)'
+                          : '1px solid rgba(255,255,255,0.06)'
+                      }}
+                    >
                       {isEditing ? (
-                        <div style={{ marginBottom: '20px', padding: '20px', background: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--input-border)' }}>
-                          <h4 style={{ color: 'var(--text-primary)', marginBottom: '15px', marginTop: 0 }}>Edit Survey Details</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                        <div
+                          style={{
+                            marginBottom: '20px',
+                            padding: '20px',
+                            background: 'var(--input-bg)',
+                            borderRadius: '12px',
+                            border: '1px solid var(--input-border)'
+                          }}
+                        >
+                          <h4
+                            style={{
+                              color: 'var(--text-primary)',
+                              marginBottom: '15px',
+                              marginTop: 0
+                            }}
+                          >
+                            Edit Survey Details
+                          </h4>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '150px 1fr 1fr 1fr',
+                              gap: '15px',
+                              marginBottom: '15px'
+                            }}
+                          >
                             <div>
-                              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Date *</label>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  marginBottom: '5px',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '14px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Survey Date *
+                              </label>
                               <input
                                 type="date"
                                 value={editDate}
@@ -727,22 +1037,51 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Survey Type *</label>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  marginBottom: '5px',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '14px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Survey Type *
+                              </label>
                               <select
                                 value={editType}
                                 onChange={(e) => setEditType(e.target.value)}
                                 required
-                                style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px',
+                                  borderRadius: '8px',
+                                  background: 'var(--bg-card)',
+                                  color: 'var(--text-primary)',
+                                  border: '1px solid var(--input-border)'
+                                }}
                                 aria-label="Edit survey type"
                               >
                                 <option value="">-- Select Type --</option>
-                                {surveyTypes.map(t => (
-                                  <option key={t.id} value={t.name}>{t.name}</option>
+                                {surveyTypes.map((t) => (
+                                  <option key={t.id} value={t.name}>
+                                    {t.name}
+                                  </option>
                                 ))}
                               </select>
                             </div>
                             <div>
-                              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Reference</label>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  marginBottom: '5px',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '14px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Reference
+                              </label>
                               <input
                                 type="text"
                                 value={editReference}
@@ -751,7 +1090,17 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Location</label>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  marginBottom: '5px',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '14px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Location
+                              </label>
                               <input
                                 type="text"
                                 value={editLocation}
@@ -761,7 +1110,17 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                             </div>
                           </div>
                           <div style={{ marginBottom: '15px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Surveyor *</label>
+                            <label
+                              style={{
+                                display: 'block',
+                                marginBottom: '5px',
+                                color: 'var(--text-secondary)',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              Surveyor *
+                            </label>
                             <select
                               value={editSurveyorId}
                               onChange={(e) => setEditSurveyorId(e.target.value)}
@@ -770,13 +1129,25 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                               aria-label="Edit surveyor"
                             >
                               <option value="">-- Select Surveyor --</option>
-                              {surveyors.map(s => (
-                                <option key={s.id} value={s.id}>{s.companyName} ({s.country})</option>
+                              {surveyors.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.companyName} ({s.country})
+                                </option>
                               ))}
                             </select>
                           </div>
                           <div>
-                            <label style={{ display: 'block', marginBottom: '5px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '500' }}>Notes</label>
+                            <label
+                              style={{
+                                display: 'block',
+                                marginBottom: '5px',
+                                color: 'var(--text-secondary)',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              Notes
+                            </label>
                             <textarea
                               value={editNotes}
                               onChange={(e) => setEditNotes(e.target.value)}
@@ -788,9 +1159,37 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                         </div>
                       ) : (
                         survey.notes && (
-                          <div style={{ marginBottom: '20px', padding: '12px 16px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)', borderRadius: '8px', borderLeft: '3px solid var(--accent-primary)' }}>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Notes</div>
-                            <p style={{ color: 'var(--text-primary)', margin: 0, lineHeight: '1.6', fontSize: '0.9rem' }}>{survey.notes}</p>
+                          <div
+                            style={{
+                              marginBottom: '20px',
+                              padding: '12px 16px',
+                              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                              borderRadius: '8px',
+                              borderLeft: '3px solid var(--accent-primary)'
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}
+                            >
+                              Notes
+                            </div>
+                            <p
+                              style={{
+                                color: 'var(--text-primary)',
+                                margin: 0,
+                                lineHeight: '1.6',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              {survey.notes}
+                            </p>
                           </div>
                         )
                       )}
@@ -811,7 +1210,14 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
                       )}
 
                       {/* Defects Manager - Hidden when editing */}
-                      {!isEditing && <DefectManager survey={survey} vessel={vessel} onUpdate={refreshDefectCounts} refreshKey={defectRefreshKey} />}
+                      {!isEditing && (
+                        <DefectManager
+                          survey={survey}
+                          vessel={vessel}
+                          onUpdate={refreshDefectCounts}
+                          refreshKey={defectRefreshKey}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -828,21 +1234,67 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
           message={confirmation.message}
           isDangerous={confirmation.isDangerous}
           onConfirm={confirmation.onConfirm}
-          onCancel={() => setConfirmation(prev => ({ ...prev, show: false }))}
+          onCancel={() => setConfirmation((prev) => ({ ...prev, show: false }))}
         />
       )}
 
       {/* Close Survey confirmation modal */}
       {closingSurveyId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 400, width: '90%' }}>
-            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>Close Survey</h3>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: 12,
+              padding: 28,
+              maxWidth: 400,
+              width: '90%'
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>
+              Close Survey
+            </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>
-              This will close the survey and all remaining open defects. This action cannot be undone.
+              This will close the survey and all remaining open defects. This action cannot be
+              undone.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setClosingSurveyId(null)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => handleCloseSurvey(closingSurveyId)} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--accent, #00aac8)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Close Survey</button>
+              <button
+                onClick={() => setClosingSurveyId(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleCloseSurvey(closingSurveyId)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--accent, #00aac8)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Close Survey
+              </button>
             </div>
           </div>
         </div>
@@ -850,16 +1302,74 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
 
       {/* Endorsement question modal */}
       {endorsementSurveyId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: 12, padding: 28, maxWidth: 460, width: '90%' }}>
-            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>Reservations Endorsement</h3>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: 12,
+              padding: 28,
+              maxWidth: 460,
+              width: '90%'
+            }}
+          >
+            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>
+              Reservations Endorsement
+            </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 24px' }}>
               Did you issue a reservations endorsement for this survey?
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button onClick={() => setEndorsementSurveyId(null)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-secondary)', cursor: 'pointer' }}>No endorsement needed</button>
-              <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,77,77,0.35)', background: 'rgba(255,77,77,0.12)', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600 }}>No — remind me in 2 days</button>
-              <button onClick={() => handleEndorsementAnswer(endorsementSurveyId, true)} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--accent, #00aac8)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Yes</button>
+              <button
+                onClick={() => setEndorsementSurveyId(null)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 6,
+                  border: '1px solid var(--input-border)',
+                  background: 'var(--input-bg)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                No endorsement needed
+              </button>
+              <button
+                onClick={() => handleEndorsementAnswer(endorsementSurveyId, false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,77,77,0.35)',
+                  background: 'rgba(255,77,77,0.12)',
+                  color: 'var(--danger)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                No — remind me in 2 days
+              </button>
+              <button
+                onClick={() => handleEndorsementAnswer(endorsementSurveyId, true)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--accent, #00aac8)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Yes
+              </button>
             </div>
           </div>
         </div>
@@ -893,7 +1403,14 @@ function SurveyAttachments({
 
   return (
     <div style={{ marginBottom: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px'
+        }}
+      >
         <h4 style={{ color: 'var(--text-primary)', margin: 0 }}>Attachments</h4>
         <div style={{ display: 'flex', gap: '8px' }}>
           {canManage && (
@@ -953,14 +1470,22 @@ function SurveyAttachments({
           }}
         >
           <Upload size={32} color="var(--text-secondary)" style={{ margin: '0 auto 10px' }} />
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Drag and drop files here (multiple files supported)</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+            Drag and drop files here (multiple files supported)
+          </p>
         </div>
       )}
 
       {attachments.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No attachments</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '10px'
+          }}
+        >
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
@@ -974,7 +1499,15 @@ function SurveyAttachments({
             >
               <span
                 onClick={() => onOpenFile(attachment.filePath)}
-                style={{ color: 'var(--accent-primary)', cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}
+                style={{
+                  color: 'var(--accent-primary)',
+                  cursor: 'pointer',
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: '500'
+                }}
                 title={attachment.fileName}
               >
                 {attachment.fileName}
@@ -982,7 +1515,18 @@ function SurveyAttachments({
               {canManage && (
                 <button
                   onClick={() => onDelete(attachment.id)}
-                  style={{ padding: '6px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', marginLeft: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{
+                    padding: '6px',
+                    background: 'var(--danger)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginLeft: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                   title="Delete attachment"
                   aria-label="Delete attachment"
                 >

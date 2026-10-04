@@ -4,11 +4,15 @@
  */
 
 /** DST-safe day counting between two date strings */
-export function countDays(startStr: string, endStr: string): { days: number; calendarDays: number; addedDay: boolean } {
+export function countDays(
+  startStr: string,
+  endStr: string
+): { days: number; calendarDays: number; addedDay: boolean } {
   if (!startStr || !endStr) return { days: 0, calendarDays: 0, addedDay: false }
   const start = new Date(startStr)
   const end = new Date(endStr)
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return { days: 0, calendarDays: 0, addedDay: false }
+  if (isNaN(start.getTime()) || isNaN(end.getTime()))
+    return { days: 0, calendarDays: 0, addedDay: false }
   if (end <= start) return { days: 0, calendarDays: 0, addedDay: false }
 
   // Use date-only comparison to avoid DST issues
@@ -73,19 +77,29 @@ export function calcProRataPremium(
   const fullInstalments = annualInstalment > 0 ? Math.floor(proRataPremium / annualInstalment) : 0
   const firstPremiumInstalment = round2(proRataPremium - annualInstalment * fullInstalments)
 
-  const commissionTotal = round2(proRataPremium * commissionPct / 100)
-  const annualCommission = round2(annualPremium * commissionPct / 100)
+  const commissionTotal = round2((proRataPremium * commissionPct) / 100)
+  const annualCommission = round2((annualPremium * commissionPct) / 100)
   const annualCommissionInstalment = round2(annualCommission / numInstalments)
-  const firstCommissionInstalment = round2(commissionTotal - annualCommissionInstalment * fullInstalments)
+  const firstCommissionInstalment = round2(
+    commissionTotal - annualCommissionInstalment * fullInstalments
+  )
 
   // Build rows: first instalment (remainder) + full instalments from bottom
   const rows: InstalmentRow[] = []
   let rowNum = 1
   if (firstPremiumInstalment > 0) {
-    rows.push({ number: rowNum++, premium: firstPremiumInstalment, commission: firstCommissionInstalment })
+    rows.push({
+      number: rowNum++,
+      premium: firstPremiumInstalment,
+      commission: firstCommissionInstalment
+    })
   }
   for (let i = 0; i < fullInstalments; i++) {
-    rows.push({ number: rowNum++, premium: annualInstalment, commission: annualCommissionInstalment })
+    rows.push({
+      number: rowNum++,
+      premium: annualInstalment,
+      commission: annualCommissionInstalment
+    })
   }
 
   return {
@@ -116,7 +130,12 @@ export function distributeInstalments(
   annualAmount: number,
   policyInstalments: Array<{ instalmentNumber: number; dueDate: string }>,
   commissionPct: number
-): Array<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number }> {
+): Array<{
+  instalmentNumber: number
+  dueDate: string
+  premiumAmount: number
+  commissionAmount: number
+}> {
   const numInst = policyInstalments.length
   if (numInst === 0 || proRataAmount <= 0 || annualAmount <= 0) return []
 
@@ -125,13 +144,18 @@ export function distributeInstalments(
   const remainder = round2(proRataAmount - fullCount * baseInstalment)
 
   const startIdx = numInst - fullCount - (remainder > 0 ? 1 : 0)
-  const result: Array<{ instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number }> = []
+  const result: Array<{
+    instalmentNumber: number
+    dueDate: string
+    premiumAmount: number
+    commissionAmount: number
+  }> = []
 
   for (let i = Math.max(0, startIdx); i < numInst; i++) {
     const pi = policyInstalments[i]
     const isFirst = i === startIdx && remainder > 0
     const prem = isFirst ? remainder : baseInstalment
-    const comm = round2(prem * commissionPct / 100)
+    const comm = round2((prem * commissionPct) / 100)
     result.push({
       instalmentNumber: result.length + 1,
       dueDate: pi.dueDate?.slice(0, 10) || '',

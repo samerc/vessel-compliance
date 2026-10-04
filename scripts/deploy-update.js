@@ -76,7 +76,9 @@ function main() {
   // Use PowerShell to create zip (available on all Windows machines)
   const outAbsolute = path.resolve(OUT_DIR)
   const zipAbsolute = path.resolve(ZIP_PATH)
-  exec(`powershell -Command "Compress-Archive -Path '${outAbsolute}\\*' -DestinationPath '${zipAbsolute}' -Force"`)
+  exec(
+    `powershell -Command "Compress-Archive -Path '${outAbsolute}\\*' -DestinationPath '${zipAbsolute}' -Force"`
+  )
 
   const zipSize = (fs.statSync(ZIP_PATH).size / (1024 * 1024)).toFixed(1)
   console.log(`\nCreated ${ZIP_NAME} (${zipSize} MB)`)
@@ -94,7 +96,9 @@ function main() {
   }
 
   // Create fresh release with the zip (prerelease so electron-updater ignores it)
-  exec(`gh release create ${TAG} "${zipAbsolute}" --repo ${REPO} --title "Code Update (build ${newBuild})" --notes-file "${notesFile}" --prerelease`)
+  exec(
+    `gh release create ${TAG} "${zipAbsolute}" --repo ${REPO} --title "Code Update (build ${newBuild})" --notes-file "${notesFile}" --prerelease`
+  )
   fs.unlinkSync(notesFile)
 
   console.log(`\n✓ Deployed build ${newBuild} (v${PKG.version})`)

@@ -8,13 +8,7 @@
  */
 import { app } from 'electron'
 import { net } from 'electron'
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  rmSync,
-  mkdirSync
-} from 'fs'
+import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync } from 'fs'
 import { join, resolve, dirname, sep } from 'path'
 
 const USER_DATA = app.getPath('userData')
@@ -72,8 +66,13 @@ function httpsGet(url: string, headers: Record<string, string> = {}): Promise<Bu
 
 /** True when a hot-update was built for an older app version than the installed one */
 function olderThanInstalled(version: unknown): boolean {
-  const a = String(version || '0').split('.').map(n => parseInt(n, 10) || 0)
-  const b = app.getVersion().split('.').map(n => parseInt(n, 10) || 0)
+  const a = String(version || '0')
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
+  const b = app
+    .getVersion()
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
   for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0)
   return false
 }
@@ -84,7 +83,9 @@ function isBlockedBuild(buildNumber: number): boolean {
     const file = join(USER_DATA, 'hot-update-blocked.json')
     if (!existsSync(file)) return false
     return JSON.parse(readFileSync(file, 'utf-8')).buildNumber === buildNumber
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
 class HotUpdateService {
@@ -97,7 +98,9 @@ class HotUpdateService {
       if (existsSync(file)) {
         return JSON.parse(readFileSync(file, 'utf-8'))
       }
-    } catch { /* no cache */ }
+    } catch {
+      /* no cache */
+    }
     return null
   }
 
@@ -106,7 +109,7 @@ class HotUpdateService {
     try {
       const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${CODE_RELEASE_TAG}`
       const buf = await httpsGet(url, {
-        'Accept': 'application/vnd.github.v3+json',
+        Accept: 'application/vnd.github.v3+json',
         'User-Agent': 'vessel-compliance-updater'
       })
       const release = JSON.parse(buf.toString('utf-8'))
@@ -119,7 +122,9 @@ class HotUpdateService {
         if (versionLine) {
           return JSON.parse(versionLine.trim())
         }
-      } catch { /* parse error */ }
+      } catch {
+        /* parse error */
+      }
       return null
     } catch {
       return null
@@ -131,7 +136,7 @@ class HotUpdateService {
     try {
       const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${CODE_RELEASE_TAG}`
       const buf = await httpsGet(url, {
-        'Accept': 'application/vnd.github.v3+json',
+        Accept: 'application/vnd.github.v3+json',
         'User-Agent': 'vessel-compliance-updater'
       })
       const release = JSON.parse(buf.toString('utf-8'))
@@ -149,7 +154,9 @@ class HotUpdateService {
         const hotApp = join(HOT_UPDATE_DIR, 'out', 'main', 'index.js')
         if (existsSync(hotApp)) return 'hot-update'
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     return 'asar'
   }
 
@@ -166,9 +173,14 @@ class HotUpdateService {
       const remote = await this.getRemoteVersion()
       if (remote) {
         availableBuild = remote.buildNumber
-        updateReady = remote.buildNumber > currentBuild && !olderThanInstalled(remote.version) && !isBlockedBuild(remote.buildNumber)
+        updateReady =
+          remote.buildNumber > currentBuild &&
+          !olderThanInstalled(remote.version) &&
+          !isBlockedBuild(remote.buildNumber)
       }
-    } catch { /* offline */ }
+    } catch {
+      /* offline */
+    }
 
     return {
       currentBuild,
@@ -252,11 +264,7 @@ class HotUpdateService {
       }
 
       // Write version.json into staging
-      writeFileSync(
-        join(stagingDir, VERSION_FILE),
-        JSON.stringify(remoteVersion, null, 2),
-        'utf-8'
-      )
+      writeFileSync(join(stagingDir, VERSION_FILE), JSON.stringify(remoteVersion, null, 2), 'utf-8')
 
       // Atomic-ish swap: old → backup, staging → current, delete backup
       const backupDir = join(USER_DATA, 'hot-update-old')
@@ -284,16 +292,26 @@ class HotUpdateService {
     if (this.checkInterval) return
 
     // Check every 30 minutes (startup already checked once)
-    this.checkInterval = setInterval(async () => {
-      try {
-        const remote = await this.getRemoteVersion()
-        const local = this.getLocalVersion()
-        const localBuild = local?.buildNumber ?? 0
-        if (remote && remote.buildNumber > localBuild && !olderThanInstalled(remote.version) && !isBlockedBuild(remote.buildNumber)) {
-          onUpdateAvailable(remote)
+    this.checkInterval = setInterval(
+      async () => {
+        try {
+          const remote = await this.getRemoteVersion()
+          const local = this.getLocalVersion()
+          const localBuild = local?.buildNumber ?? 0
+          if (
+            remote &&
+            remote.buildNumber > localBuild &&
+            !olderThanInstalled(remote.version) &&
+            !isBlockedBuild(remote.buildNumber)
+          ) {
+            onUpdateAvailable(remote)
+          }
+        } catch {
+          /* silent */
         }
-      } catch { /* silent */ }
-    }, 30 * 60 * 1000)
+      },
+      30 * 60 * 1000
+    )
   }
 
   /** Stop periodic checks */
@@ -310,7 +328,9 @@ class HotUpdateService {
       if (existsSync(HOT_UPDATE_DIR)) {
         rmSync(HOT_UPDATE_DIR, { recursive: true, force: true })
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 }
 

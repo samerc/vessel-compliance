@@ -37,11 +37,11 @@ const REF_FRAGMENT = /^[\d./]+$/
 
 const OBSERVATION_START = /This section is for the observations/i
 const NOISE = [
-  /Condition Survey Report Format/i,          // page header
-  /^--\s*\d+\s+of\s+\d+\s*--$/,               // pdf-parse page marker
+  /Condition Survey Report Format/i, // page header
+  /^--\s*\d+\s+of\s+\d+\s*--$/, // pdf-parse page marker
   /DEFICIENCIES\s*&\s*RECOMMENDATIONS/i,
-  /^[.…\s]{6,}$/,                             // signature dotted lines
-  /^Vessel.{0,3}s\s+Master\b/i,               // signature captions
+  /^[.…\s]{6,}$/, // signature dotted lines
+  /^Vessel.{0,3}s\s+Master\b/i, // signature captions
   /Attending Surveyor\s*$/i,
   /^Capt\.?\s.*(…|\.{3,}|Surveyor)/i,
   /^No\.?\s+(Recommendation|ITEMS NOT SURVEYED)\b/i,
@@ -49,10 +49,22 @@ const NOISE = [
 ]
 // "time scale: 10 day", "TIME SCALE : 3 month", "time sacle : 15 day", "time scale ( 1 month )",
 // "time for rectification : 30 day"
-const TIME_SCALE = /(?:^|\s)time\s*(?:s[ca]{2}le|for\s+rectification)\s*[:(]?\s*([^()]*?)\s*\)?\s*\.?$/i
+const TIME_SCALE =
+  /(?:^|\s)time\s*(?:s[ca]{2}le|for\s+rectification)\s*[:(]?\s*([^()]*?)\s*\)?\s*\.?$/i
 
 const MONTHS: Record<string, number> = {
-  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11
 }
 
 const iso = (d: Date): string =>
@@ -70,13 +82,28 @@ export function parseReportDate(text: string): Date | null {
     return d.getMonth() === +m[2] - 1 ? d : null
   }
   m = t.match(/(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{4})/)
-  if (m && MONTHS[m[2].toLowerCase()] !== undefined) return new Date(+m[3], MONTHS[m[2].toLowerCase()], +m[1])
+  if (m && MONTHS[m[2].toLowerCase()] !== undefined)
+    return new Date(+m[3], MONTHS[m[2].toLowerCase()], +m[1])
   return null
 }
 
 const WORD_NUMBERS: Record<string, number> = {
-  a: 1, an: 1, one: 1, on: 1 /* "on week" typo */, two: 2, three: 3, four: 4, five: 5, six: 6,
-  seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, fifteen: 15, thirty: 30
+  a: 1,
+  an: 1,
+  one: 1,
+  on: 1 /* "on week" typo */,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  twelve: 12,
+  fifteen: 15,
+  thirty: 30
 }
 
 /** Due date for a time-scale value, or null when it is not a period ("at next dry dock") */
@@ -104,7 +131,11 @@ function chapterOk(ref: string): boolean {
 }
 
 function normRef(ref: string): string {
-  return ref.replace(/\s*\/\s*/g, '/').replace(/\/$/, '').replace(/N\/I\s*/i, 'N/I ').trim()
+  return ref
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\/$/, '')
+    .replace(/N\/I\s*/i, 'N/I ')
+    .trim()
 }
 
 function cleanText(s: string): string {
@@ -117,14 +148,24 @@ function cleanText(s: string): string {
 
 /** A trailing date counts as the due date only when worded as one ("due 15/10/2026", "by ...") */
 function extractDueDate(description: string): { description: string; dueDate?: string } {
-  const m = description.match(/[\s,(]*\b(?:due(?: date)?|by|before|until|deadline|not later than)\s*:?\s*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\s*\)?\.?$/i)
+  const m = description.match(
+    /[\s,(]*\b(?:due(?: date)?|by|before|until|deadline|not later than)\s*:?\s*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\s*\)?\.?$/i
+  )
   if (!m) return { description }
   const d = parseReportDate(m[1])
   if (!d) return { description }
-  return { description: description.slice(0, description.length - m[0].length).trim(), dueDate: iso(d) }
+  return {
+    description: description.slice(0, description.length - m[0].length).trim(),
+    dueDate: iso(d)
+  }
 }
 
-function finish(number: string, lines: string[], section: Section, surveyDate: Date | null): ParsedDefect | null {
+function finish(
+  number: string,
+  lines: string[],
+  section: Section,
+  surveyDate: Date | null
+): ParsedDefect | null {
   // Pull out the time scale (own line, or at the end of the last line)
   let dueDate: string | undefined
   let dueEvent: string | undefined
@@ -166,7 +207,10 @@ function finish(number: string, lines: string[], section: Section, surveyDate: D
 
 /** Text parser (PDF text, or a Word file read as plain text) */
 export function parseDefectText(raw: string): ParsedDefect[] {
-  const lines = raw.replace(/\r/g, '').split('\n').map(l => l.replace(/[ \t ]+/g, ' ').trim())
+  const lines = raw
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((l) => l.replace(/[ \t ]+/g, ' ').trim())
   const out: ParsedDefect[] = []
   let section: Section = 'none'
   let surveyDate: Date | null = null
@@ -187,15 +231,28 @@ export function parseDefectText(raw: string): ParsedDefect[] {
     const line = lines[i]
     if (!line) continue
 
-    if (/Condition Survey Report Format/i.test(line)) { afterHeader = true; continue }
-    if (afterHeader && /^\d{1,3}$/.test(line)) { afterHeader = false; continue }
+    if (/Condition Survey Report Format/i.test(line)) {
+      afterHeader = true
+      continue
+    }
+    if (afterHeader && /^\d{1,3}$/.test(line)) {
+      afterHeader = false
+      continue
+    }
     afterHeader = false
 
     if (!surveyDate && section === 'none') {
       const dm = line.match(/^Date\b\s*:?\s*(.+)$/i)
-      if (dm) { surveyDate = parseReportDate(dm[1]); continue }
+      if (dm) {
+        surveyDate = parseReportDate(dm[1])
+        continue
+      }
     }
-    if (OBSERVATION_START.test(line)) { flush(); section = 'observations'; continue }
+    if (OBSERVATION_START.test(line)) {
+      flush()
+      section = 'observations'
+      continue
+    }
     if (section === 'none') {
       if (/^Ref\b/i.test(line)) section = 'deficiencies'
       continue
@@ -204,18 +261,28 @@ export function parseDefectText(raw: string): ParsedDefect[] {
     if (/^NOTE\b/i.test(line) || /^If the defects are not rectified/i.test(line)) {
       flush()
       // skip the NOTE paragraph up to the signature block
-      while (i + 1 < lines.length && lines[i + 1] && !/^[.…\s]{6,}$/.test(lines[i + 1]) && !OBSERVATION_START.test(lines[i + 1])) i++
+      while (
+        i + 1 < lines.length &&
+        lines[i + 1] &&
+        !/^[.…\s]{6,}$/.test(lines[i + 1]) &&
+        !OBSERVATION_START.test(lines[i + 1])
+      )
+        i++
       continue
     }
-    if (NOISE.some(re => re.test(line))) {
+    if (NOISE.some((re) => re.test(line))) {
       // signature block ends the current item
       if (/Master|Surveyor|^[.…\s]{6,}$/.test(line)) flush()
       continue
     }
 
     // A reference wrapped onto several lines in its narrow column: join the pieces
-    if (current && current.refOpen && REF_FRAGMENT.test(line) &&
-        (/[./]$/.test(current.number) || /^[0./]/.test(line) || /^\d$/.test(line))) {
+    if (
+      current &&
+      current.refOpen &&
+      REF_FRAGMENT.test(line) &&
+      (/[./]$/.test(current.number) || /^[0./]/.test(line) || /^\d$/.test(line))
+    ) {
       current.number += line
       continue
     }
@@ -235,7 +302,10 @@ export function parseDefectText(raw: string): ParsedDefect[] {
       if (TIME_SCALE.test(line)) current.closed = true
     } else if (current && current.closed) {
       flush()
-      if (line === '-') { current = { number: '-', lines: [], refOpen: false, closed: false }; continue }
+      if (line === '-') {
+        current = { number: '-', lines: [], refOpen: false, closed: false }
+        continue
+      }
       current = { number: '-', lines: [line], refOpen: false, closed: false }
     } else if (section === 'observations' && line.length > 15) {
       // free-text observation without a number (e.g. a single observation paragraph)
@@ -251,31 +321,62 @@ export function parseDefectText(raw: string): ParsedDefect[] {
 export function parseDefectTables(html: string): ParsedDefect[] | null {
   if (!/<table/i.test(html)) return null
   const cellText = (c: string): string =>
-    c.replace(/<\/p>\s*<p[^>]*>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<\/li>\s*<li[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    c
+      .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/li>\s*<li[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
   const out: ParsedDefect[] = []
   let section: Section = 'none'
   let surveyDate: Date | null = null
   let observationCount = 0
-  const rows = html.split(/<tr[^>]*>/i).slice(1).map(r => r.split(/<\/tr>/i)[0])
+  const rows = html
+    .split(/<tr[^>]*>/i)
+    .slice(1)
+    .map((r) => r.split(/<\/tr>/i)[0])
   for (const r of rows) {
-    const cells = r.split(/<t[dh][^>]*>/i).slice(1).map(c => cleanText(cellText(c.split(/<\/t[dh]>/i)[0])))
+    const cells = r
+      .split(/<t[dh][^>]*>/i)
+      .slice(1)
+      .map((c) => cleanText(cellText(c.split(/<\/t[dh]>/i)[0])))
     const nonEmpty = cells.filter(Boolean)
     if (nonEmpty.length === 0) continue
     const joined = nonEmpty.join(' ')
-    if (section === 'none' && /^Date\b/i.test(nonEmpty[0]) && nonEmpty[1]) { surveyDate = parseReportDate(nonEmpty[1]); continue }
-    if (OBSERVATION_START.test(joined)) { section = 'observations'; continue }
-    if (/^Ref$/i.test(nonEmpty[0])) { section = 'deficiencies'; continue }
+    if (section === 'none' && /^Date\b/i.test(nonEmpty[0]) && nonEmpty[1]) {
+      surveyDate = parseReportDate(nonEmpty[1])
+      continue
+    }
+    if (OBSERVATION_START.test(joined)) {
+      section = 'observations'
+      continue
+    }
+    if (/^Ref$/i.test(nonEmpty[0])) {
+      section = 'deficiencies'
+      continue
+    }
     if (section === 'none') continue
     if (/^NOTE\b/i.test(joined) || /If the defects are not rectified/i.test(joined)) continue
-    if (/Master|Attending Surveyor|Superintendent/i.test(joined) && /[.…]{3,}|Capt/i.test(joined)) continue
+    if (/Master|Attending Surveyor|Superintendent/i.test(joined) && /[.…]{3,}|Capt/i.test(joined))
+      continue
     if (/^No\.?$/i.test(nonEmpty[0]) && nonEmpty.length > 1) continue // "No. | Recommendation" header
 
     const first = nonEmpty[0]
-    const refMatch = first.replace(/\s+/g, ' ').match(new RegExp(String.raw`^${REF}(?:\s*[\/-]\s*(?:${REF})?)*$`))
+    const refMatch = first
+      .replace(/\s+/g, ' ')
+      .match(new RegExp(String.raw`^${REF}(?:\s*[\/-]\s*(?:${REF})?)*$`))
     if (refMatch && chapterOk(first) && nonEmpty.length >= 2) {
-      const d = finish(normRef(first), nonEmpty.slice(1).join('\n').split('\n'), section, surveyDate)
+      const d = finish(
+        normRef(first),
+        nonEmpty.slice(1).join('\n').split('\n'),
+        section,
+        surveyDate
+      )
       if (d) out.push(d)
     } else if (section === 'observations' && nonEmpty.length === 1 && first.length > 15) {
       observationCount++

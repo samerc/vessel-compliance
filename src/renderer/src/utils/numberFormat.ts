@@ -37,12 +37,18 @@ export function parseFormattedNumber(value: string): string {
 /**
  * Formats a number for display with thousand separators and optional decimal places.
  */
-export function displayNumber(value: number | string | null | undefined, decimals?: number): string {
+export function displayNumber(
+  value: number | string | null | undefined,
+  decimals?: number
+): string {
   if (value == null || value === '') return ''
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(num)) return ''
   if (decimals !== undefined) {
-    return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    })
   }
   return num.toLocaleString('en-US')
 }

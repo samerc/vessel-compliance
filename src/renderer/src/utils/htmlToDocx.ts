@@ -5,7 +5,7 @@ interface TextSegment {
   bold?: boolean
   italic?: boolean
   underline?: boolean
-  fontSize?: number  // in half-points (docx twips)
+  fontSize?: number // in half-points (docx twips)
   fontFamily?: string
 }
 
@@ -14,21 +14,28 @@ function parseFontSize(css: string | null | undefined, fallback: number): number
   if (!css) return fallback
   const val = parseFloat(css)
   if (isNaN(val)) return fallback
-  if (css.endsWith('pt')) return Math.round(val * 2)       // 1pt = 2 half-points
-  if (css.endsWith('px')) return Math.round(val * 1.5)     // approximate px → half-points
-  if (css.endsWith('rem')) return Math.round(val * 24)     // 1rem ≈ 12pt = 24 half-points
-  return Math.round(val * 2)                               // assume pt if no unit
+  if (css.endsWith('pt')) return Math.round(val * 2) // 1pt = 2 half-points
+  if (css.endsWith('px')) return Math.round(val * 1.5) // approximate px → half-points
+  if (css.endsWith('rem')) return Math.round(val * 24) // 1rem ≈ 12pt = 24 half-points
+  return Math.round(val * 2) // assume pt if no unit
 }
 
 /** Map CSS text-align to docx AlignmentType */
-function parseAlignment(css: string | null | undefined): typeof AlignmentType[keyof typeof AlignmentType] | undefined {
+function parseAlignment(
+  css: string | null | undefined
+): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
   if (!css) return undefined
   switch (css.trim()) {
-    case 'center': return AlignmentType.CENTER
-    case 'right': return AlignmentType.RIGHT
-    case 'justify': return AlignmentType.JUSTIFIED
-    case 'left': return AlignmentType.LEFT
-    default: return undefined
+    case 'center':
+      return AlignmentType.CENTER
+    case 'right':
+      return AlignmentType.RIGHT
+    case 'justify':
+      return AlignmentType.JUSTIFIED
+    case 'left':
+      return AlignmentType.LEFT
+    default:
+      return undefined
   }
 }
 
@@ -38,15 +45,27 @@ function parseAlignment(css: string | null | undefined): typeof AlignmentType[ke
  * inline font-size via style attribute, paragraph text-align, and Arabic/RTL text.
  */
 /** Convert CSS line-height value to DOCX line spacing in twips. 240 = single spacing. */
-function parseLineHeight(css: string | null | undefined, fallbackMultiplier?: number): number | undefined {
-  const multiplier = css ? parseFloat(css) : (fallbackMultiplier || 0)
+function parseLineHeight(
+  css: string | null | undefined,
+  fallbackMultiplier?: number
+): number | undefined {
+  const multiplier = css ? parseFloat(css) : fallbackMultiplier || 0
   if (!multiplier || isNaN(multiplier) || multiplier <= 0) return undefined
   return Math.round(240 * multiplier)
 }
 
 export function parseHtmlToParagraphs(
   html: string,
-  opts?: { size?: number; font?: string; color?: string; alignment?: typeof AlignmentType[keyof typeof AlignmentType]; lineSpacing?: number; spacingAfter?: number; indentOffset?: number; collapseEmpty?: boolean }
+  opts?: {
+    size?: number
+    font?: string
+    color?: string
+    alignment?: (typeof AlignmentType)[keyof typeof AlignmentType]
+    lineSpacing?: number
+    spacingAfter?: number
+    indentOffset?: number
+    collapseEmpty?: boolean
+  }
 ): Paragraph[] {
   if (!html || html.trim() === '') return []
 
@@ -65,12 +84,16 @@ export function parseHtmlToParagraphs(
 
   // If no HTML tags, treat as plain text with line breaks
   if (!/<[a-z][\s\S]*>/i.test(html)) {
-    return html.split('\n')
-      .filter(line => !collapseEmpty || line.trim())
-      .map(line =>
+    return html
+      .split('\n')
+      .filter((line) => !collapseEmpty || line.trim())
+      .map((line) =>
         line.trim()
           ? new Paragraph({
-              spacing: { after: spacingAfter, ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {}) },
+              spacing: {
+                after: spacingAfter,
+                ...(defaultLineSpacing ? { line: defaultLineSpacing, lineRule: 'auto' as any } : {})
+              },
               alignment: opts?.alignment,
               children: [new TextRun({ text: line, size, font, color })]
             })
@@ -82,7 +105,16 @@ export function parseHtmlToParagraphs(
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
 
-  function extractSegments(node: Node, inherited: { bold?: boolean; italic?: boolean; underline?: boolean; fontSize?: number; fontFamily?: string } = {}): TextSegment[] {
+  function extractSegments(
+    node: Node,
+    inherited: {
+      bold?: boolean
+      italic?: boolean
+      underline?: boolean
+      fontSize?: number
+      fontFamily?: string
+    } = {}
+  ): TextSegment[] {
     const segments: TextSegment[] = []
 
     for (const child of Array.from(node.childNodes)) {
@@ -121,7 +153,7 @@ export function parseHtmlToParagraphs(
   function makeParagraphFromSegments(
     segments: TextSegment[],
     listPrefix?: string,
-    alignment?: typeof AlignmentType[keyof typeof AlignmentType],
+    alignment?: (typeof AlignmentType)[keyof typeof AlignmentType],
     bidirectional?: boolean,
     lineSpacingTwips?: number
   ): Paragraph {
@@ -129,32 +161,44 @@ export function parseHtmlToParagraphs(
     if (listPrefix) {
       children.push(new TextRun({ text: listPrefix, size, font, color }))
     }
-    children.push(...segments.map(seg => new TextRun({
-      text: seg.text,
-      size: seg.fontSize || size,
-      font: seg.fontFamily || font,
-      color,
-      bold: seg.bold,
-      italics: seg.italic,
-      underline: seg.underline ? {} : undefined,
-      rightToLeft: bidirectional || undefined
-    } as any)))
+    children.push(
+      ...segments.map(
+        (seg) =>
+          new TextRun({
+            text: seg.text,
+            size: seg.fontSize || size,
+            font: seg.fontFamily || font,
+            color,
+            bold: seg.bold,
+            italics: seg.italic,
+            underline: seg.underline ? {} : undefined,
+            rightToLeft: bidirectional || undefined
+          } as any)
+      )
+    )
 
     const effectiveLineSpacing = lineSpacingTwips || defaultLineSpacing
     return new Paragraph({
-      spacing: { after: spacingAfter, ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {}) },
+      spacing: {
+        after: spacingAfter,
+        ...(effectiveLineSpacing ? { line: effectiveLineSpacing, lineRule: 'auto' as any } : {})
+      },
       alignment: alignment || opts?.alignment,
       bidirectional: bidirectional || undefined,
       ...(listPrefix
         ? { indent: { left: 140 + indentOffset, hanging: 140 } }
-        : (indentOffset ? { indent: { left: indentOffset } } : {})),
+        : indentOffset
+          ? { indent: { left: indentOffset } }
+          : {}),
       children
     } as any)
   }
 
   /** Detect if text contains RTL characters (Arabic, Hebrew) */
   function hasRtl(text: string): boolean {
-    return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF]/.test(text)
+    return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF]/.test(
+      text
+    )
   }
 
   function processNode(node: Node): void {
@@ -164,13 +208,20 @@ export function parseHtmlToParagraphs(
         if (text) {
           const rtl = hasRtl(text)
           const effectiveLs = defaultLineSpacing
-          paragraphs.push(new Paragraph({
-            spacing: { after: spacingAfter, ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {}) },
-            alignment: rtl ? AlignmentType.RIGHT : opts?.alignment,
-            bidirectional: rtl || undefined,
-            ...(indentOffset ? { indent: { left: indentOffset } } : {}),
-            children: [new TextRun({ text, size, font, color, rightToLeft: rtl || undefined } as any)]
-          } as any))
+          paragraphs.push(
+            new Paragraph({
+              spacing: {
+                after: spacingAfter,
+                ...(effectiveLs ? { line: effectiveLs, lineRule: 'auto' as any } : {})
+              },
+              alignment: rtl ? AlignmentType.RIGHT : opts?.alignment,
+              bidirectional: rtl || undefined,
+              ...(indentOffset ? { indent: { left: indentOffset } } : {}),
+              children: [
+                new TextRun({ text, size, font, color, rightToLeft: rtl || undefined } as any)
+              ]
+            } as any)
+          )
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const el = child as HTMLElement
@@ -178,15 +229,24 @@ export function parseHtmlToParagraphs(
 
         if (tag === 'p') {
           const segments = extractSegments(el)
-          if (segments.length === 0 || segments.every(s => !s.text.trim())) {
-            if (!collapseEmpty) paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
+          if (segments.length === 0 || segments.every((s) => !s.text.trim())) {
+            if (!collapseEmpty)
+              paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
           } else {
             // Parse text-align and line-height from style
             const align = parseAlignment(el.style?.textAlign)
             const pLineSpacing = parseLineHeight(el.style?.lineHeight)
-            const fullText = segments.map(s => s.text).join('')
+            const fullText = segments.map((s) => s.text).join('')
             const rtl = hasRtl(fullText)
-            paragraphs.push(makeParagraphFromSegments(segments, undefined, align || (rtl ? AlignmentType.RIGHT : undefined), rtl, pLineSpacing))
+            paragraphs.push(
+              makeParagraphFromSegments(
+                segments,
+                undefined,
+                align || (rtl ? AlignmentType.RIGHT : undefined),
+                rtl,
+                pLineSpacing
+              )
+            )
           }
         } else if (tag === 'ul' || tag === 'ol') {
           let idx = 0
@@ -202,27 +262,33 @@ export function parseHtmlToParagraphs(
           // Headings → bold, stepped-down sizes (half-points)
           const level = parseInt(tag[1], 10)
           const segments = extractSegments(el)
-          if (segments.some(s => s.text.trim())) {
+          if (segments.some((s) => s.text.trim())) {
             const align = parseAlignment(el.style?.textAlign)
             const headingSize = Math.max(size, [0, 32, 28, 26, 24, 23, 22][level] || size)
-            const children = segments.map(seg => new TextRun({
-              text: seg.text,
-              size: seg.fontSize || headingSize,
-              font: seg.fontFamily || font,
-              color,
-              bold: true,
-              italics: seg.italic,
-              underline: seg.underline ? {} : undefined
-            } as any))
-            paragraphs.push(new Paragraph({
-              spacing: { before: 120, after: spacingAfter },
-              alignment: align || opts?.alignment,
-              ...(indentOffset ? { indent: { left: indentOffset } } : {}),
-              children
-            } as any))
+            const children = segments.map(
+              (seg) =>
+                new TextRun({
+                  text: seg.text,
+                  size: seg.fontSize || headingSize,
+                  font: seg.fontFamily || font,
+                  color,
+                  bold: true,
+                  italics: seg.italic,
+                  underline: seg.underline ? {} : undefined
+                } as any)
+            )
+            paragraphs.push(
+              new Paragraph({
+                spacing: { before: 120, after: spacingAfter },
+                alignment: align || opts?.alignment,
+                ...(indentOffset ? { indent: { left: indentOffset } } : {}),
+                children
+              } as any)
+            )
           }
         } else if (tag === 'br') {
-          if (!collapseEmpty) paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
+          if (!collapseEmpty)
+            paragraphs.push(new Paragraph({ spacing: { after: 40 }, children: [] }))
         } else {
           // Recurse for other wrapper elements
           processNode(el)
@@ -232,7 +298,9 @@ export function parseHtmlToParagraphs(
   }
 
   processNode(doc.body)
-  return paragraphs.length > 0 ? paragraphs : [new Paragraph({ spacing: { after: 40 }, children: [] })]
+  return paragraphs.length > 0
+    ? paragraphs
+    : [new Paragraph({ spacing: { after: 40 }, children: [] })]
 }
 
 /**

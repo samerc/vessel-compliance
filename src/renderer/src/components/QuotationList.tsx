@@ -88,7 +88,13 @@ interface SavedFilter {
   order: number
 }
 
-export default function QuotationList({ onOpenQuotation, initialSearch, onSearchChange, openCreate, onCreateConsumed }: QuotationListProps) {
+export default function QuotationList({
+  onOpenQuotation,
+  initialSearch,
+  onSearchChange,
+  openCreate,
+  onCreateConsumed
+}: QuotationListProps) {
   const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
   const [data, setData] = useState<PaginatedData>({
     rows: [],
@@ -103,7 +109,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [renewalFilter, setRenewalFilter] = useState<string>('all')
-  const [viewFilter, setViewFilter] = useState<'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'>('active')
+  const [viewFilter, setViewFilter] = useState<
+    'all' | 'registry' | 'drafts' | 'active' | 'converted' | 'deleted'
+  >('active')
   const [deletedQuotations, setDeletedQuotations] = useState<any[]>([])
   const [deletedLoading, setDeletedLoading] = useState(false)
   const [permDeleteId, setPermDeleteId] = useState<string | null>(null)
@@ -115,7 +123,10 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   const [navYear, setNavYear] = useState(() => new Date().getFullYear())
   const [navMonth, setNavMonth] = useState(() => new Date().getMonth())
   const [isSearchActive, setIsSearchActive] = useState(false)
-  useEffect(() => { setNavYear(new Date().getFullYear()); setNavMonth(new Date().getMonth()) }, [])
+  useEffect(() => {
+    setNavYear(new Date().getFullYear())
+    setNavMonth(new Date().getMonth())
+  }, [])
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [page, setPage] = useState(0)
@@ -127,7 +138,16 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
 
   // Quotation groups state
-  const [qGroups, setQGroups] = useState<{ id: string; name: string; userId: string | null; color: string | null; order: number; memberCount: number }[]>([])
+  const [qGroups, setQGroups] = useState<
+    {
+      id: string
+      name: string
+      userId: string | null
+      color: string | null
+      order: number
+      memberCount: number
+    }[]
+  >([])
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [showGroupManager, setShowGroupManager] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -265,10 +285,14 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         status: statusFilter !== 'all' ? statusFilter : undefined,
         typeCode,
         createdBy: createdByFilter !== 'all' ? createdByFilter : undefined,
-        dateFrom: isSearchActive ? undefined : (dateFrom || undefined),
-        dateTo: isSearchActive ? undefined : (dateTo || undefined),
+        dateFrom: isSearchActive ? undefined : dateFrom || undefined,
+        dateTo: isSearchActive ? undefined : dateTo || undefined,
         renewalFilter: renewalFilter !== 'all' ? renewalFilter : undefined,
-        viewFilter: isSearchActive ? undefined : (viewFilter !== 'all' && viewFilter !== 'deleted' ? viewFilter : undefined),
+        viewFilter: isSearchActive
+          ? undefined
+          : viewFilter !== 'all' && viewFilter !== 'deleted'
+            ? viewFilter
+            : undefined,
         groupId: activeGroupId || undefined,
         favoriteIds: showFavoritesOnly ? [...favorites] : undefined,
         sortField,
@@ -315,8 +339,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     try {
       const result = await window.api.getDeletedQuotations()
       setDeletedQuotations(Array.isArray(result) ? result : [])
-    } catch { setDeletedQuotations([]) }
-    finally { setDeletedLoading(false) }
+    } catch {
+      setDeletedQuotations([])
+    } finally {
+      setDeletedLoading(false)
+    }
   }
 
   const handleRestore = async (id: string) => {
@@ -325,7 +352,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
       showSuccess('Quotation restored')
       loadDeletedQuotations()
       loadData()
-    } catch (e: any) { showError(e.message || 'Failed to restore') }
+    } catch (e: any) {
+      showError(e.message || 'Failed to restore')
+    }
   }
 
   const handlePermanentDelete = async (id: string) => {
@@ -333,8 +362,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
       await window.api.permanentlyDeleteQuotation(id)
       showSuccess('Quotation permanently deleted')
       loadDeletedQuotations()
-    } catch (e: any) { showError(e.message || 'Failed to delete') }
-    finally { setPermDeleteId(null) }
+    } catch (e: any) {
+      showError(e.message || 'Failed to delete')
+    } finally {
+      setPermDeleteId(null)
+    }
   }
 
   // Grouping
@@ -365,11 +397,13 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     try {
       setShowNewMenu(false)
       const today = new Date().toISOString().split('T')[0]
-      const created = ok(await window.api.addQuotation({
-        quotationDate: today,
-        quotationTypeId,
-        status: 'draft'
-      }))
+      const created = ok(
+        await window.api.addQuotation({
+          quotationDate: today,
+          quotationTypeId,
+          status: 'draft'
+        })
+      )
       showSuccess('Quotation created')
       onOpenQuotation(created)
     } catch (err: any) {
@@ -516,10 +550,16 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   }
 
   const navigateMonth = (direction: -1 | 1) => {
-    setNavMonth(prev => {
+    setNavMonth((prev) => {
       const n = prev + direction
-      if (n < 0) { setNavYear(y => y - 1); return 11 }
-      if (n > 11) { setNavYear(y => y + 1); return 0 }
+      if (n < 0) {
+        setNavYear((y) => y - 1)
+        return 11
+      }
+      if (n > 11) {
+        setNavYear((y) => y + 1)
+        return 0
+      }
       return n
     })
   }
@@ -531,12 +571,26 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     setIsSearchActive(false)
   }
 
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ]
   const prevDate = new Date(navYear, navMonth - 1, 1)
   const nextDate = new Date(navYear, navMonth + 1, 1)
-  const navLabel = prevDate.getFullYear() === nextDate.getFullYear()
-    ? `${monthNames[prevDate.getMonth()]} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
-    : `${monthNames[prevDate.getMonth()]} ${prevDate.getFullYear()} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
+  const navLabel =
+    prevDate.getFullYear() === nextDate.getFullYear()
+      ? `${monthNames[prevDate.getMonth()]} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
+      : `${monthNames[prevDate.getMonth()]} ${prevDate.getFullYear()} – ${monthNames[nextDate.getMonth()]} ${nextDate.getFullYear()}`
 
   const hasActiveFilters =
     statusFilter !== 'all' ||
@@ -561,7 +615,6 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     if (!amount) return '-'
     return `${currency || 'USD'} ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
-
 
   const thStyle = (field: SortField, align: 'left' | 'right' = 'left'): React.CSSProperties => ({
     padding: '10px 12px',
@@ -596,7 +649,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   }
 
   const toggleSelectId = (id: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -608,7 +661,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     if (selectedIds.size === data.rows.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(data.rows.map(r => r.id)))
+      setSelectedIds(new Set(data.rows.map((r) => r.id)))
     }
   }
 
@@ -655,7 +708,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         newGroupColor
       )
       if (result && !(result as any).error) {
-        setQGroups(prev => [...prev, result])
+        setQGroups((prev) => [...prev, result])
         setNewGroupName('')
         setNewGroupColor('#00aac8')
         setNewGroupPersonal(false)
@@ -669,8 +722,15 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   const handleUpdateGroup = async (id: string) => {
     if (!editGroupName.trim()) return
     try {
-      await window.api.quotationGroupUpdate(id, { name: editGroupName.trim(), color: editGroupColor })
-      setQGroups(prev => prev.map(g => g.id === id ? { ...g, name: editGroupName.trim(), color: editGroupColor } : g))
+      await window.api.quotationGroupUpdate(id, {
+        name: editGroupName.trim(),
+        color: editGroupColor
+      })
+      setQGroups((prev) =>
+        prev.map((g) =>
+          g.id === id ? { ...g, name: editGroupName.trim(), color: editGroupColor } : g
+        )
+      )
       setEditingGroup(null)
       showSuccess('Group updated')
     } catch (err: any) {
@@ -682,7 +742,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     if (!(await confirmDialog('Delete this group? The quotations in it are kept.'))) return
     try {
       await window.api.quotationGroupDelete(id)
-      setQGroups(prev => prev.filter(g => g.id !== id))
+      setQGroups((prev) => prev.filter((g) => g.id !== id))
       if (activeGroupId === id) setActiveGroupId(null)
       showSuccess('Group deleted')
     } catch (err: any) {
@@ -698,20 +758,40 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         style={{
           borderBottom: '1px solid var(--table-border)',
           cursor: 'pointer',
-          background: selectedIds.has(q.id) ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)') : undefined
+          background: selectedIds.has(q.id)
+            ? isLight
+              ? 'rgba(var(--accent-primary-rgb), 0.06)'
+              : 'rgba(var(--accent-primary-rgb), 0.06)'
+            : undefined
         }}
         className="hover-effect"
         onClick={() => {
-          if (selectMode) { toggleSelectId(q.id); return }
-          if (q.lockedBy && q.lockedBy !== user?.id) { showError(`This quotation is locked by ${q.lockedByName || 'another user'}`); return }
+          if (selectMode) {
+            toggleSelectId(q.id)
+            return
+          }
+          if (q.lockedBy && q.lockedBy !== user?.id) {
+            showError(`This quotation is locked by ${q.lockedByName || 'another user'}`)
+            return
+          }
           onOpenQuotation(q)
         }}
       >
         {selectMode && (
           <td style={{ padding: '10px 4px 10px 12px', width: '30px' }}>
             <button
-              onClick={(e) => { e.stopPropagation(); toggleSelectId(q.id) }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: selectedIds.has(q.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleSelectId(q.id)
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px',
+                display: 'flex',
+                color: selectedIds.has(q.id) ? 'var(--accent-primary)' : 'var(--text-secondary)'
+              }}
             >
               {selectedIds.has(q.id) ? <CheckSquare size={16} /> : <Square size={16} />}
             </button>
@@ -748,9 +828,19 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                 : 'var(--accent-primary)'
             }}
           >
-            {q.lockedBy && <span style={{ display: 'inline-flex', verticalAlign: '-2px', marginRight: '6px', color: 'var(--warning)' }} title={`Being edited by ${q.lockedByName || 'another user'}`}>
-              <Lock size={13} />
-            </span>}
+            {q.lockedBy && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  verticalAlign: '-2px',
+                  marginRight: '6px',
+                  color: 'var(--warning)'
+                }}
+                title={`Being edited by ${q.lockedByName || 'another user'}`}
+              >
+                <Lock size={13} />
+              </span>
+            )}
             {q.referenceNumber || (
               <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</span>
             )}
@@ -901,9 +991,16 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('status') && (
           <td style={{ padding: '10px 12px' }}>
             {q.workflowStepName ? (
-              <Badge color={q.workflowStepColor || '#6b7280'} dot>{q.workflowStepName}</Badge>
+              <Badge color={q.workflowStepColor || '#6b7280'} dot>
+                {q.workflowStepName}
+              </Badge>
             ) : (
-              <Badge tone={STATUS_TONES[q.status] || 'neutral'} style={{ textTransform: 'capitalize' }}>{q.status}</Badge>
+              <Badge
+                tone={STATUS_TONES[q.status] || 'neutral'}
+                style={{ textTransform: 'capitalize' }}
+              >
+                {q.status}
+              </Badge>
             )}
           </td>
         )}
@@ -925,7 +1022,12 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             <div style={{ display: 'inline-flex', gap: '2px' }}>
               {q.lockedBy && hasPermission('admin:settings') && (
                 <button
-                  onClick={async (e) => { e.stopPropagation(); await window.api.quotationForceUnlock(q.id); showSuccess('Quotation unlocked'); loadData() }}
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    await window.api.quotationForceUnlock(q.id)
+                    showSuccess('Quotation unlocked')
+                    loadData()
+                  }}
                   className="btn-ghost btn-icon"
                   style={{ color: 'var(--warning)' }}
                   title={`Force unlock (being edited by ${q.lockedByName || 'another user'})`}
@@ -935,7 +1037,12 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                 </button>
               )}
               {hasPermission('quotations:create') && (
-                <button onClick={(e) => handleDuplicate(q, e)} className="btn-ghost btn-icon" title="Duplicate" aria-label="Duplicate">
+                <button
+                  onClick={(e) => handleDuplicate(q, e)}
+                  className="btn-ghost btn-icon"
+                  title="Duplicate"
+                  aria-label="Duplicate"
+                >
                   <Copy size={15} />
                 </button>
               )}
@@ -967,13 +1074,29 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           <th style={{ padding: '10px 4px 10px 12px', width: '30px' }}>
             <button
               onClick={toggleSelectAll}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: selectedIds.size === data.rows.length && data.rows.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px',
+                display: 'flex',
+                color:
+                  selectedIds.size === data.rows.length && data.rows.length > 0
+                    ? 'var(--accent-primary)'
+                    : 'var(--text-secondary)'
+              }}
             >
-              {selectedIds.size === data.rows.length && data.rows.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+              {selectedIds.size === data.rows.length && data.rows.length > 0 ? (
+                <CheckSquare size={16} />
+              ) : (
+                <Square size={16} />
+              )}
             </button>
           </th>
         )}
-        {showFavCol && !selectMode && <th style={{ padding: '10px 4px 10px 12px', width: '30px' }} />}
+        {showFavCol && !selectMode && (
+          <th style={{ padding: '10px 4px 10px 12px', width: '30px' }} />
+        )}
         {qVisibleSet.has('referenceNumber') && (
           <th style={thStyle('referenceNumber')} onClick={() => toggleSort('referenceNumber')}>
             Ref <SortIcon field="referenceNumber" />
@@ -1000,7 +1123,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </th>
         )}
         {qVisibleSet.has('conditions') && (
-          <th className="hide-narrow" style={thStyle('conditions')} onClick={() => toggleSort('conditions')}>
+          <th
+            className="hide-narrow"
+            style={thStyle('conditions')}
+            onClick={() => toggleSort('conditions')}
+          >
             Conditions <SortIcon field="conditions" />
           </th>
         )}
@@ -1015,7 +1142,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           </th>
         )}
         {qVisibleSet.has('updatedAt') && (
-          <th className="hide-narrow" style={thStyle('updatedAt')} onClick={() => toggleSort('updatedAt')}>
+          <th
+            className="hide-narrow"
+            style={thStyle('updatedAt')}
+            onClick={() => toggleSort('updatedAt')}
+          >
             Updated <SortIcon field="updatedAt" />
           </th>
         )}
@@ -1057,37 +1188,105 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     <div>
       {/* ═══ View Tabs ═══ */}
       <div className="tabs" style={{ marginBottom: '14px' }}>
-        {(['active', 'converted', 'all'] as const).map(vf => {
-          const labels: Record<string, string> = { active: 'Active', converted: 'Converted', all: 'All' }
-          const active = viewFilter === vf && !savedFilters.some(sf => sf.id === viewFilter)
+        {(['active', 'converted', 'all'] as const).map((vf) => {
+          const labels: Record<string, string> = {
+            active: 'Active',
+            converted: 'Converted',
+            all: 'All'
+          }
+          const active = viewFilter === vf && !savedFilters.some((sf) => sf.id === viewFilter)
           return (
-            <button key={vf} className={`tab${active ? ' active' : ''}`} onClick={() => { setViewFilter(vf); setActiveGroupId(null) }}>
+            <button
+              key={vf}
+              className={`tab${active ? ' active' : ''}`}
+              onClick={() => {
+                setViewFilter(vf)
+                setActiveGroupId(null)
+              }}
+            >
               {labels[vf]}
             </button>
           )
         })}
-        {savedFilters.map(sf => (
+        {savedFilters.map((sf) => (
           <button key={sf.id} className="tab" onClick={() => applyFilter(sf.filters)}>
             {sf.name}
-            <X size={12} style={{ opacity: 0.4 }} onClick={e => deleteSavedFilter(sf.id, e)} />
+            <X size={12} style={{ opacity: 0.4 }} onClick={(e) => deleteSavedFilter(sf.id, e)} />
           </button>
         ))}
         {hasActiveFilters && !showSaveFilterInput && (
-          <button onClick={() => setShowSaveFilterInput(true)} className="btn-ghost btn-sm" style={{ color: 'var(--accent-primary)', marginLeft: '6px' }}>
+          <button
+            onClick={() => setShowSaveFilterInput(true)}
+            className="btn-ghost btn-sm"
+            style={{ color: 'var(--accent-primary)', marginLeft: '6px' }}
+          >
             <Plus size={12} /> Save View
           </button>
         )}
         {showSaveFilterInput && (
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <input type="text" value={newFilterName} onChange={e => setNewFilterName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveCurrentFilter(); if (e.key === 'Escape') { setShowSaveFilterInput(false); setNewFilterName('') } }} placeholder="View name..." style={{ padding: '5px 8px', borderRadius: '6px', fontSize: '0.78rem', border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--text-primary)', width: '140px' }} autoFocus />
-            <button onClick={saveCurrentFilter} className="btn-primary" style={{ padding: '5px 8px', fontSize: '0.75rem' }} disabled={!newFilterName.trim()}>Save</button>
-            <button title="Cancel" aria-label="Cancel" onClick={() => { setShowSaveFilterInput(false); setNewFilterName('') }} className="btn-secondary" style={{ padding: '5px' }}><X size={12} /></button>
+            <input
+              type="text"
+              value={newFilterName}
+              onChange={(e) => setNewFilterName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveCurrentFilter()
+                if (e.key === 'Escape') {
+                  setShowSaveFilterInput(false)
+                  setNewFilterName('')
+                }
+              }}
+              placeholder="View name..."
+              style={{
+                padding: '5px 8px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                border: '1px solid var(--input-border)',
+                background: 'var(--input-bg)',
+                color: 'var(--text-primary)',
+                width: '140px'
+              }}
+              autoFocus
+            />
+            <button
+              onClick={saveCurrentFilter}
+              className="btn-primary"
+              style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+              disabled={!newFilterName.trim()}
+            >
+              Save
+            </button>
+            <button
+              title="Cancel"
+              aria-label="Cancel"
+              onClick={() => {
+                setShowSaveFilterInput(false)
+                setNewFilterName('')
+              }}
+              className="btn-secondary"
+              style={{ padding: '5px' }}
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
-        <button onClick={() => { setViewFilter('deleted'); loadDeletedQuotations() }}
+        <button
+          onClick={() => {
+            setViewFilter('deleted')
+            loadDeletedQuotations()
+          }}
           className={`tab${viewFilter === 'deleted' ? ' active' : ''}`}
-          style={{ marginLeft: 'auto', ...(viewFilter === 'deleted' ? { color: 'var(--danger)', borderBottomColor: 'var(--danger)' } : {}) }}>
-          <Trash size={13} /> Recycle Bin {deletedQuotations.length > 0 && <span className="tab-count">{deletedQuotations.length}</span>}
+          style={{
+            marginLeft: 'auto',
+            ...(viewFilter === 'deleted'
+              ? { color: 'var(--danger)', borderBottomColor: 'var(--danger)' }
+              : {})
+          }}
+        >
+          <Trash size={13} /> Recycle Bin{' '}
+          {deletedQuotations.length > 0 && (
+            <span className="tab-count">{deletedQuotations.length}</span>
+          )}
         </button>
       </div>
 
@@ -1096,236 +1295,298 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         <div className="glass-card" style={{ padding: '0', overflow: 'hidden', marginTop: '12px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Reference</th>
+              <tr
+                style={{
+                  textAlign: 'left',
+                  background: 'var(--table-header-bg)',
+                  borderBottom: '1px solid var(--table-border)'
+                }}
+              >
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>
+                  Reference
+                </th>
                 <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Type</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Title</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Deleted</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>Deleted By</th>
-                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>
+                  Title
+                </th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>
+                  Deleted
+                </th>
+                <th style={{ padding: '14px 16px', fontWeight: 600, fontSize: '0.82rem' }}>
+                  Deleted By
+                </th>
+                <th
+                  style={{
+                    padding: '14px 16px',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    textAlign: 'center'
+                  }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {deletedLoading && (
-                <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center' }}><Loader2 size={24} className="spin" style={{ opacity: 0.5 }} /></td></tr>
-              )}
-              {!deletedLoading && deletedQuotations.map(q => (
-                <tr key={q.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>{q.referenceNumber || '—'}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{q.quotationTypeName || '—'}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{q.title || q.coName || '—'}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{q.deletedAt ? new Date(q.deletedAt).toLocaleDateString() : '—'}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{q.deletedByName || '—'}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                      <button onClick={() => handleRestore(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)' }}>
-                        <RotateCcw size={13} /> Restore
-                      </button>
-                      {hasPermission('quotations:bulkDelete') && (
-                        <button onClick={() => setPermDeleteId(q.id)} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      )}
-                    </div>
+                <tr>
+                  <td colSpan={6} style={{ padding: '40px', textAlign: 'center' }}>
+                    <Loader2 size={24} className="spin" style={{ opacity: 0.5 }} />
                   </td>
                 </tr>
-              ))}
+              )}
+              {!deletedLoading &&
+                deletedQuotations.map((q) => (
+                  <tr key={q.id} style={{ borderBottom: '1px solid var(--table-border)' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.85rem' }}>
+                      {q.referenceNumber || '—'}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                      {q.quotationTypeName || '—'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '12px 16px',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {q.title || q.coName || '—'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '12px 16px',
+                        fontSize: '0.82rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {q.deletedAt ? new Date(q.deletedAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '12px 16px',
+                        fontSize: '0.82rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {q.deletedByName || '—'}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => handleRestore(q.id)}
+                          className="btn-secondary"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.78rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: 'var(--accent-primary)'
+                          }}
+                        >
+                          <RotateCcw size={13} /> Restore
+                        </button>
+                        {hasPermission('quotations:bulkDelete') && (
+                          <button
+                            onClick={() => setPermDeleteId(q.id)}
+                            className="btn-secondary"
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '0.78rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: 'var(--danger)'
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               {!deletedLoading && deletedQuotations.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <Trash size={36} style={{ marginBottom: '12px', opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600 }}>Recycle bin is empty</div>
-                </td></tr>
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                  >
+                    <Trash size={36} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                    <div style={{ fontWeight: 600 }}>Recycle bin is empty</div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      ) : <>
-      {/* ═══ Search + Month Nav ═══ */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-          <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={15} />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all quotations..." style={{ width: '100%', paddingLeft: '36px', fontSize: '0.83rem' }} />
-          {loading && <Loader2 size={14} className="spinner" style={{ position: 'absolute', right: '10px', top: 'calc(50% - 7px)', color: 'var(--accent-primary)' }} />}
-          {isSearchActive && <span style={{ position: 'absolute', right: loading ? '30px' : '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>ALL</span>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
-          <button title="Previous" aria-label="Previous" onClick={() => navigateMonth(-1)} className="btn-secondary btn-icon"><ChevronLeft size={16} /></button>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '180px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
-          <button title="Next" aria-label="Next" onClick={() => navigateMonth(1)} className="btn-secondary btn-icon"><ChevronRight size={16} /></button>
-          <button onClick={goToToday} className="btn-secondary btn-sm">Today</button>
-        </div>
-        <button onClick={loadData} className="btn-secondary btn-icon" style={{ flexShrink: 0 }} title="Refresh" aria-label="Refresh"><RotateCw size={16} /></button>
-        {hasPermission('quotations:create') && (
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowNewMenu(!showNewMenu)} className="btn-primary" style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-              <Plus size={16} /> New Quotation
-            </button>
-            {showNewMenu && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNewMenu(false)} />
-                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '10px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-                  {quotationTypes.map(qt => (
-                    <button key={qt.id} onClick={() => handleCreate(qt.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '20px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>{qt.code}</span>
-                      {qt.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ═══ Filter Chips ═══ */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Status chips */}
-        {[
-          { label: 'Draft', key: 'draft', color: 'var(--text-secondary)' },
-          { label: 'Sent', key: 'sent', color: 'var(--info)' },
-          { label: 'Approved', key: 'approved', color: 'var(--success)' },
-          { label: 'Exported', key: 'exported', color: 'var(--accent-primary)' },
-          { label: 'Rejected', key: 'rejected', color: 'var(--danger)' },
-        ].map(s => {
-          const count = data.stats.byStatus?.[s.key] || 0
-          const active = statusFilter === s.key
-          return (
-            <button key={s.key} className={`chip${active ? ' active' : ''}`} onClick={() => setStatusFilter(prev => prev === s.key ? 'all' : s.key)}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />
-              {s.label}
-              {count > 0 && <span className="chip-count">{count}</span>}
-            </button>
-          )
-        })}
-        <span style={{ width: 1, height: 18, background: 'var(--table-border)', margin: '0 4px' }} />
-        {/* Type chips */}
-        {quotationTypes.map(qt => {
-          const active = typeFilter === qt.id
-          const count = (data.stats.byType as any[])?.find((t: any) => t.code === qt.code)?.count || 0
-          return (
-            <button key={qt.id} className={`chip${active ? ' active' : ''}`} onClick={() => setTypeFilter(prev => prev === qt.id ? 'all' : qt.id)}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0 4px', borderRadius: '3px', background: 'var(--accent-tint)', color: 'var(--accent-primary)' }}>{qt.code}</span>
-              {qt.name}
-              {count > 0 && <span className="chip-count">{count}</span>}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Second toolbar row: grouping, favorites toggle, select, actions */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* New / renewal */}
-        <select value={renewalFilter} onChange={e => setRenewalFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem' }} title="New or renewal">
-          <option value="all">New &amp; Renewal</option>
-          <option value="new">New only</option>
-          <option value="renewal">Renewals only</option>
-        </select>
-        {/* Created by */}
-        {creators.length > 1 && (
-          <select value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem' }} title="Created by">
-            <option value="all">All Users</option>
-            {creators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        )}
-        {/* Group by */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Layers size={14} style={{ color: 'var(--text-secondary)' }} />
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-            style={{ ...selectStyle, fontSize: '0.78rem' }}
-          >
-            <option value="none">No Grouping</option>
-            <option value="type">By Type</option>
-            <option value="vessel">By Vessel</option>
-            <option value="customer">By Customer</option>
-          </select>
-        </div>
-
-        {/* Favorites toggle */}
-        <button
-          onClick={() => setShowFavoritesOnly((v) => !v)}
-          className={`${showFavoritesOnly ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-        >
-          <Star size={13} fill={showFavoritesOnly ? '#fff' : 'none'} />
-          Favorites
-          {favorites.size > 0 && (
-            <span
+      ) : (
+        <>
+          {/* ═══ Search + Month Nav ═══ */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+              <Search
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-secondary)'
+                }}
+                size={15}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search all quotations..."
+                style={{ width: '100%', paddingLeft: '36px', fontSize: '0.83rem' }}
+              />
+              {loading && (
+                <Loader2
+                  size={14}
+                  className="spinner"
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: 'calc(50% - 7px)',
+                    color: 'var(--accent-primary)'
+                  }}
+                />
+              )}
+              {isSearchActive && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    right: loading ? '30px' : '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '0.65rem',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 600
+                  }}
+                >
+                  ALL
+                </span>
+              )}
+            </div>
+            <div
               style={{
-                background: showFavoritesOnly ? 'rgba(255,255,255,0.25)' : 'rgba(255,176,32,0.2)',
-                padding: '0 5px',
-                borderRadius: '8px',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                color: showFavoritesOnly ? '#fff' : '#ffb020'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: isSearchActive ? 0.3 : 1,
+                pointerEvents: isSearchActive ? 'none' : 'auto'
               }}
             >
-              {favorites.size}
-            </span>
-          )}
-        </button>
-
-        {/* Select mode toggle */}
-        <button
-          onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()) }}
-          className={`${selectMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-          title={selectMode ? 'Hide the checkboxes' : 'Tick several quotations to delete them or add them to a group'}
-        >
-          <CheckSquare size={13} />
-          {selectMode ? 'Done' : 'Bulk select'}
-        </button>
-
-        {/* Bulk actions (visible when items are selected) */}
-        {selectMode && selectedIds.size > 0 && (
-          <>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-              {selectedIds.size} selected
-            </span>
-            {hasPermission('quotations:bulkDelete') && (
               <button
-                onClick={() => setBulkDeleteModal(true)}
-                className="btn-danger btn-sm"
+                title="Previous"
+                aria-label="Previous"
+                onClick={() => navigateMonth(-1)}
+                className="btn-secondary btn-icon"
               >
-                <Trash2 size={13} />
-                Delete Selected
+                <ChevronLeft size={16} />
               </button>
-            )}
-            {hasPermission('quotations:edit') && qGroups.length > 0 && (
+              <span
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  minWidth: '180px',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {navLabel}
+              </span>
+              <button
+                title="Next"
+                aria-label="Next"
+                onClick={() => navigateMonth(1)}
+                className="btn-secondary btn-icon"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <button onClick={goToToday} className="btn-secondary btn-sm">
+                Today
+              </button>
+            </div>
+            <button
+              onClick={loadData}
+              className="btn-secondary btn-icon"
+              style={{ flexShrink: 0 }}
+              title="Refresh"
+              aria-label="Refresh"
+            >
+              <RotateCw size={16} />
+            </button>
+            {hasPermission('quotations:create') && (
               <div style={{ position: 'relative' }}>
                 <button
-                  onClick={() => setShowAddToGroup(v => !v)}
-                  className="btn-secondary btn-sm"
+                  onClick={() => setShowNewMenu(!showNewMenu)}
+                  className="btn-primary"
+                  style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}
                 >
-                  <FolderPlus size={13} />
-                  Add to Group
+                  <Plus size={16} /> New Quotation
                 </button>
-                {showAddToGroup && (
+                {showNewMenu && (
                   <>
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowAddToGroup(false)} />
-                    <div style={{
-                      position: 'absolute', top: '100%', left: 0, marginTop: '4px',
-                      background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)',
-                      borderRadius: '10px', padding: '6px', zIndex: 100, minWidth: '200px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
-                    }}>
-                      {qGroups.map(g => (
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                      onClick={() => setShowNewMenu(false)}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '4px',
+                        zIndex: 100,
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        border: '1px solid var(--glass-border-color)',
+                        borderRadius: '10px',
+                        padding: '6px',
+                        minWidth: '160px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                      }}
+                    >
+                      {quotationTypes.map((qt) => (
                         <button
-                          key={g.id}
-                          onClick={() => handleAddToGroup(g.id)}
+                          key={qt.id}
+                          onClick={() => handleCreate(qt.id)}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                            padding: '8px 12px', border: 'none', borderRadius: '6px',
-                            background: 'transparent', color: 'var(--text-primary)',
-                            cursor: 'pointer', fontSize: '0.82rem', textAlign: 'left'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: 'none',
+                            borderRadius: '6px',
+                            background: 'transparent',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            textAlign: 'left'
                           }}
                           className="hover-effect"
                         >
-                          <span style={{
-                            width: 10, height: 10, borderRadius: '50%',
-                            background: g.color || '#00aac8', flexShrink: 0
-                          }} />
-                          {g.name}
-                          {g.userId && <User size={10} style={{ opacity: 0.5 }} />}
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '20px',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                              color: 'var(--accent-primary)'
+                            }}
+                          >
+                            {qt.code}
+                          </span>
+                          {qt.name}
                         </button>
                       ))}
                     </div>
@@ -1333,643 +1594,1050 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                 )}
               </div>
             )}
-          </>
-        )}
-
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-          {data.total} quotation{data.total !== 1 ? 's' : ''}
-        </span>
-        {hasActiveFilters && (
-          <button onClick={clearAllFilters} className="btn-ghost btn-sm" style={{ color: 'var(--danger)' }}>Clear filters</button>
-        )}
-      </div>
-
-      {/* Quotation groups chips */}
-      {qGroups.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Tag size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-          <button onClick={() => setActiveGroupId(null)} className={`chip${activeGroupId === null ? ' active' : ''}`}>
-            All
-          </button>
-          {qGroups.map(g => (
-            <button
-              key={g.id}
-              onClick={() => setActiveGroupId(prev => prev === g.id ? null : g.id)}
-              style={{
-                padding: '4px 12px',
-                borderRadius: '14px',
-                fontSize: '0.73rem',
-                fontWeight: 600,
-                border: activeGroupId === g.id ? `1px solid ${g.color || 'var(--accent-primary)'}` : '1px solid var(--input-border)',
-                background: activeGroupId === g.id ? (g.color || '#00aac8') + '20' : 'transparent',
-                color: activeGroupId === g.id ? (g.color || ('var(--accent-primary)')) : 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: g.color || '#00aac8' }} />
-              {g.name}
-              {g.userId && <User size={9} style={{ opacity: 0.5 }} />}
-              <span style={{
-                fontSize: '0.65rem',
-                background: activeGroupId === g.id ? 'rgba(255,255,255,0.2)' : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'),
-                padding: '0 5px',
-                borderRadius: '8px',
-                fontWeight: 700
-              }}>
-                {g.memberCount}
-              </span>
-            </button>
-          ))}
-          <button
-            onClick={() => setShowGroupManager(v => !v)}
-            className="chip"
-            style={{ borderStyle: 'dashed' }}
-            title="Manage groups"
-          >
-            <Edit3 size={11} /> Manage
-          </button>
-        </div>
-      )}
-
-      {/* Group manager popover */}
-      {showGroupManager && (
-        <div
-          className="glass-card"
-          style={{ padding: '16px', marginBottom: '14px' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Manage Groups</span>
-            <button title="Close" aria-label="Close" onClick={() => setShowGroupManager(false)} className="btn-secondary" style={{ padding: '4px' }}>
-              <X size={14} />
-            </button>
           </div>
 
-          {/* Add new group */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={e => setNewGroupName(e.target.value)}
-              placeholder="Group name..."
-              style={{ flex: 1, fontSize: '0.82rem' }}
-              onKeyDown={e => e.key === 'Enter' && handleCreateGroup()}
-            />
-            <input
-              type="color"
-              value={newGroupColor}
-              onChange={e => setNewGroupColor(e.target.value)}
-              style={{ width: '32px', height: '32px', padding: '2px', borderRadius: '6px', border: '1px solid var(--input-border)', cursor: 'pointer' }}
-              title="Group color"
-            />
-            <button
-              onClick={() => setNewGroupPersonal(v => !v)}
-              className="btn-secondary"
-              style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-              title={newGroupPersonal ? 'Personal group (only you)' : 'Global group (everyone)'}
-            >
-              {newGroupPersonal ? <User size={12} /> : <Users size={12} />}
-              {newGroupPersonal ? 'Personal' : 'Global'}
-            </button>
-            <button
-              onClick={handleCreateGroup}
-              className="btn-primary"
-              style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-              disabled={!newGroupName.trim()}
-            >
-              Add
-            </button>
-          </div>
-
-          {/* Existing groups list */}
-          {qGroups.length === 0 ? (
-            <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-              No groups yet. Create one above.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {qGroups.map(g => (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '8px', background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
-                  {editingGroup === g.id ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editGroupName}
-                        onChange={e => setEditGroupName(e.target.value)}
-                        style={{ flex: 1, fontSize: '0.82rem' }}
-                        onKeyDown={e => e.key === 'Enter' && handleUpdateGroup(g.id)}
-                        autoFocus
-                      />
-                      <input
-                        type="color"
-                        value={editGroupColor}
-                        onChange={e => setEditGroupColor(e.target.value)}
-                        style={{ width: '28px', height: '28px', padding: '2px', borderRadius: '4px', border: '1px solid var(--input-border)', cursor: 'pointer' }}
-                      />
-                      <button onClick={() => handleUpdateGroup(g.id)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Save</button>
-                      <button title="Cancel" aria-label="Cancel" onClick={() => setEditingGroup(null)} className="btn-secondary" style={{ padding: '4px 6px' }}><X size={12} /></button>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: g.color || '#00aac8', flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 500 }}>{g.name}</span>
-                      {g.userId ? <span title="Personal"><User size={11} style={{ opacity: 0.4 }} /></span> : <span title="Global"><Users size={11} style={{ opacity: 0.4 }} /></span>}
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{g.memberCount}</span>
-                      {hasPermission('quotations:edit') && (
-                        <>
-                          <button
-                            onClick={() => { setEditingGroup(g.id); setEditGroupName(g.name); setEditGroupColor(g.color || '#00aac8') }}
-                            className="btn-secondary"
-                            style={{ padding: '3px 6px' }}
-                            title="Edit"
-                          >
-                            <Edit3 size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGroup(g.id)}
-                            className="btn-secondary"
-                            style={{ padding: '3px 6px', color: 'var(--danger)' }}
-                            title="Delete group"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* No groups yet — show create button */}
-      {qGroups.length === 0 && hasPermission('quotations:edit') && !showGroupManager && (
-        <div style={{ marginBottom: '12px' }}>
-          <button
-            onClick={() => setShowGroupManager(true)}
-            className="btn-secondary btn-sm"
-          >
-            <Tag size={13} /> Create Group
-          </button>
-        </div>
-      )}
-
-      {/* Favorites section (collapsible, shown when not filtering by favorites) */}
-      {!showFavoritesOnly && favoriteRowsOnPage.length > 0 && (
-        <div
-          className="glass-card"
-          style={{ padding: 0, overflow: 'hidden', marginBottom: '14px' }}
-        >
+          {/* ═══ Filter Chips ═══ */}
           <div
             style={{
-              padding: '10px 16px',
               display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              borderBottom: favoritesCollapsed ? 'none' : '1px solid var(--table-border)'
+              gap: '6px',
+              marginBottom: '10px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
             }}
-            onClick={() => setFavoritesCollapsed((v) => !v)}
           >
-            <Star size={14} fill="#ffb020" color="#ffb020" />
+            {/* Status chips */}
+            {[
+              { label: 'Draft', key: 'draft', color: 'var(--text-secondary)' },
+              { label: 'Sent', key: 'sent', color: 'var(--info)' },
+              { label: 'Approved', key: 'approved', color: 'var(--success)' },
+              { label: 'Exported', key: 'exported', color: 'var(--accent-primary)' },
+              { label: 'Rejected', key: 'rejected', color: 'var(--danger)' }
+            ].map((s) => {
+              const count = data.stats.byStatus?.[s.key] || 0
+              const active = statusFilter === s.key
+              return (
+                <button
+                  key={s.key}
+                  className={`chip${active ? ' active' : ''}`}
+                  onClick={() => setStatusFilter((prev) => (prev === s.key ? 'all' : s.key))}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />
+                  {s.label}
+                  {count > 0 && <span className="chip-count">{count}</span>}
+                </button>
+              )
+            })}
             <span
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: '#ffb020'
-              }}
-            >
-              Favorites
-            </span>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                background: 'rgba(255,176,32,0.15)',
-                color: '#ffb020',
-                padding: '1px 7px',
-                borderRadius: '8px',
-                fontWeight: 700
-              }}
-            >
-              {favoriteRowsOnPage.length}
-            </span>
-            <div style={{ flex: 1 }} />
-            {favoritesCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              style={{ width: 1, height: 18, background: 'var(--table-border)', margin: '0 4px' }}
+            />
+            {/* Type chips */}
+            {quotationTypes.map((qt) => {
+              const active = typeFilter === qt.id
+              const count =
+                (data.stats.byType as any[])?.find((t: any) => t.code === qt.code)?.count || 0
+              return (
+                <button
+                  key={qt.id}
+                  className={`chip${active ? ' active' : ''}`}
+                  onClick={() => setTypeFilter((prev) => (prev === qt.id ? 'all' : qt.id))}
+                >
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      padding: '0 4px',
+                      borderRadius: '3px',
+                      background: 'var(--accent-tint)',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    {qt.code}
+                  </span>
+                  {qt.name}
+                  {count > 0 && <span className="chip-count">{count}</span>}
+                </button>
+              )
+            })}
           </div>
-          {!favoritesCollapsed && (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <tbody>{favoriteRowsOnPage.map((q) => renderRow(q, true))}</tbody>
-            </table>
-          )}
-        </div>
-      )}
 
-      {/* Main table */}
-      <div className="glass-card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
-        {/* Loading overlay */}
-        {loading && (
+          {/* Second toolbar row: grouping, favorites toggle, select, actions */}
           <div
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '2px',
-              background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
-              animation: 'ql-bar-slide 1.5s infinite',
-              zIndex: 2
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '14px',
+              alignItems: 'center',
+              flexWrap: 'wrap'
             }}
-          />
-        )}
+          >
+            {/* New / renewal */}
+            <select
+              value={renewalFilter}
+              onChange={(e) => setRenewalFilter(e.target.value)}
+              style={{ ...selectStyle, fontSize: '0.78rem' }}
+              title="New or renewal"
+            >
+              <option value="all">New &amp; Renewal</option>
+              <option value="new">New only</option>
+              <option value="renewal">Renewals only</option>
+            </select>
+            {/* Created by */}
+            {creators.length > 1 && (
+              <select
+                value={createdByFilter}
+                onChange={(e) => setCreatedByFilter(e.target.value)}
+                style={{ ...selectStyle, fontSize: '0.78rem' }}
+                title="Created by"
+              >
+                <option value="all">All Users</option>
+                {creators.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* Group by */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Layers size={14} style={{ color: 'var(--text-secondary)' }} />
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+                style={{ ...selectStyle, fontSize: '0.78rem' }}
+              >
+                <option value="none">No Grouping</option>
+                <option value="type">By Type</option>
+                <option value="vessel">By Vessel</option>
+                <option value="customer">By Customer</option>
+              </select>
+            </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          {renderTableHeader()}
-          <tbody>
-            {data.rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={colCount}
+            {/* Favorites toggle */}
+            <button
+              onClick={() => setShowFavoritesOnly((v) => !v)}
+              className={`${showFavoritesOnly ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+            >
+              <Star size={13} fill={showFavoritesOnly ? '#fff' : 'none'} />
+              Favorites
+              {favorites.size > 0 && (
+                <span
                   style={{
-                    padding: '48px',
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)'
+                    background: showFavoritesOnly
+                      ? 'rgba(255,255,255,0.25)'
+                      : 'rgba(255,176,32,0.2)',
+                    padding: '0 5px',
+                    borderRadius: '8px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: showFavoritesOnly ? '#fff' : '#ffb020'
                   }}
                 >
-                  {loading ? 'Loading quotations...' : (
-                    <EmptyState
-                      compact
-                      icon={<FileText size={36} />}
-                      title={hasActiveFilters ? 'No quotations match your filters' : isSearchActive ? 'Nothing found' : `No quotations in ${navLabel}`}
-                      text={hasActiveFilters ? undefined : isSearchActive ? 'Search looks across all months and views.' : 'Use the arrows to look at other months, or search to look across all of them.'}
-                      action={<div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        {hasActiveFilters && <button className="btn-secondary btn-sm" onClick={clearAllFilters}>Clear filters</button>}
-                        {!hasActiveFilters && hasPermission('quotations:create') && <button className="btn-primary btn-sm" onClick={() => setShowNewMenu(true)}><Plus size={14} /> New Quotation</button>}
-                      </div>}
-                    />
-                  )}
-                </td>
-              </tr>
-            ) : groupedRows ? (
-              // Grouped rendering
-              groupedRows.map(([groupName, rows]) => (
-                <React.Fragment key={groupName}>
+                  {favorites.size}
+                </span>
+              )}
+            </button>
+
+            {/* Select mode toggle */}
+            <button
+              onClick={() => {
+                setSelectMode((v) => !v)
+                setSelectedIds(new Set())
+              }}
+              className={`${selectMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+              title={
+                selectMode
+                  ? 'Hide the checkboxes'
+                  : 'Tick several quotations to delete them or add them to a group'
+              }
+            >
+              <CheckSquare size={13} />
+              {selectMode ? 'Done' : 'Bulk select'}
+            </button>
+
+            {/* Bulk actions (visible when items are selected) */}
+            {selectMode && selectedIds.size > 0 && (
+              <>
+                <span
+                  style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-primary)' }}
+                >
+                  {selectedIds.size} selected
+                </span>
+                {hasPermission('quotations:bulkDelete') && (
+                  <button onClick={() => setBulkDeleteModal(true)} className="btn-danger btn-sm">
+                    <Trash2 size={13} />
+                    Delete Selected
+                  </button>
+                )}
+                {hasPermission('quotations:edit') && qGroups.length > 0 && (
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowAddToGroup((v) => !v)}
+                      className="btn-secondary btn-sm"
+                    >
+                      <FolderPlus size={13} />
+                      Add to Group
+                    </button>
+                    {showAddToGroup && (
+                      <>
+                        <div
+                          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                          onClick={() => setShowAddToGroup(false)}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            marginTop: '4px',
+                            background: isLight ? '#ffffff' : '#1a1d28',
+                            border: '1px solid var(--glass-border-color)',
+                            borderRadius: '10px',
+                            padding: '6px',
+                            zIndex: 100,
+                            minWidth: '200px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                          }}
+                        >
+                          {qGroups.map((g) => (
+                            <button
+                              key={g.id}
+                              onClick={() => handleAddToGroup(g.id)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: 'none',
+                                borderRadius: '6px',
+                                background: 'transparent',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                fontSize: '0.82rem',
+                                textAlign: 'left'
+                              }}
+                              className="hover-effect"
+                            >
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  background: g.color || '#00aac8',
+                                  flexShrink: 0
+                                }}
+                              />
+                              {g.name}
+                              {g.userId && <User size={10} style={{ opacity: 0.5 }} />}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {data.total} quotation{data.total !== 1 ? 's' : ''}
+            </span>
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="btn-ghost btn-sm"
+                style={{ color: 'var(--danger)' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* Quotation groups chips */}
+          {qGroups.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '6px',
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                alignItems: 'center'
+              }}
+            >
+              <Tag size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+              <button
+                onClick={() => setActiveGroupId(null)}
+                className={`chip${activeGroupId === null ? ' active' : ''}`}
+              >
+                All
+              </button>
+              {qGroups.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setActiveGroupId((prev) => (prev === g.id ? null : g.id))}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '14px',
+                    fontSize: '0.73rem',
+                    fontWeight: 600,
+                    border:
+                      activeGroupId === g.id
+                        ? `1px solid ${g.color || 'var(--accent-primary)'}`
+                        : '1px solid var(--input-border)',
+                    background:
+                      activeGroupId === g.id ? (g.color || '#00aac8') + '20' : 'transparent',
+                    color:
+                      activeGroupId === g.id
+                        ? g.color || 'var(--accent-primary)'
+                        : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: g.color || '#00aac8'
+                    }}
+                  />
+                  {g.name}
+                  {g.userId && <User size={9} style={{ opacity: 0.5 }} />}
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      background:
+                        activeGroupId === g.id
+                          ? 'rgba(255,255,255,0.2)'
+                          : isLight
+                            ? 'rgba(0,0,0,0.06)'
+                            : 'rgba(255,255,255,0.06)',
+                      padding: '0 5px',
+                      borderRadius: '8px',
+                      fontWeight: 700
+                    }}
+                  >
+                    {g.memberCount}
+                  </span>
+                </button>
+              ))}
+              <button
+                onClick={() => setShowGroupManager((v) => !v)}
+                className="chip"
+                style={{ borderStyle: 'dashed' }}
+                title="Manage groups"
+              >
+                <Edit3 size={11} /> Manage
+              </button>
+            </div>
+          )}
+
+          {/* Group manager popover */}
+          {showGroupManager && (
+            <div className="glass-card" style={{ padding: '16px', marginBottom: '14px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '12px'
+                }}
+              >
+                <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Manage Groups</span>
+                <button
+                  title="Close"
+                  aria-label="Close"
+                  onClick={() => setShowGroupManager(false)}
+                  className="btn-secondary"
+                  style={{ padding: '4px' }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Add new group */}
+              <div
+                style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}
+              >
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Group name..."
+                  style={{ flex: 1, fontSize: '0.82rem' }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+                />
+                <input
+                  type="color"
+                  value={newGroupColor}
+                  onChange={(e) => setNewGroupColor(e.target.value)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    padding: '2px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--input-border)',
+                    cursor: 'pointer'
+                  }}
+                  title="Group color"
+                />
+                <button
+                  onClick={() => setNewGroupPersonal((v) => !v)}
+                  className="btn-secondary"
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title={newGroupPersonal ? 'Personal group (only you)' : 'Global group (everyone)'}
+                >
+                  {newGroupPersonal ? <User size={12} /> : <Users size={12} />}
+                  {newGroupPersonal ? 'Personal' : 'Global'}
+                </button>
+                <button
+                  onClick={handleCreateGroup}
+                  className="btn-primary"
+                  style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                  disabled={!newGroupName.trim()}
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Existing groups list */}
+              {qGroups.length === 0 ? (
+                <div
+                  style={{
+                    padding: '10px',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  No groups yet. Create one above.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {qGroups.map((g) => (
+                    <div
+                      key={g.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                      }}
+                    >
+                      {editingGroup === g.id ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editGroupName}
+                            onChange={(e) => setEditGroupName(e.target.value)}
+                            style={{ flex: 1, fontSize: '0.82rem' }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateGroup(g.id)}
+                            autoFocus
+                          />
+                          <input
+                            type="color"
+                            value={editGroupColor}
+                            onChange={(e) => setEditGroupColor(e.target.value)}
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              padding: '2px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--input-border)',
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <button
+                            onClick={() => handleUpdateGroup(g.id)}
+                            className="btn-primary"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            title="Cancel"
+                            aria-label="Cancel"
+                            onClick={() => setEditingGroup(null)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 6px' }}
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: '50%',
+                              background: g.color || '#00aac8',
+                              flexShrink: 0
+                            }}
+                          />
+                          <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 500 }}>
+                            {g.name}
+                          </span>
+                          {g.userId ? (
+                            <span title="Personal">
+                              <User size={11} style={{ opacity: 0.4 }} />
+                            </span>
+                          ) : (
+                            <span title="Global">
+                              <Users size={11} style={{ opacity: 0.4 }} />
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            {g.memberCount}
+                          </span>
+                          {hasPermission('quotations:edit') && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingGroup(g.id)
+                                  setEditGroupName(g.name)
+                                  setEditGroupColor(g.color || '#00aac8')
+                                }}
+                                className="btn-secondary"
+                                style={{ padding: '3px 6px' }}
+                                title="Edit"
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGroup(g.id)}
+                                className="btn-secondary"
+                                style={{ padding: '3px 6px', color: 'var(--danger)' }}
+                                title="Delete group"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No groups yet — show create button */}
+          {qGroups.length === 0 && hasPermission('quotations:edit') && !showGroupManager && (
+            <div style={{ marginBottom: '12px' }}>
+              <button onClick={() => setShowGroupManager(true)} className="btn-secondary btn-sm">
+                <Tag size={13} /> Create Group
+              </button>
+            </div>
+          )}
+
+          {/* Favorites section (collapsible, shown when not filtering by favorites) */}
+          {!showFavoritesOnly && favoriteRowsOnPage.length > 0 && (
+            <div
+              className="glass-card"
+              style={{ padding: 0, overflow: 'hidden', marginBottom: '14px' }}
+            >
+              <div
+                style={{
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  borderBottom: favoritesCollapsed ? 'none' : '1px solid var(--table-border)'
+                }}
+                onClick={() => setFavoritesCollapsed((v) => !v)}
+              >
+                <Star size={14} fill="#ffb020" color="#ffb020" />
+                <span
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    color: '#ffb020'
+                  }}
+                >
+                  Favorites
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    background: 'rgba(255,176,32,0.15)',
+                    color: '#ffb020',
+                    padding: '1px 7px',
+                    borderRadius: '8px',
+                    fontWeight: 700
+                  }}
+                >
+                  {favoriteRowsOnPage.length}
+                </span>
+                <div style={{ flex: 1 }} />
+                {favoritesCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              </div>
+              {!favoritesCollapsed && (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>{favoriteRowsOnPage.map((q) => renderRow(q, true))}</tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Main table */}
+          <div
+            className="glass-card"
+            style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}
+          >
+            {/* Loading overlay */}
+            {loading && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '2px',
+                  background:
+                    'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
+                  animation: 'ql-bar-slide 1.5s infinite',
+                  zIndex: 2
+                }}
+              />
+            )}
+
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              {renderTableHeader()}
+              <tbody>
+                {data.rows.length === 0 ? (
                   <tr>
                     <td
                       colSpan={colCount}
                       style={{
-                        padding: '10px 16px',
-                        background: isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)',
-                        borderBottom: '1px solid var(--table-border)',
-                        borderTop: '1px solid var(--table-border)'
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)'
                       }}
                     >
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          fontSize: '0.82rem',
-                          color: 'var(--accent-primary)'
-                        }}
-                      >
-                        {groupName}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: '8px',
-                          fontSize: '0.72rem',
-                          background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                          color: 'var(--accent-primary)',
-                          padding: '2px 8px',
-                          borderRadius: '8px',
-                          fontWeight: 600
-                        }}
-                      >
-                        {rows.length}
-                      </span>
+                      {loading ? (
+                        'Loading quotations...'
+                      ) : (
+                        <EmptyState
+                          compact
+                          icon={<FileText size={36} />}
+                          title={
+                            hasActiveFilters
+                              ? 'No quotations match your filters'
+                              : isSearchActive
+                                ? 'Nothing found'
+                                : `No quotations in ${navLabel}`
+                          }
+                          text={
+                            hasActiveFilters
+                              ? undefined
+                              : isSearchActive
+                                ? 'Search looks across all months and views.'
+                                : 'Use the arrows to look at other months, or search to look across all of them.'
+                          }
+                          action={
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                              {hasActiveFilters && (
+                                <button className="btn-secondary btn-sm" onClick={clearAllFilters}>
+                                  Clear filters
+                                </button>
+                              )}
+                              {!hasActiveFilters && hasPermission('quotations:create') && (
+                                <button
+                                  className="btn-primary btn-sm"
+                                  onClick={() => setShowNewMenu(true)}
+                                >
+                                  <Plus size={14} /> New Quotation
+                                </button>
+                              )}
+                            </div>
+                          }
+                        />
+                      )}
                     </td>
                   </tr>
-                  {rows.map((q: any) => renderRow(q))}
-                </React.Fragment>
-              ))
-            ) : (
-              // Flat rendering
-              data.rows.map((q) => renderRow(q))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {data.total > PAGE_SIZE && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: '12px',
-            padding: '0 4px',
-            fontSize: '0.82rem',
-            color: 'var(--text-secondary)'
-          }}
-        >
-          <span>
-            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, data.total)} of{' '}
-            {data.total}
-          </span>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <button
-              onClick={() => setPage(0)}
-              disabled={page === 0}
-              className="btn-secondary"
-              style={{ padding: '5px 8px', fontSize: '0.78rem' }}
-            >
-              First
-            </button>
-            <button title="Previous" aria-label="Previous"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="btn-secondary"
-              style={{ padding: '5px' }}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span style={{ padding: '0 8px', fontWeight: 600 }}>
-              {page + 1} / {totalPages}
-            </span>
-            <button title="Next" aria-label="Next"
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="btn-secondary"
-              style={{ padding: '5px' }}
-            >
-              <ChevronRight size={16} />
-            </button>
-            <button
-              onClick={() => setPage(totalPages - 1)}
-              disabled={page >= totalPages - 1}
-              className="btn-secondary"
-              style={{ padding: '5px 8px', fontSize: '0.78rem' }}
-            >
-              Last
-            </button>
+                ) : groupedRows ? (
+                  // Grouped rendering
+                  groupedRows.map(([groupName, rows]) => (
+                    <React.Fragment key={groupName}>
+                      <tr>
+                        <td
+                          colSpan={colCount}
+                          style={{
+                            padding: '10px 16px',
+                            background: isLight
+                              ? 'rgba(var(--accent-primary-rgb), 0.04)'
+                              : 'rgba(var(--accent-primary-rgb), 0.06)',
+                            borderBottom: '1px solid var(--table-border)',
+                            borderTop: '1px solid var(--table-border)'
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: '0.82rem',
+                              color: 'var(--accent-primary)'
+                            }}
+                          >
+                            {groupName}
+                          </span>
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              fontSize: '0.72rem',
+                              background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                              color: 'var(--accent-primary)',
+                              padding: '2px 8px',
+                              borderRadius: '8px',
+                              fontWeight: 600
+                            }}
+                          >
+                            {rows.length}
+                          </span>
+                        </td>
+                      </tr>
+                      {rows.map((q: any) => renderRow(q))}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  // Flat rendering
+                  data.rows.map((q) => renderRow(q))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
 
-      {permDeleteId && (
-        <ConfirmationModal
-          title="Permanently Delete?"
-          message="Permanently delete this quotation? This cannot be undone."
-          confirmLabel="Delete Permanently"
-          isDangerous
-          onConfirm={() => handlePermanentDelete(permDeleteId)}
-          onCancel={() => setPermDeleteId(null)}
-        />
-      )}
-
-      {deleteModal?.show &&
-        deleteModal.quotation &&
-        (deleteModal.revisionCount <= 1 ? (
-          <ConfirmationModal
-            title="Delete Quotation?"
-            message={`Delete quotation ${deleteModal.quotation.referenceNumber || '(no ref)'}? This cannot be undone.`}
-            confirmLabel="Delete"
-            isDangerous
-            onConfirm={handleDelete}
-            onCancel={() => setDeleteModal(null)}
-          />
-        ) : (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.7)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}
-            onClick={() => setDeleteModal(null)}
-          >
+          {/* Pagination */}
+          {data.total > PAGE_SIZE && (
             <div
               style={{
-                width: '90%',
-                maxWidth: '480px',
-                background: isLight ? '#ffffff' : '#1a1d28',
-                borderRadius: '14px',
-                border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.2)' : '0 10px 40px rgba(0,0,0,0.5)'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: '12px',
+                padding: '0 4px',
+                fontSize: '0.82rem',
+                color: 'var(--text-secondary)'
               }}
-              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                style={{
-                  padding: '24px 24px 10px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}
-              >
-                <div
-                  style={{
-                    background: 'rgba(255, 77, 77, 0.1)',
-                    padding: '10px',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Trash2 size={24} color="var(--danger)" />
-                </div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>
-                  Delete Quotation {deleteModal.quotation.referenceNumber || '(no ref)'}
-                  {(deleteModal.quotation.revisionNumber || 0) > 0 && (
-                    <span
-                      style={{
-                        marginLeft: '6px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        background: 'rgba(180, 100, 255, 0.15)',
-                        color: isLight ? '#7a3db8' : '#b464ff'
-                      }}
-                    >
-                      R{deleteModal.quotation.revisionNumber}
-                    </span>
-                  )}
-                </h3>
-              </div>
-
-              <div style={{ padding: '16px 24px 20px 24px' }}>
-                <p
-                  style={{
-                    margin: '0 0 16px',
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  This quotation has {deleteModal.revisionCount} revision
-                  {deleteModal.revisionCount > 1 ? 's' : ''}. Choose how to delete:
-                </p>
-
-                {/* Radio: Delete this revision only */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    marginBottom: '8px',
-                    border:
-                      deleteModal.deleteMode === 'single'
-                        ? '2px solid var(--accent-primary)'
-                        : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
-                    background:
-                      deleteModal.deleteMode === 'single'
-                        ? isLight
-                          ? 'rgba(var(--accent-primary-rgb), 0.05)'
-                          : 'rgba(var(--accent-primary-rgb), 0.08)'
-                        : 'transparent'
-                  }}
-                  onClick={() =>
-                    setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    checked={deleteModal.deleteMode === 'single'}
-                    onChange={() =>
-                      setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
-                    }
-                    style={{ marginTop: '2px', accentColor: 'var(--accent-primary)' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
-                      Delete this revision only
-                      {(deleteModal.quotation.revisionNumber || 0) > 0 &&
-                        ` (R${deleteModal.quotation.revisionNumber})`}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      {(deleteModal.quotation.revisionNumber || 0) === 0
-                        ? 'This is the original. The next revision will become the base.'
-                        : 'The previous revision will become the latest version.'}
-                    </div>
-                  </div>
-                </label>
-
-                {/* Radio: Delete all revisions */}
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    border:
-                      deleteModal.deleteMode === 'all'
-                        ? '2px solid var(--danger)'
-                        : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
-                    background:
-                      deleteModal.deleteMode === 'all'
-                        ? isLight
-                          ? 'rgba(255,77,77,0.05)'
-                          : 'rgba(255,77,77,0.08)'
-                        : 'transparent'
-                  }}
-                  onClick={() =>
-                    setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="deleteMode"
-                    checked={deleteModal.deleteMode === 'all'}
-                    onChange={() =>
-                      setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
-                    }
-                    style={{ marginTop: '2px', accentColor: 'var(--danger)' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
-                      Delete all revisions ({deleteModal.revisionCount})
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      This will permanently remove the entire quotation history.
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              <div
-                style={{
-                  padding: '16px 24px',
-                  background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
-                  borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '0 0 14px 14px',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px'
-                }}
-              >
+              <span>
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, data.total)} of{' '}
+                {data.total}
+              </span>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                 <button
-                  onClick={() => setDeleteModal(null)}
+                  onClick={() => setPage(0)}
+                  disabled={page === 0}
                   className="btn-secondary"
-                  style={{ padding: '8px 16px' }}
+                  style={{ padding: '5px 8px', fontSize: '0.78rem' }}
                 >
-                  Cancel
+                  First
                 </button>
                 <button
-                  onClick={handleDelete}
-                  className="btn-primary"
-                  style={{
-                    padding: '8px 16px',
-                    background: 'var(--danger)',
-                    borderColor: 'var(--danger)'
-                  }}
+                  title="Previous"
+                  aria-label="Previous"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="btn-secondary"
+                  style={{ padding: '5px' }}
                 >
-                  Delete
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ padding: '0 8px', fontWeight: 600 }}>
+                  {page + 1} / {totalPages}
+                </span>
+                <button
+                  title="Next"
+                  aria-label="Next"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="btn-secondary"
+                  style={{ padding: '5px' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  onClick={() => setPage(totalPages - 1)}
+                  disabled={page >= totalPages - 1}
+                  className="btn-secondary"
+                  style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                >
+                  Last
                 </button>
               </div>
             </div>
-          </div>
-        ))}
+          )}
 
-      {/* Bulk delete confirmation modal */}
-      {bulkDeleteModal && (
-        <ConfirmationModal
-          title="Bulk Delete Quotations?"
-          message={`Delete ${selectedIds.size} selected quotation(s)? This cannot be undone.`}
-          confirmLabel="Delete All"
-          isDangerous
-          onConfirm={handleBulkDelete}
-          onCancel={() => setBulkDeleteModal(false)}
-        />
-      )}
+          {permDeleteId && (
+            <ConfirmationModal
+              title="Permanently Delete?"
+              message="Permanently delete this quotation? This cannot be undone."
+              confirmLabel="Delete Permanently"
+              isDangerous
+              onConfirm={() => handlePermanentDelete(permDeleteId)}
+              onCancel={() => setPermDeleteId(null)}
+            />
+          )}
 
-      {/* Keyframe for loading shimmer */}
-      <style>{`
+          {deleteModal?.show &&
+            deleteModal.quotation &&
+            (deleteModal.revisionCount <= 1 ? (
+              <ConfirmationModal
+                title="Delete Quotation?"
+                message={`Delete quotation ${deleteModal.quotation.referenceNumber || '(no ref)'}? This cannot be undone.`}
+                confirmLabel="Delete"
+                isDangerous
+                onConfirm={handleDelete}
+                onCancel={() => setDeleteModal(null)}
+              />
+            ) : (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000
+                }}
+                onClick={() => setDeleteModal(null)}
+              >
+                <div
+                  style={{
+                    width: '90%',
+                    maxWidth: '480px',
+                    background: isLight ? '#ffffff' : '#1a1d28',
+                    borderRadius: '14px',
+                    border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: isLight
+                      ? '0 10px 40px rgba(0,0,0,0.2)'
+                      : '0 10px 40px rgba(0,0,0,0.5)'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      padding: '24px 24px 10px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: 'rgba(255, 77, 77, 0.1)',
+                        padding: '10px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Trash2 size={24} color="var(--danger)" />
+                    </div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>
+                      Delete Quotation {deleteModal.quotation.referenceNumber || '(no ref)'}
+                      {(deleteModal.quotation.revisionNumber || 0) > 0 && (
+                        <span
+                          style={{
+                            marginLeft: '6px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            background: 'rgba(180, 100, 255, 0.15)',
+                            color: isLight ? '#7a3db8' : '#b464ff'
+                          }}
+                        >
+                          R{deleteModal.quotation.revisionNumber}
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+
+                  <div style={{ padding: '16px 24px 20px 24px' }}>
+                    <p
+                      style={{
+                        margin: '0 0 16px',
+                        fontSize: '0.88rem',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      This quotation has {deleteModal.revisionCount} revision
+                      {deleteModal.revisionCount > 1 ? 's' : ''}. Choose how to delete:
+                    </p>
+
+                    {/* Radio: Delete this revision only */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        marginBottom: '8px',
+                        border:
+                          deleteModal.deleteMode === 'single'
+                            ? '2px solid var(--accent-primary)'
+                            : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
+                        background:
+                          deleteModal.deleteMode === 'single'
+                            ? isLight
+                              ? 'rgba(var(--accent-primary-rgb), 0.05)'
+                              : 'rgba(var(--accent-primary-rgb), 0.08)'
+                            : 'transparent'
+                      }}
+                      onClick={() =>
+                        setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'single' } : prev))
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="deleteMode"
+                        checked={deleteModal.deleteMode === 'single'}
+                        onChange={() =>
+                          setDeleteModal((prev) =>
+                            prev ? { ...prev, deleteMode: 'single' } : prev
+                          )
+                        }
+                        style={{ marginTop: '2px', accentColor: 'var(--accent-primary)' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                          Delete this revision only
+                          {(deleteModal.quotation.revisionNumber || 0) > 0 &&
+                            ` (R${deleteModal.quotation.revisionNumber})`}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          {(deleteModal.quotation.revisionNumber || 0) === 0
+                            ? 'This is the original. The next revision will become the base.'
+                            : 'The previous revision will become the latest version.'}
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Radio: Delete all revisions */}
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border:
+                          deleteModal.deleteMode === 'all'
+                            ? '2px solid var(--danger)'
+                            : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
+                        background:
+                          deleteModal.deleteMode === 'all'
+                            ? isLight
+                              ? 'rgba(255,77,77,0.05)'
+                              : 'rgba(255,77,77,0.08)'
+                            : 'transparent'
+                      }}
+                      onClick={() =>
+                        setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="deleteMode"
+                        checked={deleteModal.deleteMode === 'all'}
+                        onChange={() =>
+                          setDeleteModal((prev) => (prev ? { ...prev, deleteMode: 'all' } : prev))
+                        }
+                        style={{ marginTop: '2px', accentColor: 'var(--danger)' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>
+                          Delete all revisions ({deleteModal.revisionCount})
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          This will permanently remove the entire quotation history.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '16px 24px',
+                      background: isLight ? '#fafafa' : 'rgba(0,0,0,0.02)',
+                      borderTop: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '0 0 14px 14px',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '12px'
+                    }}
+                  >
+                    <button
+                      onClick={() => setDeleteModal(null)}
+                      className="btn-secondary"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="btn-primary"
+                      style={{
+                        padding: '8px 16px',
+                        background: 'var(--danger)',
+                        borderColor: 'var(--danger)'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+          {/* Bulk delete confirmation modal */}
+          {bulkDeleteModal && (
+            <ConfirmationModal
+              title="Bulk Delete Quotations?"
+              message={`Delete ${selectedIds.size} selected quotation(s)? This cannot be undone.`}
+              confirmLabel="Delete All"
+              isDangerous
+              onConfirm={handleBulkDelete}
+              onCancel={() => setBulkDeleteModal(false)}
+            />
+          )}
+
+          {/* Keyframe for loading shimmer */}
+          <style>{`
         @keyframes ql-bar-slide {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
       `}</style>
-      </>}
+        </>
+      )}
     </div>
   )
 }

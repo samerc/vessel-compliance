@@ -12,7 +12,13 @@ interface SanctionsModalProps {
   onConfirmMatch: () => void
 }
 
-export default function SanctionsModal({ searchedName, matches, onClose, onMarkClean, onConfirmMatch }: SanctionsModalProps) {
+export default function SanctionsModal({
+  searchedName,
+  matches,
+  onClose,
+  onMarkClean,
+  onConfirmMatch
+}: SanctionsModalProps) {
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
   const modalRef = useRef<HTMLDivElement>(null)
@@ -54,19 +60,27 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
 
   const getSourceLabel = (source: string) => {
     switch (source.toLowerCase()) {
-      case 'ofac': return 'OFAC (US)'
-      case 'eu': return 'EU Sanctions'
-      case 'un': return 'UN Sanctions'
-      default: return source.toUpperCase()
+      case 'ofac':
+        return 'OFAC (US)'
+      case 'eu':
+        return 'EU Sanctions'
+      case 'un':
+        return 'UN Sanctions'
+      default:
+        return source.toUpperCase()
     }
   }
 
   const getSourceColor = (source: string) => {
     switch (source.toLowerCase()) {
-      case 'ofac': return '#ff6b6b'
-      case 'eu': return '#4dabf7'
-      case 'un': return '#69db7c'
-      default: return '#ffd43b'
+      case 'ofac':
+        return '#ff6b6b'
+      case 'eu':
+        return '#4dabf7'
+      case 'un':
+        return '#69db7c'
+      default:
+        return '#ffd43b'
     }
   }
 
@@ -106,7 +120,7 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
           flexDirection: 'column',
           color: 'var(--text-primary)'
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -121,8 +135,19 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
         >
           <AlertTriangle size={24} color="#ffc107" />
           <div style={{ flex: 1 }}>
-            <h2 id="sanctions-modal-title" style={{ margin: 0, fontSize: '1.25rem', color: isLight ? '#1a1a1a' : '#ffffff' }}>Potential Sanctions Match</h2>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: isLight ? '#666' : 'var(--text-secondary)' }}>
+            <h2
+              id="sanctions-modal-title"
+              style={{ margin: 0, fontSize: '1.25rem', color: isLight ? '#1a1a1a' : '#ffffff' }}
+            >
+              Potential Sanctions Match
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.85rem',
+                color: isLight ? '#666' : 'var(--text-secondary)'
+              }}
+            >
               Searched: <strong>{searchedName}</strong>
             </p>
           </div>
@@ -147,9 +172,16 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
 
         {/* Content */}
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
-          <p style={{ marginTop: 0, marginBottom: '20px', color: isLight ? '#444' : 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Found {matches.length} potential match{matches.length !== 1 ? 'es' : ''} in sanctions databases.
-            Please review carefully before proceeding.
+          <p
+            style={{
+              marginTop: 0,
+              marginBottom: '20px',
+              color: isLight ? '#444' : 'var(--text-secondary)',
+              fontSize: '0.9rem'
+            }}
+          >
+            Found {matches.length} potential match{matches.length !== 1 ? 'es' : ''} in sanctions
+            databases. Please review carefully before proceeding.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -165,7 +197,14 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                 }}
               >
                 {/* Source Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '12px'
+                  }}
+                >
                   <span
                     style={{
                       background: getSourceColor(match.source),
@@ -178,7 +217,12 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                   >
                     {getSourceLabel(match.source)}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: isLight ? '#666' : 'var(--text-secondary)' }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: isLight ? '#666' : 'var(--text-secondary)'
+                    }}
+                  >
                     ID: {match.source_id}
                   </span>
                   {match.score !== undefined && (
@@ -187,8 +231,18 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                         fontSize: '0.7rem',
                         padding: '2px 8px',
                         borderRadius: '4px',
-                        background: match.score >= 0.9 ? 'rgba(255, 77, 77, 0.2)' : match.score >= 0.7 ? 'rgba(255, 193, 7, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                        color: match.score >= 0.9 ? '#ff6b6b' : match.score >= 0.7 ? '#ffc107' : 'var(--text-secondary)',
+                        background:
+                          match.score >= 0.9
+                            ? 'rgba(255, 77, 77, 0.2)'
+                            : match.score >= 0.7
+                              ? 'rgba(255, 193, 7, 0.2)'
+                              : 'rgba(255, 255, 255, 0.1)',
+                        color:
+                          match.score >= 0.9
+                            ? '#ff6b6b'
+                            : match.score >= 0.7
+                              ? '#ffc107'
+                              : 'var(--text-secondary)',
                         marginLeft: 'auto'
                       }}
                     >
@@ -196,7 +250,13 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                     </span>
                   )}
                   {match.listed_on && !match.score && (
-                    <span style={{ fontSize: '0.75rem', color: isLight ? '#666' : 'var(--text-secondary)', marginLeft: 'auto' }}>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: isLight ? '#666' : 'var(--text-secondary)',
+                        marginLeft: 'auto'
+                      }}
+                    >
                       Listed: {formatDate(match.listed_on)}
                     </span>
                   )}
@@ -204,7 +264,14 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
 
                 {/* Names */}
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isLight ? '#666' : 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div
+                    style={{
+                      fontSize: '0.7rem',
+                      textTransform: 'uppercase',
+                      color: isLight ? '#666' : 'var(--text-secondary)',
+                      marginBottom: '4px'
+                    }}
+                  >
                     Known Names / Aliases
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -228,10 +295,23 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
 
                 {/* Target Type */}
                 <div style={{ marginBottom: match.remarks ? '12px' : 0 }}>
-                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isLight ? '#666' : 'var(--text-secondary)', marginBottom: '4px' }}>
+                  <div
+                    style={{
+                      fontSize: '0.7rem',
+                      textTransform: 'uppercase',
+                      color: isLight ? '#666' : 'var(--text-secondary)',
+                      marginBottom: '4px'
+                    }}
+                  >
                     Type
                   </div>
-                  <span style={{ fontSize: '0.85rem', textTransform: 'capitalize', color: isLight ? '#333' : '#fff' }}>
+                  <span
+                    style={{
+                      fontSize: '0.85rem',
+                      textTransform: 'capitalize',
+                      color: isLight ? '#333' : '#fff'
+                    }}
+                  >
                     {match.target_type}
                   </span>
                 </div>
@@ -239,10 +319,24 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
                 {/* Remarks */}
                 {match.remarks && (
                   <div>
-                    <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isLight ? '#666' : 'var(--text-secondary)', marginBottom: '4px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        textTransform: 'uppercase',
+                        color: isLight ? '#666' : 'var(--text-secondary)',
+                        marginBottom: '4px'
+                      }}
+                    >
                       Remarks
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: isLight ? '#444' : 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.85rem',
+                        color: isLight ? '#444' : 'var(--text-secondary)',
+                        lineHeight: 1.5
+                      }}
+                    >
                       {match.remarks}
                     </p>
                   </div>
@@ -263,7 +357,15 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
             background: isLight ? '#fafafa' : 'transparent'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isLight ? '#666' : 'var(--text-secondary)', fontSize: '0.8rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: isLight ? '#666' : 'var(--text-secondary)',
+              fontSize: '0.8rem'
+            }}
+          >
             <Shield size={14} />
             <span>Data from Sanctions API (OFAC, UN, EU)</span>
           </div>

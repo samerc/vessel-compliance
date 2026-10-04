@@ -1,13 +1,22 @@
 import XLSX from 'xlsx-js-style'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { Vessel, Fleet, VesselDocument, DocumentType, VesselDynamicPolicy, ConditionSurvey, SurveyDefect, Surveyor } from '../../../shared/types'
+import {
+  Vessel,
+  Fleet,
+  VesselDocument,
+  DocumentType,
+  VesselDynamicPolicy,
+  ConditionSurvey,
+  SurveyDefect,
+  Surveyor
+} from '../../../shared/types'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import { formatDate } from '../utils/dateUtils'
 import { getReportSettings, getReportText, reportTextParagraphs } from './ReportSettingsService'
 
 // Guard against IPC error objects (safeHandle returns { error:true } on failure)
-const safeArray = (v: unknown): any[] => Array.isArray(v) ? v : []
+const safeArray = (v: unknown): any[] => (Array.isArray(v) ? v : [])
 
 // Dynamic entity document helpers
 async function loadEntityDocData() {
@@ -21,12 +30,18 @@ async function loadEntityDocData() {
   }
 }
 
-function entityDocStatus(entity: any, edTypes: any[], edDocs: any[]): { name: string; onFile: boolean }[] {
+function entityDocStatus(
+  entity: any,
+  edTypes: any[],
+  edDocs: any[]
+): { name: string; onFile: boolean }[] {
   return edTypes
     .filter((t: any) => t.entityScope === 'both' || t.entityScope === entity.type)
     .map((t: any) => ({
       name: t.name,
-      onFile: edDocs.some((d: any) => d.entityId === entity.id && d.documentTypeId === t.id && d.filePath)
+      onFile: edDocs.some(
+        (d: any) => d.entityId === entity.id && d.documentTypeId === t.id && d.filePath
+      )
     }))
 }
 
@@ -48,13 +63,22 @@ const isExpiringSoon = (expiryDate: string | null | undefined, days = 60): boole
   return expiry >= today && expiry <= threshold
 }
 
-const annualShortCycle = (expiryDate: string | null | undefined, receivedDate: string | null | undefined): boolean => {
+const annualShortCycle = (
+  expiryDate: string | null | undefined,
+  receivedDate: string | null | undefined
+): boolean => {
   if (!expiryDate || !receivedDate) return false
-  const span = (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
+  const span =
+    (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
   return span < 60
 }
 
-const getDocStatus = (hasFile: boolean, expiryDate: string | null | undefined, annualRenewal = false, receivedDate?: string): string => {
+const getDocStatus = (
+  hasFile: boolean,
+  expiryDate: string | null | undefined,
+  annualRenewal = false,
+  receivedDate?: string
+): string => {
   if (!hasFile) return 'Missing'
   if (isExpired(expiryDate)) return 'Expired'
   if (isExpiringSoon(expiryDate)) {
@@ -64,7 +88,12 @@ const getDocStatus = (hasFile: boolean, expiryDate: string | null | undefined, a
   return 'Compliant'
 }
 
-const getExcelDocStatus = (hasFile: boolean, expiryDate: string | null | undefined, annualRenewal = false, receivedDate?: string): string => {
+const getExcelDocStatus = (
+  hasFile: boolean,
+  expiryDate: string | null | undefined,
+  annualRenewal = false,
+  receivedDate?: string
+): string => {
   if (!hasFile) return 'MISSING'
   if (isExpired(expiryDate)) return 'EXPIRED'
   if (isExpiringSoon(expiryDate)) {
@@ -89,7 +118,7 @@ export const ReportService = {
     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
 
     for (const type of docTypes) {
-      const doc = docs.find(d => d.documentTypeId === type.id)
+      const doc = docs.find((d) => d.documentTypeId === type.id)
       const isRequired = doc ? doc.required : type.required
 
       if (isRequired || !!doc?.filePath) {
@@ -98,13 +127,20 @@ export const ReportService = {
           if (doc?.filePath) compliantCount++
         }
 
-        const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || doc?.expiryDate) : doc?.expiryDate
-        const expiryToShow = (!!doc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : 'N/A'
+        const resolvedExpiry = type.annualRenewal
+          ? effectiveExpiry || doc?.expiryDate
+          : doc?.expiryDate
+        const expiryToShow = !!doc?.filePath && resolvedExpiry ? dateOnly(resolvedExpiry) : 'N/A'
 
         complianceData.push({
           'Document Name': type.name + (!isRequired ? ' (Optional)' : ''),
-          'Description': type.description || '',
-          'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry, type.annualRenewal, doc?.receivedDate),
+          Description: type.description || '',
+          Status: getExcelDocStatus(
+            !!doc?.filePath,
+            resolvedExpiry,
+            type.annualRenewal,
+            doc?.receivedDate
+          ),
           'Date of Receipt': doc?.receivedDate || 'N/A',
           'Expiry Date': expiryToShow,
           'Uploaded Date': doc?.uploadedDate ? formatDate(doc.uploadedDate) : 'N/A'
@@ -114,14 +150,14 @@ export const ReportService = {
 
     // Custom document types
     const customDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
-    customDocTypes.forEach(customType => {
-      const vDoc = docs.find(d => d.documentTypeId === customType.id)
+    customDocTypes.forEach((customType) => {
+      const vDoc = docs.find((d) => d.documentTypeId === customType.id)
       requiredCount++
       if (vDoc?.filePath) compliantCount++
       complianceData.push({
         'Document Name': `${customType.name} (Custom)`,
-        'Description': customType.description || '',
-        'Status': getExcelDocStatus(!!vDoc?.filePath, vDoc?.expiryDate),
+        Description: customType.description || '',
+        Status: getExcelDocStatus(!!vDoc?.filePath, vDoc?.expiryDate),
         'Date of Receipt': vDoc?.receivedDate || 'N/A',
         'Expiry Date': vDoc?.expiryDate || 'N/A',
         'Uploaded Date': vDoc?.uploadedDate ? formatDate(vDoc.uploadedDate) : 'N/A'
@@ -134,28 +170,58 @@ export const ReportService = {
     const allEntityUBOs = await window.api.getEntityUBOs()
     const assuredRoles = safeArray(await window.api.getAssuredRoles())
     const roleOrderMap = new Map(assuredRoles.map((r, i) => [r.name, i]))
-    vesselAssureds.sort((a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999))
+    vesselAssureds.sort(
+      (a, b) => (roleOrderMap.get(a.role) ?? 999) - (roleOrderMap.get(b.role) ?? 999)
+    )
     const { edTypes, edDocs } = await loadEntityDocData()
 
     const entityDocsData: any[] = []
     if (vesselAssureds.length > 0) {
-      entityDocsData.push({ 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
-      entityDocsData.push({ 'Document Name': 'ASSURED ENTITIES & DOCUMENTS', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
-      entityDocsData.push({ 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+      entityDocsData.push({
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      })
+      entityDocsData.push({
+        'Document Name': 'ASSURED ENTITIES & DOCUMENTS',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      })
+      entityDocsData.push({
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      })
 
       vesselAssureds.forEach((va, index) => {
-        const entity = allEntities.find(e => e.id === va.entityId)
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) return
 
-        entityDocsData.push({ 'Document Name': `Assured ${index + 1}: ${entity.name}`, 'Description': `Role: ${va.role}`, 'Status': entity.type.toUpperCase(), 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+        entityDocsData.push({
+          'Document Name': `Assured ${index + 1}: ${entity.name}`,
+          Description: `Role: ${va.role}`,
+          Status: entity.type.toUpperCase(),
+          'Date of Receipt': '',
+          'Expiry Date': '',
+          'Uploaded Date': ''
+        })
 
         for (const ds of entityDocStatus(entity, edTypes, edDocs)) {
           requiredCount++
           if (ds.onFile) compliantCount++
           entityDocsData.push({
             'Document Name': `  - ${ds.name}`,
-            'Description': '',
-            'Status': ds.onFile ? 'ON FILE' : 'MISSING',
+            Description: '',
+            Status: ds.onFile ? 'ON FILE' : 'MISSING',
             'Date of Receipt': '',
             'Expiry Date': '',
             'Uploaded Date': ''
@@ -164,24 +230,37 @@ export const ReportService = {
 
         // UBOs
         const ubos = allEntityUBOs
-          .filter(u => u.assuredEntityId === entity.id)
-          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter((u) => u.assuredEntityId === entity.id)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
           .filter(Boolean)
 
         if (ubos.length > 0) {
-          entityDocsData.push({ 'Document Name': '  UBOs:', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+          entityDocsData.push({
+            'Document Name': '  UBOs:',
+            Description: '',
+            Status: '',
+            'Date of Receipt': '',
+            'Expiry Date': '',
+            'Uploaded Date': ''
+          })
           ubos.forEach((ubo, uboIndex) => {
             if (!ubo) return
-            entityDocsData.push({ 'Document Name': `    ${uboIndex + 1}. ${ubo.name}`, 'Description': ubo.identifier || '', 'Status': ubo.type.toUpperCase(), 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
-
+            entityDocsData.push({
+              'Document Name': `    ${uboIndex + 1}. ${ubo.name}`,
+              Description: ubo.identifier || '',
+              Status: ubo.type.toUpperCase(),
+              'Date of Receipt': '',
+              'Expiry Date': '',
+              'Uploaded Date': ''
+            })
 
             for (const ds of entityDocStatus(ubo, edTypes, edDocs)) {
               requiredCount++
               if (ds.onFile) compliantCount++
               entityDocsData.push({
                 'Document Name': `       - ${ds.name}`,
-                'Description': '',
-                'Status': ds.onFile ? 'ON FILE' : 'MISSING',
+                Description: '',
+                Status: ds.onFile ? 'ON FILE' : 'MISSING',
                 'Date of Receipt': '',
                 'Expiry Date': '',
                 'Uploaded Date': ''
@@ -189,24 +268,81 @@ export const ReportService = {
             }
           })
         } else {
-          entityDocsData.push({ 'Document Name': '  No Ultimate Beneficial Owner on record', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+          entityDocsData.push({
+            'Document Name': '  No Ultimate Beneficial Owner on record',
+            Description: '',
+            Status: 'WARNING',
+            'Date of Receipt': '',
+            'Expiry Date': '',
+            'Uploaded Date': ''
+          })
         }
 
-        entityDocsData.push({ 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' })
+        entityDocsData.push({
+          'Document Name': '',
+          Description: '',
+          Status: '',
+          'Date of Receipt': '',
+          'Expiry Date': '',
+          'Uploaded Date': ''
+        })
       })
     }
 
     // Calculate compliance rate including entity documents
-    const complianceRate = requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
+    const complianceRate =
+      requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
     const missingCount = requiredCount - compliantCount
 
     const summaryHeader = [
-      { 'Document Name': 'VESSEL COMPLIANCE SUMMARY', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Vessel Name', 'Description': vessel.name, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'IMO Number', 'Description': vessel.imoNumber, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Compliance Rate', 'Description': `${complianceRate}%`, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': 'Compliant / Missing', 'Description': `${compliantCount} / ${missingCount}`, 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' },
-      { 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '', 'Uploaded Date': '' }
+      {
+        'Document Name': 'VESSEL COMPLIANCE SUMMARY',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      },
+      {
+        'Document Name': 'Vessel Name',
+        Description: vessel.name,
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      },
+      {
+        'Document Name': 'IMO Number',
+        Description: vessel.imoNumber,
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      },
+      {
+        'Document Name': 'Compliance Rate',
+        Description: `${complianceRate}%`,
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      },
+      {
+        'Document Name': 'Compliant / Missing',
+        Description: `${compliantCount} / ${missingCount}`,
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      },
+      {
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': '',
+        'Uploaded Date': ''
+      }
     ]
 
     const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...complianceData, ...entityDocsData])
@@ -215,7 +351,12 @@ export const ReportService = {
     XLSX.writeFile(wb, `${vessel.name}_Compliance_Report.xlsx`)
   },
 
-  exportVesselToPDF: async (vessel: Vessel, docTypes: DocumentType[], docs: VesselDocument[], options?: { returnBytes?: boolean }): Promise<Uint8Array | void> => {
+  exportVesselToPDF: async (
+    vessel: Vessel,
+    docTypes: DocumentType[],
+    docs: VesselDocument[],
+    options?: { returnBytes?: boolean }
+  ): Promise<Uint8Array | void> => {
     const doc = new jsPDF()
     const tableData: any[] = []
     let compliantCount = 0
@@ -225,7 +366,7 @@ export const ReportService = {
     const effectiveExpiry = resolveEffectivePolicyExpiry(dynamicPolicies)
 
     for (const type of docTypes) {
-      const vDoc = docs.find(d => d.documentTypeId === type.id)
+      const vDoc = docs.find((d) => d.documentTypeId === type.id)
       const isRequired = vDoc ? vDoc.required : type.required
 
       if (isRequired || !!vDoc?.filePath) {
@@ -234,8 +375,10 @@ export const ReportService = {
           if (vDoc?.filePath) compliantCount++
         }
 
-        const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || vDoc?.expiryDate) : vDoc?.expiryDate
-        const pdfExpiryToShow = (!!vDoc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : '-'
+        const resolvedExpiry = type.annualRenewal
+          ? effectiveExpiry || vDoc?.expiryDate
+          : vDoc?.expiryDate
+        const pdfExpiryToShow = !!vDoc?.filePath && resolvedExpiry ? dateOnly(resolvedExpiry) : '-'
 
         tableData.push([
           type.name + (!isRequired ? ' (Optional)' : ''),
@@ -248,8 +391,8 @@ export const ReportService = {
 
     // Custom document types for PDF
     const pdfCustomDocTypes = await window.api.getVesselCustomDocTypes(vessel.id)
-    pdfCustomDocTypes.forEach(customType => {
-      const vDoc = docs.find(d => d.documentTypeId === customType.id)
+    pdfCustomDocTypes.forEach((customType) => {
+      const vDoc = docs.find((d) => d.documentTypeId === customType.id)
       requiredCount++
       if (vDoc?.filePath) compliantCount++
       tableData.push([
@@ -266,13 +409,15 @@ export const ReportService = {
     const allEntityUBOs = await window.api.getEntityUBOs()
     const pdfAssuredRoles = safeArray(await window.api.getAssuredRoles())
     const pdfRoleOrderMap = new Map(pdfAssuredRoles.map((r, i) => [r.name, i]))
-    vesselAssureds.sort((a, b) => (pdfRoleOrderMap.get(a.role) ?? 999) - (pdfRoleOrderMap.get(b.role) ?? 999))
+    vesselAssureds.sort(
+      (a, b) => (pdfRoleOrderMap.get(a.role) ?? 999) - (pdfRoleOrderMap.get(b.role) ?? 999)
+    )
     const { edTypes, edDocs } = await loadEntityDocData()
 
     // Count entity documents
     if (vesselAssureds.length > 0) {
       vesselAssureds.forEach((va) => {
-        const entity = allEntities.find(e => e.id === va.entityId)
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) return
 
         for (const ds of entityDocStatus(entity, edTypes, edDocs)) {
@@ -282,8 +427,8 @@ export const ReportService = {
 
         // Count UBO documents
         const ubos = allEntityUBOs
-          .filter(u => u.assuredEntityId === entity.id)
-          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter((u) => u.assuredEntityId === entity.id)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
           .filter(Boolean)
 
         ubos.forEach((ubo) => {
@@ -296,7 +441,8 @@ export const ReportService = {
       })
     }
 
-    const complianceRate = requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
+    const complianceRate =
+      requiredCount > 0 ? ((compliantCount / requiredCount) * 100).toFixed(1) : '100'
 
     // Header
     doc.setFillColor(15, 18, 24)
@@ -334,7 +480,11 @@ export const ReportService = {
     doc.text('Compliance Rate', 145, 59)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
+    doc.setTextColor(
+      parseFloat(complianceRate) > 80 ? 0 : 200,
+      parseFloat(complianceRate) > 80 ? 150 : 0,
+      0
+    )
     doc.text(`${complianceRate}%`, 145, 69)
 
     doc.setFontSize(9)
@@ -349,7 +499,7 @@ export const ReportService = {
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
       columnStyles: {
-        0: { cellWidth: 60 },
+        0: { cellWidth: 60 }
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 2) {
@@ -393,7 +543,7 @@ export const ReportService = {
       finalY += 10
 
       vesselAssureds.forEach((va, index) => {
-        const entity = allEntities.find(e => e.id === va.entityId)
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) return
 
         // Check if we need a new page
@@ -427,8 +577,8 @@ export const ReportService = {
 
         // UBOs
         const ubos = allEntityUBOs
-          .filter(u => u.assuredEntityId === entity.id)
-          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter((u) => u.assuredEntityId === entity.id)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
           .filter(Boolean)
 
         if (ubos.length > 0) {
@@ -481,13 +631,18 @@ export const ReportService = {
     doc.save(`${vessel.name}_Compliance_Report.pdf`)
   },
 
-  exportFleetToExcel: async (fleet: Fleet, vessels: Vessel[], docTypes: DocumentType[], allDocs: VesselDocument[]) => {
+  exportFleetToExcel: async (
+    fleet: Fleet,
+    vessels: Vessel[],
+    docTypes: DocumentType[],
+    allDocs: VesselDocument[]
+  ) => {
     const data: any[] = []
     let totalCompliant = 0
     let totalRequired = 0
-    const activeVessels = vessels.filter(v => v.isActive)
+    const activeVessels = vessels.filter((v) => v.isActive)
     const allDynamicPolicies = await window.api.getAllVesselDynamicPolicies()
-    
+
     // Group policies by vesselId
     const policyMap = new Map<string, VesselDynamicPolicy[]>()
     for (const p of allDynamicPolicies) {
@@ -501,22 +656,29 @@ export const ReportService = {
       const effectiveExpiry = resolveEffectivePolicyExpiry(vesselPolicies)
 
       for (const type of docTypes) {
-        const doc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
+        const doc = allDocs.find((d) => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = doc ? doc.required : type.required
 
         if (isRequired) {
           totalRequired++
           if (doc?.filePath) totalCompliant++
 
-          const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || doc?.expiryDate) : doc?.expiryDate
-          const expiryToShow = (!!doc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : 'N/A'
+          const resolvedExpiry = type.annualRenewal
+            ? effectiveExpiry || doc?.expiryDate
+            : doc?.expiryDate
+          const expiryToShow = !!doc?.filePath && resolvedExpiry ? dateOnly(resolvedExpiry) : 'N/A'
 
           data.push({
-            'Vessel': v.name,
-            'IMO': v.imoNumber,
+            Vessel: v.name,
+            IMO: v.imoNumber,
             'Document Name': type.name,
-            'Description': type.description || '',
-            'Status': getExcelDocStatus(!!doc?.filePath, resolvedExpiry, type.annualRenewal, doc?.receivedDate),
+            Description: type.description || '',
+            Status: getExcelDocStatus(
+              !!doc?.filePath,
+              resolvedExpiry,
+              type.annualRenewal,
+              doc?.receivedDate
+            ),
             'Date of Receipt': doc?.receivedDate || 'N/A',
             'Expiry Date': expiryToShow
           })
@@ -537,7 +699,7 @@ export const ReportService = {
     for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
       for (const va of vesselAssureds) {
-        const entity = allEntities.find(e => e.id === va.entityId)
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) continue
 
         if (assuredMap.has(entity.id)) {
@@ -552,23 +714,50 @@ export const ReportService = {
     }
 
     // Sort assureds by role order
-    const sortedExcelAssureds = [...assuredMap.entries()].sort((a, b) => (excelRoleOrderMap.get(a[1].role) ?? 999) - (excelRoleOrderMap.get(b[1].role) ?? 999))
+    const sortedExcelAssureds = [...assuredMap.entries()].sort(
+      (a, b) =>
+        (excelRoleOrderMap.get(a[1].role) ?? 999) - (excelRoleOrderMap.get(b[1].role) ?? 999)
+    )
 
     // Add assured entities section
     const assuredData: any[] = []
     if (sortedExcelAssureds.length > 0) {
-      assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
-      assuredData.push({ 'Vessel': 'FLEET ASSUREDS', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
-      assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
+      assuredData.push({
+        Vessel: '',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      })
+      assuredData.push({
+        Vessel: 'FLEET ASSUREDS',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      })
+      assuredData.push({
+        Vessel: '',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      })
 
       for (const [, { entity, vessels: vesselNames, role }] of sortedExcelAssureds) {
         const vesselList = vesselNames.join(', ')
         assuredData.push({
-          'Vessel': entity.name,
-          'IMO': entity.type.toUpperCase(),
+          Vessel: entity.name,
+          IMO: entity.type.toUpperCase(),
           'Document Name': `Role: ${role}`,
-          'Description': `Vessels: ${vesselList}`,
-          'Status': '',
+          Description: `Vessels: ${vesselList}`,
+          Status: '',
           'Date of Receipt': '',
           'Expiry Date': ''
         })
@@ -578,11 +767,11 @@ export const ReportService = {
           totalRequired++
           if (ds.onFile) totalCompliant++
           assuredData.push({
-            'Vessel': '',
-            'IMO': '',
+            Vessel: '',
+            IMO: '',
             'Document Name': `  - ${ds.name}`,
-            'Description': '',
-            'Status': ds.onFile ? 'ON FILE' : 'MISSING',
+            Description: '',
+            Status: ds.onFile ? 'ON FILE' : 'MISSING',
             'Date of Receipt': '',
             'Expiry Date': ''
           })
@@ -590,21 +779,29 @@ export const ReportService = {
 
         // UBOs for this entity
         const ubos = allEntityUBOs
-          .filter(u => u.assuredEntityId === entity.id)
-          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter((u) => u.assuredEntityId === entity.id)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
           .filter(Boolean)
 
         if (ubos.length > 0) {
-          assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '  UBOs:', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
+          assuredData.push({
+            Vessel: '',
+            IMO: '',
+            'Document Name': '  UBOs:',
+            Description: '',
+            Status: '',
+            'Date of Receipt': '',
+            'Expiry Date': ''
+          })
 
           ubos.forEach((ubo, uboIndex) => {
             if (!ubo) return
             assuredData.push({
-              'Vessel': '',
-              'IMO': '',
+              Vessel: '',
+              IMO: '',
               'Document Name': `    ${uboIndex + 1}. ${ubo.name}`,
-              'Description': ubo.identifier || '',
-              'Status': ubo.type.toUpperCase(),
+              Description: ubo.identifier || '',
+              Status: ubo.type.toUpperCase(),
               'Date of Receipt': '',
               'Expiry Date': ''
             })
@@ -613,37 +810,126 @@ export const ReportService = {
               totalRequired++
               if (ds.onFile) totalCompliant++
               assuredData.push({
-                'Vessel': '',
-                'IMO': '',
+                Vessel: '',
+                IMO: '',
                 'Document Name': `       - ${ds.name}`,
-                'Description': '',
-                'Status': ds.onFile ? 'ON FILE' : 'MISSING',
+                Description: '',
+                Status: ds.onFile ? 'ON FILE' : 'MISSING',
                 'Date of Receipt': '',
                 'Expiry Date': ''
               })
             }
           })
         } else {
-          assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '  No Ultimate Beneficial Owner on record', 'Description': '', 'Status': 'WARNING', 'Date of Receipt': '', 'Expiry Date': '' })
+          assuredData.push({
+            Vessel: '',
+            IMO: '',
+            'Document Name': '  No Ultimate Beneficial Owner on record',
+            Description: '',
+            Status: 'WARNING',
+            'Date of Receipt': '',
+            'Expiry Date': ''
+          })
         }
 
-        assuredData.push({ 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' })
+        assuredData.push({
+          Vessel: '',
+          IMO: '',
+          'Document Name': '',
+          Description: '',
+          Status: '',
+          'Date of Receipt': '',
+          'Expiry Date': ''
+        })
       }
     }
 
-    const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
+    const complianceRate =
+      totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
     const missingCount = totalRequired - totalCompliant
 
     const summaryHeader = [
-      { 'Vessel': 'FLEET COMPLIANCE SUMMARY', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Fleet Name', 'IMO': fleet.name, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Total Vessels', 'IMO': activeVessels.length.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Total Assureds', 'IMO': assuredMap.size.toString(), 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Fleet Compliance Rate', 'IMO': `${complianceRate}%`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'Compliant / Missing', 'IMO': `${totalCompliant} / ${missingCount}`, 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': 'VESSEL DOCUMENTS', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' },
-      { 'Vessel': '', 'IMO': '', 'Document Name': '', 'Description': '', 'Status': '', 'Date of Receipt': '', 'Expiry Date': '' }
+      {
+        Vessel: 'FLEET COMPLIANCE SUMMARY',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'Fleet Name',
+        IMO: fleet.name,
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'Total Vessels',
+        IMO: activeVessels.length.toString(),
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'Total Assureds',
+        IMO: assuredMap.size.toString(),
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'Fleet Compliance Rate',
+        IMO: `${complianceRate}%`,
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'Compliant / Missing',
+        IMO: `${totalCompliant} / ${missingCount}`,
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: '',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: 'VESSEL DOCUMENTS',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      },
+      {
+        Vessel: '',
+        IMO: '',
+        'Document Name': '',
+        Description: '',
+        Status: '',
+        'Date of Receipt': '',
+        'Expiry Date': ''
+      }
     ]
 
     const ws = XLSX.utils.json_to_sheet([...summaryHeader, ...data, ...assuredData])
@@ -652,12 +938,17 @@ export const ReportService = {
     XLSX.writeFile(wb, `${fleet.name}_Fleet_Compliance_Report.xlsx`)
   },
 
-  exportFleetToPDF: async (fleet: Fleet, vessels: Vessel[], docTypes: DocumentType[], allDocs: VesselDocument[]) => {
+  exportFleetToPDF: async (
+    fleet: Fleet,
+    vessels: Vessel[],
+    docTypes: DocumentType[],
+    allDocs: VesselDocument[]
+  ) => {
     const doc = new jsPDF()
     const tableData: any[] = []
     let totalCompliant = 0
     let totalRequired = 0
-    const activeVessels = vessels.filter(v => v.isActive)
+    const activeVessels = vessels.filter((v) => v.isActive)
 
     const allDynamicPolicies = await window.api.getAllVesselDynamicPolicies()
     const policyMap = new Map<string, VesselDynamicPolicy[]>()
@@ -672,15 +963,17 @@ export const ReportService = {
       const effectiveExpiry = resolveEffectivePolicyExpiry(vesselPolicies)
 
       for (const type of docTypes) {
-        const vDoc = allDocs.find(d => d.vesselId === v.id && d.documentTypeId === type.id)
+        const vDoc = allDocs.find((d) => d.vesselId === v.id && d.documentTypeId === type.id)
         const isRequired = vDoc ? vDoc.required : type.required
 
         if (isRequired) {
           totalRequired++
           if (vDoc?.filePath) totalCompliant++
 
-          const resolvedExpiry = type.annualRenewal ? (effectiveExpiry || vDoc?.expiryDate) : vDoc?.expiryDate
-          const fleetPdfExpiry = (!!vDoc?.filePath && resolvedExpiry) ? dateOnly(resolvedExpiry) : '-'
+          const resolvedExpiry = type.annualRenewal
+            ? effectiveExpiry || vDoc?.expiryDate
+            : vDoc?.expiryDate
+          const fleetPdfExpiry = !!vDoc?.filePath && resolvedExpiry ? dateOnly(resolvedExpiry) : '-'
 
           tableData.push([
             v.name,
@@ -705,7 +998,7 @@ export const ReportService = {
     for (const vessel of activeVessels) {
       const vesselAssureds = await window.api.getVesselAssureds(vessel.id)
       for (const va of vesselAssureds) {
-        const entity = allEntities.find(e => e.id === va.entityId)
+        const entity = allEntities.find((e) => e.id === va.entityId)
         if (!entity) continue
 
         if (assuredMap.has(entity.id)) {
@@ -720,8 +1013,8 @@ export const ReportService = {
 
     // Sort assureds by first role order
     const sortedAssureds = [...assuredMap.entries()].sort((a, b) => {
-      const aMin = Math.min(...a[1].roles.map(r => fleetRoleOrderMap.get(r) ?? 999))
-      const bMin = Math.min(...b[1].roles.map(r => fleetRoleOrderMap.get(r) ?? 999))
+      const aMin = Math.min(...a[1].roles.map((r) => fleetRoleOrderMap.get(r) ?? 999))
+      const bMin = Math.min(...b[1].roles.map((r) => fleetRoleOrderMap.get(r) ?? 999))
       return aMin - bMin
     })
 
@@ -733,8 +1026,8 @@ export const ReportService = {
       }
 
       const ubos = allEntityUBOs
-        .filter(u => u.assuredEntityId === entity.id)
-        .map(u => allEntities.find(e => e.id === u.uboEntityId))
+        .filter((u) => u.assuredEntityId === entity.id)
+        .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
         .filter(Boolean)
 
       ubos.forEach((ubo) => {
@@ -746,7 +1039,8 @@ export const ReportService = {
       })
     }
 
-    const complianceRate = totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
+    const complianceRate =
+      totalRequired > 0 ? ((totalCompliant / totalRequired) * 100).toFixed(1) : '100'
 
     // Header
     doc.setFillColor(15, 18, 24)
@@ -785,7 +1079,11 @@ export const ReportService = {
     doc.text('Fleet Compliance Rate', 142, 59)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(16)
-    doc.setTextColor(parseFloat(complianceRate) > 80 ? 0 : 200, parseFloat(complianceRate) > 80 ? 150 : 0, 0)
+    doc.setTextColor(
+      parseFloat(complianceRate) > 80 ? 0 : 200,
+      parseFloat(complianceRate) > 80 ? 150 : 0,
+      0
+    )
     doc.text(`${complianceRate}%`, 142, 69)
 
     doc.setFontSize(9)
@@ -801,7 +1099,7 @@ export const ReportService = {
       theme: 'striped',
       headStyles: { fillColor: [58, 123, 213], textColor: 255 },
       columnStyles: {
-        0: { cellWidth: 50 },
+        0: { cellWidth: 50 }
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 2) {
@@ -863,7 +1161,11 @@ export const ReportService = {
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(9)
         doc.setTextColor(100, 100, 100)
-        doc.text(`Role: ${roles.join(', ')} | Type: ${entity.type.toUpperCase()} | Vessels: ${vesselNames.join(', ')}`, 14, finalY)
+        doc.text(
+          `Role: ${roles.join(', ')} | Type: ${entity.type.toUpperCase()} | Vessels: ${vesselNames.join(', ')}`,
+          14,
+          finalY
+        )
         finalY += 8
 
         // Entity documents
@@ -879,8 +1181,8 @@ export const ReportService = {
 
         // UBOs for this entity
         const ubos = allEntityUBOs
-          .filter(u => u.assuredEntityId === entity.id)
-          .map(u => allEntities.find(e => e.id === u.uboEntityId))
+          .filter((u) => u.assuredEntityId === entity.id)
+          .map((u) => allEntities.find((e) => e.id === u.uboEntityId))
           .filter(Boolean)
 
         if (ubos.length > 0) {
@@ -932,7 +1234,12 @@ export const ReportService = {
     doc.save(`${fleet.name}_Fleet_Report.pdf`)
   },
 
-  exportSurveyToPDF: async (vessel: Vessel, survey: ConditionSurvey, defects: SurveyDefect[], includeNoteIds?: Set<string>) => {
+  exportSurveyToPDF: async (
+    vessel: Vessel,
+    survey: ConditionSurvey,
+    defects: SurveyDefect[],
+    includeNoteIds?: Set<string>
+  ) => {
     const doc = new jsPDF()
 
     // Fetch supplementary data
@@ -940,18 +1247,23 @@ export const ReportService = {
       window.api.getSurveyors(),
       window.api.getFlagStates()
     ])
-    const surveyor: Surveyor | undefined = surveyors.find((s: Surveyor) => s.id === survey.surveyorId)
+    const surveyor: Surveyor | undefined = surveyors.find(
+      (s: Surveyor) => s.id === survey.surveyorId
+    )
     const flagState = flagStatesRaw.find((f: any) => f.id === vessel.flagStateId)
 
     // Configurable intro / end text (Admin → Report Settings → Report Texts)
     const reportSettings = await getReportSettings()
-    const { intro: introText, end: endText } = getReportText(reportSettings, 'conditionSurveyDefects')
+    const { intro: introText, end: endText } = getReportText(
+      reportSettings,
+      'conditionSurveyDefects'
+    )
     const introParas = reportTextParagraphs(introText)
     const endParas = reportTextParagraphs(endText)
 
-    const openCount = defects.filter(d => d.status === 'OPEN').length
-    const closedCount = defects.filter(d => d.status === 'CLOSED').length
-    const criticalCount = defects.filter(d => d.severity === 'Critical').length
+    const openCount = defects.filter((d) => d.status === 'OPEN').length
+    const closedCount = defects.filter((d) => d.status === 'CLOSED').length
+    const criticalCount = defects.filter((d) => d.severity === 'Critical').length
 
     // Sort: OPEN first, then CLOSED; within each group sort numerically by defect number
     const sortedDefects = [...defects].sort((a, b) => {
@@ -960,15 +1272,19 @@ export const ReportService = {
     })
 
     // Determine if survey is closed (all defects closed) and find its closing date
-    const isSurveyClosed = defects.length > 0 && defects.every(d => d.status === 'CLOSED')
+    const isSurveyClosed = defects.length > 0 && defects.every((d) => d.status === 'CLOSED')
     const latestCloseTs = isSurveyClosed
-      ? defects.filter(d => d.closedAt).map(d => d.closedAt!).sort().pop()
+      ? defects
+          .filter((d) => d.closedAt)
+          .map((d) => d.closedAt!)
+          .sort()
+          .pop()
       : undefined
     const surveyClosedDisplay = latestCloseTs ? formatDate(latestCloseTs) : null
 
     // ── Header band ──────────────────────────────────────────────────
     doc.setFillColor(15, 18, 24)
-    doc.rect(0, 5, 210, 46, 'F')   // starts at y=5 so printer margin doesn't clip it
+    doc.rect(0, 5, 210, 46, 'F') // starts at y=5 so printer margin doesn't clip it
 
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(11)
@@ -1071,7 +1387,10 @@ export const ReportService = {
       doc.setTextColor(40, 40, 40)
       for (const para of introParas) {
         for (const line of doc.splitTextToSize(para, 182)) {
-          if (y > 260) { doc.addPage(); y = 20 }
+          if (y > 260) {
+            doc.addPage()
+            y = 20
+          }
           doc.text(line, 14, y)
           y += 5
         }
@@ -1087,12 +1406,12 @@ export const ReportService = {
       doc.setTextColor(150, 150, 150)
       doc.text('No defects recorded for this survey.', 14, y + 8)
     } else {
-      const tableBody = sortedDefects.map(d => [
+      const tableBody = sortedDefects.map((d) => [
         d.defectNumber,
         d.description,
         d.severity || '—',
         d.status,
-        d.closedAt ? formatDate(d.closedAt) : '—',
+        d.closedAt ? formatDate(d.closedAt) : '—'
       ])
 
       autoTable(doc, {
@@ -1107,21 +1426,21 @@ export const ReportService = {
           fontSize: 9,
           fontStyle: 'bold',
           cellPadding: { top: 5, right: 4, bottom: 5, left: 4 },
-          lineColor: [28, 52, 95],
+          lineColor: [28, 52, 95]
         },
         columnStyles: {
           0: { cellWidth: 16, halign: 'center' },
           1: { cellWidth: 90 },
           2: { cellWidth: 28, halign: 'center' },
           3: { cellWidth: 24, halign: 'center' },
-          4: { cellWidth: 24 },
+          4: { cellWidth: 24 }
         },
         styles: {
           fontSize: 9,
           cellPadding: { top: 4, right: 4, bottom: 4, left: 4 },
           lineColor: [200, 200, 200],
           lineWidth: 0.3,
-          textColor: [20, 20, 20],
+          textColor: [20, 20, 20]
         },
         didParseCell: (data) => {
           if (data.section !== 'body') return
@@ -1157,20 +1476,24 @@ export const ReportService = {
               data.cell.styles.fontStyle = 'bold'
             }
           }
-        },
+        }
       })
     }
 
     // ── Selected defect notes ─────────────────────────────────────────
-    const notesToShow = includeNoteIds && includeNoteIds.size > 0
-      ? sortedDefects.filter(d => (d.notes || d.closureNotes) && includeNoteIds.has(d.id))
-      : []
+    const notesToShow =
+      includeNoteIds && includeNoteIds.size > 0
+        ? sortedDefects.filter((d) => (d.notes || d.closureNotes) && includeNoteIds.has(d.id))
+        : []
 
-    let ny = ((doc as any).lastAutoTable?.finalY ?? y + 10)
+    let ny = (doc as any).lastAutoTable?.finalY ?? y + 10
     if (notesToShow.length > 0) {
       ny += 10
 
-      if (ny > 265) { doc.addPage(); ny = 20 }
+      if (ny > 265) {
+        doc.addPage()
+        ny = 20
+      }
 
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
@@ -1183,7 +1506,10 @@ export const ReportService = {
       ny += 6
 
       for (const d of notesToShow) {
-        if (ny > 265) { doc.addPage(); ny = 20 }
+        if (ny > 265) {
+          doc.addPage()
+          ny = 20
+        }
         doc.setFontSize(9)
         doc.setFont('helvetica', 'bold')
         doc.setTextColor(0, 0, 0)
@@ -1215,7 +1541,10 @@ export const ReportService = {
       doc.setTextColor(40, 40, 40)
       for (const para of endParas) {
         for (const line of doc.splitTextToSize(para, 182)) {
-          if (closingY > 262) { doc.addPage(); closingY = 25 }
+          if (closingY > 262) {
+            doc.addPage()
+            closingY = 25
+          }
           doc.text(line, 14, closingY)
           closingY += 5
         }
@@ -1242,16 +1571,18 @@ export const ReportService = {
 
   exportOpenDefectsToExcel: async () => {
     const data = await window.api.getOpenDefectsByVessel()
-    const rows = data.map(d => ({
-      'Vessel': d.vesselName,
-      'IMO': d.imoNumber,
+    const rows = data.map((d) => ({
+      Vessel: d.vesselName,
+      IMO: d.imoNumber,
       'Survey Date': d.surveyDate,
-      'Surveyor': d.surveyorName,
+      Surveyor: d.surveyorName,
       'Defect #': d.defectNumber,
-      'Description': d.description,
-      'Severity': d.severity,
+      Description: d.description,
+      Severity: d.severity,
       'Due Date': d.dueDate || 'N/A',
-      'Days Open': Math.floor((new Date().getTime() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      'Days Open': Math.floor(
+        (new Date().getTime() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+      )
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()

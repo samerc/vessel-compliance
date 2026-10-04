@@ -1,7 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Trash2, Pencil, X, Search, Globe, Anchor, Building2,
-  CheckCircle2, XCircle, Mail
+  Plus,
+  Trash2,
+  Pencil,
+  X,
+  Search,
+  Globe,
+  Anchor,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Mail
 } from 'lucide-react'
 import { FlagState, FlagStatePort } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
@@ -52,7 +61,9 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const [formAuthorityName, setFormAuthorityName] = useState('')
   const [formAuthorityAddress, setFormAuthorityAddress] = useState('')
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+  }, [])
 
   const loadData = async () => {
     const data = await window.api.getFlagStates()
@@ -76,15 +87,21 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     if (!searchTerm.trim()) return flagStates
     const q = searchTerm.toLowerCase()
     return flagStates.filter(
-      fs => fs.name.toLowerCase().includes(q) || fs.iso3Code.toLowerCase().includes(q)
+      (fs) => fs.name.toLowerCase().includes(q) || fs.iso3Code.toLowerCase().includes(q)
     )
   }, [flagStates, searchTerm])
 
   // Stats
-  const bunkerCount = useMemo(() => flagStates.filter(fs => fs.ratifiedBunker).length, [flagStates])
-  const wreckCount = useMemo(() => flagStates.filter(fs => fs.ratifiedWreck).length, [flagStates])
+  const bunkerCount = useMemo(
+    () => flagStates.filter((fs) => fs.ratifiedBunker).length,
+    [flagStates]
+  )
+  const wreckCount = useMemo(() => flagStates.filter((fs) => fs.ratifiedWreck).length, [flagStates])
   const [portCounts, setPortCounts] = useState<Record<string, number>>({})
-  const withPortsCount = useMemo(() => Object.values(portCounts).filter(c => c > 0).length, [portCounts])
+  const withPortsCount = useMemo(
+    () => Object.values(portCounts).filter((c) => c > 0).length,
+    [portCounts]
+  )
 
   // Load port counts for all flags on mount
   useEffect(() => {
@@ -92,7 +109,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     const loadAllPortCounts = async () => {
       const counts: Record<string, number> = {}
       await Promise.all(
-        flagStates.map(async fs => {
+        flagStates.map(async (fs) => {
           try {
             const ports = await window.api.flagStateGetPorts(fs.id)
             counts[fs.id] = Array.isArray(ports) ? ports.length : 0
@@ -121,9 +138,13 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   }
 
   // Name → auto ISO lookup
-  const handleNameChange = (value: string, setName: (v: string) => void, setIso3: (v: string) => void) => {
+  const handleNameChange = (
+    value: string,
+    setName: (v: string) => void,
+    setIso3: (v: string) => void
+  ) => {
     setName(value)
-    const match = countryNameToIso3.find(c => c.name.toLowerCase() === value.toLowerCase())
+    const match = countryNameToIso3.find((c) => c.name.toLowerCase() === value.toLowerCase())
     if (match) setIso3(match.iso3)
   }
 
@@ -217,14 +238,18 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   const handleAddPort = async () => {
     if (!selectedFlag || !newPortName.trim()) return
     try {
-      const port = await window.api.flagStateAddPort(selectedFlag.id, newPortName.trim(), newPortDefault) as any
+      const port = (await window.api.flagStateAddPort(
+        selectedFlag.id,
+        newPortName.trim(),
+        newPortDefault
+      )) as any
       if (port && !port.error) {
         const updated = newPortDefault
-          ? panelPorts.map(p => ({ ...p, isDefault: false }))
+          ? panelPorts.map((p) => ({ ...p, isDefault: false }))
           : [...panelPorts]
         updated.push(port)
         setPanelPorts(updated)
-        setPortCounts(prev => ({ ...prev, [selectedFlag.id]: updated.length }))
+        setPortCounts((prev) => ({ ...prev, [selectedFlag.id]: updated.length }))
         setNewPortName('')
         setNewPortDefault(false)
         showSuccess('Port added')
@@ -238,11 +263,14 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     if (!editingPortId || !editPortName.trim()) return
     try {
       await window.api.flagStateUpdatePort(editingPortId, editPortName.trim(), editPortDefault)
-      setPanelPorts(prev => prev.map(p => {
-        if (p.id === editingPortId) return { ...p, name: editPortName.trim(), isDefault: editPortDefault }
-        if (editPortDefault) return { ...p, isDefault: false }
-        return p
-      }))
+      setPanelPorts((prev) =>
+        prev.map((p) => {
+          if (p.id === editingPortId)
+            return { ...p, name: editPortName.trim(), isDefault: editPortDefault }
+          if (editPortDefault) return { ...p, isDefault: false }
+          return p
+        })
+      )
       setEditingPortId(null)
       showSuccess('Port updated')
     } catch (err: any) {
@@ -254,9 +282,9 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     if (!selectedFlag) return
     try {
       await window.api.flagStateDeletePort(portId)
-      const updated = panelPorts.filter(p => p.id !== portId)
+      const updated = panelPorts.filter((p) => p.id !== portId)
       setPanelPorts(updated)
-      setPortCounts(prev => ({ ...prev, [selectedFlag.id]: updated.length }))
+      setPortCounts((prev) => ({ ...prev, [selectedFlag.id]: updated.length }))
       showSuccess('Port deleted')
     } catch (err: any) {
       showError(err.message || 'Failed to delete port')
@@ -278,28 +306,91 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
   return (
     <div className="fade-in">
       {/* Header */}
-      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <header
+        style={{
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}
+      >
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px' }}>Flag States</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage vessel flag state registries, conventions, and ports.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Manage vessel flag state registries, conventions, and ports.
+          </p>
         </div>
       </header>
 
       {/* Stats strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '16px',
+          marginBottom: '24px'
+        }}
+      >
         {[
-          { icon: <Globe size={20} color="white" />, label: 'Total Flags', value: flagStates.length, gradient: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))' },
-          { icon: <CheckCircle2 size={20} color="white" />, label: 'Bunker Ratified', value: bunkerCount, gradient: 'linear-gradient(135deg, #22c55e, #16a34a)' },
-          { icon: <CheckCircle2 size={20} color="white" />, label: 'Wreck Ratified', value: wreckCount, gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
-          { icon: <Anchor size={20} color="white" />, label: 'With Ports', value: withPortsCount, gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }
+          {
+            icon: <Globe size={20} color="white" />,
+            label: 'Total Flags',
+            value: flagStates.length,
+            gradient: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))'
+          },
+          {
+            icon: <CheckCircle2 size={20} color="white" />,
+            label: 'Bunker Ratified',
+            value: bunkerCount,
+            gradient: 'linear-gradient(135deg, #22c55e, #16a34a)'
+          },
+          {
+            icon: <CheckCircle2 size={20} color="white" />,
+            label: 'Wreck Ratified',
+            value: wreckCount,
+            gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)'
+          },
+          {
+            icon: <Anchor size={20} color="white" />,
+            label: 'With Ports',
+            value: withPortsCount,
+            gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+          }
         ].map((stat, i) => (
-          <div key={i} className="glass-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: stat.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div
+            key={i}
+            className="glass-card"
+            style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: stat.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
               {stat.icon}
             </div>
             <div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.1 }}>{stat.value}</div>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{stat.label}</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.1 }}>
+                {stat.value}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.8px',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                {stat.label}
+              </div>
             </div>
           </div>
         ))}
@@ -308,17 +399,42 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       {/* Search + Add row */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
-          <Search style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={15} />
+          <Search
+            style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-secondary)'
+            }}
+            size={15}
+          />
           <input
             type="text"
             placeholder="Search by name or ISO code..."
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{ paddingLeft: '34px', paddingRight: '10px', width: '100%', fontSize: '0.88rem' }}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              paddingLeft: '34px',
+              paddingRight: '10px',
+              width: '100%',
+              fontSize: '0.88rem'
+            }}
           />
         </div>
         {canManage && (
-          <button className="btn-primary" onClick={openAddModal} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.9rem', flexShrink: 0 }}>
+          <button
+            className="btn-primary"
+            onClick={openAddModal}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 18px',
+              fontSize: '0.9rem',
+              flexShrink: 0
+            }}
+          >
             <Plus size={16} /> Add Flag
           </button>
         )}
@@ -326,9 +442,11 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
       {/* Main: table + slide-in */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-
         {/* Table */}
-        <div className="glass-card" style={{ flex: 1, minWidth: 0, padding: 0, overflow: 'hidden' }}>
+        <div
+          className="glass-card"
+          style={{ flex: 1, minWidth: 0, padding: 0, overflow: 'hidden' }}
+        >
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
@@ -341,91 +459,212 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
               </colgroup>
               <caption className="sr-only">Flag states</caption>
               <thead>
-                <tr style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)', position: 'sticky', top: 0, zIndex: 1 }}>
-                  {['Flag Name', 'ISO', 'Bunker', 'Wreck', 'Ports', 'Authority'].map(col => (
-                    <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.69rem', textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
+                <tr
+                  style={{
+                    background: 'var(--table-header-bg)',
+                    borderBottom: '1px solid var(--table-border)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1
+                  }}
+                >
+                  {['Flag Name', 'ISO', 'Bunker', 'Wreck', 'Ports', 'Authority'].map((col) => (
+                    <th
+                      key={col}
+                      style={{
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        fontSize: '0.69rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.6px',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {col}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      <Globe size={30} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }} />
+                    <td
+                      colSpan={6}
+                      style={{
+                        padding: '48px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      <Globe
+                        size={30}
+                        style={{ display: 'block', margin: '0 auto 10px', opacity: 0.25 }}
+                      />
                       {searchTerm ? 'No flag states match your search' : 'No flag states added yet'}
                     </td>
                   </tr>
-                ) : filtered.map(fs => {
-                  const flagCls = getFlagClass(fs.iso3Code)
-                  const isSelected = selectedFlag?.id === fs.id
-                  const pCount = portCounts[fs.id] || 0
-                  return (
-                    <tr
-                      key={fs.id}
-                      onClick={() => handleSelect(fs)}
-                      className="hover-effect"
-                      style={{
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--table-border)',
-                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent',
-                        borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                        transition: 'background 0.12s, border-color 0.12s'
-                      }}
-                    >
-                      {/* Flag Name */}
-                      <td style={{ padding: '12px 16px', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {flagCls ? (
-                            <span className={flagCls} style={{ fontSize: '1.3rem', flexShrink: 0 }} />
-                          ) : (
-                            <div style={{ width: '28px', height: '20px', borderRadius: '3px', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Globe size={12} color="var(--text-secondary)" />
-                            </div>
-                          )}
-                          <span style={{ fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fs.name}</span>
-                        </div>
-                      </td>
-                      {/* ISO */}
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 600 }}>{fs.iso3Code}</span>
-                      </td>
-                      {/* Bunker */}
-                      <td style={{ padding: '12px 16px' }}>
-                        {fs.ratifiedBunker ? (
-                          <CheckCircle2 size={16} color="#22c55e" />
-                        ) : (
-                          <XCircle size={16} color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'} />
-                        )}
-                      </td>
-                      {/* Wreck */}
-                      <td style={{ padding: '12px 16px' }}>
-                        {fs.ratifiedWreck ? (
-                          <CheckCircle2 size={16} color="#22c55e" />
-                        ) : (
-                          <XCircle size={16} color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'} />
-                        )}
-                      </td>
-                      {/* Ports */}
-                      <td style={{ padding: '12px 16px' }}>
-                        {pCount > 0 ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)', background: accentBg, padding: '2px 8px', borderRadius: '10px' }}>
-                            <Anchor size={11} />{pCount}
+                ) : (
+                  filtered.map((fs) => {
+                    const flagCls = getFlagClass(fs.iso3Code)
+                    const isSelected = selectedFlag?.id === fs.id
+                    const pCount = portCounts[fs.id] || 0
+                    return (
+                      <tr
+                        key={fs.id}
+                        onClick={() => handleSelect(fs)}
+                        className="hover-effect"
+                        style={{
+                          cursor: 'pointer',
+                          borderBottom: '1px solid var(--table-border)',
+                          background: isSelected
+                            ? isLight
+                              ? 'rgba(26,115,232,0.07)'
+                              : 'rgba(var(--accent-primary-rgb), 0.06)'
+                            : 'transparent',
+                          borderLeft: isSelected
+                            ? '3px solid var(--accent-primary)'
+                            : '3px solid transparent',
+                          transition: 'background 0.12s, border-color 0.12s'
+                        }}
+                      >
+                        {/* Flag Name */}
+                        <td style={{ padding: '12px 16px', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            {flagCls ? (
+                              <span
+                                className={flagCls}
+                                style={{ fontSize: '1.3rem', flexShrink: 0 }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '28px',
+                                  height: '20px',
+                                  borderRadius: '3px',
+                                  background: isLight
+                                    ? 'rgba(0,0,0,0.06)'
+                                    : 'rgba(255,255,255,0.06)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <Globe size={12} color="var(--text-secondary)" />
+                              </div>
+                            )}
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '0.88rem',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              {fs.name}
+                            </span>
+                          </div>
+                        </td>
+                        {/* ISO */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.82rem',
+                              color: 'var(--text-secondary)',
+                              fontFamily: 'monospace',
+                              fontWeight: 600
+                            }}
+                          >
+                            {fs.iso3Code}
                           </span>
-                        ) : (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.5 }}>—</span>
-                        )}
-                      </td>
-                      {/* Authority */}
-                      <td style={{ padding: '12px 16px' }}>
-                        {fs.authorityName ? (
-                          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{fs.authorityName}</span>
-                        ) : (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.5 }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
+                        </td>
+                        {/* Bunker */}
+                        <td style={{ padding: '12px 16px' }}>
+                          {fs.ratifiedBunker ? (
+                            <CheckCircle2 size={16} color="#22c55e" />
+                          ) : (
+                            <XCircle
+                              size={16}
+                              color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}
+                            />
+                          )}
+                        </td>
+                        {/* Wreck */}
+                        <td style={{ padding: '12px 16px' }}>
+                          {fs.ratifiedWreck ? (
+                            <CheckCircle2 size={16} color="#22c55e" />
+                          ) : (
+                            <XCircle
+                              size={16}
+                              color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}
+                            />
+                          )}
+                        </td>
+                        {/* Ports */}
+                        <td style={{ padding: '12px 16px' }}>
+                          {pCount > 0 ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                background: accentBg,
+                                padding: '2px 8px',
+                                borderRadius: '10px'
+                              }}
+                            >
+                              <Anchor size={11} />
+                              {pCount}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                                opacity: 0.5
+                              }}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                        {/* Authority */}
+                        <td style={{ padding: '12px 16px' }}>
+                          {fs.authorityName ? (
+                            <span
+                              style={{
+                                fontSize: '0.82rem',
+                                color: 'var(--text-secondary)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'block'
+                              }}
+                            >
+                              {fs.authorityName}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                                opacity: 0.5
+                              }}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -448,53 +687,144 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
             }}
           >
             {/* Panel header */}
-            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--table-border)' }}>
+            <div
+              style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--table-border)' }}
+            >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '14px',
+                    background:
+                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
                   {(() => {
                     const cls = getFlagClass(selectedFlag.iso3Code)
-                    return cls
-                      ? <span className={cls} style={{ fontSize: '1.6rem' }} />
-                      : <Globe size={24} color="white" />
+                    return cls ? (
+                      <span className={cls} style={{ fontSize: '1.6rem' }} />
+                    ) : (
+                      <Globe size={24} color="white" />
+                    )
                   })()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.2, marginBottom: '2px', wordBreak: 'break-word' }}>{selectedFlag.name}</div>
-                  {selectedFlag.displayName && <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>{selectedFlag.displayName}</div>}
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 600 }}>{selectedFlag.iso3Code}</div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
+                      lineHeight: 1.2,
+                      marginBottom: '2px',
+                      wordBreak: 'break-word'
+                    }}
+                  >
+                    {selectedFlag.name}
+                  </div>
+                  {selectedFlag.displayName && (
+                    <div
+                      style={{
+                        fontSize: '0.82rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '2px'
+                      }}
+                    >
+                      {selectedFlag.displayName}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--text-secondary)',
+                      fontFamily: 'monospace',
+                      fontWeight: 600
+                    }}
+                  >
+                    {selectedFlag.iso3Code}
+                  </div>
                 </div>
-                <button title="Close" aria-label="Close" onClick={() => { setSelectedFlag(null); setPanelPorts([]) }} style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                <button
+                  title="Close"
+                  aria-label="Close"
+                  onClick={() => {
+                    setSelectedFlag(null)
+                    setPanelPorts([])
+                  }}
+                  style={{
+                    padding: '4px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    flexShrink: 0
+                  }}
+                >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
             {/* Panel body */}
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
+            <div
+              style={{
+                padding: '16px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}
+            >
               {/* Conventions */}
               <div>
                 <div style={sectionLabel}>Conventions</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.85rem'
+                    }}
+                  >
                     {selectedFlag.ratifiedBunker ? (
                       <CheckCircle2 size={15} color="#22c55e" />
                     ) : (
                       <XCircle size={15} color="var(--danger)" />
                     )}
                     <span>Bunker Convention (2001):</span>
-                    <span style={{ fontWeight: 600, color: selectedFlag.ratifiedBunker ? '#22c55e' : 'var(--danger)' }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: selectedFlag.ratifiedBunker ? '#22c55e' : 'var(--danger)'
+                      }}
+                    >
                       {selectedFlag.ratifiedBunker ? 'Ratified' : 'Not Ratified'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.85rem'
+                    }}
+                  >
                     {selectedFlag.ratifiedWreck ? (
                       <CheckCircle2 size={15} color="#22c55e" />
                     ) : (
                       <XCircle size={15} color="var(--danger)" />
                     )}
                     <span>Wreck Removal Convention (2007):</span>
-                    <span style={{ fontWeight: 600, color: selectedFlag.ratifiedWreck ? '#22c55e' : 'var(--danger)' }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: selectedFlag.ratifiedWreck ? '#22c55e' : 'var(--danger)'
+                      }}
+                    >
                       {selectedFlag.ratifiedWreck ? 'Ratified' : 'Not Ratified'}
                     </span>
                   </div>
@@ -509,14 +839,41 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                   </span>
                 </div>
                 {selectedFlag.authorityName ? (
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>{selectedFlag.authorityName}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
+                    {selectedFlag.authorityName}
+                  </div>
                 ) : (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Not set</div>
+                  <div
+                    style={{
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    Not set
+                  </div>
                 )}
                 {selectedFlag.authorityAddress ? (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line', lineHeight: 1.5 }}>{selectedFlag.authorityAddress}</div>
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'pre-line',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    {selectedFlag.authorityAddress}
+                  </div>
                 ) : !selectedFlag.authorityName ? null : (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No address</div>
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--text-secondary)',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    No address
+                  </div>
                 )}
               </div>
 
@@ -530,93 +887,209 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                 {selectedFlag.email ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {selectedFlag.email.split(',').map((e, i) => (
-                      <span key={i} style={{
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        background: accentBg,
-                        border: `1px solid ${isLight ? 'rgba(26,115,232,0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`,
-                        fontSize: '0.82rem',
-                        color: 'var(--accent-primary)'
-                      }}>{e.trim()}</span>
+                      <span
+                        key={i}
+                        style={{
+                          padding: '3px 10px',
+                          borderRadius: '6px',
+                          background: accentBg,
+                          border: `1px solid ${isLight ? 'rgba(26,115,232,0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`,
+                          fontSize: '0.82rem',
+                          color: 'var(--accent-primary)'
+                        }}
+                      >
+                        {e.trim()}
+                      </span>
                     ))}
                   </div>
                 ) : (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Not set</div>
+                  <div
+                    style={{
+                      fontSize: '0.85rem',
+                      color: 'var(--text-secondary)',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    Not set
+                  </div>
                 )}
               </div>
 
               {/* Ports of Registry */}
               <div>
-                <div style={{ ...sectionLabel, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div
+                  style={{
+                    ...sectionLabel,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <Anchor size={11} /> Ports of Registry
                   </span>
                   {panelPorts.length > 0 && (
-                    <span style={{ padding: '1px 6px', borderRadius: '8px', background: accentBg, color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.65rem' }}>{panelPorts.length}</span>
+                    <span
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: '8px',
+                        background: accentBg,
+                        color: 'var(--accent-primary)',
+                        fontWeight: 700,
+                        fontSize: '0.65rem'
+                      }}
+                    >
+                      {panelPorts.length}
+                    </span>
                   )}
                 </div>
 
                 {loadingPorts ? (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', padding: '8px 0' }}>Loading ports...</div>
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--text-secondary)',
+                      padding: '8px 0'
+                    }}
+                  >
+                    Loading ports...
+                  </div>
                 ) : panelPorts.length === 0 ? (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '8px' }}>No ports of registry</div>
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--text-secondary)',
+                      fontStyle: 'italic',
+                      marginBottom: '8px'
+                    }}
+                  >
+                    No ports of registry
+                  </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-                    {panelPorts.map(port => (
-                      <div key={port.id} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        background: port.isDefault ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.1)') : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)'),
-                        border: `1px solid ${port.isDefault ? 'rgba(var(--accent-primary-rgb), 0.25)' : 'var(--glass-border)'}`,
-                        fontSize: '0.85rem'
-                      }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    {panelPorts.map((port) => (
+                      <div
+                        key={port.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: port.isDefault
+                            ? isLight
+                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                              : 'rgba(var(--accent-primary-rgb), 0.1)'
+                            : isLight
+                              ? 'rgba(0,0,0,0.02)'
+                              : 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${port.isDefault ? 'rgba(var(--accent-primary-rgb), 0.25)' : 'var(--glass-border)'}`,
+                          fontSize: '0.85rem'
+                        }}
+                      >
                         {editingPortId === port.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                          <div
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}
+                          >
                             <input
                               type="text"
                               value={editPortName}
-                              onChange={e => setEditPortName(e.target.value)}
+                              onChange={(e) => setEditPortName(e.target.value)}
                               style={{ flex: 1, padding: '2px 6px', fontSize: '0.82rem' }}
                               autoFocus
-                              onKeyDown={e => { if (e.key === 'Enter') handleUpdatePort(); if (e.key === 'Escape') setEditingPortId(null) }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdatePort()
+                                if (e.key === 'Escape') setEditingPortId(null)
+                              }}
                             />
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              <input type="checkbox" checked={editPortDefault} onChange={e => setEditPortDefault(e.target.checked)} />
+                            <label
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={editPortDefault}
+                                onChange={(e) => setEditPortDefault(e.target.checked)}
+                              />
                               Default
                             </label>
-                            <button onClick={handleUpdatePort} className="btn-primary" style={{ padding: '2px 6px', fontSize: '0.72rem' }}>Save</button>
-                            <button onClick={() => setEditingPortId(null)} className="btn-secondary" style={{ padding: '2px 6px', fontSize: '0.72rem' }}>Cancel</button>
+                            <button
+                              onClick={handleUpdatePort}
+                              className="btn-primary"
+                              style={{ padding: '2px 6px', fontSize: '0.72rem' }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingPortId(null)}
+                              className="btn-secondary"
+                              style={{ padding: '2px 6px', fontSize: '0.72rem' }}
+                            >
+                              Cancel
+                            </button>
                           </div>
                         ) : (
                           <>
-                            <span style={{ flex: 1, fontWeight: port.isDefault ? 600 : 400 }}>{port.name}</span>
+                            <span style={{ flex: 1, fontWeight: port.isDefault ? 600 : 400 }}>
+                              {port.name}
+                            </span>
                             {port.isDefault && (
-                              <span style={{
-                                fontSize: '0.62rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background: 'rgba(var(--accent-primary-rgb), 0.2)',
-                                color: 'var(--accent-primary)',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px'
-                              }}>Default</span>
+                              <span
+                                style={{
+                                  fontSize: '0.62rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(var(--accent-primary-rgb), 0.2)',
+                                  color: 'var(--accent-primary)',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px'
+                                }}
+                              >
+                                Default
+                              </span>
                             )}
                             {canManage && (
                               <>
                                 <button
-                                  onClick={() => { setEditingPortId(port.id); setEditPortName(port.name); setEditPortDefault(port.isDefault) }}
-                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--accent-primary)' }}
+                                  onClick={() => {
+                                    setEditingPortId(port.id)
+                                    setEditPortName(port.name)
+                                    setEditPortDefault(port.isDefault)
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    color: 'var(--accent-primary)'
+                                  }}
                                   title="Edit port"
                                 >
                                   <Pencil size={13} />
                                 </button>
                                 <button
                                   onClick={() => handleDeletePort(port.id)}
-                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--danger)' }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    color: 'var(--danger)'
+                                  }}
                                   title="Delete port"
                                 >
                                   <Trash2 size={13} />
@@ -632,23 +1105,54 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
                 {/* Add port inline */}
                 {canManage && (
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}
+                  >
                     <input
                       type="text"
                       value={newPortName}
-                      onChange={e => setNewPortName(e.target.value)}
+                      onChange={(e) => setNewPortName(e.target.value)}
                       placeholder="Port name"
-                      style={{ flex: 1, minWidth: '100px', padding: '4px 8px', fontSize: '0.82rem' }}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPort() } }}
+                      style={{
+                        flex: 1,
+                        minWidth: '100px',
+                        padding: '4px 8px',
+                        fontSize: '0.82rem'
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddPort()
+                        }
+                      }}
                     />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      <input type="checkbox" checked={newPortDefault} onChange={e => setNewPortDefault(e.target.checked)} />
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newPortDefault}
+                        onChange={(e) => setNewPortDefault(e.target.checked)}
+                      />
                       Default
                     </label>
                     <button
                       onClick={handleAddPort}
                       className="btn-primary"
-                      style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
                     >
                       <Plus size={13} /> Add
                     </button>
@@ -661,10 +1165,31 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                 <div>
                   <div style={sectionLabel}>Actions</div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => openEditModal(selectedFlag)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      onClick={() => openEditModal(selectedFlag)}
+                      className="btn-secondary"
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: '0.82rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
                       <Pencil size={14} /> Edit Flag
                     </button>
-                    <button onClick={() => setDeleteConfirmId(selectedFlag.id)} className="btn-secondary" style={{ padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)' }}>
+                    <button
+                      onClick={() => setDeleteConfirmId(selectedFlag.id)}
+                      className="btn-secondary"
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: '0.82rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: 'var(--danger)'
+                      }}
+                    >
                       <Trash2 size={14} /> Delete
                     </button>
                   </div>
@@ -677,46 +1202,121 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', padding: '32px', width: '520px', maxWidth: '90vw', border: '1px solid var(--glass-border-color)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '520px',
+              maxWidth: '90vw',
+              border: '1px solid var(--glass-border-color)',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '28px'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background:
+                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
                   <Globe size={18} color="white" />
                 </div>
-                <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{modalEditId ? 'Edit Flag State' : 'Add Flag State'}</h3>
+                <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
+                  {modalEditId ? 'Edit Flag State' : 'Add Flag State'}
+                </h3>
               </div>
-              <button title="Close" aria-label="Close" onClick={closeModal} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
+              <button
+                title="Close"
+                aria-label="Close"
+                onClick={closeModal}
+                style={{
+                  padding: '6px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {/* Name + ISO row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Country Name *</label>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: '5px',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 500
+                    }}
+                  >
+                    Country Name *
+                  </label>
                   <input
                     type="text"
                     value={formName}
-                    onChange={e => handleNameChange(e.target.value, setFormName, setFormIso3)}
+                    onChange={(e) => handleNameChange(e.target.value, setFormName, setFormIso3)}
                     placeholder="e.g. Panama"
                     style={{ width: '100%' }}
                     list="country-names-modal"
                     autoFocus
                   />
                   <datalist id="country-names-modal">
-                    {countryNameToIso3.map(c => (
+                    {countryNameToIso3.map((c) => (
                       <option key={c.iso3} value={c.name} />
                     ))}
                   </datalist>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>ISO Code *</label>
+                  <label
+                    style={{
+                      display: 'block',
+                      marginBottom: '5px',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 500
+                    }}
+                  >
+                    ISO Code *
+                  </label>
                   <input
                     type="text"
                     value={formIso3}
-                    onChange={e => setFormIso3(e.target.value.toUpperCase().slice(0, 3))}
+                    onChange={(e) => setFormIso3(e.target.value.toUpperCase().slice(0, 3))}
                     placeholder="PAN"
                     style={{ width: '100%', textTransform: 'uppercase', fontFamily: 'monospace' }}
                     maxLength={3}
@@ -726,25 +1326,48 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
               {/* Display Name */}
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Display Name (for documents)</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500
+                  }}
+                >
+                  Display Name (for documents)
+                </label>
                 <input
                   type="text"
                   value={formDisplayName}
-                  onChange={e => setFormDisplayName(e.target.value)}
+                  onChange={(e) => setFormDisplayName(e.target.value)}
                   placeholder="e.g. Republic of Panama, Union of Comoros"
                   style={{ width: '100%' }}
                 />
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Official name used in policies and blue cards. If empty, the short name above will be used.
+                <div
+                  style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}
+                >
+                  Official name used in policies and blue cards. If empty, the short name above will
+                  be used.
                 </div>
               </div>
 
               {/* Email */}
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Email</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500
+                  }}
+                >
+                  Email
+                </label>
                 <textarea
                   value={formEmail}
-                  onChange={e => setFormEmail(e.target.value)}
+                  onChange={(e) => setFormEmail(e.target.value)}
                   placeholder="Email addresses (comma-separated)"
                   rows={2}
                   style={{ width: '100%', resize: 'vertical' }}
@@ -753,14 +1376,48 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
               {/* Conventions */}
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Conventions</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500
+                  }}
+                >
+                  Conventions
+                </label>
                 <div style={{ display: 'flex', gap: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={formRatifiedBunker} onChange={e => setFormRatifiedBunker(e.target.checked)} />
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formRatifiedBunker}
+                      onChange={(e) => setFormRatifiedBunker(e.target.checked)}
+                    />
                     Bunker Convention (2001)
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={formRatifiedWreck} onChange={e => setFormRatifiedWreck(e.target.checked)} />
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formRatifiedWreck}
+                      onChange={(e) => setFormRatifiedWreck(e.target.checked)}
+                    />
                     Wreck Removal Convention (2007)
                   </label>
                 </div>
@@ -768,20 +1425,40 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
 
               {/* Authority */}
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Maritime Authority Name</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500
+                  }}
+                >
+                  Maritime Authority Name
+                </label>
                 <input
                   type="text"
                   value={formAuthorityName}
-                  onChange={e => setFormAuthorityName(e.target.value)}
+                  onChange={(e) => setFormAuthorityName(e.target.value)}
                   placeholder="e.g. Panama Maritime Authority"
                   style={{ width: '100%' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Authority Address</label>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500
+                  }}
+                >
+                  Authority Address
+                </label>
                 <textarea
                   value={formAuthorityAddress}
-                  onChange={e => setFormAuthorityAddress(e.target.value)}
+                  onChange={(e) => setFormAuthorityAddress(e.target.value)}
                   placeholder="Authority address"
                   rows={3}
                   style={{ width: '100%', resize: 'vertical' }}
@@ -789,9 +1466,26 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
               </div>
 
               {/* Buttons */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button onClick={closeModal} className="btn-secondary" style={{ padding: '10px 20px' }}>Cancel</button>
-                <button onClick={handleModalSave} className="btn-primary" style={{ padding: '10px 20px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '10px',
+                  justifyContent: 'flex-end',
+                  marginTop: '8px'
+                }}
+              >
+                <button
+                  onClick={closeModal}
+                  className="btn-secondary"
+                  style={{ padding: '10px 20px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleModalSave}
+                  className="btn-primary"
+                  style={{ padding: '10px 20px' }}
+                >
                   {modalEditId ? 'Save Changes' : 'Add Flag State'}
                 </button>
               </div>

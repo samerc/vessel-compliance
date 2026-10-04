@@ -171,7 +171,10 @@ export default function EntityEditPanel({
       const withFile = safeDocs.filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
       try {
         const exists = await window.api.fsExistsMany(withFile.map((d) => d.filePath!))
-        if (Array.isArray(exists)) withFile.forEach((d, i) => { fstatus[d.id] = exists[i] })
+        if (Array.isArray(exists))
+          withFile.forEach((d, i) => {
+            fstatus[d.id] = exists[i]
+          })
       } catch {
         /* unknown = shown as present */
       }
@@ -1018,7 +1021,9 @@ export default function EntityEditPanel({
                   </span>
                   {canManage && (
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button title="Edit" aria-label="Edit"
+                      <button
+                        title="Edit"
+                        aria-label="Edit"
                         onClick={() => startEditAddress(addr)}
                         style={{
                           background: 'none',
@@ -1030,7 +1035,9 @@ export default function EntityEditPanel({
                       >
                         <Pencil size={12} />
                       </button>
-                      <button title="Delete" aria-label="Delete"
+                      <button
+                        title="Delete"
+                        aria-label="Delete"
                         onClick={() => handleDeleteAddress(addr.id)}
                         style={{
                           background: 'none',

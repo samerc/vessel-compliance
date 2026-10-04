@@ -6,7 +6,20 @@ import { TextAlign } from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import { Extension, Node as TipTapNode } from '@tiptap/react'
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ChevronDown, WrapText, Link as LinkIcon, Unlink } from 'lucide-react'
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  ChevronDown,
+  WrapText,
+  Link as LinkIcon,
+  Unlink
+} from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { promptDialog } from './DialogHost'
 import './RichTextEditor.css'
@@ -15,19 +28,21 @@ import './RichTextEditor.css'
 const FontFamily = Extension.create({
   name: 'fontFamily',
   addGlobalAttributes() {
-    return [{
-      types: ['textStyle'],
-      attributes: {
-        fontFamily: {
-          default: null,
-          parseHTML: el => (el as HTMLElement).style.fontFamily?.replace(/['"]+/g, '') || null,
-          renderHTML: attrs => {
-            if (!attrs.fontFamily) return {}
-            return { style: `font-family: ${attrs.fontFamily}` }
+    return [
+      {
+        types: ['textStyle'],
+        attributes: {
+          fontFamily: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).style.fontFamily?.replace(/['"]+/g, '') || null,
+            renderHTML: (attrs) => {
+              if (!attrs.fontFamily) return {}
+              return { style: `font-family: ${attrs.fontFamily}` }
+            }
           }
         }
       }
-    }]
+    ]
   }
 })
 
@@ -39,26 +54,28 @@ const FONT_FAMILIES = [
   { label: 'Courier New', value: 'Courier New, monospace' },
   { label: 'Verdana', value: 'Verdana, sans-serif' },
   { label: 'Calibri', value: 'Calibri, sans-serif' },
-  { label: 'Aptos', value: 'Aptos, sans-serif' },
+  { label: 'Aptos', value: 'Aptos, sans-serif' }
 ]
 
 // Custom FontSize extension using TextStyle marks
 const FontSize = Extension.create({
   name: 'fontSize',
   addGlobalAttributes() {
-    return [{
-      types: ['textStyle'],
-      attributes: {
-        fontSize: {
-          default: null,
-          parseHTML: el => (el as HTMLElement).style.fontSize?.replace(/['"]+/g, '') || null,
-          renderHTML: attrs => {
-            if (!attrs.fontSize) return {}
-            return { style: `font-size: ${attrs.fontSize}` }
+    return [
+      {
+        types: ['textStyle'],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).style.fontSize?.replace(/['"]+/g, '') || null,
+            renderHTML: (attrs) => {
+              if (!attrs.fontSize) return {}
+              return { style: `font-size: ${attrs.fontSize}` }
+            }
           }
         }
       }
-    }]
+    ]
   }
 })
 
@@ -66,19 +83,21 @@ const FontSize = Extension.create({
 const LineHeight = TipTapNode.create({
   name: 'lineHeight',
   addGlobalAttributes() {
-    return [{
-      types: ['paragraph'],
-      attributes: {
-        lineHeight: {
-          default: null,
-          parseHTML: el => (el as HTMLElement).style.lineHeight || null,
-          renderHTML: attrs => {
-            if (!attrs.lineHeight) return {}
-            return { style: `line-height: ${attrs.lineHeight}` }
+    return [
+      {
+        types: ['paragraph'],
+        attributes: {
+          lineHeight: {
+            default: null,
+            parseHTML: (el) => (el as HTMLElement).style.lineHeight || null,
+            renderHTML: (attrs) => {
+              if (!attrs.lineHeight) return {}
+              return { style: `line-height: ${attrs.lineHeight}` }
+            }
           }
         }
       }
-    }]
+    ]
   }
 })
 
@@ -92,7 +111,7 @@ const FONT_SIZES = [
   { label: '16', value: '16pt' },
   { label: '18', value: '18pt' },
   { label: '20', value: '20pt' },
-  { label: '24', value: '24pt' },
+  { label: '24', value: '24pt' }
 ]
 
 const LINE_SPACINGS = [
@@ -104,7 +123,7 @@ const LINE_SPACINGS = [
   { label: '1.5', value: '1.5' },
   { label: '2.0', value: '2' },
   { label: '2.5', value: '2.5' },
-  { label: '3.0', value: '3' },
+  { label: '3.0', value: '3' }
 ]
 
 export interface PlaceholderItem {
@@ -128,9 +147,25 @@ interface RichTextEditorProps {
   placeholderItems?: PlaceholderItem[]
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, minHeight = 80, maxWidth, showFontSize, showFontFamily, showAlignment, showLineSpacing, showPlaceholders, showHeadings, placeholderItems }: RichTextEditorProps) {
+export default function RichTextEditor({
+  value,
+  onChange,
+  placeholder,
+  minHeight = 80,
+  maxWidth,
+  showFontSize,
+  showFontFamily,
+  showAlignment,
+  showLineSpacing,
+  showPlaceholders,
+  showHeadings,
+  placeholderItems
+}: RichTextEditorProps) {
   const { theme } = useTheme()
-  const iconColor = useMemo(() => (theme === 'light' || theme === 'aurora') ? '#606770' : 'rgba(255,255,255,0.6)', [theme])
+  const iconColor = useMemo(
+    () => (theme === 'light' || theme === 'aurora' ? '#606770' : 'rgba(255,255,255,0.6)'),
+    [theme]
+  )
   const activeIconColor = '#ffffff'
   const skipUpdate = useRef(false)
   const [fontSizeOpen, setFontSizeOpen] = useState(false)
@@ -163,7 +198,9 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       if (showFontFamily) exts.push(FontFamily)
     }
     if (showAlignment) {
-      exts.push(TextAlign.configure({ types: showHeadings ? ['paragraph', 'heading'] : ['paragraph'] }))
+      exts.push(
+        TextAlign.configure({ types: showHeadings ? ['paragraph', 'heading'] : ['paragraph'] })
+      )
     }
     if (showLineSpacing) {
       exts.push(LineHeight)
@@ -171,29 +208,32 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
     return exts
   }, [showFontSize, showFontFamily, showAlignment, showLineSpacing, showHeadings])
 
-  const editor = useEditor({
-    extensions,
-    content: value || '',
-    editable: true,
-    immediatelyRender: true,
-    onUpdate: ({ editor: e }) => {
-      skipUpdate.current = true
-      const html = e.getHTML()
-      onChange(html === '<p></p>' ? '' : html)
-    },
-    editorProps: {
-      handlePaste: (view, event) => {
-        // Strip rich formatting on paste — insert as plain text to avoid foreign styles
-        const text = event.clipboardData?.getData('text/plain')
-        if (text) {
-          event.preventDefault()
-          view.dispatch(view.state.tr.insertText(text))
-          return true
+  const editor = useEditor(
+    {
+      extensions,
+      content: value || '',
+      editable: true,
+      immediatelyRender: true,
+      onUpdate: ({ editor: e }) => {
+        skipUpdate.current = true
+        const html = e.getHTML()
+        onChange(html === '<p></p>' ? '' : html)
+      },
+      editorProps: {
+        handlePaste: (view, event) => {
+          // Strip rich formatting on paste — insert as plain text to avoid foreign styles
+          const text = event.clipboardData?.getData('text/plain')
+          if (text) {
+            event.preventDefault()
+            view.dispatch(view.state.tr.insertText(text))
+            return true
+          }
+          return false
         }
-        return false
       }
-    }
-  }, [extensions])
+    },
+    [extensions]
+  )
 
   useEffect(() => {
     if (!editor) return
@@ -211,10 +251,26 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   useEffect(() => {
     if (!fontSizeOpen && !fontFamilyOpen && !lineSpacingOpen && !placeholderOpen) return
     const handler = (e: MouseEvent) => {
-      if (fontSizeOpen && fontSizeRef.current && !fontSizeRef.current.contains(e.target as Node)) setFontSizeOpen(false)
-      if (fontFamilyOpen && fontFamilyRef.current && !fontFamilyRef.current.contains(e.target as Node)) setFontFamilyOpen(false)
-      if (lineSpacingOpen && lineSpacingRef.current && !lineSpacingRef.current.contains(e.target as Node)) setLineSpacingOpen(false)
-      if (placeholderOpen && placeholderRef.current && !placeholderRef.current.contains(e.target as Node)) setPlaceholderOpen(false)
+      if (fontSizeOpen && fontSizeRef.current && !fontSizeRef.current.contains(e.target as Node))
+        setFontSizeOpen(false)
+      if (
+        fontFamilyOpen &&
+        fontFamilyRef.current &&
+        !fontFamilyRef.current.contains(e.target as Node)
+      )
+        setFontFamilyOpen(false)
+      if (
+        lineSpacingOpen &&
+        lineSpacingRef.current &&
+        !lineSpacingRef.current.contains(e.target as Node)
+      )
+        setLineSpacingOpen(false)
+      if (
+        placeholderOpen &&
+        placeholderRef.current &&
+        !placeholderRef.current.contains(e.target as Node)
+      )
+        setPlaceholderOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -248,7 +304,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
 
   const currentFontFamily = (editor.getAttributes('textStyle') as any).fontFamily || ''
   const fontFamilyLabel = currentFontFamily
-    ? FONT_FAMILIES.find(f => f.value === currentFontFamily)?.label || 'Custom'
+    ? FONT_FAMILIES.find((f) => f.value === currentFontFamily)?.label || 'Custom'
     : 'Font'
 
   const setFontFamily = (family: string) => {
@@ -279,12 +335,22 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                 onClick={() => setFontSizeOpen(!fontSizeOpen)}
                 title="Font Size"
               >
-                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600, minWidth: '16px', textAlign: 'center' }}>{fontSizeLabel}</span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: iconColor,
+                    fontWeight: 600,
+                    minWidth: '16px',
+                    textAlign: 'center'
+                  }}
+                >
+                  {fontSizeLabel}
+                </span>
                 <ChevronDown size={10} color={iconColor} />
               </button>
               {fontSizeOpen && (
                 <div className="rte-font-size-dropdown">
-                  {FONT_SIZES.map(s => (
+                  {FONT_SIZES.map((s) => (
                     <button
                       key={s.value}
                       type="button"
@@ -310,12 +376,24 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                 title="Font Family"
                 style={{ minWidth: '70px' }}
               >
-                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{fontFamilyLabel}</span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: iconColor,
+                    fontWeight: 600,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '80px'
+                  }}
+                >
+                  {fontFamilyLabel}
+                </span>
                 <ChevronDown size={10} color={iconColor} />
               </button>
               {fontFamilyOpen && (
                 <div className="rte-font-size-dropdown" style={{ minWidth: '160px' }}>
-                  {FONT_FAMILIES.map(f => (
+                  {FONT_FAMILIES.map((f) => (
                     <button
                       key={f.value}
                       type="button"
@@ -334,41 +412,117 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         )}
         {showHeadings && (
           <>
-            {[1, 2, 3].map(lvl => (
-              <button key={lvl} type="button" className={btn(editor.isActive('heading', { level: lvl }))} onClick={() => editor.chain().focus().toggleHeading({ level: lvl as any }).run()} title={`Heading ${lvl}`}
-                style={{ fontSize: '0.72rem', fontWeight: 700, color: editor.isActive('heading', { level: lvl }) ? activeIconColor : iconColor }}>
+            {[1, 2, 3].map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                className={btn(editor.isActive('heading', { level: lvl }))}
+                onClick={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .toggleHeading({ level: lvl as any })
+                    .run()
+                }
+                title={`Heading ${lvl}`}
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: editor.isActive('heading', { level: lvl }) ? activeIconColor : iconColor
+                }}
+              >
                 H{lvl}
               </button>
             ))}
             <div className="rte-separator" />
           </>
         )}
-        <button type="button" className={btn(editor.isActive('bold'))} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
-          <Bold size={14} color={editor.isActive('bold') ? activeIconColor : iconColor} strokeWidth={2.5} />
+        <button
+          type="button"
+          className={btn(editor.isActive('bold'))}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          title="Bold"
+        >
+          <Bold
+            size={14}
+            color={editor.isActive('bold') ? activeIconColor : iconColor}
+            strokeWidth={2.5}
+          />
         </button>
-        <button type="button" className={btn(editor.isActive('italic'))} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
-          <Italic size={14} color={editor.isActive('italic') ? activeIconColor : iconColor} strokeWidth={2.5} />
+        <button
+          type="button"
+          className={btn(editor.isActive('italic'))}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          title="Italic"
+        >
+          <Italic
+            size={14}
+            color={editor.isActive('italic') ? activeIconColor : iconColor}
+            strokeWidth={2.5}
+          />
         </button>
-        <button type="button" className={btn(editor.isActive('underline'))} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline">
-          <UnderlineIcon size={14} color={editor.isActive('underline') ? activeIconColor : iconColor} strokeWidth={2.5} />
+        <button
+          type="button"
+          className={btn(editor.isActive('underline'))}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          title="Underline"
+        >
+          <UnderlineIcon
+            size={14}
+            color={editor.isActive('underline') ? activeIconColor : iconColor}
+            strokeWidth={2.5}
+          />
         </button>
-        <button type="button" className={btn(isLinkActive)} onClick={toggleLink} title={isLinkActive ? 'Remove Link' : 'Add Link'}>
-          {isLinkActive
-            ? <Unlink size={14} color={activeIconColor} strokeWidth={2.5} />
-            : <LinkIcon size={14} color={iconColor} strokeWidth={2.5} />
-          }
+        <button
+          type="button"
+          className={btn(isLinkActive)}
+          onClick={toggleLink}
+          title={isLinkActive ? 'Remove Link' : 'Add Link'}
+        >
+          {isLinkActive ? (
+            <Unlink size={14} color={activeIconColor} strokeWidth={2.5} />
+          ) : (
+            <LinkIcon size={14} color={iconColor} strokeWidth={2.5} />
+          )}
         </button>
         <div className="rte-separator" />
         {showAlignment && (
           <>
-            <button type="button" className={btn(editor.isActive({ textAlign: 'left' }))} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Align Left">
-              <AlignLeft size={14} color={editor.isActive({ textAlign: 'left' }) ? activeIconColor : iconColor} strokeWidth={2.5} />
+            <button
+              type="button"
+              className={btn(editor.isActive({ textAlign: 'left' }))}
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              title="Align Left"
+            >
+              <AlignLeft
+                size={14}
+                color={editor.isActive({ textAlign: 'left' }) ? activeIconColor : iconColor}
+                strokeWidth={2.5}
+              />
             </button>
-            <button type="button" className={btn(editor.isActive({ textAlign: 'center' }))} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Align Center">
-              <AlignCenter size={14} color={editor.isActive({ textAlign: 'center' }) ? activeIconColor : iconColor} strokeWidth={2.5} />
+            <button
+              type="button"
+              className={btn(editor.isActive({ textAlign: 'center' }))}
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              title="Align Center"
+            >
+              <AlignCenter
+                size={14}
+                color={editor.isActive({ textAlign: 'center' }) ? activeIconColor : iconColor}
+                strokeWidth={2.5}
+              />
             </button>
-            <button type="button" className={btn(editor.isActive({ textAlign: 'right' }))} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Align Right">
-              <AlignRight size={14} color={editor.isActive({ textAlign: 'right' }) ? activeIconColor : iconColor} strokeWidth={2.5} />
+            <button
+              type="button"
+              className={btn(editor.isActive({ textAlign: 'right' }))}
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              title="Align Right"
+            >
+              <AlignRight
+                size={14}
+                color={editor.isActive({ textAlign: 'right' }) ? activeIconColor : iconColor}
+                strokeWidth={2.5}
+              />
             </button>
             <div className="rte-separator" />
           </>
@@ -387,7 +541,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
               </button>
               {lineSpacingOpen && (
                 <div className="rte-font-size-dropdown">
-                  {LINE_SPACINGS.map(s => (
+                  {LINE_SPACINGS.map((s) => (
                     <button
                       key={s.value}
                       type="button"
@@ -403,11 +557,29 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
             <div className="rte-separator" />
           </>
         )}
-        <button type="button" className={btn(editor.isActive('bulletList'))} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">
-          <List size={14} color={editor.isActive('bulletList') ? activeIconColor : iconColor} strokeWidth={2.5} />
+        <button
+          type="button"
+          className={btn(editor.isActive('bulletList'))}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          title="Bullet List"
+        >
+          <List
+            size={14}
+            color={editor.isActive('bulletList') ? activeIconColor : iconColor}
+            strokeWidth={2.5}
+          />
         </button>
-        <button type="button" className={btn(editor.isActive('orderedList'))} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered List">
-          <ListOrdered size={14} color={editor.isActive('orderedList') ? activeIconColor : iconColor} strokeWidth={2.5} />
+        <button
+          type="button"
+          className={btn(editor.isActive('orderedList'))}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          title="Numbered List"
+        >
+          <ListOrdered
+            size={14}
+            color={editor.isActive('orderedList') ? activeIconColor : iconColor}
+            strokeWidth={2.5}
+          />
         </button>
         {showPlaceholders && placeholderItems && placeholderItems.length > 0 && (
           <>
@@ -421,23 +593,47 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                 style={{ minWidth: '90px', gap: '4px' }}
               >
                 <span style={{ fontSize: '13px', lineHeight: 1 }}>&#8853;</span>
-                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600 }}>Insert Field</span>
+                <span style={{ fontSize: '11px', color: iconColor, fontWeight: 600 }}>
+                  Insert Field
+                </span>
                 <ChevronDown size={10} color={iconColor} />
               </button>
               {placeholderOpen && (
-                <div className="rte-font-size-dropdown" style={{ minWidth: '220px', maxHeight: '320px', overflowY: 'auto', right: 0, left: 'auto' }}>
+                <div
+                  className="rte-font-size-dropdown"
+                  style={{
+                    minWidth: '220px',
+                    maxHeight: '320px',
+                    overflowY: 'auto',
+                    right: 0,
+                    left: 'auto'
+                  }}
+                >
                   {(() => {
-                    const grouped = placeholderItems.reduce<Record<string, PlaceholderItem[]>>((acc, p) => {
-                      if (!acc[p.category]) acc[p.category] = []
-                      acc[p.category].push(p)
-                      return acc
-                    }, {})
+                    const grouped = placeholderItems.reduce<Record<string, PlaceholderItem[]>>(
+                      (acc, p) => {
+                        if (!acc[p.category]) acc[p.category] = []
+                        acc[p.category].push(p)
+                        return acc
+                      },
+                      {}
+                    )
                     return Object.entries(grouped).map(([cat, items]) => (
                       <div key={cat}>
-                        <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--table-border)' }}>
+                        <div
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            color: 'var(--text-secondary)',
+                            borderBottom: '1px solid var(--table-border)'
+                          }}
+                        >
                           {cat}
                         </div>
-                        {items.map(item => (
+                        {items.map((item) => (
                           <button
                             key={item.key}
                             type="button"
@@ -446,10 +642,23 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
                               editor.chain().focus().insertContent(item.key).run()
                               setPlaceholderOpen(false)
                             }}
-                            style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', width: '100%' }}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              gap: '8px',
+                              width: '100%'
+                            }}
                           >
                             <span>{item.label}</span>
-                            <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{item.key}</span>
+                            <span
+                              style={{
+                                fontFamily: 'monospace',
+                                fontSize: '0.72rem',
+                                color: 'var(--text-secondary)'
+                              }}
+                            >
+                              {item.key}
+                            </span>
                           </button>
                         ))}
                       </div>

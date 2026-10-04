@@ -5,8 +5,28 @@ import type { InstalmentRow } from '../utils/premiumCalc'
 import { StrMoneyInput } from './quotation-tabs/shared'
 
 // ── Number to words ────────────────────────────────────────────────────────────
-const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+const ONES = [
+  '',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen'
+]
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
 
 function intToWords(n: number): string {
@@ -15,10 +35,23 @@ function intToWords(n: number): string {
     if (num === 0) return ''
     if (num < 20) return ONES[num]
     if (num < 100) return TENS[Math.floor(num / 10)] + (num % 10 ? '-' + ONES[num % 10] : '')
-    if (num < 1000) return ONES[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + helper(num % 100) : '')
-    if (num < 1_000_000) return helper(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + helper(num % 1000) : '')
-    if (num < 1_000_000_000) return helper(Math.floor(num / 1_000_000)) + ' Million' + (num % 1_000_000 ? ' ' + helper(num % 1_000_000) : '')
-    return helper(Math.floor(num / 1_000_000_000)) + ' Billion' + (num % 1_000_000_000 ? ' ' + helper(num % 1_000_000_000) : '')
+    if (num < 1000)
+      return ONES[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + helper(num % 100) : '')
+    if (num < 1_000_000)
+      return (
+        helper(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + helper(num % 1000) : '')
+      )
+    if (num < 1_000_000_000)
+      return (
+        helper(Math.floor(num / 1_000_000)) +
+        ' Million' +
+        (num % 1_000_000 ? ' ' + helper(num % 1_000_000) : '')
+      )
+    return (
+      helper(Math.floor(num / 1_000_000_000)) +
+      ' Billion' +
+      (num % 1_000_000_000 ? ' ' + helper(num % 1_000_000_000) : '')
+    )
   }
   return helper(Math.round(n))
 }
@@ -27,7 +60,10 @@ function numberToText(n: number): string {
   const int = Math.floor(Math.abs(n))
   const dec = Math.round((Math.abs(n) - int) * 100)
   const words = int === 0 ? 'Zero' : intToWords(int)
-  const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formatted = n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
   return `${formatted} - ${words} and ${dec.toString().padStart(2, '0')}/100`
 }
 
@@ -81,8 +117,14 @@ export default function PremiumCalculator() {
 
     const startObj = new Date(startDate)
     const endObj = new Date(endDate)
-    const startTime = startObj.getHours().toString().padStart(2, '0') + ':' + startObj.getMinutes().toString().padStart(2, '0')
-    const endTime = endObj.getHours().toString().padStart(2, '0') + ':' + endObj.getMinutes().toString().padStart(2, '0')
+    const startTime =
+      startObj.getHours().toString().padStart(2, '0') +
+      ':' +
+      startObj.getMinutes().toString().padStart(2, '0')
+    const endTime =
+      endObj.getHours().toString().padStart(2, '0') +
+      ':' +
+      endObj.getMinutes().toString().padStart(2, '0')
 
     const calc = calcProRataPremium(days, annual, period, instalments, commission)
 
@@ -111,15 +153,31 @@ export default function PremiumCalculator() {
     borderRadius: '8px',
     border: `1px solid rgba(${color}, 0.15)`
   })
-  const stepLabel: React.CSSProperties = { color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '4px', fontFamily: 'inherit' }
+  const stepLabel: React.CSSProperties = {
+    color: 'var(--text-secondary)',
+    fontSize: '0.8rem',
+    marginBottom: '4px',
+    fontFamily: 'inherit'
+  }
   const stepVal: React.CSSProperties = { color: 'var(--text-primary)' }
-  const stepHighlight: React.CSSProperties = { color: 'var(--text-primary)', fontWeight: '600', marginTop: '4px' }
+  const stepHighlight: React.CSSProperties = {
+    color: 'var(--text-primary)',
+    fontWeight: '600',
+    marginTop: '4px'
+  }
 
   return (
     <div>
       {/* Input Section */}
       <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}
+        >
           <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Pro-Rata Premium Calculator</h3>
           <button
             onClick={handleReset}
@@ -132,73 +190,163 @@ export default function PremiumCalculator() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               Start Date & Time
             </label>
             <input
               type="datetime-local"
               value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
               aria-label="Policy start date and time"
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               End Date & Time
             </label>
             <input
               type="datetime-local"
               value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
               aria-label="Policy end date and time"
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               Annual Premium
             </label>
-            <StrMoneyInput value={annualPremium} onChange={s => setAnnualPremium(s)} placeholder="e.g. 10000" style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} aria-label="Annual premium amount" />
+            <StrMoneyInput
+              value={annualPremium}
+              onChange={(s) => setAnnualPremium(s)}
+              placeholder="e.g. 10000"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
+              aria-label="Annual premium amount"
+            />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               Standard Period (days)
             </label>
             <input
               type="number"
               value={standardPeriod}
-              onChange={e => setStandardPeriod(e.target.value)}
+              onChange={(e) => setStandardPeriod(e.target.value)}
               min="1"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
               aria-label="Standard policy period in days"
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               Number of Instalments
             </label>
             <input
               type="number"
               value={numInstalments}
-              onChange={e => setNumInstalments(e.target.value)}
+              onChange={(e) => setNumInstalments(e.target.value)}
               min="1"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
               aria-label="Number of premium instalments"
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}
+            >
               Commission (%)
             </label>
             <input
               type="number"
               value={commissionPct}
-              onChange={e => setCommissionPct(e.target.value)}
+              onChange={(e) => setCommissionPct(e.target.value)}
               min="0"
               max="100"
               step="0.01"
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
+                color: 'var(--text-primary)'
+              }}
               aria-label="Commission percentage"
             />
           </div>
@@ -212,31 +360,107 @@ export default function PremiumCalculator() {
           <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Summary</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-              <div style={{ padding: '16px', background: 'rgba(var(--accent-primary-rgb), 0.08)', borderRadius: '10px', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Policy Days</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{calculation.days}</div>
+              <div
+                style={{
+                  padding: '16px',
+                  background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(var(--accent-primary-rgb), 0.2)'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Policy Days
+                </div>
+                <div
+                  style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}
+                >
+                  {calculation.days}
+                </div>
               </div>
-              <div style={{ padding: '16px', background: 'rgba(0, 255, 136, 0.08)', borderRadius: '10px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Pro-Rata Premium</div>
+              <div
+                style={{
+                  padding: '16px',
+                  background: 'rgba(0, 255, 136, 0.08)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(0, 255, 136, 0.2)'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Pro-Rata Premium
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.proRataPremium)}</div>
+                  <div
+                    style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}
+                  >
+                    {fmt(calculation.proRataPremium)}
+                  </div>
                   <button
                     onClick={() => copyToClipboard(calculation.proRataPremium, 'premium')}
                     title={numberToText(calculation.proRataPremium)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === 'premium' ? 'var(--success)' : 'var(--text-secondary)', display: 'flex', padding: '4px', borderRadius: '6px', flexShrink: 0 }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: copiedField === 'premium' ? 'var(--success)' : 'var(--text-secondary)',
+                      display: 'flex',
+                      padding: '4px',
+                      borderRadius: '6px',
+                      flexShrink: 0
+                    }}
                   >
                     {copiedField === 'premium' ? <Check size={16} /> : <Copy size={16} />}
                   </button>
                 </div>
               </div>
-              <div style={{ padding: '16px', background: 'rgba(255, 165, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(255, 165, 0, 0.2)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Commission</div>
+              <div
+                style={{
+                  padding: '16px',
+                  background: 'rgba(255, 165, 0, 0.08)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 165, 0, 0.2)'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Total Commission
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{fmt(calculation.commissionTotal)}</div>
+                  <div
+                    style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}
+                  >
+                    {fmt(calculation.commissionTotal)}
+                  </div>
                   <button
                     onClick={() => copyToClipboard(calculation.commissionTotal, 'commission')}
                     title={numberToText(calculation.commissionTotal)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === 'commission' ? 'var(--success)' : 'var(--text-secondary)', display: 'flex', padding: '4px', borderRadius: '6px', flexShrink: 0 }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color:
+                        copiedField === 'commission' ? 'var(--success)' : 'var(--text-secondary)',
+                      display: 'flex',
+                      padding: '4px',
+                      borderRadius: '6px',
+                      flexShrink: 0
+                    }}
                   >
                     {copiedField === 'commission' ? <Check size={16} /> : <Copy size={16} />}
                   </button>
@@ -247,26 +471,52 @@ export default function PremiumCalculator() {
 
           {/* Instalment Breakdown */}
           <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Instalment Breakdown</h3>
-            <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid var(--table-border)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
+              Instalment Breakdown
+            </h3>
+            <div
+              style={{
+                overflow: 'hidden',
+                borderRadius: '8px',
+                border: '1px solid var(--table-border)'
+              }}
+            >
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <caption className="sr-only">Premium and commission instalment breakdown</caption>
                 <thead>
-                  <tr style={{ textAlign: 'left', background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-border)' }}>
-                    <th scope="col" style={{ padding: '14px 16px', width: '80px' }}>#</th>
-                    <th scope="col" style={{ padding: '14px 16px' }}>Premium Instalment</th>
+                  <tr
+                    style={{
+                      textAlign: 'left',
+                      background: 'var(--table-header-bg)',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    <th scope="col" style={{ padding: '14px 16px', width: '80px' }}>
+                      #
+                    </th>
+                    <th scope="col" style={{ padding: '14px 16px' }}>
+                      Premium Instalment
+                    </th>
                     {parseFloat(commissionPct) > 0 && (
-                      <th scope="col" style={{ padding: '14px 16px' }}>Commission Instalment</th>
+                      <th scope="col" style={{ padding: '14px 16px' }}>
+                        Commission Instalment
+                      </th>
                     )}
                   </tr>
                 </thead>
                 <tbody>
-                  {calculation.rows.map(row => (
+                  {calculation.rows.map((row) => (
                     <tr key={row.number} style={{ borderBottom: '1px solid var(--table-border)' }}>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{row.number}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.premium)}</td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                        {row.number}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                        {fmt(row.premium)}
+                      </td>
                       {parseFloat(commissionPct) > 0 && (
-                        <td style={{ padding: '12px 16px', fontWeight: '500' }}>{fmt(row.commission)}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                          {fmt(row.commission)}
+                        </td>
                       )}
                     </tr>
                   ))}
@@ -284,32 +534,42 @@ export default function PremiumCalculator() {
 
           {/* Calculation Steps */}
           <section className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Calculation Steps</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontFamily: 'monospace', fontSize: '0.9rem' }}>
-
+            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
+              Calculation Steps
+            </h3>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem'
+              }}
+            >
               {/* Step 1: Days */}
               <div style={stepStyle('0, 210, 255')}>
                 <div style={stepLabel}>Step 1: Calculate Number of Days</div>
-                <div style={stepVal}>
-                  Calendar day difference = {calculation.calendarDays} days
-                </div>
+                <div style={stepVal}>Calendar day difference = {calculation.calendarDays} days</div>
                 <div style={stepVal}>
                   Start time: {calculation.startTime} | End time: {calculation.endTime}
-                  {calculation.addedDay
-                    ? <span style={{ color: 'var(--accent-primary)' }}> → end time {'>'} start time, +1 day</span>
-                    : <span style={{ color: 'var(--text-secondary)' }}> → no extra day added</span>
-                  }
+                  {calculation.addedDay ? (
+                    <span style={{ color: 'var(--accent-primary)' }}>
+                      {' '}
+                      → end time {'>'} start time, +1 day
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-secondary)' }}> → no extra day added</span>
+                  )}
                 </div>
-                <div style={stepHighlight}>
-                  Total days = {calculation.days}
-                </div>
+                <div style={stepHighlight}>Total days = {calculation.days}</div>
               </div>
 
               {/* Step 2: Pro-rata premium */}
               <div style={stepStyle('0, 255, 136')}>
                 <div style={stepLabel}>Step 2: Calculate Pro-Rata Premium</div>
                 <div style={stepVal}>
-                  ({calculation.days} × {fmt(parseFloat(annualPremium))}) / {standardPeriod} = {fmt(calculation.proRataPremium)}
+                  ({calculation.days} × {fmt(parseFloat(annualPremium))}) / {standardPeriod} ={' '}
+                  {fmt(calculation.proRataPremium)}
                 </div>
               </div>
 
@@ -317,7 +577,8 @@ export default function PremiumCalculator() {
               <div style={stepStyle('150, 100, 255')}>
                 <div style={stepLabel}>Step 3: Calculate Annual Instalment Amount</div>
                 <div style={stepVal}>
-                  {fmt(parseFloat(annualPremium))} / {numInstalments} = {fmt(calculation.annualInstalment)}
+                  {fmt(parseFloat(annualPremium))} / {numInstalments} ={' '}
+                  {fmt(calculation.annualInstalment)}
                 </div>
               </div>
 
@@ -325,18 +586,20 @@ export default function PremiumCalculator() {
               <div style={stepStyle('150, 100, 255')}>
                 <div style={stepLabel}>Step 4: Full Instalments Covered</div>
                 <div style={stepVal}>
-                  {fmt(calculation.proRataPremium)} / {fmt(calculation.annualInstalment)} = {(calculation.proRataPremium / calculation.annualInstalment).toFixed(4)}...
+                  {fmt(calculation.proRataPremium)} / {fmt(calculation.annualInstalment)} ={' '}
+                  {(calculation.proRataPremium / calculation.annualInstalment).toFixed(4)}...
                 </div>
-                <div style={stepHighlight}>
-                  Full instalments = {calculation.fullInstalments}
-                </div>
+                <div style={stepHighlight}>Full instalments = {calculation.fullInstalments}</div>
               </div>
 
               {/* Step 5: First instalment */}
               <div style={stepStyle('150, 100, 255')}>
                 <div style={stepLabel}>Step 5: First Instalment (Remainder)</div>
                 <div style={stepVal}>
-                  {fmt(calculation.proRataPremium)} - ({fmt(calculation.annualInstalment)} × {calculation.fullInstalments}) = {fmt(calculation.proRataPremium)} - {fmt(calculation.annualInstalment * calculation.fullInstalments)} = {fmt(calculation.firstPremiumInstalment)}
+                  {fmt(calculation.proRataPremium)} - ({fmt(calculation.annualInstalment)} ×{' '}
+                  {calculation.fullInstalments}) = {fmt(calculation.proRataPremium)} -{' '}
+                  {fmt(calculation.annualInstalment * calculation.fullInstalments)} ={' '}
+                  {fmt(calculation.firstPremiumInstalment)}
                 </div>
               </div>
 
@@ -346,7 +609,8 @@ export default function PremiumCalculator() {
                   <div style={stepStyle('255, 165, 0')}>
                     <div style={stepLabel}>Step 6: Calculate Pro-Rata Commission</div>
                     <div style={stepVal}>
-                      {fmt(calculation.proRataPremium)} × {commissionPct}% = {fmt(calculation.commissionTotal)}
+                      {fmt(calculation.proRataPremium)} × {commissionPct}% ={' '}
+                      {fmt(calculation.commissionTotal)}
                     </div>
                   </div>
 
@@ -354,7 +618,8 @@ export default function PremiumCalculator() {
                   <div style={stepStyle('255, 165, 0')}>
                     <div style={stepLabel}>Step 7: Annual Commission</div>
                     <div style={stepVal}>
-                      {fmt(parseFloat(annualPremium))} × {commissionPct}% = {fmt(calculation.annualCommission)}
+                      {fmt(parseFloat(annualPremium))} × {commissionPct}% ={' '}
+                      {fmt(calculation.annualCommission)}
                     </div>
                   </div>
 
@@ -362,7 +627,8 @@ export default function PremiumCalculator() {
                   <div style={stepStyle('255, 165, 0')}>
                     <div style={stepLabel}>Step 8: Annual Commission per Instalment</div>
                     <div style={stepVal}>
-                      {fmt(calculation.annualCommission)} / {numInstalments} = {fmt(calculation.annualCommissionInstalment)}
+                      {fmt(calculation.annualCommission)} / {numInstalments} ={' '}
+                      {fmt(calculation.annualCommissionInstalment)}
                     </div>
                   </div>
 
@@ -378,7 +644,11 @@ export default function PremiumCalculator() {
                   <div style={stepStyle('255, 165, 0')}>
                     <div style={stepLabel}>Step 10: First Commission Instalment (Remainder)</div>
                     <div style={stepVal}>
-                      {fmt(calculation.commissionTotal)} - ({fmt(calculation.annualCommissionInstalment)} × {calculation.fullInstalments}) = {fmt(calculation.commissionTotal)} - {fmt(calculation.annualCommissionInstalment * calculation.fullInstalments)} = {fmt(calculation.firstCommissionInstalment)}
+                      {fmt(calculation.commissionTotal)} - (
+                      {fmt(calculation.annualCommissionInstalment)} × {calculation.fullInstalments})
+                      = {fmt(calculation.commissionTotal)} -{' '}
+                      {fmt(calculation.annualCommissionInstalment * calculation.fullInstalments)} ={' '}
+                      {fmt(calculation.firstCommissionInstalment)}
                     </div>
                   </div>
                 </>
@@ -389,7 +659,10 @@ export default function PremiumCalculator() {
       )}
 
       {!calculation && startDate && endDate && (
-        <div className="glass-card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div
+          className="glass-card"
+          style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}
+        >
           Enter valid dates and a premium amount to see the calculation results.
         </div>
       )}

@@ -2,7 +2,9 @@ import xml2js from 'xml2js'
 import { normalizeText, extractText, parseDate, normalizeEntityType } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
-export async function parseOfacSdn(xmlData: string): Promise<{ entities: SanctionsEntity[]; releaseDate: string | null }> {
+export async function parseOfacSdn(
+  xmlData: string
+): Promise<{ entities: SanctionsEntity[]; releaseDate: string | null }> {
   const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true })
   const result = await parser.parseStringPromise(xmlData)
 
@@ -23,7 +25,9 @@ export async function parseOfacSdn(xmlData: string): Promise<{ entities: Sanctio
     try {
       const entity = parseSDNEntry(entry)
       if (entity) entries.push(entity)
-    } catch { /* skip malformed */ }
+    } catch {
+      /* skip malformed */
+    }
   }
 
   return { entities: entries, releaseDate }
@@ -102,8 +106,11 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
 
   let vesselImo: string | null = null
   if (entityType === 'vessel') {
-    const imoId = identifications.find(id =>
-      id.type && (id.type.toLowerCase().includes('imo') || id.type.toLowerCase().includes('vessel registration'))
+    const imoId = identifications.find(
+      (id) =>
+        id.type &&
+        (id.type.toLowerCase().includes('imo') ||
+          id.type.toLowerCase().includes('vessel registration'))
     )
     if (imoId) {
       const match = imoId.number.match(/\d{7}/)
@@ -144,9 +151,13 @@ function getAkaName(aka: any): string {
 function parseAddress(addr: any): string | null {
   if (!addr) return null
   const parts = [
-    extractText(addr.address1), extractText(addr.address2), extractText(addr.address3),
-    extractText(addr.city), extractText(addr.stateOrProvince),
-    extractText(addr.postalCode), extractText(addr.country)
+    extractText(addr.address1),
+    extractText(addr.address2),
+    extractText(addr.address3),
+    extractText(addr.city),
+    extractText(addr.stateOrProvince),
+    extractText(addr.postalCode),
+    extractText(addr.country)
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(', ') : null
 }

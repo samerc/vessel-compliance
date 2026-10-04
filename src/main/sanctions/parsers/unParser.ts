@@ -2,7 +2,9 @@ import xml2js from 'xml2js'
 import { normalizeText, extractText, parseDate } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
-export async function parseUnSanctions(xmlData: string): Promise<{ entities: SanctionsEntity[]; releaseDate: string | null }> {
+export async function parseUnSanctions(
+  xmlData: string
+): Promise<{ entities: SanctionsEntity[]; releaseDate: string | null }> {
   const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true })
   const result = await parser.parseStringPromise(xmlData)
 
@@ -18,7 +20,9 @@ export async function parseUnSanctions(xmlData: string): Promise<{ entities: San
         try {
           const entity = parseUnIndividual(ind)
           if (entity) entries.push(entity)
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
   }
@@ -31,7 +35,9 @@ export async function parseUnSanctions(xmlData: string): Promise<{ entities: San
         try {
           const entity = parseUnEntity(ent)
           if (entity) entries.push(entity)
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
   }
@@ -41,24 +47,31 @@ export async function parseUnSanctions(xmlData: string): Promise<{ entities: San
 
 function parseUnIndividual(ind: any): SanctionsEntity | null {
   const nameParts = [
-    extractText(ind.FIRST_NAME), extractText(ind.SECOND_NAME),
-    extractText(ind.THIRD_NAME), extractText(ind.FOURTH_NAME)
+    extractText(ind.FIRST_NAME),
+    extractText(ind.SECOND_NAME),
+    extractText(ind.THIRD_NAME),
+    extractText(ind.FOURTH_NAME)
   ].filter(Boolean)
   const primaryName = nameParts.join(' ')
   if (!primaryName) return null
 
   const aliases: string[] = []
   if (ind.INDIVIDUAL_ALIAS) {
-    let aliasList = Array.isArray(ind.INDIVIDUAL_ALIAS) ? ind.INDIVIDUAL_ALIAS : [ind.INDIVIDUAL_ALIAS]
+    let aliasList = Array.isArray(ind.INDIVIDUAL_ALIAS)
+      ? ind.INDIVIDUAL_ALIAS
+      : [ind.INDIVIDUAL_ALIAS]
     for (const alias of aliasList) {
       const aliasName = extractText(alias.ALIAS_NAME || alias)
-      if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName)) aliases.push(aliasName)
+      if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName))
+        aliases.push(aliasName)
     }
   }
 
   let dateOfBirth: string | null = null
   if (ind.INDIVIDUAL_DATE_OF_BIRTH) {
-    let dobList = Array.isArray(ind.INDIVIDUAL_DATE_OF_BIRTH) ? ind.INDIVIDUAL_DATE_OF_BIRTH : [ind.INDIVIDUAL_DATE_OF_BIRTH]
+    let dobList = Array.isArray(ind.INDIVIDUAL_DATE_OF_BIRTH)
+      ? ind.INDIVIDUAL_DATE_OF_BIRTH
+      : [ind.INDIVIDUAL_DATE_OF_BIRTH]
     if (dobList[0]) dateOfBirth = parseDate(dobList[0].DATE || dobList[0].YEAR || dobList[0])
   }
 
@@ -70,7 +83,9 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
 
   const addresses: string[] = []
   if (ind.INDIVIDUAL_ADDRESS) {
-    let addrList = Array.isArray(ind.INDIVIDUAL_ADDRESS) ? ind.INDIVIDUAL_ADDRESS : [ind.INDIVIDUAL_ADDRESS]
+    let addrList = Array.isArray(ind.INDIVIDUAL_ADDRESS)
+      ? ind.INDIVIDUAL_ADDRESS
+      : [ind.INDIVIDUAL_ADDRESS]
     for (const addr of addrList) {
       const address = parseUnAddress(addr)
       if (address) addresses.push(address)
@@ -79,7 +94,9 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
 
   const identifications: { type: string; number: string; country: string }[] = []
   if (ind.INDIVIDUAL_DOCUMENT) {
-    let docList = Array.isArray(ind.INDIVIDUAL_DOCUMENT) ? ind.INDIVIDUAL_DOCUMENT : [ind.INDIVIDUAL_DOCUMENT]
+    let docList = Array.isArray(ind.INDIVIDUAL_DOCUMENT)
+      ? ind.INDIVIDUAL_DOCUMENT
+      : [ind.INDIVIDUAL_DOCUMENT]
     for (const doc of docList) {
       identifications.push({
         type: extractText(doc.TYPE_OF_DOCUMENT || doc.TYPE_OF_DOCUMENT2),
@@ -122,7 +139,8 @@ function parseUnEntity(ent: any): SanctionsEntity | null {
     let aliasList = Array.isArray(ent.ENTITY_ALIAS) ? ent.ENTITY_ALIAS : [ent.ENTITY_ALIAS]
     for (const alias of aliasList) {
       const aliasName = extractText(alias.ALIAS_NAME || alias)
-      if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName)) aliases.push(aliasName)
+      if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName))
+        aliases.push(aliasName)
     }
   }
 
@@ -170,8 +188,10 @@ function extractImoFromText(text: string | null): string | null {
 function parseUnAddress(addr: any): string | null {
   if (!addr) return null
   const parts = [
-    extractText(addr.STREET), extractText(addr.CITY),
-    extractText(addr.STATE_PROVINCE), extractText(addr.ZIP_CODE),
+    extractText(addr.STREET),
+    extractText(addr.CITY),
+    extractText(addr.STATE_PROVINCE),
+    extractText(addr.ZIP_CODE),
     extractText(addr.COUNTRY)
   ].filter(Boolean)
   if (parts.length === 0 && addr.NOTE) return extractText(addr.NOTE)

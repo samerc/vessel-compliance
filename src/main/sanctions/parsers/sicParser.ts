@@ -2,7 +2,10 @@ import XLSX from 'xlsx-js-style'
 import { normalizeText } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
-export function parseSicExcel(buffer: Buffer): { entities: SanctionsEntity[]; releaseDate: string | null } {
+export function parseSicExcel(buffer: Buffer): {
+  entities: SanctionsEntity[]
+  releaseDate: string | null
+} {
   const wb = XLSX.read(buffer, { type: 'buffer' })
   const entries: SanctionsEntity[] = []
 
@@ -59,7 +62,8 @@ export function parseSicExcel(buffer: Buffer): { entities: SanctionsEntity[]; re
 
       const rawDate = row[0]
       if (rawDate != null) {
-        lastDate = typeof rawDate === 'number' ? excelDateToString(rawDate) : cleanText(rawDate) || null
+        lastDate =
+          typeof rawDate === 'number' ? excelDateToString(rawDate) : cleanText(rawDate) || null
         lastSubject = cleanText(row[5]) || null
       }
       const subject = cleanText(row[5]) || lastSubject
@@ -104,13 +108,16 @@ export function parseSicExcel(buffer: Buffer): { entities: SanctionsEntity[]; re
 
 function extractAliases(fullName: string): { primary: string; aliases: string[] } {
   if (!fullName.toLowerCase().includes(' or ')) return { primary: fullName, aliases: [] }
-  const parts = fullName.split(/\s+or\s+/i).map(p => p.trim()).filter(Boolean)
+  const parts = fullName
+    .split(/\s+or\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
   if (parts.length <= 1) return { primary: fullName, aliases: [] }
   // First part is primary, but it may be "First Last1" and rest are just last name variants
   const primary = parts[0]
   const firstParts = primary.split(/\s+/)
   const firstName = firstParts.length > 1 ? firstParts.slice(0, -1).join(' ') : ''
-  const aliases = parts.slice(1).map(p => {
+  const aliases = parts.slice(1).map((p) => {
     if (p.includes(' ')) return p
     return firstName ? `${firstName} ${p}` : p
   })

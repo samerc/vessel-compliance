@@ -5,7 +5,7 @@ export const REPORT_SETTINGS_DEFAULTS: ReportSettings = {
   companyName: 'Al Bahriah Insurance & Reinsurance SAL',
   companySubtitle: '',
   footerText: 'Al Bahriah Insurance & Reinsurance SAL — Confidential',
-  primaryColor: [28, 52, 95],
+  primaryColor: [28, 52, 95]
 }
 
 /** Reports that support custom intro/end text (shown in Admin → Report Settings → Report Texts).
@@ -80,9 +80,6 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 /** Derive a lighter tint of the primary color for vessel/sub-header rows */
-export function tintColor(
-  rgb: [number, number, number],
-  factor = 0.8
-): [number, number, number] {
+export function tintColor(rgb: [number, number, number], factor = 0.8): [number, number, number] {
   return rgb.map((c) => Math.round(c + (255 - c) * factor)) as [number, number, number]
 }

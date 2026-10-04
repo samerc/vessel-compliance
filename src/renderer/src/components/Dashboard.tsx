@@ -1,12 +1,45 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
-  Activity, AlertTriangle, CheckCircle, Clock, AlertCircle,
-  Ship, FileText, Users, Shield, Wrench, Calendar, FileWarning,
-  RefreshCw, Building2, User, TrendingUp, ChevronLeft, ChevronRight, Database,
-  Settings, BarChart3, GitBranch, Zap, Layers,
-  ChevronUp, ChevronDown, RotateCcw, History, LayoutDashboard
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Ship,
+  FileText,
+  Users,
+  Shield,
+  Wrench,
+  Calendar,
+  FileWarning,
+  RefreshCw,
+  Building2,
+  User,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  Settings,
+  BarChart3,
+  GitBranch,
+  Zap,
+  Layers,
+  ChevronUp,
+  ChevronDown,
+  RotateCcw,
+  History,
+  LayoutDashboard
 } from 'lucide-react'
-import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty, WorkflowStep, EntityDocumentType, EntityDocument } from '../../../shared/types'
+import {
+  Vessel,
+  VesselDocument,
+  DocumentType,
+  Entity,
+  SurveyWarranty,
+  WorkflowStep,
+  EntityDocumentType,
+  EntityDocument
+} from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -27,19 +60,136 @@ interface WidgetDef {
 }
 
 const WIDGET_REGISTRY: WidgetDef[] = [
-  { id: 'kpi', name: 'Key Metrics', description: 'Active vessels, entities, compliance rate, critical issues, sanctions pending', icon: BarChart3, category: 'overview', defaultEnabled: true, defaultOrder: 0, size: 'full' },
-  { id: 'expirations', name: 'Upcoming Expirations', description: 'Documents and policies expiring soon', icon: Clock, category: 'compliance', defaultEnabled: true, defaultOrder: 1, size: 'half' },
-  { id: 'operational', name: 'Operational Status', description: 'Document compliance, entity docs, sanctions status', icon: Activity, category: 'compliance', defaultEnabled: true, defaultOrder: 2, size: 'half' },
-  { id: 'recentVessels', name: 'Recently Added Vessels', description: 'Latest vessels added to the system', icon: Ship, category: 'activity', defaultEnabled: true, defaultOrder: 3, size: 'third' },
-  { id: 'recentEntities', name: 'Recently Added Entities', description: 'Latest entities added', icon: Building2, category: 'activity', defaultEnabled: true, defaultOrder: 4, size: 'third' },
-  { id: 'recentChanges', name: 'Recent Changes', description: 'Latest audit trail entries', icon: History, category: 'activity', defaultEnabled: true, defaultOrder: 5, size: 'third' },
-  { id: 'dataQuality', name: 'Data Quality', description: 'Missing customer assignments, contacts, policy dates', icon: AlertTriangle, category: 'compliance', defaultEnabled: true, defaultOrder: 6, size: 'third' },
-  { id: 'weekRenewals', name: 'Renewals This Week', description: 'Policies renewing within the current week', icon: Calendar, category: 'operations', defaultEnabled: true, defaultOrder: 7, size: 'third' },
-  { id: 'renewalCalendar', name: 'Renewal Calendar', description: 'Upcoming policy renewals by month', icon: Calendar, category: 'operations', defaultEnabled: false, defaultOrder: 8, size: 'half' },
-  { id: 'quickActions', name: 'Quick Actions', description: 'Shortcuts to create vessels, quotations, entities', icon: Zap, category: 'overview', defaultEnabled: false, defaultOrder: 9, size: 'third' },
-  { id: 'quotationPipeline', name: 'Quotation Pipeline', description: 'Quotations by workflow status', icon: GitBranch, category: 'operations', defaultEnabled: false, defaultOrder: 10, size: 'half' },
-  { id: 'fleetOverview', name: 'Fleet Overview', description: 'Vessel count by fleet with compliance rate', icon: Layers, category: 'overview', defaultEnabled: false, defaultOrder: 11, size: 'third' },
-  { id: 'deadlineCalendar', name: 'Deadline Calendar', description: 'Monthly calendar showing policy expirations, survey dates, warranty deadlines', icon: Calendar, category: 'operations', defaultEnabled: false, defaultOrder: 12, size: 'full' },
+  {
+    id: 'kpi',
+    name: 'Key Metrics',
+    description: 'Active vessels, entities, compliance rate, critical issues, sanctions pending',
+    icon: BarChart3,
+    category: 'overview',
+    defaultEnabled: true,
+    defaultOrder: 0,
+    size: 'full'
+  },
+  {
+    id: 'expirations',
+    name: 'Upcoming Expirations',
+    description: 'Documents and policies expiring soon',
+    icon: Clock,
+    category: 'compliance',
+    defaultEnabled: true,
+    defaultOrder: 1,
+    size: 'half'
+  },
+  {
+    id: 'operational',
+    name: 'Operational Status',
+    description: 'Document compliance, entity docs, sanctions status',
+    icon: Activity,
+    category: 'compliance',
+    defaultEnabled: true,
+    defaultOrder: 2,
+    size: 'half'
+  },
+  {
+    id: 'recentVessels',
+    name: 'Recently Added Vessels',
+    description: 'Latest vessels added to the system',
+    icon: Ship,
+    category: 'activity',
+    defaultEnabled: true,
+    defaultOrder: 3,
+    size: 'third'
+  },
+  {
+    id: 'recentEntities',
+    name: 'Recently Added Entities',
+    description: 'Latest entities added',
+    icon: Building2,
+    category: 'activity',
+    defaultEnabled: true,
+    defaultOrder: 4,
+    size: 'third'
+  },
+  {
+    id: 'recentChanges',
+    name: 'Recent Changes',
+    description: 'Latest audit trail entries',
+    icon: History,
+    category: 'activity',
+    defaultEnabled: true,
+    defaultOrder: 5,
+    size: 'third'
+  },
+  {
+    id: 'dataQuality',
+    name: 'Data Quality',
+    description: 'Missing customer assignments, contacts, policy dates',
+    icon: AlertTriangle,
+    category: 'compliance',
+    defaultEnabled: true,
+    defaultOrder: 6,
+    size: 'third'
+  },
+  {
+    id: 'weekRenewals',
+    name: 'Renewals This Week',
+    description: 'Policies renewing within the current week',
+    icon: Calendar,
+    category: 'operations',
+    defaultEnabled: true,
+    defaultOrder: 7,
+    size: 'third'
+  },
+  {
+    id: 'renewalCalendar',
+    name: 'Renewal Calendar',
+    description: 'Upcoming policy renewals by month',
+    icon: Calendar,
+    category: 'operations',
+    defaultEnabled: false,
+    defaultOrder: 8,
+    size: 'half'
+  },
+  {
+    id: 'quickActions',
+    name: 'Quick Actions',
+    description: 'Shortcuts to create vessels, quotations, entities',
+    icon: Zap,
+    category: 'overview',
+    defaultEnabled: false,
+    defaultOrder: 9,
+    size: 'third'
+  },
+  {
+    id: 'quotationPipeline',
+    name: 'Quotation Pipeline',
+    description: 'Quotations by workflow status',
+    icon: GitBranch,
+    category: 'operations',
+    defaultEnabled: false,
+    defaultOrder: 10,
+    size: 'half'
+  },
+  {
+    id: 'fleetOverview',
+    name: 'Fleet Overview',
+    description: 'Vessel count by fleet with compliance rate',
+    icon: Layers,
+    category: 'overview',
+    defaultEnabled: false,
+    defaultOrder: 11,
+    size: 'third'
+  },
+  {
+    id: 'deadlineCalendar',
+    name: 'Deadline Calendar',
+    description: 'Monthly calendar showing policy expirations, survey dates, warranty deadlines',
+    icon: Calendar,
+    category: 'operations',
+    defaultEnabled: false,
+    defaultOrder: 12,
+    size: 'full'
+  }
 ]
 
 interface WidgetLayout {
@@ -48,12 +198,16 @@ interface WidgetLayout {
 
 function getDefaultLayout(): WidgetLayout {
   return {
-    widgets: WIDGET_REGISTRY.map(w => ({ id: w.id, enabled: w.defaultEnabled, order: w.defaultOrder }))
+    widgets: WIDGET_REGISTRY.map((w) => ({
+      id: w.id,
+      enabled: w.defaultEnabled,
+      order: w.defaultOrder
+    }))
   }
 }
 
 function mergeLayoutWithRegistry(layout: WidgetLayout): WidgetLayout {
-  const known = new Map(layout.widgets.map(w => [w.id, w]))
+  const known = new Map(layout.widgets.map((w) => [w.id, w]))
   const merged: WidgetLayout['widgets'] = []
   for (const def of WIDGET_REGISTRY) {
     const saved = known.get(def.id)
@@ -68,16 +222,35 @@ function mergeLayoutWithRegistry(layout: WidgetLayout): WidgetLayout {
 }
 
 function getWidgetDef(id: string): WidgetDef | undefined {
-  return WIDGET_REGISTRY.find(w => w.id === id)
+  return WIDGET_REGISTRY.find((w) => w.id === id)
 }
 
 // ── Shared types / helpers ───────────────────────────────────────────────
 
 interface DashboardActivity {
-  recentVessels: Array<{ id: string; name: string; imoNumber: string; fleetName?: string; createdAt: string; isActive: boolean }>
+  recentVessels: Array<{
+    id: string
+    name: string
+    imoNumber: string
+    fleetName?: string
+    createdAt: string
+    isActive: boolean
+  }>
   recentEntities: Array<{ id: string; name: string; type: string; createdAt: string }>
-  recentAuditEntries: Array<{ vesselId: string; vesselName: string; fieldName: string; newValue?: string; changedAt: string }>
-  weekRenewals: Array<{ vesselName: string; imoNumber: string; policyTypeName: string; policyNumber?: string; endDate: string }>
+  recentAuditEntries: Array<{
+    vesselId: string
+    vesselName: string
+    fieldName: string
+    newValue?: string
+    changedAt: string
+  }>
+  weekRenewals: Array<{
+    vesselName: string
+    imoNumber: string
+    policyTypeName: string
+    policyNumber?: string
+    endDate: string
+  }>
 }
 
 interface ExpirationItem {
@@ -109,7 +282,7 @@ function fmtDate(s?: string | null): string {
 }
 
 function formatFieldName(name: string): string {
-  return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function daysUntil(dateStr: string): number {
@@ -130,7 +303,12 @@ interface WidgetData {
   activeWarranties: SurveyWarranty[]
   endorsementsDue: number
   activity: DashboardActivity
-  dataQuality: { vesselsNoCustomer: number; entitiesNoEmail: number; entitiesNoPhone: number; policiesNoEndDate: number }
+  dataQuality: {
+    vesselsNoCustomer: number
+    entitiesNoEmail: number
+    entitiesNoPhone: number
+    policiesNoEndDate: number
+  }
   isLight: boolean
   onViewAlerts: () => void
   onViewSurveyFollowUp?: () => void
@@ -139,7 +317,14 @@ interface WidgetData {
   // computed
   activeVessels: Vessel[]
   activeVesselIds: Set<string>
-  allAlerts: { vessel: string; vesselId: string; document: string; msg: string; type: string; expiryDate?: string }[]
+  allAlerts: {
+    vessel: string
+    vesselId: string
+    document: string
+    msg: string
+    type: string
+    expiryDate?: string
+  }[]
   missingCount: number
   expiredCount: number
   soonCount: number
@@ -178,8 +363,18 @@ export default function Dashboard({
   const [pendingSanctions, setPendingSanctions] = useState<any[]>([])
   const [activeWarranties, setActiveWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<number>(0)
-  const [activity, setActivity] = useState<DashboardActivity>({ recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] })
-  const [dataQuality, setDataQuality] = useState<{ vesselsNoCustomer: number; entitiesNoEmail: number; entitiesNoPhone: number; policiesNoEndDate: number }>({ vesselsNoCustomer: 0, entitiesNoEmail: 0, entitiesNoPhone: 0, policiesNoEndDate: 0 })
+  const [activity, setActivity] = useState<DashboardActivity>({
+    recentVessels: [],
+    recentEntities: [],
+    recentAuditEntries: [],
+    weekRenewals: []
+  })
+  const [dataQuality, setDataQuality] = useState<{
+    vesselsNoCustomer: number
+    entitiesNoEmail: number
+    entitiesNoPhone: number
+    policiesNoEndDate: number
+  }>({ vesselsNoCustomer: 0, entitiesNoEmail: 0, entitiesNoPhone: 0, policiesNoEndDate: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
 
@@ -193,18 +388,21 @@ export default function Dashboard({
   // Load layout from server
   useEffect(() => {
     if (!user?.id) return
-    window.api.dashboardGetLayout().then(saved => {
-      if (saved && saved.widgets) {
-        setLayout(mergeLayoutWithRegistry(saved))
-      }
-      layoutLoadedRef.current = true
-      // Check onboarding (use localStorage as fallback since session may be stale)
-      if (!user.dashboardOnboarded && !localStorage.getItem('dashboard_onboarded_' + user.id)) {
-        setShowOnboarding(true)
-      }
-    }).catch(() => {
-      layoutLoadedRef.current = true
-    })
+    window.api
+      .dashboardGetLayout()
+      .then((saved) => {
+        if (saved && saved.widgets) {
+          setLayout(mergeLayoutWithRegistry(saved))
+        }
+        layoutLoadedRef.current = true
+        // Check onboarding (use localStorage as fallback since session may be stale)
+        if (!user.dashboardOnboarded && !localStorage.getItem('dashboard_onboarded_' + user.id)) {
+          setShowOnboarding(true)
+        }
+      })
+      .catch(() => {
+        layoutLoadedRef.current = true
+      })
   }, [user?.id, user?.dashboardOnboarded])
 
   // Save layout when it changes (skip initial load)
@@ -233,39 +431,52 @@ export default function Dashboard({
       setDocs(Array.isArray(dData) ? dData : [])
       setDocTypes(Array.isArray(tData) ? tData : [])
       setEntities(Array.isArray(eData) ? eData : [])
-      setEntityDocTypes(Array.isArray(edtData) ? (edtData as EntityDocumentType[]).filter(t => t.isActive && t.isRequired) : [])
+      setEntityDocTypes(
+        Array.isArray(edtData)
+          ? (edtData as EntityDocumentType[]).filter((t) => t.isActive && t.isRequired)
+          : []
+      )
       setEntityDocs(Array.isArray(edData) ? edData : [])
     } catch {
       showError('Failed to load core dashboard data')
     }
 
     const secondaryResults = await Promise.allSettled([
-      window.api.getOpenDefectsByVessel().then(d => setOpenDefects(Array.isArray(d) ? d : [])),
-      window.api.complianceGetPendingResults().then(d => setPendingSanctions(Array.isArray(d) ? d : [])),
-      window.api.surveyWarrantyGetAll().then(d => setActiveWarranties(Array.isArray(d) ? d : [])),
-      window.api.surveyWarrantyGetEndorsementsDue().then(d => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
-      window.api.dashboardGetActivity().then(d =>
-        setActivity(
-          d && Array.isArray((d as any).recentVessels)
-            ? (d as any)
-            : { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
-        )
-      ),
-      window.api.dashboardGetDataQualityAlerts().then(d => {
+      window.api.getOpenDefectsByVessel().then((d) => setOpenDefects(Array.isArray(d) ? d : [])),
+      window.api
+        .complianceGetPendingResults()
+        .then((d) => setPendingSanctions(Array.isArray(d) ? d : [])),
+      window.api.surveyWarrantyGetAll().then((d) => setActiveWarranties(Array.isArray(d) ? d : [])),
+      window.api
+        .surveyWarrantyGetEndorsementsDue()
+        .then((d) => setEndorsementsDue(Array.isArray(d) ? d.length : 0)),
+      window.api
+        .dashboardGetActivity()
+        .then((d) =>
+          setActivity(
+            d && Array.isArray((d as any).recentVessels)
+              ? (d as any)
+              : { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
+          )
+        ),
+      window.api.dashboardGetDataQualityAlerts().then((d) => {
         if (d && typeof d === 'object' && !('error' in d)) setDataQuality(d)
       })
     ])
-    const failCount = secondaryResults.filter(r => r.status === 'rejected').length
-    if (failCount > 0) showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
+    const failCount = secondaryResults.filter((r) => r.status === 'rejected').length
+    if (failCount > 0)
+      showError(`${failCount} dashboard section${failCount > 1 ? 's' : ''} failed to load`)
     setLastRefreshed(new Date())
     setIsLoading(false)
   }, [showError])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // ── Computed values ──
-  const activeVessels = useMemo(() => vessels.filter(v => v.isActive), [vessels])
-  const activeVesselIds = useMemo(() => new Set(activeVessels.map(v => v.id)), [activeVessels])
+  const activeVessels = useMemo(() => vessels.filter((v) => v.isActive), [vessels])
+  const activeVesselIds = useMemo(() => new Set(activeVessels.map((v) => v.id)), [activeVessels])
 
   const docMap = useMemo(() => {
     const map = new Map<string, VesselDocument>()
@@ -277,31 +488,72 @@ export default function Dashboard({
 
   const allAlerts = useMemo(() => {
     const today = new Date()
-    const thirtyDays = new Date(); thirtyDays.setDate(today.getDate() + 30)
-    const ninetyDays = new Date(); ninetyDays.setDate(today.getDate() + 90)
-    const alerts: { vessel: string; vesselId: string; document: string; msg: string; type: string; expiryDate?: string }[] = []
+    const thirtyDays = new Date()
+    thirtyDays.setDate(today.getDate() + 30)
+    const ninetyDays = new Date()
+    ninetyDays.setDate(today.getDate() + 90)
+    const alerts: {
+      vessel: string
+      vesselId: string
+      document: string
+      msg: string
+      type: string
+      expiryDate?: string
+    }[] = []
 
     for (const v of activeVessels) {
       for (const t of docTypes) {
         const doc = docMap.get(`${v.id}:${t.id}`)
         const isRequired = doc ? doc.required : t.required
         const hasFile = !!doc?.filePath
-        const effectiveExpiry = (t.annualRenewal && v.policyExpiryDate) ? v.policyExpiryDate : doc?.expiryDate
+        const effectiveExpiry =
+          t.annualRenewal && v.policyExpiryDate ? v.policyExpiryDate : doc?.expiryDate
 
         if (isRequired && !hasFile) {
-          alerts.push({ vessel: v.name, vesselId: v.id, document: t.name, msg: 'Missing File', type: 'missing' })
+          alerts.push({
+            vessel: v.name,
+            vesselId: v.id,
+            document: t.name,
+            msg: 'Missing File',
+            type: 'missing'
+          })
         } else if (hasFile && effectiveExpiry) {
           const expiry = new Date(effectiveExpiry)
           if (expiry < today) {
-            alerts.push({ vessel: v.name, vesselId: v.id, document: t.name, msg: 'Expired', type: 'expired', expiryDate: effectiveExpiry })
+            alerts.push({
+              vessel: v.name,
+              vesselId: v.id,
+              document: t.name,
+              msg: 'Expired',
+              type: 'expired',
+              expiryDate: effectiveExpiry
+            })
           } else if (expiry < thirtyDays) {
-            const isShortCycle = t.annualRenewal && doc?.receivedDate &&
-              (new Date(effectiveExpiry).getTime() - new Date(doc.receivedDate).getTime()) / 86400000 < 60
+            const isShortCycle =
+              t.annualRenewal &&
+              doc?.receivedDate &&
+              (new Date(effectiveExpiry).getTime() - new Date(doc.receivedDate).getTime()) /
+                86400000 <
+                60
             if (!isShortCycle) {
-              alerts.push({ vessel: v.name, vesselId: v.id, document: t.name, msg: 'Expiring Soon', type: 'soon', expiryDate: effectiveExpiry })
+              alerts.push({
+                vessel: v.name,
+                vesselId: v.id,
+                document: t.name,
+                msg: 'Expiring Soon',
+                type: 'soon',
+                expiryDate: effectiveExpiry
+              })
             }
           } else if (expiry < ninetyDays) {
-            alerts.push({ vessel: v.name, vesselId: v.id, document: t.name, msg: 'Expiring in 90 days', type: 'upcoming', expiryDate: effectiveExpiry })
+            alerts.push({
+              vessel: v.name,
+              vesselId: v.id,
+              document: t.name,
+              msg: 'Expiring in 90 days',
+              type: 'upcoming',
+              expiryDate: effectiveExpiry
+            })
           }
         }
       }
@@ -309,20 +561,30 @@ export default function Dashboard({
     return alerts
   }, [activeVessels, docTypes, docMap])
 
-  const missingCount = useMemo(() => allAlerts.filter(a => a.type === 'missing').length, [allAlerts])
-  const expiredCount = useMemo(() => allAlerts.filter(a => a.type === 'expired').length, [allAlerts])
-  const soonCount = useMemo(() => allAlerts.filter(a => a.type === 'soon').length, [allAlerts])
+  const missingCount = useMemo(
+    () => allAlerts.filter((a) => a.type === 'missing').length,
+    [allAlerts]
+  )
+  const expiredCount = useMemo(
+    () => allAlerts.filter((a) => a.type === 'expired').length,
+    [allAlerts]
+  )
+  const soonCount = useMemo(() => allAlerts.filter((a) => a.type === 'soon').length, [allAlerts])
 
   const globalCompliance = useMemo(() => {
     if (activeVessels.length === 0 || docTypes.length === 0) return 100
-    const criticalCount = allAlerts.filter(a => a.type === 'missing' || a.type === 'expired').length
+    const criticalCount = allAlerts.filter(
+      (a) => a.type === 'missing' || a.type === 'expired'
+    ).length
     const total = activeVessels.length * docTypes.length
     return Math.round(((total - criticalCount) / total) * 100)
   }, [activeVessels, docTypes, allAlerts])
 
   const policyStats = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const thirtyDays = new Date(today); thirtyDays.setDate(today.getDate() + 30)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const thirtyDays = new Date(today)
+    thirtyDays.setDate(today.getDate() + 30)
     const expiringVessels: { name: string; date: string; vesselId: string }[] = []
 
     for (const v of activeVessels) {
@@ -337,8 +599,9 @@ export default function Dashboard({
   }, [activeVessels])
 
   const overdueWarranties = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    return activeWarranties.filter(w => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return activeWarranties.filter((w) => {
       if (w.deadlineType !== 'days' || !w.deadlineDays || !w.inceptionDate) return false
       const dl = new Date(w.inceptionDate)
       dl.setDate(dl.getDate() + w.deadlineDays)
@@ -347,7 +610,8 @@ export default function Dashboard({
   }, [activeWarranties])
 
   const upcomingItems = useMemo((): ExpirationItem[] => {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
     const items: ExpirationItem[] = []
 
     for (const a of allAlerts) {
@@ -398,34 +662,77 @@ export default function Dashboard({
     return count
   }, [entities, entityDocTypes, entityDocs])
 
-  const widgetData: WidgetData = useMemo(() => ({
-    vessels, docs, docTypes, entities, openDefects, pendingSanctions, activeWarranties, endorsementsDue,
-    activity, dataQuality, isLight, onViewAlerts, onViewSurveyFollowUp, onNavigateToVessel, onNavigate,
-    activeVessels, activeVesselIds, allAlerts, missingCount, expiredCount, soonCount, globalCompliance,
-    entityDocMissingCount, upcomingItems, overdueWarranties
-  }), [
-    vessels, docs, docTypes, entities, openDefects, pendingSanctions, activeWarranties, endorsementsDue,
-    activity, dataQuality, isLight, onViewAlerts, onViewSurveyFollowUp, onNavigateToVessel, onNavigate,
-    activeVessels, activeVesselIds, allAlerts, missingCount, expiredCount, soonCount, globalCompliance,
-    entityDocMissingCount, upcomingItems, overdueWarranties
-  ])
+  const widgetData: WidgetData = useMemo(
+    () => ({
+      vessels,
+      docs,
+      docTypes,
+      entities,
+      openDefects,
+      pendingSanctions,
+      activeWarranties,
+      endorsementsDue,
+      activity,
+      dataQuality,
+      isLight,
+      onViewAlerts,
+      onViewSurveyFollowUp,
+      onNavigateToVessel,
+      onNavigate,
+      activeVessels,
+      activeVesselIds,
+      allAlerts,
+      missingCount,
+      expiredCount,
+      soonCount,
+      globalCompliance,
+      entityDocMissingCount,
+      upcomingItems,
+      overdueWarranties
+    }),
+    [
+      vessels,
+      docs,
+      docTypes,
+      entities,
+      openDefects,
+      pendingSanctions,
+      activeWarranties,
+      endorsementsDue,
+      activity,
+      dataQuality,
+      isLight,
+      onViewAlerts,
+      onViewSurveyFollowUp,
+      onNavigateToVessel,
+      onNavigate,
+      activeVessels,
+      activeVesselIds,
+      allAlerts,
+      missingCount,
+      expiredCount,
+      soonCount,
+      globalCompliance,
+      entityDocMissingCount,
+      upcomingItems,
+      overdueWarranties
+    ]
+  )
 
   // ── Layout helpers ──
-  const enabledWidgets = useMemo(() =>
-    layout.widgets.filter(w => w.enabled).sort((a, b) => a.order - b.order),
+  const enabledWidgets = useMemo(
+    () => layout.widgets.filter((w) => w.enabled).sort((a, b) => a.order - b.order),
     [layout]
   )
 
   const toggleWidget = (id: string) => {
-    const newWidgets = layout.widgets.map(w =>
-      w.id === id ? { ...w, enabled: !w.enabled } : w
-    )
+    const newWidgets = layout.widgets.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w))
     saveLayout({ widgets: newWidgets })
   }
 
   const moveWidget = (id: string, direction: 'up' | 'down') => {
     const sorted = [...layout.widgets].sort((a, b) => a.order - b.order)
-    const idx = sorted.findIndex(w => w.id === id)
+    const idx = sorted.findIndex((w) => w.id === id)
     if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= sorted.length) return
@@ -454,7 +761,12 @@ export default function Dashboard({
   }
 
   const today = new Date()
-  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = today.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  })
 
   const sizeToSpan = (size: string) => {
     if (size === 'full') return 'span 6'
@@ -473,7 +785,7 @@ export default function Dashboard({
   const filteredEditWidgets = useMemo(() => {
     const sorted = [...layout.widgets].sort((a, b) => a.order - b.order)
     if (editFilter === 'all') return sorted
-    return sorted.filter(w => {
+    return sorted.filter((w) => {
       const def = getWidgetDef(w.id)
       return def?.category === editFilter
     })
@@ -481,32 +793,57 @@ export default function Dashboard({
 
   return (
     <div className="fade-in page">
-
       {/* ── Onboarding Overlay ── */}
       {showOnboarding && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <div style={{
-            background: isLight ? '#ffffff' : '#1a1d28',
-            borderRadius: '16px', padding: '32px', maxWidth: '440px', width: '90%',
-            border: `1px solid ${isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'}`,
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '56px', height: '56px', borderRadius: '14px',
-              background: 'linear-gradient(135deg, var(--accent-primary), #2563eb)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 20px'
-            }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '440px',
+              width: '90%',
+              border: `1px solid ${isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'}`,
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, var(--accent-primary), #2563eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 20px'
+              }}
+            >
               <Settings size={28} color="#fff" />
             </div>
             <h2 style={{ margin: '0 0 10px', fontSize: '1.25rem', fontWeight: '800' }}>
               Welcome to Your Dashboard
             </h2>
-            <p style={{ margin: '0 0 24px', color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.6 }}>
-              Your dashboard is customizable. Click the gear icon to add, remove, and rearrange widgets to suit your workflow.
+            <p
+              style={{
+                margin: '0 0 24px',
+                color: 'var(--text-secondary)',
+                fontSize: '0.88rem',
+                lineHeight: 1.6
+              }}
+            >
+              Your dashboard is customizable. Click the gear icon to add, remove, and rearrange
+              widgets to suit your workflow.
             </p>
             <button
               onClick={dismissOnboarding}
@@ -523,41 +860,63 @@ export default function Dashboard({
       <PageHeader
         icon={<LayoutDashboard size={26} />}
         title="Dashboard"
-        subtitle={<>
-          {dateStr} · {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''} · {entities.length} entit{entities.length !== 1 ? 'ies' : 'y'}
-          {lastRefreshed && (
-            <span style={{ marginLeft: '10px', opacity: 0.6 }}>· Updated {relativeTime(lastRefreshed.toISOString())}</span>
-          )}
-        </>}
-        actions={<>
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className={`${editMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-            title="Customize dashboard"
-          >
-            <Settings size={14} />
-            {editMode ? 'Done' : 'Customize'}
-          </button>
-          <button onClick={loadData} disabled={isLoading} className="btn-secondary btn-sm">
-            <RefreshCw size={14} className={isLoading ? 'spinner' : undefined} />
-            Refresh
-          </button>
-        </>}
+        subtitle={
+          <>
+            {dateStr} · {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''}{' '}
+            · {entities.length} entit{entities.length !== 1 ? 'ies' : 'y'}
+            {lastRefreshed && (
+              <span style={{ marginLeft: '10px', opacity: 0.6 }}>
+                · Updated {relativeTime(lastRefreshed.toISOString())}
+              </span>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={`${editMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+              title="Customize dashboard"
+            >
+              <Settings size={14} />
+              {editMode ? 'Done' : 'Customize'}
+            </button>
+            <button onClick={loadData} disabled={isLoading} className="btn-secondary btn-sm">
+              <RefreshCw size={14} className={isLoading ? 'spinner' : undefined} />
+              Refresh
+            </button>
+          </>
+        }
       />
 
       {/* ── Edit Mode ── */}
       {editMode && (
-        <div style={{
-          ...cardStyle,
-          marginBottom: '24px',
-          padding: '20px 24px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div
+          style={{
+            ...cardStyle,
+            marginBottom: '24px',
+            padding: '20px 24px'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}
+          >
             <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700' }}>Customize Widgets</h3>
             <button
               onClick={resetToDefault}
               className="btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 12px' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.78rem',
+                padding: '5px 12px'
+              }}
             >
               <RotateCcw size={12} />
               Reset to Default
@@ -566,7 +925,7 @@ export default function Dashboard({
 
           {/* Category filter */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            {categories.map(cat => (
+            {categories.map((cat) => (
               <button
                 key={cat.key}
                 onClick={() => setEditFilter(cat.key)}
@@ -575,8 +934,9 @@ export default function Dashboard({
                   borderRadius: '8px',
                   fontSize: '0.76rem',
                   fontWeight: '600',
-                  border: `1px solid ${editFilter === cat.key ? 'var(--accent-primary)' : (isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)')}`,
-                  background: editFilter === cat.key ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
+                  border: `1px solid ${editFilter === cat.key ? 'var(--accent-primary)' : isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'}`,
+                  background:
+                    editFilter === cat.key ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                   color: editFilter === cat.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
@@ -599,74 +959,152 @@ export default function Dashboard({
                   style={{
                     padding: '14px 16px',
                     borderRadius: '10px',
-                    border: `1px solid ${w.enabled ? 'var(--accent-primary)' : (isLight ? '#e4e7ef' : 'rgba(255,255,255,0.08)')}`,
+                    border: `1px solid ${w.enabled ? 'var(--accent-primary)' : isLight ? '#e4e7ef' : 'rgba(255,255,255,0.08)'}`,
                     background: w.enabled
-                      ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)')
-                      : (isLight ? '#f8f9fb' : 'rgba(255,255,255,0.02)'),
+                      ? isLight
+                        ? 'rgba(var(--accent-primary-rgb), 0.04)'
+                        : 'rgba(var(--accent-primary-rgb), 0.06)'
+                      : isLight
+                        ? '#f8f9fb'
+                        : 'rgba(255,255,255,0.02)',
                     opacity: w.enabled ? 1 : 0.7,
                     transition: 'all 0.15s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '8px',
-                      background: w.enabled ? 'linear-gradient(135deg, var(--accent-primary), #2563eb)' : (isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'),
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                    }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: w.enabled
+                          ? 'linear-gradient(135deg, var(--accent-primary), #2563eb)'
+                          : isLight
+                            ? '#e4e7ef'
+                            : 'rgba(255,255,255,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                    >
                       <Icon size={15} color={w.enabled ? '#fff' : 'var(--text-secondary)'} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '700', fontSize: '0.82rem', marginBottom: '2px' }}>{def.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{def.description}</div>
-                      <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <span style={{
-                          fontSize: '0.62rem', fontWeight: '700', textTransform: 'uppercase',
-                          padding: '1px 6px', borderRadius: '4px',
-                          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
-                          color: 'var(--text-secondary)', letterSpacing: '0.04em'
-                        }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.82rem', marginBottom: '2px' }}>
+                        {def.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.4
+                        }}
+                      >
+                        {def.description}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          display: 'flex',
+                          gap: '6px',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
+                            color: 'var(--text-secondary)',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
                           {def.size}
                         </span>
-                        <span style={{
-                          fontSize: '0.62rem', fontWeight: '700', textTransform: 'uppercase',
-                          padding: '1px 6px', borderRadius: '4px',
-                          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
-                          color: 'var(--text-secondary)', letterSpacing: '0.04em'
-                        }}>
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
+                            color: 'var(--text-secondary)',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
                           {def.category}
                         </span>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        alignItems: 'center'
+                      }}
+                    >
                       {/* Toggle */}
                       <button
                         onClick={() => toggleWidget(w.id)}
                         style={{
-                          width: '36px', height: '20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                          background: w.enabled ? 'var(--accent-primary)' : (isLight ? '#ccc' : 'rgba(255,255,255,0.2)'),
-                          position: 'relative', transition: 'background 0.2s ease'
+                          width: '36px',
+                          height: '20px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: w.enabled
+                            ? 'var(--accent-primary)'
+                            : isLight
+                              ? '#ccc'
+                              : 'rgba(255,255,255,0.2)',
+                          position: 'relative',
+                          transition: 'background 0.2s ease'
                         }}
                       >
-                        <div style={{
-                          width: '16px', height: '16px', borderRadius: '50%', background: '#fff',
-                          position: 'absolute', top: '2px',
-                          left: w.enabled ? '18px' : '2px',
-                          transition: 'left 0.2s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                        }} />
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            position: 'absolute',
+                            top: '2px',
+                            left: w.enabled ? '18px' : '2px',
+                            transition: 'left 0.2s ease',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                          }}
+                        />
                       </button>
                       {/* Reorder */}
                       <div style={{ display: 'flex', gap: '1px', marginTop: '4px' }}>
                         <button
                           onClick={() => moveWidget(w.id, 'up')}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)' }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '1px',
+                            color: 'var(--text-secondary)'
+                          }}
                           title="Move up"
                         >
                           <ChevronUp size={12} />
                         </button>
                         <button
                           onClick={() => moveWidget(w.id, 'down')}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)' }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '1px',
+                            color: 'var(--text-secondary)'
+                          }}
                           title="Move down"
                         >
                           <ChevronDown size={12} />
@@ -682,17 +1120,32 @@ export default function Dashboard({
       )}
 
       {/* ── Widget Grid ── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(6, 1fr)',
-        gap: '16px'
-      }}>
-        {enabledWidgets.map(w => {
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(6, 1fr)',
+          gap: '16px'
+        }}
+      >
+        {enabledWidgets.map((w) => {
           const def = getWidgetDef(w.id)
           if (!def) return null
           return (
-            <div key={w.id} style={{ gridColumn: sizeToSpan(def.size), maxHeight: '420px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <WidgetRenderer id={w.id} data={widgetData} cardStyle={{ ...cardStyle, maxHeight: '420px', overflow: 'auto', flex: 1 }} />
+            <div
+              key={w.id}
+              style={{
+                gridColumn: sizeToSpan(def.size),
+                maxHeight: '420px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <WidgetRenderer
+                id={w.id}
+                data={widgetData}
+                cardStyle={{ ...cardStyle, maxHeight: '420px', overflow: 'auto', flex: 1 }}
+              />
             </div>
           )
         })}
@@ -703,82 +1156,248 @@ export default function Dashboard({
 
 // ── Widget Renderer ──────────────────────────────────────────────────────
 
-function WidgetRenderer({ id, data, cardStyle }: { id: string; data: WidgetData; cardStyle: React.CSSProperties }) {
+function WidgetRenderer({
+  id,
+  data,
+  cardStyle
+}: {
+  id: string
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   switch (id) {
-    case 'kpi': return <KPIWidget data={data} />
-    case 'expirations': return <ExpirationsWidget data={data} cardStyle={cardStyle} />
-    case 'operational': return <OperationalWidget data={data} cardStyle={cardStyle} />
-    case 'recentVessels': return <RecentVesselsWidget data={data} cardStyle={cardStyle} />
-    case 'recentEntities': return <RecentEntitiesWidget data={data} cardStyle={cardStyle} />
-    case 'recentChanges': return <RecentChangesWidget data={data} cardStyle={cardStyle} />
-    case 'dataQuality': return <DataQualityWidget data={data} cardStyle={cardStyle} />
-    case 'weekRenewals': return <WeekRenewalsWidget data={data} cardStyle={cardStyle} />
-    case 'renewalCalendar': return <RenewalCalendarWidget cardStyle={cardStyle} data={data} />
-    case 'quotationPipeline': return <QuotationPipelineWidget cardStyle={cardStyle} data={data} />
-    case 'quickActions': return <QuickActionsWidget cardStyle={cardStyle} data={data} />
-    case 'fleetOverview': return <FleetOverviewWidget cardStyle={cardStyle} data={data} />
-    case 'deadlineCalendar': return <DeadlineCalendarWidget cardStyle={cardStyle} data={data} />
-    default: return null
+    case 'kpi':
+      return <KPIWidget data={data} />
+    case 'expirations':
+      return <ExpirationsWidget data={data} cardStyle={cardStyle} />
+    case 'operational':
+      return <OperationalWidget data={data} cardStyle={cardStyle} />
+    case 'recentVessels':
+      return <RecentVesselsWidget data={data} cardStyle={cardStyle} />
+    case 'recentEntities':
+      return <RecentEntitiesWidget data={data} cardStyle={cardStyle} />
+    case 'recentChanges':
+      return <RecentChangesWidget data={data} cardStyle={cardStyle} />
+    case 'dataQuality':
+      return <DataQualityWidget data={data} cardStyle={cardStyle} />
+    case 'weekRenewals':
+      return <WeekRenewalsWidget data={data} cardStyle={cardStyle} />
+    case 'renewalCalendar':
+      return <RenewalCalendarWidget cardStyle={cardStyle} data={data} />
+    case 'quotationPipeline':
+      return <QuotationPipelineWidget cardStyle={cardStyle} data={data} />
+    case 'quickActions':
+      return <QuickActionsWidget cardStyle={cardStyle} data={data} />
+    case 'fleetOverview':
+      return <FleetOverviewWidget cardStyle={cardStyle} data={data} />
+    case 'deadlineCalendar':
+      return <DeadlineCalendarWidget cardStyle={cardStyle} data={data} />
+    default:
+      return null
   }
 }
 
 // ── KPI Widget ───────────────────────────────────────────────────────────
 
 function KPIWidget({ data }: { data: WidgetData }) {
-  const { activeVessels, vessels, entities, globalCompliance, missingCount, expiredCount, pendingSanctions } = data
+  const {
+    activeVessels,
+    vessels,
+    entities,
+    globalCompliance,
+    missingCount,
+    expiredCount,
+    pendingSanctions
+  } = data
   const sanctionsPending = pendingSanctions.length
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
-      <KPICard icon={<Ship size={18} color="#fff" />} iconBg="linear-gradient(135deg, #0ea5e9, #2563eb)" label="Active Vessels" value={activeVessels.length} sub={`${vessels.length - activeVessels.length} inactive`} />
-      <KPICard icon={<Users size={18} color="#fff" />} iconBg="linear-gradient(135deg, #8b5cf6, #6d28d9)" label="Entities" value={entities.length} sub={`${entities.filter(e => e.type === 'company').length} co · ${entities.filter(e => e.type === 'person').length} persons`} />
-      <KPICard icon={<TrendingUp size={18} color="#fff" />} iconBg={globalCompliance === 100 ? 'linear-gradient(135deg, #10b981, #059669)' : globalCompliance > 80 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #ef4444, #dc2626)'} label="Doc Compliance" value={`${globalCompliance}%`} sub={`${activeVessels.length} active vessels`} valueColor={globalCompliance === 100 ? '#10b981' : globalCompliance > 80 ? '#f59e0b' : 'var(--danger)'} />
-      <KPICard icon={<AlertTriangle size={18} color="#fff" />} iconBg={missingCount + expiredCount > 0 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)'} label="Critical Issues" value={missingCount + expiredCount} sub={`${missingCount} missing · ${expiredCount} expired`} valueColor={missingCount + expiredCount > 0 ? 'var(--danger)' : '#10b981'} />
-      <KPICard icon={<Shield size={18} color="#fff" />} iconBg={sanctionsPending > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'} label="Sanctions Pending" value={sanctionsPending} sub="Awaiting review" valueColor={sanctionsPending > 0 ? '#f59e0b' : '#10b981'} />
+      <KPICard
+        icon={<Ship size={18} color="#fff" />}
+        iconBg="linear-gradient(135deg, #0ea5e9, #2563eb)"
+        label="Active Vessels"
+        value={activeVessels.length}
+        sub={`${vessels.length - activeVessels.length} inactive`}
+      />
+      <KPICard
+        icon={<Users size={18} color="#fff" />}
+        iconBg="linear-gradient(135deg, #8b5cf6, #6d28d9)"
+        label="Entities"
+        value={entities.length}
+        sub={`${entities.filter((e) => e.type === 'company').length} co · ${entities.filter((e) => e.type === 'person').length} persons`}
+      />
+      <KPICard
+        icon={<TrendingUp size={18} color="#fff" />}
+        iconBg={
+          globalCompliance === 100
+            ? 'linear-gradient(135deg, #10b981, #059669)'
+            : globalCompliance > 80
+              ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+              : 'linear-gradient(135deg, #ef4444, #dc2626)'
+        }
+        label="Doc Compliance"
+        value={`${globalCompliance}%`}
+        sub={`${activeVessels.length} active vessels`}
+        valueColor={
+          globalCompliance === 100 ? '#10b981' : globalCompliance > 80 ? '#f59e0b' : 'var(--danger)'
+        }
+      />
+      <KPICard
+        icon={<AlertTriangle size={18} color="#fff" />}
+        iconBg={
+          missingCount + expiredCount > 0
+            ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+            : 'linear-gradient(135deg, #10b981, #059669)'
+        }
+        label="Critical Issues"
+        value={missingCount + expiredCount}
+        sub={`${missingCount} missing · ${expiredCount} expired`}
+        valueColor={missingCount + expiredCount > 0 ? 'var(--danger)' : '#10b981'}
+      />
+      <KPICard
+        icon={<Shield size={18} color="#fff" />}
+        iconBg={
+          sanctionsPending > 0
+            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+            : 'linear-gradient(135deg, #10b981, #059669)'
+        }
+        label="Sanctions Pending"
+        value={sanctionsPending}
+        sub="Awaiting review"
+        valueColor={sanctionsPending > 0 ? '#f59e0b' : '#10b981'}
+      />
     </div>
   )
 }
 
 // ── Expirations Widget ───────────────────────────────────────────────────
 
-function ExpirationsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function ExpirationsWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { upcomingItems, isLight, onViewAlerts, onNavigateToVessel } = data
 
   return (
     <div style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'linear-gradient(135deg, var(--accent-primary), #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '0.95rem',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '7px',
+              background: 'linear-gradient(135deg, var(--accent-primary), #2563eb)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <Calendar size={14} color="#fff" />
           </div>
           Upcoming Expirations
           {upcomingItems.length > 0 && (
-            <span style={{ padding: '1px 8px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: '700', background: 'rgba(255,77,77,0.12)', color: 'var(--danger)' }}>
+            <span
+              style={{
+                padding: '1px 8px',
+                borderRadius: '8px',
+                fontSize: '0.68rem',
+                fontWeight: '700',
+                background: 'rgba(255,77,77,0.12)',
+                color: 'var(--danger)'
+              }}
+            >
               {upcomingItems.length}
             </span>
           )}
         </h3>
         <button
           onClick={onViewAlerts}
-          style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: '600' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--accent-primary)',
+            cursor: 'pointer',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            fontWeight: '600'
+          }}
         >
           View All <ChevronRight size={13} />
         </button>
       </div>
 
       {upcomingItems.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', gap: '10px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '40px 20px',
+            gap: '10px'
+          }}
+        >
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              background: 'rgba(16,185,129,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <CheckCircle size={22} color="#10b981" />
           </div>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>All documents and policies are current</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            All documents and policies are current
+          </span>
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
           <thead>
             <tr>
-              {['Status', 'Vessel', 'Document / Policy', 'Days', 'Expires'].map(h => (
-                <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--table-border)', whiteSpace: 'nowrap' }}>{h}</th>
+              {['Status', 'Vessel', 'Document / Policy', 'Days', 'Expires'].map((h) => (
+                <th
+                  key={h}
+                  style={{
+                    padding: '6px 10px',
+                    textAlign: 'left',
+                    fontSize: '0.68rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--text-secondary)',
+                    borderBottom: '1px solid var(--table-border)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -787,43 +1406,111 @@ function ExpirationsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: R
               const isExp = item.severity === 'expired'
               const isMiss = item.severity === 'missing'
               const isSoon = item.severity === 'soon'
-              const color = (isExp || isMiss) ? 'var(--danger)' : isSoon ? '#f59e0b' : '#10b981'
-              const bgLabel = (isExp || isMiss) ? 'rgba(255,77,77,0.1)' : isSoon ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)'
+              const color = isExp || isMiss ? 'var(--danger)' : isSoon ? '#f59e0b' : '#10b981'
+              const bgLabel =
+                isExp || isMiss
+                  ? 'rgba(255,77,77,0.1)'
+                  : isSoon
+                    ? 'rgba(245,158,11,0.1)'
+                    : 'rgba(16,185,129,0.1)'
               const statusLabel = isExp ? 'EXPIRED' : isMiss ? 'MISSING' : 'EXPIRING'
               const days = item.expiryDate ? daysUntil(item.expiryDate) : null
-              const rowBg = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.018)' : 'rgba(255,255,255,0.012)')
+              const rowBg =
+                idx % 2 === 0
+                  ? 'transparent'
+                  : isLight
+                    ? 'rgba(0,0,0,0.018)'
+                    : 'rgba(255,255,255,0.012)'
 
               return (
                 <tr
                   key={idx}
-                  onClick={() => onNavigateToVessel?.(item.vesselId, item.kind === 'policy' ? 'policies' : 'documents')}
+                  onClick={() =>
+                    onNavigateToVessel?.(
+                      item.vesselId,
+                      item.kind === 'policy' ? 'policies' : 'documents'
+                    )
+                  }
                   style={{ background: rowBg, cursor: onNavigateToVessel ? 'pointer' : 'default' }}
                 >
                   <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
-                    <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: '800', background: bgLabel, color, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
-                      {isMiss ? <AlertCircle size={9} /> : isExp ? <AlertTriangle size={9} /> : <Clock size={9} />}
+                    <span
+                      style={{
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        fontSize: '0.65rem',
+                        fontWeight: '800',
+                        background: bgLabel,
+                        color,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        width: 'fit-content'
+                      }}
+                    >
+                      {isMiss ? (
+                        <AlertCircle size={9} />
+                      ) : isExp ? (
+                        <AlertTriangle size={9} />
+                      ) : (
+                        <Clock size={9} />
+                      )}
                       {statusLabel}
                     </span>
                   </td>
-                  <td style={{ padding: '7px 10px', fontWeight: '600', whiteSpace: 'nowrap', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <td
+                    style={{
+                      padding: '7px 10px',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '140px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
                     {item.vesselName}
                   </td>
-                  <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td
+                    style={{
+                      padding: '7px 10px',
+                      color: 'var(--text-secondary)',
+                      maxWidth: '180px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
                     {item.kind === 'policy' ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Shield size={11} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                        <Shield
+                          size={11}
+                          style={{ color: 'var(--accent-primary)', flexShrink: 0 }}
+                        />
                         {item.label}
                       </span>
-                    ) : item.label}
+                    ) : (
+                      item.label
+                    )}
                   </td>
                   <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                     {days !== null ? (
                       <span style={{ fontWeight: '700', color, fontSize: '0.8rem' }}>
                         {days < 0 ? `${Math.abs(days)}d over` : days === 0 ? 'today' : `${days}d`}
                       </span>
-                    ) : '\u2014'}
+                    ) : (
+                      '\u2014'
+                    )}
                   </td>
-                  <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+                  <td
+                    style={{
+                      padding: '7px 10px',
+                      color: 'var(--text-secondary)',
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.78rem'
+                    }}
+                  >
                     {item.expiryDate ? fmtDate(item.expiryDate) : '\u2014'}
                   </td>
                 </tr>
@@ -838,34 +1525,113 @@ function ExpirationsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: R
 
 // ── Operational Status Widget ────────────────────────────────────────────
 
-function OperationalWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
-  const { missingCount, expiredCount, soonCount, entityDocMissingCount, openDefects, activeWarranties, overdueWarranties, endorsementsDue, onViewSurveyFollowUp } = data
+function OperationalWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
+  const {
+    missingCount,
+    expiredCount,
+    soonCount,
+    entityDocMissingCount,
+    openDefects,
+    activeWarranties,
+    overdueWarranties,
+    endorsementsDue,
+    onViewSurveyFollowUp
+  } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 16px',
+          fontSize: '0.95rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '7px',
+            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Activity size={14} color="#fff" />
         </div>
         Operational Status
       </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <StatusRow icon={<FileText size={14} />} label="Critical Documents" value={missingCount + expiredCount} color={(missingCount + expiredCount) > 0 ? 'var(--danger)' : '#10b981'} />
-        <StatusRow icon={<Clock size={14} />} label="Expiring in 30 days" value={soonCount} color={soonCount > 0 ? '#f59e0b' : '#10b981'} />
-        <StatusRow icon={<Users size={14} />} label="Entity Docs Missing" value={entityDocMissingCount} color={entityDocMissingCount > 0 ? '#f97316' : '#10b981'} />
-        <StatusRow icon={<Wrench size={14} />} label="Open Defects" value={openDefects.length} color={openDefects.length > 0 ? '#f97316' : '#10b981'} />
-        <StatusRow icon={<FileWarning size={14} />} label="Active Warranties" value={activeWarranties.length} color={activeWarranties.length > 0 ? '#f59e0b' : '#10b981'} />
+        <StatusRow
+          icon={<FileText size={14} />}
+          label="Critical Documents"
+          value={missingCount + expiredCount}
+          color={missingCount + expiredCount > 0 ? 'var(--danger)' : '#10b981'}
+        />
+        <StatusRow
+          icon={<Clock size={14} />}
+          label="Expiring in 30 days"
+          value={soonCount}
+          color={soonCount > 0 ? '#f59e0b' : '#10b981'}
+        />
+        <StatusRow
+          icon={<Users size={14} />}
+          label="Entity Docs Missing"
+          value={entityDocMissingCount}
+          color={entityDocMissingCount > 0 ? '#f97316' : '#10b981'}
+        />
+        <StatusRow
+          icon={<Wrench size={14} />}
+          label="Open Defects"
+          value={openDefects.length}
+          color={openDefects.length > 0 ? '#f97316' : '#10b981'}
+        />
+        <StatusRow
+          icon={<FileWarning size={14} />}
+          label="Active Warranties"
+          value={activeWarranties.length}
+          color={activeWarranties.length > 0 ? '#f59e0b' : '#10b981'}
+        />
         {overdueWarranties > 0 && (
-          <StatusRow icon={<AlertTriangle size={14} />} label="Overdue Warranties" value={overdueWarranties} color="var(--danger)" />
+          <StatusRow
+            icon={<AlertTriangle size={14} />}
+            label="Overdue Warranties"
+            value={overdueWarranties}
+            color="var(--danger)"
+          />
         )}
-        <StatusRow icon={<Calendar size={14} />} label="Endorsements Due" value={endorsementsDue} color={endorsementsDue > 0 ? '#f59e0b' : '#10b981'} />
+        <StatusRow
+          icon={<Calendar size={14} />}
+          label="Endorsements Due"
+          value={endorsementsDue}
+          color={endorsementsDue > 0 ? '#f59e0b' : '#10b981'}
+        />
       </div>
 
       {onViewSurveyFollowUp && (activeWarranties.length > 0 || endorsementsDue > 0) && (
         <button
           onClick={onViewSurveyFollowUp}
           className="btn-secondary"
-          style={{ width: '100%', marginTop: '16px', fontSize: '0.78rem', padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+          style={{
+            width: '100%',
+            marginTop: '16px',
+            fontSize: '0.78rem',
+            padding: '7px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px'
+          }}
         >
           <FileWarning size={13} /> View Survey Follow-Up
         </button>
@@ -876,13 +1642,38 @@ function OperationalWidget({ data, cardStyle }: { data: WidgetData; cardStyle: R
 
 // ── Recent Vessels Widget ────────────────────────────────────────────────
 
-function RecentVesselsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function RecentVesselsWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { activity, isLight } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #0ea5e9, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #0ea5e9, #2563eb)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Ship size={13} color="#fff" />
         </div>
         Recently Added Vessels
@@ -892,22 +1683,70 @@ function RecentVesselsWidget({ data, cardStyle }: { data: WidgetData; cardStyle:
       ) : (
         <div>
           {activity.recentVessels.map((v, idx) => (
-            <div key={v.id} style={{
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-              borderRadius: '8px',
-              background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)')
-            }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: v.isActive ? 'rgba(14,165,233,0.12)' : 'rgba(128,128,128,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div
+              key={v.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                background:
+                  idx % 2 === 0
+                    ? 'transparent'
+                    : isLight
+                      ? 'rgba(0,0,0,0.025)'
+                      : 'rgba(255,255,255,0.02)'
+              }}
+            >
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '7px',
+                  background: v.isActive ? 'rgba(14,165,233,0.12)' : 'rgba(128,128,128,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
                 <Ship size={14} color={v.isActive ? '#0ea5e9' : 'var(--text-secondary)'} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '700', fontSize: '0.82rem', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', gap: '6px', marginTop: '1px' }}>
+                <div
+                  style={{
+                    fontWeight: '700',
+                    fontSize: '0.82rem',
+                    textTransform: 'uppercase',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {v.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    display: 'flex',
+                    gap: '6px',
+                    marginTop: '1px'
+                  }}
+                >
                   <span>IMO {v.imoNumber}</span>
                   {v.fleetName && <span>· {v.fleetName}</span>}
                 </div>
               </div>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+              >
                 {relativeTime(v.createdAt)}
               </span>
             </div>
@@ -920,13 +1759,38 @@ function RecentVesselsWidget({ data, cardStyle }: { data: WidgetData; cardStyle:
 
 // ── Recent Entities Widget ───────────────────────────────────────────────
 
-function RecentEntitiesWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function RecentEntitiesWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { activity, isLight } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Users size={13} color="#fff" />
         </div>
         Recently Added Entities
@@ -938,21 +1802,75 @@ function RecentEntitiesWidget({ data, cardStyle }: { data: WidgetData; cardStyle
           {activity.recentEntities.map((e, idx) => {
             const isCompany = e.type === 'company'
             return (
-              <div key={e.id} style={{
-                display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                borderRadius: '8px',
-                background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)')
-              }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: isCompany ? 'rgba(139,92,246,0.12)' : 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {isCompany ? <Building2 size={14} color="#8b5cf6" /> : <User size={14} color="#10b981" />}
+              <div
+                key={e.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background:
+                    idx % 2 === 0
+                      ? 'transparent'
+                      : isLight
+                        ? 'rgba(0,0,0,0.025)'
+                        : 'rgba(255,255,255,0.02)'
+                }}
+              >
+                <div
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '7px',
+                    background: isCompany ? 'rgba(139,92,246,0.12)' : 'rgba(16,185,129,0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {isCompany ? (
+                    <Building2 size={14} color="#8b5cf6" />
+                  ) : (
+                    <User size={14} color="#10b981" />
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '600', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
-                  <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '5px', background: isCompany ? 'rgba(139,92,246,0.1)' : 'rgba(16,185,129,0.1)', color: isCompany ? '#8b5cf6' : '#10b981', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.04em' }}>
+                  <div
+                    style={{
+                      fontWeight: '600',
+                      fontSize: '0.82rem',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {e.name}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '1px 6px',
+                      borderRadius: '5px',
+                      background: isCompany ? 'rgba(139,92,246,0.1)' : 'rgba(16,185,129,0.1)',
+                      color: isCompany ? '#8b5cf6' : '#10b981',
+                      textTransform: 'uppercase',
+                      fontWeight: '700',
+                      letterSpacing: '0.04em'
+                    }}
+                  >
                     {e.type}
                   </span>
                 </div>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                >
                   {relativeTime(e.createdAt)}
                 </span>
               </div>
@@ -966,13 +1884,38 @@ function RecentEntitiesWidget({ data, cardStyle }: { data: WidgetData; cardStyle
 
 // ── Recent Changes Widget ────────────────────────────────────────────────
 
-function RecentChangesWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function RecentChangesWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { activity, isLight } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Activity size={13} color="#fff" />
         </div>
         Recent Changes
@@ -982,27 +1925,88 @@ function RecentChangesWidget({ data, cardStyle }: { data: WidgetData; cardStyle:
       ) : (
         <div>
           {activity.recentAuditEntries.map((entry, idx) => (
-            <div key={idx} style={{
-              display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px',
-              borderRadius: '8px',
-              background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)')
-            }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                background:
+                  idx % 2 === 0
+                    ? 'transparent'
+                    : isLight
+                      ? 'rgba(0,0,0,0.025)'
+                      : 'rgba(255,255,255,0.02)'
+              }}
+            >
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '7px',
+                  background: 'rgba(245,158,11,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginTop: '1px'
+                }}
+              >
                 <Ship size={13} color="#f59e0b" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '700', fontSize: '0.82rem', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.vesselName}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{formatFieldName(entry.fieldName)}</span>
+                <div
+                  style={{
+                    fontWeight: '700',
+                    fontSize: '0.82rem',
+                    textTransform: 'uppercase',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {entry.vesselName}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    marginTop: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+                    {formatFieldName(entry.fieldName)}
+                  </span>
                   {entry.newValue && (
                     <>
                       <span>{'\u2192'}</span>
-                      <span style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.newValue}</span>
+                      <span
+                        style={{
+                          maxWidth: '80px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {entry.newValue}
+                      </span>
                     </>
                   )}
                 </div>
               </div>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+              >
                 {relativeTime(entry.changedAt)}
               </span>
             </div>
@@ -1015,22 +2019,72 @@ function RecentChangesWidget({ data, cardStyle }: { data: WidgetData; cardStyle:
 
 // ── Data Quality Widget ──────────────────────────────────────────────────
 
-function DataQualityWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function DataQualityWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { dataQuality, isLight } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #e6a800, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #e6a800, #d97706)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Database size={13} color="#fff" />
         </div>
-        <span style={{ fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Data Quality</span>
+        <span
+          style={{
+            fontSize: '0.68rem',
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em'
+          }}
+        >
+          Data Quality
+        </span>
       </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <DataQualityRow label="Vessels without customer" count={dataQuality.vesselsNoCustomer} isLight={isLight} />
-        <DataQualityRow label="Entities without email" count={dataQuality.entitiesNoEmail} isLight={isLight} />
-        <DataQualityRow label="Entities without phone" count={dataQuality.entitiesNoPhone} isLight={isLight} />
-        <DataQualityRow label="Policies without end date" count={dataQuality.policiesNoEndDate} isLight={isLight} />
+        <DataQualityRow
+          label="Vessels without customer"
+          count={dataQuality.vesselsNoCustomer}
+          isLight={isLight}
+        />
+        <DataQualityRow
+          label="Entities without email"
+          count={dataQuality.entitiesNoEmail}
+          isLight={isLight}
+        />
+        <DataQualityRow
+          label="Entities without phone"
+          count={dataQuality.entitiesNoPhone}
+          isLight={isLight}
+        />
+        <DataQualityRow
+          label="Policies without end date"
+          count={dataQuality.policiesNoEndDate}
+          isLight={isLight}
+        />
       </div>
     </div>
   )
@@ -1038,13 +2092,38 @@ function DataQualityWidget({ data, cardStyle }: { data: WidgetData; cardStyle: R
 
 // ── Week Renewals Widget ─────────────────────────────────────────────────
 
-function WeekRenewalsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: React.CSSProperties }) {
+function WeekRenewalsWidget({
+  data,
+  cardStyle
+}: {
+  data: WidgetData
+  cardStyle: React.CSSProperties
+}) {
   const { activity, isLight } = data
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Calendar size={13} color="#fff" />
         </div>
         Renewals This Week
@@ -1056,27 +2135,88 @@ function WeekRenewalsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: 
           {activity.weekRenewals.slice(0, 10).map((r, idx) => {
             const days = daysUntil(r.endDate)
             return (
-              <div key={idx} style={{
-                display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                borderRadius: '8px',
-                background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)')
-              }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: days <= 2 ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background:
+                    idx % 2 === 0
+                      ? 'transparent'
+                      : isLight
+                        ? 'rgba(0,0,0,0.025)'
+                        : 'rgba(255,255,255,0.02)'
+                }}
+              >
+                <div
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '7px',
+                    background: days <= 2 ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
                   <Calendar size={13} color={days <= 2 ? '#ef4444' : '#10b981'} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.82rem', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.policyTypeName}</div>
+                  <div
+                    style={{
+                      fontWeight: '700',
+                      fontSize: '0.82rem',
+                      textTransform: 'uppercase',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {r.vesselName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {r.policyTypeName}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: '700', color: days <= 2 ? 'var(--danger)' : '#10b981' }}>{days === 0 ? 'Today' : `${days}d`}</div>
-                  <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>{fmtDate(r.endDate)}</div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      color: days <= 2 ? 'var(--danger)' : '#10b981'
+                    }}
+                  >
+                    {days === 0 ? 'Today' : `${days}d`}
+                  </div>
+                  <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>
+                    {fmtDate(r.endDate)}
+                  </div>
                 </div>
               </div>
             )
           })}
           {activity.weekRenewals.length > 10 && (
-            <div style={{ textAlign: 'center', padding: '8px', fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '8px',
+                fontSize: '0.78rem',
+                color: 'var(--accent-primary)',
+                fontWeight: 600
+              }}
+            >
               +{activity.weekRenewals.length - 10} more
             </div>
           )}
@@ -1088,9 +2228,17 @@ function WeekRenewalsWidget({ data, cardStyle }: { data: WidgetData; cardStyle: 
 
 // ── Renewal Calendar Widget ──────────────────────────────────────────────
 
-function RenewalCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+function RenewalCalendarWidget({
+  cardStyle,
+  data
+}: {
+  cardStyle: React.CSSProperties
+  data: WidgetData
+}) {
   const { onNavigate } = data
-  const [monthCounts, setMonthCounts] = useState<{ label: string; count: number; year: number; month: number }[]>([])
+  const [monthCounts, setMonthCounts] = useState<
+    { label: string; count: number; year: number; month: number }[]
+  >([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -1104,29 +2252,54 @@ function RenewalCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProper
         month: d.getMonth() + 1
       })
     }
-    Promise.all(months.map(m =>
-      window.api.getPolicyRenewalsByMonth(m.year, m.month)
-        .then(rows => ({ ...m, count: Array.isArray(rows) ? rows.length : 0 }))
-        .catch(() => ({ ...m, count: 0 }))
-    )).then(results => {
+    Promise.all(
+      months.map((m) =>
+        window.api
+          .getPolicyRenewalsByMonth(m.year, m.month)
+          .then((rows) => ({ ...m, count: Array.isArray(rows) ? rows.length : 0 }))
+          .catch(() => ({ ...m, count: 0 }))
+      )
+    ).then((results) => {
       setMonthCounts(results)
       setLoading(false)
     })
   }, [])
 
-  const maxCount = Math.max(...monthCounts.map(m => m.count), 1)
+  const maxCount = Math.max(...monthCounts.map((m) => m.count), 1)
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #06b6d4, #0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 16px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #06b6d4, #0284c7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Calendar size={13} color="#fff" />
         </div>
         Renewal Calendar
       </h3>
       {loading ? (
         <div style={{ padding: '30px', textAlign: 'center' }}>
-          <div className="skeleton" style={{ width: '100%', height: '120px', borderRadius: '8px' }} />
+          <div
+            className="skeleton"
+            style={{ width: '100%', height: '120px', borderRadius: '8px' }}
+          />
         </div>
       ) : (
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', height: '140px' }}>
@@ -1137,19 +2310,36 @@ function RenewalCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProper
               <div
                 key={m.label}
                 style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px',
                   cursor: onNavigate ? 'pointer' : 'default'
                 }}
                 onClick={() => onNavigate?.('renewals')}
               >
                 <span style={{ fontSize: '0.72rem', fontWeight: '700', color }}>{m.count}</span>
-                <div style={{
-                  width: '100%', maxWidth: '40px', height: `${barHeight}px`,
-                  background: `${color}22`, border: `2px solid ${color}`,
-                  borderRadius: '4px 4px 0 0',
-                  transition: 'height 0.3s ease'
-                }} />
-                <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{m.label}</span>
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: '40px',
+                    height: `${barHeight}px`,
+                    background: `${color}22`,
+                    border: `2px solid ${color}`,
+                    borderRadius: '4px 4px 0 0',
+                    transition: 'height 0.3s ease'
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '0.66rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {m.label}
+                </span>
               </div>
             )
           })}
@@ -1161,63 +2351,127 @@ function RenewalCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProper
 
 // ── Quotation Pipeline Widget ────────────────────────────────────────────
 
-function QuotationPipelineWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+function QuotationPipelineWidget({
+  cardStyle,
+  data
+}: {
+  cardStyle: React.CSSProperties
+  data: WidgetData
+}) {
   const { isLight, onNavigate } = data
   const [stepCounts, setStepCounts] = useState<{ name: string; color: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      window.api.workflowGetSteps(),
-      window.api.getQuotations()
-    ]).then(([steps, quotations]) => {
-      const stepsArr = Array.isArray(steps) ? steps as WorkflowStep[] : []
-      const quots = Array.isArray(quotations) ? quotations : []
-      const counts = stepsArr
-        .sort((a, b) => a.order - b.order)
-        .map(step => ({
-          name: step.name,
-          color: step.color || '#888',
-          count: quots.filter((q: any) => q.workflowStepId === step.id).length
-        }))
-      setStepCounts(counts)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    Promise.all([window.api.workflowGetSteps(), window.api.getQuotations()])
+      .then(([steps, quotations]) => {
+        const stepsArr = Array.isArray(steps) ? (steps as WorkflowStep[]) : []
+        const quots = Array.isArray(quotations) ? quotations : []
+        const counts = stepsArr
+          .sort((a, b) => a.order - b.order)
+          .map((step) => ({
+            name: step.name,
+            color: step.color || '#888',
+            count: quots.filter((q: any) => q.workflowStepId === step.id).length
+          }))
+        setStepCounts(counts)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
-  const maxCount = Math.max(...stepCounts.map(s => s.count), 1)
+  const maxCount = Math.max(...stepCounts.map((s) => s.count), 1)
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 16px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <GitBranch size={13} color="#fff" />
         </div>
         Quotation Pipeline
       </h3>
       {loading ? (
         <div style={{ padding: '30px', textAlign: 'center' }}>
-          <div className="skeleton" style={{ width: '100%', height: '80px', borderRadius: '8px' }} />
+          <div
+            className="skeleton"
+            style={{ width: '100%', height: '80px', borderRadius: '8px' }}
+          />
         </div>
       ) : stepCounts.length === 0 ? (
         <EmptyActivity label="No workflow steps configured" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {stepCounts.map(step => (
+          {stepCounts.map((step) => (
             <div
               key={step.name}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: onNavigate ? 'pointer' : 'default' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: onNavigate ? 'pointer' : 'default'
+              }}
               onClick={() => onNavigate?.('quotations')}
             >
-              <span style={{ fontSize: '0.78rem', fontWeight: '600', width: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{step.name}</span>
-              <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: isLight ? '#f0f0f0' : 'rgba(255,255,255,0.06)' }}>
-                <div style={{
-                  height: '100%', borderRadius: '4px',
-                  width: `${Math.max((step.count / maxCount) * 100, 2)}%`,
-                  background: step.color, transition: 'width 0.3s ease'
-                }} />
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: '600',
+                  width: '100px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {step.name}
+              </span>
+              <div
+                style={{
+                  flex: 1,
+                  height: '8px',
+                  borderRadius: '4px',
+                  background: isLight ? '#f0f0f0' : 'rgba(255,255,255,0.06)'
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    borderRadius: '4px',
+                    width: `${Math.max((step.count / maxCount) * 100, 2)}%`,
+                    background: step.color,
+                    transition: 'width 0.3s ease'
+                  }}
+                />
               </div>
-              <span style={{ fontSize: '0.78rem', fontWeight: '800', minWidth: '24px', textAlign: 'right', color: step.color }}>{step.count}</span>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: '800',
+                  minWidth: '24px',
+                  textAlign: 'right',
+                  color: step.color
+                }}
+              >
+                {step.count}
+              </span>
             </div>
           ))}
         </div>
@@ -1228,26 +2482,56 @@ function QuotationPipelineWidget({ cardStyle, data }: { cardStyle: React.CSSProp
 
 // ── Quick Actions Widget ─────────────────────────────────────────────────
 
-function QuickActionsWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+function QuickActionsWidget({
+  cardStyle,
+  data
+}: {
+  cardStyle: React.CSSProperties
+  data: WidgetData
+}) {
   const { onNavigate } = data
 
   const actions = [
     { label: 'New Vessel', icon: Ship, tab: 'new-vessel', color: '#0ea5e9' },
     { label: 'New Quotation', icon: FileText, tab: 'new-quotation', color: '#8b5cf6' },
     { label: 'New Entity', icon: Building2, tab: 'new-entity', color: '#10b981' },
-    { label: 'Search', icon: () => <span style={{ fontSize: '0.7rem', fontWeight: '700' }}>Ctrl+K</span>, tab: 'search', color: '#f59e0b' }
+    {
+      label: 'Search',
+      icon: () => <span style={{ fontSize: '0.7rem', fontWeight: '700' }}>Ctrl+K</span>,
+      tab: 'search',
+      color: '#f59e0b'
+    }
   ]
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 14px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 14px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Zap size={13} color="#fff" />
         </div>
         Quick Actions
       </h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {actions.map(a => {
+        {actions.map((a) => {
           const Icon = a.icon
           return (
             <button
@@ -1255,16 +2539,29 @@ function QuickActionsWidget({ cardStyle, data }: { cardStyle: React.CSSPropertie
               onClick={() => onNavigate?.(a.tab)}
               className="btn-secondary"
               style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '10px 14px', fontSize: '0.82rem', fontWeight: '600',
-                width: '100%', textAlign: 'left', justifyContent: 'flex-start'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                fontSize: '0.82rem',
+                fontWeight: '600',
+                width: '100%',
+                textAlign: 'left',
+                justifyContent: 'flex-start'
               }}
             >
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '7px',
-                background: `${a.color}18`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }}>
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  background: `${a.color}18`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
                 <Icon size={14} color={a.color} />
               </div>
               {a.label}
@@ -1278,16 +2575,25 @@ function QuickActionsWidget({ cardStyle, data }: { cardStyle: React.CSSPropertie
 
 // ── Fleet Overview Widget ────────────────────────────────────────────────
 
-function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+function FleetOverviewWidget({
+  cardStyle,
+  data
+}: {
+  cardStyle: React.CSSProperties
+  data: WidgetData
+}) {
   const { activeVessels, allAlerts, docTypes, isLight } = data
   const [fleets, setFleets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    window.api.getFleets().then(f => {
-      setFleets(Array.isArray(f) ? f : [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    window.api
+      .getFleets()
+      .then((f) => {
+        setFleets(Array.isArray(f) ? f : [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   const fleetRows = useMemo(() => {
@@ -1306,21 +2612,43 @@ function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperti
       const fid = fleetOfVessel.get(a.vesselId)
       if (fid) alertCounts.set(fid, (alertCounts.get(fid) || 0) + 1)
     }
-    return fleets.map(fleet => {
-      const vesselCount = vesselCounts.get(fleet.id) || 0
-      if (vesselCount === 0) return null
-      const total = vesselCount * docTypes.length
-      const compliance = total > 0 ? Math.round(((total - (alertCounts.get(fleet.id) || 0)) / total) * 100) : 100
-      return { name: fleet.name, vesselCount, compliance }
-    }).filter(Boolean) as { name: string; vesselCount: number; compliance: number }[]
+    return fleets
+      .map((fleet) => {
+        const vesselCount = vesselCounts.get(fleet.id) || 0
+        if (vesselCount === 0) return null
+        const total = vesselCount * docTypes.length
+        const compliance =
+          total > 0 ? Math.round(((total - (alertCounts.get(fleet.id) || 0)) / total) * 100) : 100
+        return { name: fleet.name, vesselCount, compliance }
+      })
+      .filter(Boolean) as { name: string; vesselCount: number; compliance: number }[]
   }, [fleets, activeVessels, allAlerts, docTypes])
 
-  const unassigned = activeVessels.filter(v => !(v as any).fleetId).length
+  const unassigned = activeVessels.filter((v) => !(v as any).fleetId).length
 
   return (
     <div style={cardStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #06b6d4, #0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <h3
+        style={{
+          margin: '0 0 16px',
+          fontSize: '0.92rem',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}
+      >
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '6px',
+            background: 'linear-gradient(135deg, #06b6d4, #0284c7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
           <Layers size={13} color="#fff" />
         </div>
         Fleet Overview
@@ -1334,16 +2662,45 @@ function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperti
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr>
-                {['Fleet', 'Vessels', 'Compliance'].map(h => (
-                  <th key={h} style={{ padding: '5px 10px', textAlign: 'left', fontSize: '0.66rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', borderBottom: '1px solid var(--table-border)' }}>{h}</th>
+                {['Fleet', 'Vessels', 'Compliance'].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '5px 10px',
+                      textAlign: 'left',
+                      fontSize: '0.66rem',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      color: 'var(--text-secondary)',
+                      borderBottom: '1px solid var(--table-border)'
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {fleetRows.map((row, idx) => {
-                const compColor = row.compliance === 100 ? '#10b981' : row.compliance > 80 ? '#f59e0b' : 'var(--danger)'
+                const compColor =
+                  row.compliance === 100
+                    ? '#10b981'
+                    : row.compliance > 80
+                      ? '#f59e0b'
+                      : 'var(--danger)'
                 return (
-                  <tr key={row.name} style={{ background: idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.018)' : 'rgba(255,255,255,0.012)') }}>
+                  <tr
+                    key={row.name}
+                    style={{
+                      background:
+                        idx % 2 === 0
+                          ? 'transparent'
+                          : isLight
+                            ? 'rgba(0,0,0,0.018)'
+                            : 'rgba(255,255,255,0.012)'
+                    }}
+                  >
                     <td style={{ padding: '7px 10px', fontWeight: '600' }}>{row.name}</td>
                     <td style={{ padding: '7px 10px' }}>{row.vesselCount}</td>
                     <td style={{ padding: '7px 10px' }}>
@@ -1355,7 +2712,14 @@ function FleetOverviewWidget({ cardStyle, data }: { cardStyle: React.CSSProperti
             </tbody>
           </table>
           {unassigned > 0 && (
-            <div style={{ marginTop: '10px', fontSize: '0.74rem', color: '#f59e0b', fontWeight: '600' }}>
+            <div
+              style={{
+                marginTop: '10px',
+                fontSize: '0.74rem',
+                color: '#f59e0b',
+                fontWeight: '600'
+              }}
+            >
               {unassigned} unassigned vessel{unassigned !== 1 ? 's' : ''}
             </div>
           )}
@@ -1374,7 +2738,13 @@ interface CalendarEvent {
   vesselName: string
 }
 
-function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSProperties; data: WidgetData }) {
+function DeadlineCalendarWidget({
+  cardStyle,
+  data
+}: {
+  cardStyle: React.CSSProperties
+  data: WidgetData
+}) {
   const { isLight } = data
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -1387,32 +2757,66 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
   useEffect(() => {
     setLoading(true)
     setSelectedDay(null)
-    window.api.dashboardGetCalendarEvents(year, month + 1).then(result => {
-      if (!result || typeof result !== 'object') { setEvents([]); setLoading(false); return }
-      const evts: CalendarEvent[] = []
-      if (Array.isArray(result.policies)) {
-        for (const p of result.policies) {
-          if (p.endDate) evts.push({ date: p.endDate, type: 'policy', label: p.policyTypeName, vesselName: p.vesselName })
+    window.api
+      .dashboardGetCalendarEvents(year, month + 1)
+      .then((result) => {
+        if (!result || typeof result !== 'object') {
+          setEvents([])
+          setLoading(false)
+          return
         }
-      }
-      if (Array.isArray(result.documents)) {
-        for (const d of result.documents) {
-          if (d.expiryDate) evts.push({ date: d.expiryDate, type: 'document', label: d.documentName, vesselName: d.vesselName })
+        const evts: CalendarEvent[] = []
+        if (Array.isArray(result.policies)) {
+          for (const p of result.policies) {
+            if (p.endDate)
+              evts.push({
+                date: p.endDate,
+                type: 'policy',
+                label: p.policyTypeName,
+                vesselName: p.vesselName
+              })
+          }
         }
-      }
-      if (Array.isArray(result.surveys)) {
-        for (const s of result.surveys) {
-          if (s.surveyDate) evts.push({ date: s.surveyDate, type: 'survey', label: s.surveyType || 'Survey', vesselName: s.vesselName })
+        if (Array.isArray(result.documents)) {
+          for (const d of result.documents) {
+            if (d.expiryDate)
+              evts.push({
+                date: d.expiryDate,
+                type: 'document',
+                label: d.documentName,
+                vesselName: d.vesselName
+              })
+          }
         }
-      }
-      if (Array.isArray(result.warranties)) {
-        for (const w of result.warranties) {
-          if (w.deadlineDate) evts.push({ date: w.deadlineDate, type: 'warranty', label: w.description || 'Warranty', vesselName: w.vesselName })
+        if (Array.isArray(result.surveys)) {
+          for (const s of result.surveys) {
+            if (s.surveyDate)
+              evts.push({
+                date: s.surveyDate,
+                type: 'survey',
+                label: s.surveyType || 'Survey',
+                vesselName: s.vesselName
+              })
+          }
         }
-      }
-      setEvents(evts)
-      setLoading(false)
-    }).catch(() => { setEvents([]); setLoading(false) })
+        if (Array.isArray(result.warranties)) {
+          for (const w of result.warranties) {
+            if (w.deadlineDate)
+              evts.push({
+                date: w.deadlineDate,
+                type: 'warranty',
+                label: w.description || 'Warranty',
+                vesselName: w.vesselName
+              })
+          }
+        }
+        setEvents(evts)
+        setLoading(false)
+      })
+      .catch(() => {
+        setEvents([])
+        setLoading(false)
+      })
   }, [year, month])
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
@@ -1430,10 +2834,11 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return events.filter(e => e.date.startsWith(dateStr))
+    return events.filter((e) => e.date.startsWith(dateStr))
   }
 
-  const dayHasType = (dayEvents: CalendarEvent[], type: string) => dayEvents.some(e => e.type === type)
+  const dayHasType = (dayEvents: CalendarEvent[], type: string) =>
+    dayEvents.some((e) => e.type === type)
 
   const DOT_COLORS = {
     policy: '#ef4444',
@@ -1446,30 +2851,97 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
 
   return (
     <div style={{ ...cardStyle, maxHeight: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '0.92rem',
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <div
+            style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '6px',
+              background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <Calendar size={13} color="#fff" />
           </div>
           Deadline Calendar
         </h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={prevMonth} className="btn-secondary" style={{ padding: '4px 8px' }} aria-label="Previous month">
+          <button
+            onClick={prevMonth}
+            className="btn-secondary"
+            style={{ padding: '4px 8px' }}
+            aria-label="Previous month"
+          >
             <ChevronLeft size={14} />
           </button>
-          <span style={{ fontWeight: '700', fontSize: '0.88rem', minWidth: '140px', textAlign: 'center' }}>{monthLabel}</span>
-          <button onClick={nextMonth} className="btn-secondary" style={{ padding: '4px 8px' }} aria-label="Next month">
+          <span
+            style={{
+              fontWeight: '700',
+              fontSize: '0.88rem',
+              minWidth: '140px',
+              textAlign: 'center'
+            }}
+          >
+            {monthLabel}
+          </span>
+          <button
+            onClick={nextMonth}
+            className="btn-secondary"
+            style={{ padding: '4px 8px' }}
+            aria-label="Next month"
+          >
             <ChevronRight size={14} />
           </button>
-          <button onClick={goToday} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.72rem', marginLeft: '4px' }}>Today</button>
+          <button
+            onClick={goToday}
+            className="btn-secondary"
+            style={{ padding: '4px 10px', fontSize: '0.72rem', marginLeft: '4px' }}
+          >
+            Today
+          </button>
         </div>
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: '16px',
+          marginBottom: '12px',
+          fontSize: '0.72rem',
+          color: 'var(--text-secondary)'
+        }}
+      >
         {Object.entries(DOT_COLORS).map(([type, color]) => (
           <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: color,
+                display: 'inline-block'
+              }}
+            />
             {type.charAt(0).toUpperCase() + type.slice(1)}
           </div>
         ))}
@@ -1477,15 +2949,29 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
 
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center' }}>
-          <div className="skeleton" style={{ width: '100%', height: '200px', borderRadius: '8px' }} />
+          <div
+            className="skeleton"
+            style={{ width: '100%', height: '200px', borderRadius: '8px' }}
+          />
         </div>
       ) : (
         <>
           {/* Calendar Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
             {/* Day of week headers */}
-            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: '0.68rem', fontWeight: '700', color: 'var(--text-secondary)', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
+              <div
+                key={d}
+                style={{
+                  textAlign: 'center',
+                  fontSize: '0.68rem',
+                  fontWeight: '700',
+                  color: 'var(--text-secondary)',
+                  padding: '4px 0',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}
+              >
                 {d}
               </div>
             ))}
@@ -1520,22 +3006,66 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
                         : 'transparent',
                     borderRadius: '6px',
                     cursor: hasEvents ? 'pointer' : 'default',
-                    border: isSelected ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                    border: isSelected
+                      ? '1px solid var(--accent-primary)'
+                      : '1px solid transparent',
                     transition: 'all 0.1s ease'
                   }}
                 >
-                  <span style={{
-                    fontSize: '0.8rem',
-                    fontWeight: isToday ? '800' : hasEvents ? '600' : '400',
-                    color: isToday ? 'var(--accent-primary)' : hasEvents ? 'var(--text-primary)' : 'var(--text-secondary)'
-                  }}>
+                  <span
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: isToday ? '800' : hasEvents ? '600' : '400',
+                      color: isToday
+                        ? 'var(--accent-primary)'
+                        : hasEvents
+                          ? 'var(--text-primary)'
+                          : 'var(--text-secondary)'
+                    }}
+                  >
                     {day}
                   </span>
                   <div style={{ display: 'flex', gap: '2px', marginTop: '2px', minHeight: '6px' }}>
-                    {dayHasType(dayEvents, 'policy') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.policy }} />}
-                    {dayHasType(dayEvents, 'document') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.document }} />}
-                    {dayHasType(dayEvents, 'survey') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.survey }} />}
-                    {dayHasType(dayEvents, 'warranty') && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS.warranty }} />}
+                    {dayHasType(dayEvents, 'policy') && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: DOT_COLORS.policy
+                        }}
+                      />
+                    )}
+                    {dayHasType(dayEvents, 'document') && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: DOT_COLORS.document
+                        }}
+                      />
+                    )}
+                    {dayHasType(dayEvents, 'survey') && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: DOT_COLORS.survey
+                        }}
+                      />
+                    )}
+                    {dayHasType(dayEvents, 'warranty') && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: DOT_COLORS.warranty
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               )
@@ -1544,33 +3074,83 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
 
           {/* Selected Day Events */}
           {selectedDay !== null && (
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-              borderRadius: '8px',
-              border: '1px solid var(--table-border)'
-            }}>
+            <div
+              style={{
+                marginTop: '12px',
+                padding: '12px',
+                background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                borderRadius: '8px',
+                border: '1px solid var(--table-border)'
+              }}
+            >
               <div style={{ fontWeight: '700', fontSize: '0.82rem', marginBottom: '8px' }}>
-                {new Date(year, month, selectedDay).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                <span style={{ marginLeft: '8px', fontWeight: '400', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                {new Date(year, month, selectedDay).toLocaleDateString('en-GB', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long'
+                })}
+                <span
+                  style={{
+                    marginLeft: '8px',
+                    fontWeight: '400',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.78rem'
+                  }}
+                >
                   {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}
                 </span>
               </div>
               {selectedDayEvents.length === 0 ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No events on this day</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  No events on this day
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {selectedDayEvents.map((evt, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', background: isLight ? '#fff' : 'rgba(255,255,255,0.03)' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: DOT_COLORS[evt.type], flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: '600', textTransform: 'uppercase' }}>{evt.vesselName}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{evt.label}</span>
-                      <span style={{
-                        marginLeft: 'auto', fontSize: '0.66rem', fontWeight: '700', textTransform: 'uppercase',
-                        padding: '1px 6px', borderRadius: '4px',
-                        background: `${DOT_COLORS[evt.type]}18`, color: DOT_COLORS[evt.type]
-                      }}>
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        background: isLight ? '#fff' : 'rgba(255,255,255,0.03)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: DOT_COLORS[evt.type],
+                          flexShrink: 0
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '0.78rem',
+                          fontWeight: '600',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {evt.vesselName}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {evt.label}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: '0.66rem',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: `${DOT_COLORS[evt.type]}18`,
+                          color: DOT_COLORS[evt.type]
+                        }}
+                      >
                         {evt.type}
                       </span>
                     </div>
@@ -1587,36 +3167,68 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
 
 // ── Shared sub-components ────────────────────────────────────────────────
 
-function DataQualityRow({ label, count, isLight }: { label: string; count: number; isLight: boolean }) {
+function DataQualityRow({
+  label,
+  count,
+  isLight
+}: {
+  label: string
+  count: number
+  isLight: boolean
+}) {
   const hasIssue = count > 0
   const color = hasIssue ? '#e6a800' : '#00c864'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', borderRadius: '7px' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '7px 8px',
+        borderRadius: '7px'
+      }}
+    >
       <span style={{ display: 'flex', flexShrink: 0 }}>
-        {hasIssue
-          ? <AlertTriangle size={13} color={color} />
-          : <CheckCircle size={13} color={color} />
-        }
+        {hasIssue ? (
+          <AlertTriangle size={13} color={color} />
+        ) : (
+          <CheckCircle size={13} color={color} />
+        )}
       </span>
-      <span style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>{label}</span>
-      <span style={{
-        fontWeight: '800',
-        fontSize: '0.78rem',
-        color,
-        padding: '1px 7px',
-        borderRadius: '6px',
-        background: hasIssue
-          ? (isLight ? 'rgba(230,168,0,0.1)' : 'rgba(230,168,0,0.15)')
-          : (isLight ? 'rgba(0,200,100,0.1)' : 'rgba(0,200,100,0.15)'),
-        minWidth: '24px',
-        textAlign: 'center'
-      }}>{count}</span>
+      <span style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+        {label}
+      </span>
+      <span
+        style={{
+          fontWeight: '800',
+          fontSize: '0.78rem',
+          color,
+          padding: '1px 7px',
+          borderRadius: '6px',
+          background: hasIssue
+            ? isLight
+              ? 'rgba(230,168,0,0.1)'
+              : 'rgba(230,168,0,0.15)'
+            : isLight
+              ? 'rgba(0,200,100,0.1)'
+              : 'rgba(0,200,100,0.15)',
+          minWidth: '24px',
+          textAlign: 'center'
+        }}
+      >
+        {count}
+      </span>
     </div>
   )
 }
 
 function KPICard({
-  icon, iconBg, label, value, sub, valueColor
+  icon,
+  iconBg,
+  label,
+  value,
+  sub,
+  valueColor
 }: {
   icon: React.ReactNode
   iconBg: string
@@ -1626,36 +3238,122 @@ function KPICard({
   valueColor?: string
 }) {
   return (
-    <div className="glass-card" style={{ padding: '18px 20px', border: '1px solid var(--table-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ width: '38px', height: '38px', borderRadius: '9px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div
+      className="glass-card"
+      style={{ padding: '18px 20px', border: '1px solid var(--table-border)' }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          marginBottom: '12px'
+        }}
+      >
+        <div
+          style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '9px',
+            background: iconBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}
+        >
           {icon}
         </div>
       </div>
-      <div style={{ fontSize: '1.75rem', fontWeight: '800', lineHeight: 1, marginBottom: '4px', color: valueColor || 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</div>
-      <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: sub ? '2px' : 0 }}>{label}</div>
-      {sub && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.7 }}>{sub}</div>}
+      <div
+        style={{
+          fontSize: '1.75rem',
+          fontWeight: '800',
+          lineHeight: 1,
+          marginBottom: '4px',
+          color: valueColor || 'var(--text-primary)',
+          letterSpacing: '-0.02em'
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: '0.78rem',
+          fontWeight: '600',
+          color: 'var(--text-secondary)',
+          marginBottom: sub ? '2px' : 0
+        }}
+      >
+        {label}
+      </div>
+      {sub && (
+        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.7 }}>
+          {sub}
+        </div>
+      )}
     </div>
   )
 }
 
-function StatusRow({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function StatusRow({
+  icon,
+  label,
+  value,
+  color
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+  color: string
+}) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '9px 10px',
+        borderRadius: '8px'
+      }}
+    >
       <span style={{ color: 'var(--text-secondary)', display: 'flex', flexShrink: 0 }}>{icon}</span>
       <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{label}</span>
-      <span style={{
-        fontWeight: '800', fontSize: '1rem', color,
-        minWidth: '28px', textAlign: 'right'
-      }}>{value}</span>
-      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0, opacity: value > 0 ? 1 : 0.3 }} />
+      <span
+        style={{
+          fontWeight: '800',
+          fontSize: '1rem',
+          color,
+          minWidth: '28px',
+          textAlign: 'right'
+        }}
+      >
+        {value}
+      </span>
+      <div
+        style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: color,
+          flexShrink: 0,
+          opacity: value > 0 ? 1 : 0.3
+        }}
+      />
     </div>
   )
 }
 
 function EmptyActivity({ label }: { label: string }) {
   return (
-    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+    <div
+      style={{
+        padding: '24px',
+        textAlign: 'center',
+        color: 'var(--text-secondary)',
+        fontSize: '0.82rem'
+      }}
+    >
       {label}
     </div>
   )

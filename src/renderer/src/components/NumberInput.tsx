@@ -26,7 +26,7 @@ export default function NumberInput({
   min,
   max,
   decimals,
-  className,
+  className
 }: Props) {
   const [display, setDisplay] = useState('')
   const [focused, setFocused] = useState(false)
@@ -39,9 +39,13 @@ export default function NumberInput({
       } else {
         const num = typeof value === 'string' ? parseFloat(value) : value
         if (!isNaN(num)) {
-          const formatted = decimals !== undefined
-            ? num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-            : num.toLocaleString('en-US')
+          const formatted =
+            decimals !== undefined
+              ? num.toLocaleString('en-US', {
+                  minimumFractionDigits: decimals,
+                  maximumFractionDigits: decimals
+                })
+              : num.toLocaleString('en-US')
           setDisplay(formatted)
         } else {
           setDisplay('')
@@ -50,22 +54,25 @@ export default function NumberInput({
     }
   }, [value, focused, decimals])
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value
-    const { display: formatted, raw: cleanRaw } = formatNumberWithCommas(raw)
-    setDisplay(formatted)
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value
+      const { display: formatted, raw: cleanRaw } = formatNumberWithCommas(raw)
+      setDisplay(formatted)
 
-    if (cleanRaw === '' || cleanRaw === '-') {
-      onChange(null)
-    } else {
-      const num = parseFloat(cleanRaw)
-      if (!isNaN(num)) {
-        if (min !== undefined && num < min) return
-        if (max !== undefined && num > max) return
-        onChange(num)
+      if (cleanRaw === '' || cleanRaw === '-') {
+        onChange(null)
+      } else {
+        const num = parseFloat(cleanRaw)
+        if (!isNaN(num)) {
+          if (min !== undefined && num < min) return
+          if (max !== undefined && num > max) return
+          onChange(num)
+        }
       }
-    }
-  }, [onChange, min, max])
+    },
+    [onChange, min, max]
+  )
 
   const handleFocus = useCallback(() => setFocused(true), [])
 
@@ -80,9 +87,13 @@ export default function NumberInput({
     }
     const num = parseFloat(clean)
     if (!isNaN(num)) {
-      const formatted = decimals !== undefined
-        ? num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-        : num.toLocaleString('en-US')
+      const formatted =
+        decimals !== undefined
+          ? num.toLocaleString('en-US', {
+              minimumFractionDigits: decimals,
+              maximumFractionDigits: decimals
+            })
+          : num.toLocaleString('en-US')
       setDisplay(formatted)
       onChange(num)
     }

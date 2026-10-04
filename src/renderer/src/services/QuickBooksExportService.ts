@@ -3,38 +3,138 @@ import { computePayablePremium, vesselTechnical } from '../../../shared/premium'
 
 // ── Column descriptions (Row 1) ─────────────────────────────────────────────
 const HEADER_DESCRIPTIONS = [
-  'Serial Number', 'Sales Order No', 'End', 'PO Number', 'Sales Order Date',
-  'Customer', 'Billing Address Line 1', 'Billing Address Line 2', 'Billing Address Line 3',
-  'Billing Address Line 4', 'Billing Address City', 'Billing Address State',
-  'Billing Address Country', 'FOB', 'P_Date', 'Due Date', 'Ship Date',
-  'No. of Days', 'Product/Service Class', 'Memo', 'Class', 'Shipping Address Line 1',
-  'Shipping Address Line 2', 'Shipping Address Line 3', 'Shipping Address City',
-  'Shipping Address State', 'Shipping Address Zip', 'Shipping Address Country',
-  'IMO', 'IMO #', 'M/V Type', 'Flag', 'Built', 'GT', 'M/V Class',
-  'Ex.Com', 'Terms', 'Product/Service Amount', 'Shipping Method', 'Currency',
-  'Exchange Rate', 'Amount Received', 'Total Amount', 'Value', 'Order',
-  'Sum Insured', 'AGR/Rate', 'Tech Prem', 'NCB', 'G A Prem', 'Conditions',
-  'Deductible', 'Condition Survey', 'Interest', 'Remarks', 'Subjectivities',
-  'Matter Insured', 'Voyage Fm', 'Voyage To', 'Product/Service',
-  'Product/Service Description', 'Template', 'Is Closed', 'Sales Rep'
+  'Serial Number',
+  'Sales Order No',
+  'End',
+  'PO Number',
+  'Sales Order Date',
+  'Customer',
+  'Billing Address Line 1',
+  'Billing Address Line 2',
+  'Billing Address Line 3',
+  'Billing Address Line 4',
+  'Billing Address City',
+  'Billing Address State',
+  'Billing Address Country',
+  'FOB',
+  'P_Date',
+  'Due Date',
+  'Ship Date',
+  'No. of Days',
+  'Product/Service Class',
+  'Memo',
+  'Class',
+  'Shipping Address Line 1',
+  'Shipping Address Line 2',
+  'Shipping Address Line 3',
+  'Shipping Address City',
+  'Shipping Address State',
+  'Shipping Address Zip',
+  'Shipping Address Country',
+  'IMO',
+  'IMO #',
+  'M/V Type',
+  'Flag',
+  'Built',
+  'GT',
+  'M/V Class',
+  'Ex.Com',
+  'Terms',
+  'Product/Service Amount',
+  'Shipping Method',
+  'Currency',
+  'Exchange Rate',
+  'Amount Received',
+  'Total Amount',
+  'Value',
+  'Order',
+  'Sum Insured',
+  'AGR/Rate',
+  'Tech Prem',
+  'NCB',
+  'G A Prem',
+  'Conditions',
+  'Deductible',
+  'Condition Survey',
+  'Interest',
+  'Remarks',
+  'Subjectivities',
+  'Matter Insured',
+  'Voyage Fm',
+  'Voyage To',
+  'Product/Service',
+  'Product/Service Description',
+  'Template',
+  'Is Closed',
+  'Sales Rep'
 ]
 
 // ── Column names (Row 2) ────────────────────────────────────────────────────
 const HEADER_NAMES = [
-  'S.No', 'Sales Order No', 'End', 'PO Number', 'Sales Order Date',
-  'Customer', 'Billing Address Line 1', 'Billing Address Line 2', 'Billing Address Line 3',
-  'Billing Address Line 4', 'Billing Address City', 'Billing Address State',
-  'Billing Address Country', 'FOB', 'P_Date', 'Due Date', 'Ship Date',
-  'No. of Days', 'Product/Service Class', 'Memo', 'Class', 'Shipping Address Line 1',
-  'Shipping Address Line 2', 'Shipping Address Line 3', 'Shipping Address City',
-  'Shipping Address State', 'Shipping Address Zip', 'Shipping Address Country',
-  'IMO', 'IMO #', 'M/V Type', 'Flag', 'Built', 'GT', 'M/V Class',
-  'Ex.Com', 'Terms', 'Product/Service Amount', 'Shipping Method', 'Currency',
-  'Exchange Rate', 'Amount Received', 'Total Amount', 'Value', 'Order',
-  'Sum Insured', 'AGR/Rate', 'Tech Prem', 'NCB', 'G A Prem', 'Conditions',
-  'Deductible', 'Condition Survey', 'Interest', 'Remarks', 'Subjectivities',
-  'Matter Insured', 'Voyage Fm', 'Voyage To', 'Product/Service',
-  'Product/Service Description', 'Template', 'Is Closed', 'Sales Rep'
+  'S.No',
+  'Sales Order No',
+  'End',
+  'PO Number',
+  'Sales Order Date',
+  'Customer',
+  'Billing Address Line 1',
+  'Billing Address Line 2',
+  'Billing Address Line 3',
+  'Billing Address Line 4',
+  'Billing Address City',
+  'Billing Address State',
+  'Billing Address Country',
+  'FOB',
+  'P_Date',
+  'Due Date',
+  'Ship Date',
+  'No. of Days',
+  'Product/Service Class',
+  'Memo',
+  'Class',
+  'Shipping Address Line 1',
+  'Shipping Address Line 2',
+  'Shipping Address Line 3',
+  'Shipping Address City',
+  'Shipping Address State',
+  'Shipping Address Zip',
+  'Shipping Address Country',
+  'IMO',
+  'IMO #',
+  'M/V Type',
+  'Flag',
+  'Built',
+  'GT',
+  'M/V Class',
+  'Ex.Com',
+  'Terms',
+  'Product/Service Amount',
+  'Shipping Method',
+  'Currency',
+  'Exchange Rate',
+  'Amount Received',
+  'Total Amount',
+  'Value',
+  'Order',
+  'Sum Insured',
+  'AGR/Rate',
+  'Tech Prem',
+  'NCB',
+  'G A Prem',
+  'Conditions',
+  'Deductible',
+  'Condition Survey',
+  'Interest',
+  'Remarks',
+  'Subjectivities',
+  'Matter Insured',
+  'Voyage Fm',
+  'Voyage To',
+  'Product/Service',
+  'Product/Service Description',
+  'Template',
+  'Is Closed',
+  'Sales Rep'
 ]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,13 +173,15 @@ function formatWithCommas(n: number | undefined | null): string {
 
 function encodeDeductibles(deductibles: any[], allDeductibleDefs: any[]): string {
   if (!deductibles.length) return '--'
-  return deductibles.map(d => {
-    const def = allDeductibleDefs.find((dd: any) => dd.id === d.piDeductibleId)
-    const code = def?.letterCode || '?'
-    const amount = (d.amount || 0) / 1000
-    const amtStr = amount === Math.floor(amount) ? String(amount) : amount.toFixed(1)
-    return code + amtStr
-  }).join('')
+  return deductibles
+    .map((d) => {
+      const def = allDeductibleDefs.find((dd: any) => dd.id === d.piDeductibleId)
+      const code = def?.letterCode || '?'
+      const amount = (d.amount || 0) / 1000
+      const amtStr = amount === Math.floor(amount) ? String(amount) : amount.toFixed(1)
+      return code + amtStr
+    })
+    .join('')
 }
 
 function getConditionsSummary(quotation: any, clauses: any[]): string {
@@ -105,7 +207,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
 
   const [instalments, addresses] = await Promise.all([
     window.api.policyGetInstalments(policyId),
-    window.api.policyGetAddresses(policyId),
+    window.api.policyGetAddresses(policyId)
   ])
   const safeInstalments = Array.isArray(instalments) ? instalments : []
   const safeAddresses = Array.isArray(addresses) ? addresses : []
@@ -142,37 +244,56 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
         const isHull = q.quotationTypeCode === 'H'
         const [qvs, piAlts, hullAlts, lols, avp, disc] = await Promise.all([
           window.api.getQuotationVessels(policy.quotationId),
-          q.quotationTypeCode === 'P' ? window.api.piGetQuotationAlternatives(policy.quotationId) : Promise.resolve([]),
-          isHull ? window.api.hullGetQuotationAlternatives(policy.quotationId) : Promise.resolve([]),
-          q.quotationTypeCode === 'P' ? window.api.lolGetOptions(policy.quotationId) : Promise.resolve([]),
+          q.quotationTypeCode === 'P'
+            ? window.api.piGetQuotationAlternatives(policy.quotationId)
+            : Promise.resolve([]),
+          isHull
+            ? window.api.hullGetQuotationAlternatives(policy.quotationId)
+            : Promise.resolve([]),
+          q.quotationTypeCode === 'P'
+            ? window.api.lolGetOptions(policy.quotationId)
+            : Promise.resolve([]),
           isHull ? window.api.hullGetAltVesselPremiums(policy.quotationId) : Promise.resolve([]),
           window.api.quotationDiscountGetByQuotation(policy.quotationId)
         ])
         const vessels = Array.isArray(qvs) ? qvs : []
         qDiscounts = Array.isArray(disc) ? disc : []
-        qVessel = vessels.find((v: any) => v.vesselId === policy.vesselId) || (vessels.length === 1 ? vessels[0] : null)
+        qVessel =
+          vessels.find((v: any) => v.vesselId === policy.vesselId) ||
+          (vessels.length === 1 ? vessels[0] : null)
         if (qVessel) {
           const altVesselPrems: Record<string, number> = {}
           for (const r of (Array.isArray(avp) ? avp : []) as any[]) {
-            if (r.premiumAmount != null) altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+            if (r.premiumAmount != null)
+              altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
           }
-          vesselTech = vesselTechnical({
-            quotation: q, vessels,
-            piAlts: Array.isArray(piAlts) ? piAlts : [],
-            hullAlts: Array.isArray(hullAlts) ? hullAlts : [],
-            lolOptions: Array.isArray(lols) ? lols : [],
-            altVesselPrems, discounts: qDiscounts
-          }, qVessel, policy.selectedAlternativeId || '', (policy as any).selected_lol_option_id || '')
+          vesselTech = vesselTechnical(
+            {
+              quotation: q,
+              vessels,
+              piAlts: Array.isArray(piAlts) ? piAlts : [],
+              hullAlts: Array.isArray(hullAlts) ? hullAlts : [],
+              lolOptions: Array.isArray(lols) ? lols : [],
+              altVesselPrems,
+              discounts: qDiscounts
+            },
+            qVessel,
+            policy.selectedAlternativeId || '',
+            (policy as any).selected_lol_option_id || ''
+          )
         }
       }
-    } catch { /* ignore — quotation data is supplementary */ }
+    } catch {
+      /* ignore — quotation data is supplementary */
+    }
   }
 
   // 4. Resolve entity addresses
   const ownerAddr = safeAddresses.find((a: any) => a.role?.toLowerCase().includes('owner'))
   const managerAddr = safeAddresses.find((a: any) => a.role?.toLowerCase().includes('manager'))
-  const otherAddrs = safeAddresses.filter((a: any) =>
-    !a.role?.toLowerCase().includes('owner') && !a.role?.toLowerCase().includes('manager')
+  const otherAddrs = safeAddresses.filter(
+    (a: any) =>
+      !a.role?.toLowerCase().includes('owner') && !a.role?.toLowerCase().includes('manager')
   )
 
   // 5. Compute fields
@@ -180,32 +301,39 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   const exchangeRate = policy.exchangeRate || 1
   const amountReceived = Math.round(premium * exchangeRate * 100) / 100
   const commPct = policy.commissionPercent ? `${policy.commissionPercent}%` : '--'
-  const numDays = policy.inceptionDate && policy.expiryDate
-    ? daysBetween(policy.inceptionDate, policy.expiryDate)
-    : 0
+  const numDays =
+    policy.inceptionDate && policy.expiryDate
+      ? daysBetween(policy.inceptionDate, policy.expiryDate)
+      : 0
 
   // Value / insured value from quotation
   const insuredValue = quotation?.agreedValue || quotation?.limitOfLiabilityAmount || 0
   // Technical premium of THIS vessel (not the fleet total of the quotation)
   const technicalPremium = vesselTech ?? (quotation?.premiumAmount || premium)
   const ncbApplies = !!quotation?.ncbEnabled && !qVessel?.ncbExcluded
-  const ncbPct = !ncbApplies ? '--'
+  const ncbPct = !ncbApplies
+    ? '--'
     : quotation.ncbDiscountType === 'amount'
-      ? (quotation.ncbDiscountAmount ? formatWithCommas(quotation.ncbDiscountAmount) : '--')
-      : (quotation.ncbDiscountPercent ? `${quotation.ncbDiscountPercent}%` : '--')
+      ? quotation.ncbDiscountAmount
+        ? formatWithCommas(quotation.ncbDiscountAmount)
+        : '--'
+      : quotation.ncbDiscountPercent
+        ? `${quotation.ncbDiscountPercent}%`
+        : '--'
 
   // Gross adjusted premium (after NCB/UPCC/extra discounts, honouring per-vessel exclusions)
-  const grossPremium = quotation ? computePayablePremium(technicalPremium, quotation, qDiscounts, qVessel) : technicalPremium
+  const grossPremium = quotation
+    ? computePayablePremium(technicalPremium, quotation, qDiscounts, qVessel)
+    : technicalPremium
 
   // Rate
-  const rate = insuredValue > 0
-    ? ((premium / insuredValue) * 100).toFixed(4) + '%'
-    : '--'
+  const rate = insuredValue > 0 ? ((premium / insuredValue) * 100).toFixed(4) + '%' : '--'
 
   // Flag format: "ISO3  FlagName"
-  const flagStr = policy.flagIso3Code && policy.flagStateName
-    ? `${policy.flagIso3Code}  ${policy.flagStateName}`
-    : policy.flagStateName || '--'
+  const flagStr =
+    policy.flagIso3Code && policy.flagStateName
+      ? `${policy.flagIso3Code}  ${policy.flagStateName}`
+      : policy.flagStateName || '--'
 
   // Shipping method
   const shippingMethod = policy.customerType === 'broker' ? 'Indirect' : 'Direct'
@@ -234,7 +362,12 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
     formatDateMDY(policy.createdAt), // Sales Order Date
     policy.customerName || '', // Customer
     ownerAddr?.addressText || '', // Billing Address Line 1
-    '', '', '', '', '', '', // Billing Address Lines 2-Country
+    '',
+    '',
+    '',
+    '',
+    '',
+    '', // Billing Address Lines 2-Country
     policy.fleetName || '', // FOB
     formatDateDMY(policy.inceptionDate), // P_Date
     formatDateMDY(policy.inceptionDate), // Due Date
@@ -246,12 +379,19 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
     ownerAddr?.entityName || '', // Shipping Address Line 1 — owners
     managerAddr?.entityName || '', // Shipping Address Line 2 — managers
     otherAddrs.map((a: any) => a.entityName).join(', ') || '', // Shipping Address Line 3
-    '', '', '', '', // Shipping Address City-Country
+    '',
+    '',
+    '',
+    '', // Shipping Address City-Country
     policy.imoNumber || '', // IMO
     policy.imoNumber || '', // IMO #
     policy.vesselType || '', // M/V Type
     flagStr, // Flag
-    policy.builtYear ? (policy.rebuiltYear ? `${policy.builtYear}/${policy.rebuiltYear}` : policy.builtYear) : '', // Built
+    policy.builtYear
+      ? policy.rebuiltYear
+        ? `${policy.builtYear}/${policy.rebuiltYear}`
+        : policy.builtYear
+      : '', // Built
     policy.grossTonnage || '', // GT
     policy.classificationSociety || '', // M/V Class
     commPct, // Ex.Com
@@ -282,7 +422,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
     'Gross Premium', // Product/Service Description
     'Policy/Slip/End', // Template
     'false', // Is Closed
-    policy.createdByName || '', // Sales Rep
+    policy.createdByName || '' // Sales Rep
   ]
 
   // 7. Build workbook

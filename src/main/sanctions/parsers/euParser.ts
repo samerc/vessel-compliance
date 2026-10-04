@@ -1,14 +1,19 @@
 import { normalizeText } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
-export function parseEuSanctions(csvData: string): { entities: SanctionsEntity[]; releaseDate: string | null } {
+export function parseEuSanctions(csvData: string): {
+  entities: SanctionsEntity[]
+  releaseDate: string | null
+} {
   const entries: SanctionsEntity[] = []
   const lines = csvData.split('\n')
   if (lines.length < 2) return { entities: entries, releaseDate: null }
 
   const header = parseCSVLine(lines[0])
   const colIndex: Record<string, number> = {}
-  header.forEach((col, idx) => { colIndex[col] = idx })
+  header.forEach((col, idx) => {
+    colIndex[col] = idx
+  })
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim()
@@ -17,7 +22,9 @@ export function parseEuSanctions(csvData: string): { entities: SanctionsEntity[]
       const row = parseCSVLine(line)
       const entity = parseEuRow(row, colIndex)
       if (entity) entries.push(entity)
-    } catch { /* skip malformed */ }
+    } catch {
+      /* skip malformed */
+    }
   }
 
   return { entities: entries, releaseDate: null }
@@ -31,8 +38,10 @@ function parseCSVLine(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const char = line[i]
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-      else inQuotes = !inQuotes
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else inQuotes = !inQuotes
     } else if (char === ',' && !inQuotes) {
       result.push(current.trim())
       current = ''
@@ -58,18 +67,33 @@ function parseEuRow(row: string[], colIndex: Record<string, number>): SanctionsE
   if (schema.includes('person')) entityType = 'individual'
   else if (schema.includes('vessel')) entityType = 'vessel'
   else if (schema.includes('airplane') || schema.includes('aircraft')) entityType = 'aircraft'
-  else if (schema.includes('organization') || schema.includes('company') || schema.includes('legalentity')) entityType = 'entity'
+  else if (
+    schema.includes('organization') ||
+    schema.includes('company') ||
+    schema.includes('legalentity')
+  )
+    entityType = 'entity'
 
   const aliasStr = getValue('aliases')
-  const aliases = aliasStr ? aliasStr.split(';').map(a => a.trim()).filter(Boolean) : []
+  const aliases = aliasStr
+    ? aliasStr
+        .split(';')
+        .map((a) => a.trim())
+        .filter(Boolean)
+    : []
 
   const addressStr = getValue('addresses')
-  const addresses = addressStr ? addressStr.split(';').map(a => a.trim()).filter(Boolean) : []
+  const addresses = addressStr
+    ? addressStr
+        .split(';')
+        .map((a) => a.trim())
+        .filter(Boolean)
+    : []
 
   const identifications: { type: string; number: string; country: string }[] = []
   const idStr = getValue('identifiers')
   if (idStr) {
-    idStr.split(';').forEach(id => {
+    idStr.split(';').forEach((id) => {
       const trimmed = id.trim()
       if (trimmed) identifications.push({ type: 'ID', number: trimmed, country: '' })
     })
@@ -79,7 +103,10 @@ function parseEuRow(row: string[], colIndex: Record<string, number>): SanctionsE
   const nationality = countries ? countries.split(';')[0].trim() : null
 
   const datasets = getValue('datasets') || 'EU'
-  const programs = datasets.split(';').map(d => d.trim()).filter(Boolean)
+  const programs = datasets
+    .split(';')
+    .map((d) => d.trim())
+    .filter(Boolean)
 
   return {
     source: 'EU',
@@ -94,7 +121,10 @@ function parseEuRow(row: string[], colIndex: Record<string, number>): SanctionsE
     identifications,
     programs: programs.length > 0 ? programs : ['EU FSF'],
     remarks: getValue('notes') || null,
-    vessel_imo: entityType === 'vessel' ? (identifications.find(id => id.number.match(/^\d{7}$/))?.number || null) : null,
+    vessel_imo:
+      entityType === 'vessel'
+        ? identifications.find((id) => id.number.match(/^\d{7}$/))?.number || null
+        : null,
     listed_date: getValue('first_seen') || getValue('created_at') || null,
     mother_name: null,
     father_name: null

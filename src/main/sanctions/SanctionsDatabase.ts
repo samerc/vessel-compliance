@@ -82,7 +82,7 @@ export class SanctionsDatabase {
     `)
     // Migration: add mother_name, father_name columns
     try {
-      const cols = this.db!.prepare("PRAGMA table_info(entities)").all() as any[]
+      const cols = this.db!.prepare('PRAGMA table_info(entities)').all() as any[]
       const colNames = cols.map((c: any) => c.name)
       if (!colNames.includes('mother_name')) {
         this.db!.exec('ALTER TABLE entities ADD COLUMN mother_name TEXT')
@@ -90,19 +90,23 @@ export class SanctionsDatabase {
       if (!colNames.includes('father_name')) {
         this.db!.exec('ALTER TABLE entities ADD COLUMN father_name TEXT')
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   getAllEntities(): SanctionsEntity[] {
     if (!this.db) return []
     const rows = this.db.prepare('SELECT * FROM entities').all() as any[]
-    return rows.map(r => this.deserializeEntity(r))
+    return rows.map((r) => this.deserializeEntity(r))
   }
 
   getEntityCount(source?: string): number {
     if (!this.db) return 0
     if (source) {
-      const row = this.db.prepare('SELECT COUNT(*) as cnt FROM entities WHERE source = ?').get(source) as any
+      const row = this.db
+        .prepare('SELECT COUNT(*) as cnt FROM entities WHERE source = ?')
+        .get(source) as any
       return row?.cnt || 0
     }
     const row = this.db.prepare('SELECT COUNT(*) as cnt FROM entities').get() as any
@@ -113,7 +117,13 @@ export class SanctionsDatabase {
     if (!this.db) return []
     const normalizedQuery = query.toLowerCase().trim()
     let sql = `SELECT * FROM entities WHERE (name_normalized LIKE ? OR aliases LIKE ? OR (vessel_imo IS NOT NULL AND vessel_imo = ?) OR mother_name LIKE ? OR father_name LIKE ?)`
-    const params: any[] = [`%${normalizedQuery}%`, `%${normalizedQuery}%`, query.trim(), `%${normalizedQuery}%`, `%${normalizedQuery}%`]
+    const params: any[] = [
+      `%${normalizedQuery}%`,
+      `%${normalizedQuery}%`,
+      query.trim(),
+      `%${normalizedQuery}%`,
+      `%${normalizedQuery}%`
+    ]
     if (options.source) {
       sql += ' AND source = ?'
       params.push(options.source)
@@ -121,7 +131,7 @@ export class SanctionsDatabase {
     sql += ' LIMIT ?'
     params.push(options.limit || 100)
     const rows = this.db.prepare(sql).all(...params) as any[]
-    return rows.map(r => this.deserializeEntity(r))
+    return rows.map((r) => this.deserializeEntity(r))
   }
 
   insertEntitiesBatch(entities: SanctionsEntity[]): void {
@@ -165,9 +175,16 @@ export class SanctionsDatabase {
     return this.db.prepare('SELECT * FROM data_updates ORDER BY source').all() as DataUpdate[]
   }
 
-  upsertDataUpdate(source: string, recordCount: number, status: string, releaseDate: string | null): void {
+  upsertDataUpdate(
+    source: string,
+    recordCount: number,
+    status: string,
+    releaseDate: string | null
+  ): void {
     if (!this.db) return
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO data_updates (source, updated_at, record_count, status, release_date)
       VALUES (?, datetime('now'), ?, ?, ?)
       ON CONFLICT(source) DO UPDATE SET
@@ -175,44 +192,54 @@ export class SanctionsDatabase {
         record_count = excluded.record_count,
         status = excluded.status,
         release_date = excluded.release_date
-    `).run(source, recordCount, status, releaseDate || null)
+    `
+      )
+      .run(source, recordCount, status, releaseDate || null)
   }
 
   getSicEntities(): SanctionsEntity[] {
     if (!this.db) return []
-    const rows = this.db.prepare("SELECT * FROM entities WHERE source = 'SIC' ORDER BY name").all() as any[]
-    return rows.map(r => this.deserializeEntity(r))
+    const rows = this.db
+      .prepare("SELECT * FROM entities WHERE source = 'SIC' ORDER BY name")
+      .all() as any[]
+    return rows.map((r) => this.deserializeEntity(r))
   }
 
   getSicEntity(id: number): SanctionsEntity | null {
     if (!this.db) return null
-    const row = this.db.prepare('SELECT * FROM entities WHERE id = ? AND source = ?').get(id, 'SIC') as any
+    const row = this.db
+      .prepare('SELECT * FROM entities WHERE id = ? AND source = ?')
+      .get(id, 'SIC') as any
     return row ? this.deserializeEntity(row) : null
   }
 
   insertSicEntity(e: Omit<SanctionsEntity, 'id'>): number {
     if (!this.db) return 0
-    const result = this.db.prepare(`
+    const result = this.db
+      .prepare(
+        `
       INSERT INTO entities (source, source_id, entity_type, name, name_normalized, aliases, date_of_birth, nationality, addresses, identifications, programs, vessel_imo, remarks, listed_date, mother_name, father_name)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      'SIC',
-      e.source_id || null,
-      e.entity_type || 'individual',
-      e.name,
-      e.name_normalized || '',
-      JSON.stringify(e.aliases || []),
-      e.date_of_birth || null,
-      e.nationality || null,
-      JSON.stringify(e.addresses || []),
-      JSON.stringify(e.identifications || []),
-      JSON.stringify(e.programs || []),
-      e.vessel_imo || null,
-      e.remarks || null,
-      e.listed_date || null,
-      e.mother_name || null,
-      e.father_name || null
-    )
+    `
+      )
+      .run(
+        'SIC',
+        e.source_id || null,
+        e.entity_type || 'individual',
+        e.name,
+        e.name_normalized || '',
+        JSON.stringify(e.aliases || []),
+        e.date_of_birth || null,
+        e.nationality || null,
+        JSON.stringify(e.addresses || []),
+        JSON.stringify(e.identifications || []),
+        JSON.stringify(e.programs || []),
+        e.vessel_imo || null,
+        e.remarks || null,
+        e.listed_date || null,
+        e.mother_name || null,
+        e.father_name || null
+      )
     this.updateSicDataUpdate()
     return Number(result.lastInsertRowid)
   }
@@ -221,20 +248,55 @@ export class SanctionsDatabase {
     if (!this.db) return
     const fields: string[] = []
     const values: any[] = []
-    if (e.name !== undefined) { fields.push('name = ?'); values.push(e.name) }
-    if (e.name_normalized !== undefined) { fields.push('name_normalized = ?'); values.push(e.name_normalized) }
-    if (e.source_id !== undefined) { fields.push('source_id = ?'); values.push(e.source_id || null) }
-    if (e.entity_type !== undefined) { fields.push('entity_type = ?'); values.push(e.entity_type) }
-    if (e.aliases !== undefined) { fields.push('aliases = ?'); values.push(JSON.stringify(e.aliases || [])) }
-    if (e.date_of_birth !== undefined) { fields.push('date_of_birth = ?'); values.push(e.date_of_birth || null) }
-    if (e.nationality !== undefined) { fields.push('nationality = ?'); values.push(e.nationality || null) }
-    if (e.remarks !== undefined) { fields.push('remarks = ?'); values.push(e.remarks || null) }
-    if (e.listed_date !== undefined) { fields.push('listed_date = ?'); values.push(e.listed_date || null) }
-    if (e.mother_name !== undefined) { fields.push('mother_name = ?'); values.push(e.mother_name || null) }
-    if (e.father_name !== undefined) { fields.push('father_name = ?'); values.push(e.father_name || null) }
+    if (e.name !== undefined) {
+      fields.push('name = ?')
+      values.push(e.name)
+    }
+    if (e.name_normalized !== undefined) {
+      fields.push('name_normalized = ?')
+      values.push(e.name_normalized)
+    }
+    if (e.source_id !== undefined) {
+      fields.push('source_id = ?')
+      values.push(e.source_id || null)
+    }
+    if (e.entity_type !== undefined) {
+      fields.push('entity_type = ?')
+      values.push(e.entity_type)
+    }
+    if (e.aliases !== undefined) {
+      fields.push('aliases = ?')
+      values.push(JSON.stringify(e.aliases || []))
+    }
+    if (e.date_of_birth !== undefined) {
+      fields.push('date_of_birth = ?')
+      values.push(e.date_of_birth || null)
+    }
+    if (e.nationality !== undefined) {
+      fields.push('nationality = ?')
+      values.push(e.nationality || null)
+    }
+    if (e.remarks !== undefined) {
+      fields.push('remarks = ?')
+      values.push(e.remarks || null)
+    }
+    if (e.listed_date !== undefined) {
+      fields.push('listed_date = ?')
+      values.push(e.listed_date || null)
+    }
+    if (e.mother_name !== undefined) {
+      fields.push('mother_name = ?')
+      values.push(e.mother_name || null)
+    }
+    if (e.father_name !== undefined) {
+      fields.push('father_name = ?')
+      values.push(e.father_name || null)
+    }
     if (fields.length === 0) return
     values.push(id)
-    this.db.prepare(`UPDATE entities SET ${fields.join(', ')} WHERE id = ? AND source = 'SIC'`).run(...values)
+    this.db
+      .prepare(`UPDATE entities SET ${fields.join(', ')} WHERE id = ? AND source = 'SIC'`)
+      .run(...values)
     this.updateSicDataUpdate()
   }
 
@@ -273,6 +335,10 @@ export class SanctionsDatabase {
 
   private parseJson(val: any, fallback: any): any {
     if (!val) return fallback
-    try { return JSON.parse(val) } catch { return fallback }
+    try {
+      return JSON.parse(val)
+    } catch {
+      return fallback
+    }
   }
 }

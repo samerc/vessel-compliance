@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  FileText, Trash2, Save, ChevronUp, ChevronDown,
-  Tag, X, Plus, Copy, FileDown, Mail
+  FileText,
+  Trash2,
+  Save,
+  ChevronUp,
+  ChevronDown,
+  Tag,
+  X,
+  Plus,
+  Copy,
+  FileDown,
+  Mail
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -26,7 +35,7 @@ const CATEGORY_TABS = [
   { id: 'vessel', label: 'Vessel' },
   { id: 'entity', label: 'Entity' },
   { id: 'certificate', label: 'Certificate' },
-  { id: 'email', label: 'Email' },
+  { id: 'email', label: 'Email' }
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -36,10 +45,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   vessel: '#0ea5e9',
   entity: '#f59e0b',
   certificate: '#10b981',
-  email: '#ec4899',
+  email: '#ec4899'
 }
 
-const PLACEHOLDER_ITEMS = TEMPLATE_PLACEHOLDERS.map(p => ({
+const PLACEHOLDER_ITEMS = TEMPLATE_PLACEHOLDERS.map((p) => ({
   key: p.key,
   label: p.label,
   category: p.category
@@ -91,9 +100,11 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     }
   }, [activeCategory])
 
-  useEffect(() => { loadTemplates() }, [loadTemplates])
+  useEffect(() => {
+    loadTemplates()
+  }, [loadTemplates])
 
-  const selected = templates.find(t => t.id === selectedId) || null
+  const selected = templates.find((t) => t.id === selectedId) || null
 
   // Sync editor fields when selection changes
   useEffect(() => {
@@ -104,7 +115,9 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       setEditCategory(selected.category)
       setEditBody(selected.body || '')
       setDirty(false)
-      setTimeout(() => { skipDirtyRef.current = false }, 50)
+      setTimeout(() => {
+        skipDirtyRef.current = false
+      }, 50)
     }
   }, [selectedId, selected?.id])
 
@@ -112,10 +125,11 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   useEffect(() => {
     if (skipDirtyRef.current) return
     if (selected) {
-      const changed = editName !== selected.name
-        || editDescription !== (selected.description || '')
-        || editCategory !== selected.category
-        || editBody !== (selected.body || '')
+      const changed =
+        editName !== selected.name ||
+        editDescription !== (selected.description || '') ||
+        editCategory !== selected.category ||
+        editBody !== (selected.body || '')
       setDirty(changed)
     }
   }, [editName, editDescription, editCategory, editBody])
@@ -175,7 +189,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
   }
 
   const handleReorder = async (id: string, direction: 'up' | 'down') => {
-    const idx = templates.findIndex(t => t.id === id)
+    const idx = templates.findIndex((t) => t.id === id)
     if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= templates.length) return
@@ -183,18 +197,19 @@ export default function DocumentTemplateManager(): React.JSX.Element {
     ;[newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]]
     setTemplates(newList)
     try {
-      await window.api.docTemplateReorder(newList.map(t => t.id))
+      await window.api.docTemplateReorder(newList.map((t) => t.id))
     } catch {
       loadTemplates()
     }
   }
 
-  const filteredTemplates = activeCategory === 'all'
-    ? templates
-    : templates.filter(t => t.category === activeCategory)
+  const filteredTemplates =
+    activeCategory === 'all' ? templates : templates.filter((t) => t.category === activeCategory)
 
   // Grouped placeholders for reference
-  const groupedPlaceholders = TEMPLATE_PLACEHOLDERS.reduce<Record<string, typeof TEMPLATE_PLACEHOLDERS[number][]>>((acc, p) => {
+  const groupedPlaceholders = TEMPLATE_PLACEHOLDERS.reduce<
+    Record<string, (typeof TEMPLATE_PLACEHOLDERS)[number][]>
+  >((acc, p) => {
     if (!acc[p.category]) acc[p.category] = []
     acc[p.category].push(p)
     return acc
@@ -206,31 +221,34 @@ export default function DocumentTemplateManager(): React.JSX.Element {
         icon={<Mail size={26} />}
         title="Templates"
         subtitle="Create and manage document and email templates with placeholders"
-        actions={canManage && (
-          <button className="btn-primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> New Template
-          </button>
-        )}
+        actions={
+          canManage && (
+            <button className="btn-primary" onClick={() => setShowCreate(true)}>
+              <Plus size={16} /> New Template
+            </button>
+          )
+        }
       />
 
       {/* Category Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {CATEGORY_TABS.map(cat => (
+        {CATEGORY_TABS.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => { setActiveCategory(cat.id); setSelectedId(null) }}
+            onClick={() => {
+              setActiveCategory(cat.id)
+              setSelectedId(null)
+            }}
             style={{
               padding: '6px 14px',
               borderRadius: '8px',
-              border: activeCategory === cat.id
-                ? '1px solid var(--accent-primary)'
-                : '1px solid var(--input-border)',
-              background: activeCategory === cat.id
-                ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                : 'transparent',
-              color: activeCategory === cat.id
-                ? 'var(--accent-primary)'
-                : 'var(--text-secondary)',
+              border:
+                activeCategory === cat.id
+                  ? '1px solid var(--accent-primary)'
+                  : '1px solid var(--input-border)',
+              background:
+                activeCategory === cat.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
+              color: activeCategory === cat.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
               cursor: 'pointer',
               fontSize: '0.82rem',
               fontWeight: activeCategory === cat.id ? 600 : 400,
@@ -246,14 +264,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
       {/* Two-panel layout */}
       <div style={{ display: 'flex', gap: '20px', minHeight: '500px' }}>
         {/* Left: Template List */}
-        <div style={{
-          width: '340px',
-          flexShrink: 0,
-          borderRadius: '12px',
-          border: 'var(--glass-border)',
-          background: 'var(--bg-card)',
-          overflow: 'hidden'
-        }}>
+        <div
+          style={{
+            width: '340px',
+            flexShrink: 0,
+            borderRadius: '12px',
+            border: 'var(--glass-border)',
+            background: 'var(--bg-card)',
+            overflow: 'hidden'
+          }}
+        >
           {loading ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
               Loading...
@@ -278,9 +298,8 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     padding: '12px 16px',
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--table-border)',
-                    background: selectedId === t.id
-                      ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                      : 'transparent',
+                    background:
+                      selectedId === t.id ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
@@ -288,31 +307,53 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   }}
                   className="hover-effect"
                 >
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: `${CATEGORY_COLORS[t.category] || '#6b7280'}22`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <FileText size={18} style={{ color: CATEGORY_COLORS[t.category] || '#6b7280' }} />
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: `${CATEGORY_COLORS[t.category] || '#6b7280'}22`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <FileText
+                      size={18}
+                      style={{ color: CATEGORY_COLORS[t.category] || '#6b7280' }}
+                    />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div
+                      style={{
+                        fontWeight: 500,
+                        fontSize: '0.88rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       {t.name}
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                      <span style={{
-                        fontSize: '0.7rem',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        background: `${CATEGORY_COLORS[t.category] || '#6b7280'}22`,
-                        color: CATEGORY_COLORS[t.category] || '#6b7280',
-                        fontWeight: 500
-                      }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '6px',
+                        alignItems: 'center',
+                        marginTop: '2px'
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: `${CATEGORY_COLORS[t.category] || '#6b7280'}22`,
+                          color: CATEGORY_COLORS[t.category] || '#6b7280',
+                          fontWeight: 500
+                        }}
+                      >
                         {t.category}
                       </span>
                       {t.body && (
@@ -324,8 +365,13 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   </div>
                   {canManage && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <button title="Move up" aria-label="Move up"
-                        onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'up') }}
+                      <button
+                        title="Move up"
+                        aria-label="Move up"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleReorder(t.id, 'up')
+                        }}
                         disabled={i === 0}
                         style={{
                           background: 'transparent',
@@ -338,13 +384,21 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       >
                         <ChevronUp size={14} />
                       </button>
-                      <button title="Move down" aria-label="Move down"
-                        onClick={(e) => { e.stopPropagation(); handleReorder(t.id, 'down') }}
+                      <button
+                        title="Move down"
+                        aria-label="Move down"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleReorder(t.id, 'down')
+                        }}
                         disabled={i === filteredTemplates.length - 1}
                         style={{
                           background: 'transparent',
                           border: 'none',
-                          color: i === filteredTemplates.length - 1 ? 'var(--text-secondary)' : 'var(--accent-primary)',
+                          color:
+                            i === filteredTemplates.length - 1
+                              ? 'var(--text-secondary)'
+                              : 'var(--accent-primary)',
                           cursor: i === filteredTemplates.length - 1 ? 'default' : 'pointer',
                           padding: '2px',
                           opacity: i === filteredTemplates.length - 1 ? 0.3 : 1
@@ -361,23 +415,27 @@ export default function DocumentTemplateManager(): React.JSX.Element {
         </div>
 
         {/* Right: Detail Panel */}
-        <div style={{
-          flex: 1,
-          borderRadius: '12px',
-          border: 'var(--glass-border)',
-          background: 'var(--bg-card)',
-          overflow: 'hidden'
-        }}>
+        <div
+          style={{
+            flex: 1,
+            borderRadius: '12px',
+            border: 'var(--glass-border)',
+            background: 'var(--bg-card)',
+            overflow: 'hidden'
+          }}
+        >
           {!selected ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'var(--text-secondary)',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--text-secondary)',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
               <FileText size={40} style={{ opacity: 0.2 }} />
               <p>Select a template to view details</p>
             </div>
@@ -386,7 +444,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
               {/* Template Info */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                  <label
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '4px',
+                      display: 'block'
+                    }}
+                  >
                     Template Name
                   </label>
                   <input
@@ -407,7 +474,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   />
                 </div>
                 <div style={{ width: '140px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                  <label
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '4px',
+                      display: 'block'
+                    }}
+                  >
                     Category
                   </label>
                   <select
@@ -424,15 +500,26 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                       fontSize: '0.88rem'
                     }}
                   >
-                    {TEMPLATE_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    {TEMPLATE_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                <label
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '4px',
+                    display: 'block'
+                  }}
+                >
                   Description
                 </label>
                 <textarea
@@ -455,7 +542,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
               {/* Rich Text Body */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+                <label
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '4px',
+                    display: 'block'
+                  }}
+                >
                   Template Body
                 </label>
                 <RichTextEditor
@@ -477,7 +573,12 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 {canManage && dirty && (
                   <button
                     className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.85rem'
+                    }}
                     onClick={handleSave}
                   >
                     <Save size={14} /> Save Changes
@@ -486,7 +587,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 <button
                   className="btn-secondary"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                  onClick={() => { setGenerateMode('docx'); setShowGenerate(true) }}
+                  onClick={() => {
+                    setGenerateMode('docx')
+                    setShowGenerate(true)
+                  }}
                   disabled={!editBody}
                 >
                   <FileDown size={14} /> Generate DOCX
@@ -494,7 +598,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 <button
                   className="btn-secondary"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                  onClick={() => { setGenerateMode('copy'); setShowGenerate(true) }}
+                  onClick={() => {
+                    setGenerateMode('copy')
+                    setShowGenerate(true)
+                  }}
                   disabled={!editBody}
                 >
                   <Copy size={14} /> Copy Text
@@ -502,7 +609,13 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 {canManage && (
                   <button
                     className="btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--danger)' }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.85rem',
+                      color: 'var(--danger)'
+                    }}
                     onClick={handleDelete}
                   >
                     <Trash2 size={14} /> Delete
@@ -512,23 +625,34 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
               {/* Available Placeholders Reference */}
               <div>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
                   <Tag size={14} /> Available Placeholders Reference
                 </h3>
                 {Object.entries(groupedPlaceholders).map(([category, items]) => (
                   <div key={category} style={{ marginBottom: '12px' }}>
-                    <div style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px'
-                    }}>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '6px'
+                      }}
+                    >
                       {category}
                     </div>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {items.map(item => (
+                      {items.map((item) => (
                         <span
                           key={item.key}
                           title={item.label}
@@ -557,37 +681,64 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 
       {/* Create Modal */}
       {showCreate && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: isLight ? '#ffffff' : '#1a1d28',
-            borderRadius: '12px',
-            padding: '24px',
-            width: '460px',
-            maxWidth: '90vw',
-            border: 'var(--glass-border)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              background: isLight ? '#ffffff' : '#1a1d28',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '460px',
+              maxWidth: '90vw',
+              border: 'var(--glass-border)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px'
+              }}
+            >
               <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Plus size={20} /> New Template
               </h2>
-              <button title="Close" aria-label="Close"
+              <button
+                title="Close"
+                aria-label="Close"
                 onClick={() => setShowCreate(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
               >
                 <X size={20} />
               </button>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '4px',
+                  display: 'block'
+                }}
+              >
                 Name
               </label>
               <input
@@ -608,7 +759,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '4px',
+                  display: 'block'
+                }}
+              >
                 Description (optional)
               </label>
               <textarea
@@ -629,7 +789,16 @@ export default function DocumentTemplateManager(): React.JSX.Element {
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '4px',
+                  display: 'block'
+                }}
+              >
                 Category
               </label>
               <select
@@ -644,8 +813,10 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                   fontSize: '0.88rem'
                 }}
               >
-                {TEMPLATE_CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                {TEMPLATE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c.charAt(0).toUpperCase() + c.slice(1)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -660,7 +831,13 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 disabled={creating || !createName.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {creating ? 'Creating...' : <><Plus size={14} /> Create</>}
+                {creating ? (
+                  'Creating...'
+                ) : (
+                  <>
+                    <Plus size={14} /> Create
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -684,7 +861,15 @@ export default function DocumentTemplateManager(): React.JSX.Element {
 }
 
 // Separate generate/copy modal component
-function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuccess, showError }: {
+function GenerateModal({
+  isLight,
+  mode,
+  templateName,
+  bodyHtml,
+  onClose,
+  showSuccess,
+  showError
+}: {
   isLight: boolean
   mode: 'docx' | 'copy'
   templateName: string
@@ -702,25 +887,40 @@ function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuc
   const [processing, setProcessing] = useState(false)
 
   useEffect(() => {
-    window.api.getVessels().then(v => {
-      if (Array.isArray(v)) setVessels(v.map((x: any) => ({ id: x.id, name: x.name })))
-    }).catch(() => {})
-    window.api.getEntities().then(e => {
-      if (Array.isArray(e)) setEntities(e.map((x: any) => ({ id: x.id, name: x.name })))
-    }).catch(() => {})
+    window.api
+      .getVessels()
+      .then((v) => {
+        if (Array.isArray(v)) setVessels(v.map((x: any) => ({ id: x.id, name: x.name })))
+      })
+      .catch(() => {})
+    window.api
+      .getEntities()
+      .then((e) => {
+        if (Array.isArray(e)) setEntities(e.map((x: any) => ({ id: x.id, name: x.name })))
+      })
+      .catch(() => {})
   }, [])
 
   // Load policies when vessel changes
   useEffect(() => {
-    if (!selectedVesselId) { setPolicies([]); setSelectedPolicyId(''); return }
-    window.api.getVesselDynamicPolicies(selectedVesselId).then(p => {
-      if (Array.isArray(p)) {
-        setPolicies(p.map((x: any) => ({
-          id: x.id,
-          label: `${x.policyTypeName || 'Policy'} - ${x.policyNumber || 'No number'}`
-        })))
-      }
-    }).catch(() => {})
+    if (!selectedVesselId) {
+      setPolicies([])
+      setSelectedPolicyId('')
+      return
+    }
+    window.api
+      .getVesselDynamicPolicies(selectedVesselId)
+      .then((p) => {
+        if (Array.isArray(p)) {
+          setPolicies(
+            p.map((x: any) => ({
+              id: x.id,
+              label: `${x.policyTypeName || 'Policy'} - ${x.policyNumber || 'No number'}`
+            }))
+          )
+        }
+      })
+      .catch(() => {})
   }, [selectedVesselId])
 
   const handleAction = async () => {
@@ -761,45 +961,70 @@ function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuc
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: isLight ? '#ffffff' : '#1a1d28',
-        borderRadius: '12px',
-        padding: '24px',
-        width: '480px',
-        maxWidth: '90vw',
-        border: 'var(--glass-border)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}
+    >
+      <div
+        style={{
+          background: isLight ? '#ffffff' : '#1a1d28',
+          borderRadius: '12px',
+          padding: '24px',
+          width: '480px',
+          maxWidth: '90vw',
+          border: 'var(--glass-border)'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}
+        >
           <h2 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {mode === 'docx'
-              ? <><FileDown size={20} /> Generate DOCX</>
-              : <><Copy size={20} /> Copy Text</>
-            }
+            {mode === 'docx' ? (
+              <>
+                <FileDown size={20} /> Generate DOCX
+              </>
+            ) : (
+              <>
+                <Copy size={20} /> Copy Text
+              </>
+            )}
           </h2>
-          <button title="Close" aria-label="Close"
+          <button
+            title="Close"
+            aria-label="Close"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer'
+            }}
           >
             <X size={20} />
           </button>
         </div>
 
-        <div style={{
-          padding: '10px 14px',
-          borderRadius: '8px',
-          background: 'var(--input-bg)',
-          marginBottom: '16px',
-          fontSize: '0.88rem'
-        }}>
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: '8px',
+            background: 'var(--input-bg)',
+            marginBottom: '16px',
+            fontSize: '0.88rem'
+          }}
+        >
           <strong>{templateName}</strong>
         </div>
 
@@ -808,57 +1033,113 @@ function GenerateModal({ isLight, mode, templateName, bodyHtml, onClose, showSuc
         </p>
 
         <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+          <label
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: '4px',
+              display: 'block'
+            }}
+          >
             Vessel
           </label>
-          <select value={selectedVesselId} onChange={(e) => setSelectedVesselId(e.target.value)} style={selectStyle}>
+          <select
+            value={selectedVesselId}
+            onChange={(e) => setSelectedVesselId(e.target.value)}
+            style={selectStyle}
+          >
             <option value="">-- None --</option>
-            {vessels.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
+            {vessels.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
             ))}
           </select>
         </div>
 
         {policies.length > 0 && (
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+            <label
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '4px',
+                display: 'block'
+              }}
+            >
               Policy
             </label>
-            <select value={selectedPolicyId} onChange={(e) => setSelectedPolicyId(e.target.value)} style={selectStyle}>
+            <select
+              value={selectedPolicyId}
+              onChange={(e) => setSelectedPolicyId(e.target.value)}
+              style={selectStyle}
+            >
               <option value="">-- None --</option>
-              {policies.map(p => (
-                <option key={p.id} value={p.id}>{p.label}</option>
+              {policies.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
               ))}
             </select>
           </div>
         )}
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block' }}>
+          <label
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: '4px',
+              display: 'block'
+            }}
+          >
             Entity
           </label>
-          <select value={selectedEntityId} onChange={(e) => setSelectedEntityId(e.target.value)} style={selectStyle}>
+          <select
+            value={selectedEntityId}
+            onChange={(e) => setSelectedEntityId(e.target.value)}
+            style={selectStyle}
+          >
             <option value="">-- None --</option>
-            {entities.map(e => (
-              <option key={e.id} value={e.id}>{e.name}</option>
+            {entities.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
             ))}
           </select>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="btn-primary"
             disabled={processing}
             onClick={handleAction}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            {processing
-              ? (mode === 'docx' ? 'Generating...' : 'Copying...')
-              : mode === 'docx'
-                ? <><FileDown size={14} /> Generate</>
-                : <><Copy size={14} /> Copy</>
-            }
+            {processing ? (
+              mode === 'docx' ? (
+                'Generating...'
+              ) : (
+                'Copying...'
+              )
+            ) : mode === 'docx' ? (
+              <>
+                <FileDown size={14} /> Generate
+              </>
+            ) : (
+              <>
+                <Copy size={14} /> Copy
+              </>
+            )}
           </button>
         </div>
       </div>
