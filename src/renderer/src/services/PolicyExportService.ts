@@ -598,6 +598,64 @@ async function buildBlueCardPage(
   return buildMlcPage(data, cardType, isLastPage, settings)
 }
 
+// ==================== Stored files of signed policies ====================
+
+// A SIGNED policy's documents are stored byte for byte on their first export after signing
+// (policy_export_files). Re-exporting returns the stored file, so a later change to this export
+// code never changes a signed document. The store is cleared whenever the frozen content is reset
+// (policy or blue-card edit, signing); a revision is a new policy. Unsigned policies are never stored.
+const POL_MIME: Record<string, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pdf: 'application/pdf'
+}
+
+async function polStoredFile(policyId: string, docKey: string): Promise<{ blob: Blob; fileName: string } | null> {
+  try {
+    const f = await window.api.policyGetExportFile(policyId, docKey)
+    if (f && f.data && f.data.byteLength > 0) {
+      const ext = (f.fileName.split('.').pop() || '').toLowerCase()
+      return { blob: new Blob([new Uint8Array(f.data)], { type: POL_MIME[ext] || 'application/octet-stream' }), fileName: f.fileName }
+    }
+  } catch (e) { console.warn('[PolicyExport] stored file read failed; building fresh', e) }
+  return null
+}
+
+async function polStoreFile(policyId: string, docKey: string, built: { blob: Blob; fileName: string }): Promise<void> {
+  try {
+    await window.api.policySaveExportFile(policyId, docKey, built.fileName, new Uint8Array(await built.blob.arrayBuffer()))
+  } catch (e) { console.warn('[PolicyExport] storing the signed file failed', e) }
+}
+
+/** Stored file when there is one, otherwise build it (and store it if the policy is signed). */
+async function polFrozenFile(
+  policyId: string,
+  docKey: string,
+  build: () => Promise<{ blob: Blob; fileName: string }>
+): Promise<{ blob: Blob; fileName: string }> {
+  const stored = await polStoredFile(policyId, docKey)
+  if (stored) return stored
+  const built = await build()
+  await polStoreFile(policyId, docKey, built)
+  return built
+}
+
+async function buildBlueCardBlob(
+  data: BlueCardData,
+  cardType: BlueCardType,
+  policyId?: string
+): Promise<{ blob: Blob; fileName: string }> {
+  if (!policyId) return buildBlueCardBlobFresh(data, cardType)
+  return polFrozenFile(policyId, `bc:${cardType}:${data.policyNumber}`, () => buildBlueCardBlobFresh(data, cardType, policyId))
+}
+
+async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+  return polFrozenFile(policyId, 'da', () => buildDebitAdviceBlobFresh(policyId))
+}
+
+async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+  return polFrozenFile(policyId, 'ca', () => buildCreditAdviceBlobFresh(policyId))
+}
+
 // ==================== Public Export Functions ====================
 
 /**
@@ -612,7 +670,7 @@ export async function exportBlueCardDocx(
   polDownloadBlob(blob, fileName)
 }
 
-async function buildBlueCardBlob(
+async function buildBlueCardBlobFresh(
   data: BlueCardData,
   cardType: BlueCardType,
   policyId?: string
@@ -2728,6 +2786,11 @@ function polGetDefaultOpeningClause(typeCode: string): string {
 // ==================== Policy Document Export ====================
 
 export async function exportPolicyDocx(policyId: string, totalPages?: number, includeTC?: boolean): Promise<void> {
+  const storable = !totalPages && !includeTC
+  if (storable) {
+    const stored = await polStoredFile(policyId, 'policy')
+    if (stored) { polDownloadBlob(stored.blob, stored.fileName); return }
+  }
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3404,7 +3467,9 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
   const revSuffix = data.policy.revisionNumber > 0 ? ` - R${data.policy.revisionNumber}` : ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`)
+  const polFileName = `${data.policy.policyNumber} - ${vName}${revSuffix}.docx`
+  if (storable) await polStoreFile(policyId, 'policy', { blob, fileName: polFileName })
+  polDownloadBlob(blob, polFileName)
 
   // Mark policy as exported
   try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
@@ -3446,6 +3511,8 @@ async function generatePolicyDocxBuffer(policyId: string, totalPages?: number, i
  * Pass 2: Re-generate DOCX with hardcoded total → convert + merge → final PDF
  */
 export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
+  const storedPdf = await polStoredFile(policyId, 'policy-pdf')
+  if (storedPdf) { polDownloadBlob(storedPdf.blob, storedPdf.fileName); return }
   // Check if T&C template exists for this policy type
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3461,7 +3528,9 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     const { buffer, fileName } = await generatePolicyDocxBuffer(policyId, undefined, true)
     const res = await window.api.convertDocxBufferToPdf({ docxData: Array.from(new Uint8Array(buffer)), fileName }) as any
     if (!res || res.error) throw new Error(res?.message || 'PDF conversion failed')
-    polDownloadBlob(new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }), res.fileName)
+    const htmlPdf = { blob: new Blob([new Uint8Array(res.data)], { type: 'application/pdf' }), fileName: res.fileName }
+    await polStoreFile(policyId, 'policy-pdf', htmlPdf)
+    polDownloadBlob(htmlPdf.blob, htmlPdf.fileName)
     try { ok(await window.api.policyUpdate(policyId, { exportedAt: new Date().toISOString().slice(0, 19).replace('T', ' ') })) } catch { /* non-critical */ }
     return
   }
@@ -3503,6 +3572,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
 
   // Download the merged PDF
   const pdfBlob = new Blob([new Uint8Array(result.data)], { type: 'application/pdf' })
+  await polStoreFile(policyId, 'policy-pdf', { blob: pdfBlob, fileName: result.fileName })
   polDownloadBlob(pdfBlob, result.fileName)
 
   // Mark policy as exported
@@ -3677,7 +3747,7 @@ export async function exportDebitAdviceDocx(policyId: string): Promise<void> {
   polDownloadBlob(blob, fileName)
 }
 
-async function buildDebitAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+async function buildDebitAdviceBlobFresh(policyId: string): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)
@@ -3916,7 +3986,7 @@ export async function exportCreditAdviceDocx(policyId: string): Promise<void> {
   polDownloadBlob(blob, fileName)
 }
 
-async function buildCreditAdviceBlob(policyId: string): Promise<{ blob: Blob; fileName: string }> {
+async function buildCreditAdviceBlobFresh(policyId: string): Promise<{ blob: Blob; fileName: string }> {
   await loadPolicyFontSize()
   const data = await loadFrozenExportData(policyId)
   applyFrozenFontSize(data)

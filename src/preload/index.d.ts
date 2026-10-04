@@ -948,6 +948,10 @@ export interface Api {
   policyRenewFleet: (vesselIds: string[], quotationTypeCode: string) => Promise<{ quotationId: string }>
   policySign: (policyId: string) => Promise<{ success: boolean }>
   policyGetSignature: (policyId: string) => Promise<{ imageData: number[]; signedBy: string; signedAt: string; signerName: string } | null>
+  /** Exact exported file of a SIGNED policy (docKey: policy, policy-pdf, da, ca, bc:...) */
+  policyGetExportFile: (policyId: string, docKey: string) => Promise<{ fileName: string; data: Uint8Array } | null>
+  /** Stores the file only if the policy is signed; resolves to whether it was stored */
+  policySaveExportFile: (policyId: string, docKey: string, fileName: string, data: Uint8Array) => Promise<boolean>
 
   // Policy Endorsements
   endorsementList: (policyDocId: string) => Promise<PolicyEndorsement[]>

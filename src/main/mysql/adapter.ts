@@ -3288,6 +3288,23 @@ export class MySQLAdapter {
                 }
             } catch (e) { console.error('export_snapshot migration:', e) }
 
+            // Migration: exact exported files of SIGNED policies (policy, DA, CA, blue cards).
+            // Re-exporting a signed policy returns these bytes, so a later change to the export
+            // code never changes a signed document. Cleared whenever export_snapshot is reset.
+            try {
+                await this.pool.query(`
+                    CREATE TABLE IF NOT EXISTS policy_export_files (
+                        id VARCHAR(36) PRIMARY KEY,
+                        policy_doc_id VARCHAR(36) NOT NULL,
+                        doc_key VARCHAR(100) NOT NULL,
+                        file_name VARCHAR(500) NOT NULL,
+                        data LONGBLOB NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY uq_policy_export_file (policy_doc_id, doc_key)
+                    )
+                `)
+            } catch (e) { console.error('policy_export_files migration:', e) }
+
             // Migration: Per-vessel amounts on deductibles
             {
                 const [dvaCols] = await this.pool.query("SHOW COLUMNS FROM quotation_deductibles LIKE 'vessel_amounts'") as any[]
@@ -12106,6 +12123,39 @@ export class MySQLAdapter {
             `UPDATE policy_documents SET ${sets.join(', ')} WHERE id = ?`,
             vals
         )
+        // A reset or re-capture of the frozen content (edit, blue-card edit, signing) also drops
+        // the stored files, so the next export is built from the new content
+        if ('exportSnapshot' in fields) await this.clearPolicyExportFiles(id)
+    }
+
+    // ---- Stored export files (signed policies) ----
+
+    async getPolicyExportFile(policyId: string, docKey: string): Promise<{ fileName: string; data: Buffer } | null> {
+        if (!this.pool) return null
+        const [rows] = await this.pool.query(
+            'SELECT file_name AS fileName, data FROM policy_export_files WHERE policy_doc_id = ? AND doc_key = ?',
+            [policyId, docKey]
+        )
+        const r = (rows as any[])[0]
+        return r ? { fileName: r.fileName, data: r.data } : null
+    }
+
+    /** Stores the file only when the policy is signed; returns whether it was stored. */
+    async savePolicyExportFile(policyId: string, docKey: string, fileName: string, data: Buffer): Promise<boolean> {
+        if (!this.pool) return false
+        const [pol] = await this.pool.query('SELECT signed_at FROM policy_documents WHERE id = ?', [policyId])
+        if (!(pol as any[])[0]?.signed_at) return false
+        await this.pool.execute(
+            `INSERT INTO policy_export_files (id, policy_doc_id, doc_key, file_name, data) VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE id = id`,
+            [uuidv4(), policyId, docKey, fileName, data]
+        )
+        return true
+    }
+
+    async clearPolicyExportFiles(policyId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute('DELETE FROM policy_export_files WHERE policy_doc_id = ?', [policyId])
     }
 
     async setPolicyInstalments(policyId: string, instalments: { instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]): Promise<void> {
@@ -15698,6 +15748,8 @@ export class MySQLAdapter {
             'UPDATE policy_documents SET signed_by = ?, signed_at = CURRENT_TIMESTAMP WHERE id = ?',
             [userId, policyId]
         )
+        // Files stored before this signing do not carry the signature
+        await this.clearPolicyExportFiles(policyId)
     }
 
     async getPolicySignature(policyId: string): Promise<{ imageData: Buffer; signedBy: string; signedAt: string; signerName: string } | null> {

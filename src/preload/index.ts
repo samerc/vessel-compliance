@@ -912,6 +912,8 @@ const api = {
   policyRenewFleet: (vesselIds: string[], quotationTypeCode: string) => ipcRenderer.invoke('policy:renewFleet', vesselIds, quotationTypeCode),
   policySign: (policyId: string) => ipcRenderer.invoke('policy:sign', policyId),
   policyGetSignature: (policyId: string) => ipcRenderer.invoke('policy:getSignature', policyId),
+  policyGetExportFile: (policyId: string, docKey: string) => ipcRenderer.invoke('policy:getExportFile', policyId, docKey),
+  policySaveExportFile: (policyId: string, docKey: string, fileName: string, data: Uint8Array) => ipcRenderer.invoke('policy:saveExportFile', policyId, docKey, fileName, data),
 
   // Policy Endorsements
   endorsementList: (policyDocId: string) => ipcRenderer.invoke('endorsement:list', policyDocId),

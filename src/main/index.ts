@@ -3332,6 +3332,17 @@ app.whenReady().then(() => {
     }).catch(() => {})
     return { success: true, policyNumber }
   })
+  // Exact exported files of signed policies (re-export returns these bytes unchanged)
+  safeHandle('policy:getExportFile', async (event, policyId: string, docKey: string) => {
+    requireSession(event)
+    const f = await db.getPolicyExportFile(String(policyId), String(docKey))
+    return f ? { fileName: f.fileName, data: new Uint8Array(f.data) } : null
+  })
+  safeHandle('policy:saveExportFile', async (event, policyId: string, docKey: string, fileName: string, data: Uint8Array) => {
+    requireSession(event)
+    if (!(data instanceof Uint8Array) || data.byteLength === 0 || data.byteLength > 50 * 1024 * 1024) throw new Error('Invalid export file')
+    return db.savePolicyExportFile(String(policyId), String(docKey).slice(0, 100), String(fileName).slice(0, 500), Buffer.from(data))
+  })
   safeHandle('policy:getSignature', async (event, policyId: string) => {
     requireSession(event)
     const sig = await db.getPolicySignature(policyId)
