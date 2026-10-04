@@ -61,6 +61,8 @@ function App(): React.JSX.Element {
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null)
   const [initialQuotationId, setInitialQuotationId] = useState<string | null>(null)
   const [initialEntityId, setInitialEntityId] = useState<string | null>(null)
+  // Set by Dashboard Quick Actions: the target page opens its create form once
+  const [createIntent, setCreateIntent] = useState<'vessel' | 'quotation' | 'entity' | null>(null)
   const [quotationPolicyContext, setQuotationPolicyContext] = useState<{ policyId: string; policyNumber: string } | null>(null)
   const [policyView, setPolicyView] = useState<'list' | 'settings'>('list')
   const [policySetupQuotationId, setPolicySetupQuotationId] = useState<string | null>(null)
@@ -565,6 +567,7 @@ function App(): React.JSX.Element {
                           setNavigateBackTab(undefined)
                           setActiveTab('vessels')
                         } else if (item.itemType === 'entity') {
+                          setInitialEntityId(item.itemId)
                           setActiveTab('directory')
                         } else if (item.itemType === 'quotation') {
                           setInitialQuotationId(item.itemId)
@@ -656,7 +659,7 @@ function App(): React.JSX.Element {
             <NavGroup id="admin" label="Admin" icon={<Settings size={14} />}
               groupCollapsed={collapsedGroups.has('admin')} onToggle={toggleGroup} sidebarCollapsed={sc}
             >
-              {hasPermission('admin:settings') && navItem('admin', <Settings size={18} />, 'Settings')}
+              {(hasPermission('admin:settings') || hasPermission('fileManager:view')) && navItem('admin', <Settings size={18} />, 'Settings')}
               {hasPermission('admin:users') && navItem('users', <UserCog size={18} />, 'User Management')}
             </NavGroup>
           </nav>
@@ -750,7 +753,17 @@ function App(): React.JSX.Element {
           )}
           {/* Per-page boundary: a crash on one page stays on that page; switching tab resets it */}
           <ErrorBoundary key={activeTab} variant="page">
-          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => setActiveTab(tab as any)} />}
+          {activeTab === 'dashboard' && <Dashboard onViewAlerts={() => setActiveTab('compliance')} onViewSurveyFollowUp={() => setActiveTab('survey-followup')} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section); setNavigateBackTab('dashboard'); setActiveTab('vessels') }} onNavigate={(tab) => {
+            if (tab === 'search') { setSearchOpen(true); return }
+            const intentTab = { 'new-vessel': 'vessels', 'new-quotation': 'quotations', 'new-entity': 'directory' } as const
+            if (tab in intentTab) {
+              setCreateIntent(tab.slice(4) as 'vessel' | 'quotation' | 'entity')
+              if (tab === 'new-vessel') { setNavigateToVesselId(null); setNavigateToVesselSection(undefined) }
+              setActiveTab(intentTab[tab as keyof typeof intentTab])
+              return
+            }
+            setActiveTab(tab as any)
+          }} />}
           {activeTab === 'vessels' && <VesselManager
             initialVesselId={navigateToVesselId}
             initialVesselSection={navigateToVesselSection}
@@ -768,13 +781,15 @@ function App(): React.JSX.Element {
               'policies-list': 'Back to Policies',
             } as Record<string, string>)[navigateBackTab] || 'Back' : undefined}
             onNavigateToQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }}
+            openCreate={createIntent === 'vessel'}
+            onCreateConsumed={() => setCreateIntent(null)}
           />}
           <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'vessel-filter' && <VesselFilter onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('vessel-filter'); setActiveTab('vessels') }} />}
           {activeTab === 'fleets' && <FleetManager />}
           {activeTab === 'admin' && <AdminPanel isAdmin={isAdmin} onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('admin'); setActiveTab('vessels') }} />}
-          {activeTab === 'users' && isAdmin && <UserManager />}
-          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} />}
+          {activeTab === 'users' && hasPermission('admin:users') && <UserManager />}
+          {activeTab === 'directory' && <Directory onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateBackTab('directory'); setActiveTab('vessels') }} initialEntityId={initialEntityId} onInitialEntityConsumed={() => setInitialEntityId(null)} openCreate={createIntent === 'entity'} onCreateConsumed={() => setCreateIntent(null)} />}
           {activeTab === 'compliance' && (hasPermission('compliance:view') ? <ComplianceCenter initialTab={complianceSubTab} onTabChange={setComplianceSubTab} onNavigateToVessel={(vesselId, section) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection(section || 'policies'); setNavigateBackTab('compliance'); setActiveTab('vessels') }} /> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
           </Suspense>
           {activeTab === 'sanctions-search' && (hasPermission('sanctions:search') ? <Suspense fallback={<LoadingFallback />}><SanctionsSearch /></Suspense> : <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You do not have permission to view this page.</div>)}
@@ -790,6 +805,8 @@ function App(): React.JSX.Element {
             policyContext={quotationPolicyContext}
             onClearPolicyContext={() => { setQuotationPolicyContext(null) }}
             onReturnToPolicy={(policyId) => { setSelectedPolicyId(policyId); setQuotationPolicyContext(null); setInitialQuotationId(null); setActiveTab('policy-detail') }}
+            openCreate={createIntent === 'quotation'}
+            onCreateConsumed={() => setCreateIntent(null)}
           /></Suspense>}
           {activeTab === 'renewals' && <Suspense fallback={<LoadingFallback />}><PolicyRenewals onNavigateToVessel={(vesselId) => { setNavigateToVesselId(vesselId); setNavigateToVesselSection('policies'); setNavigateBackTab('renewals'); setActiveTab('vessels') }} onCreateRenewalQuotation={(qId) => { setInitialQuotationId(qId); setActiveTab('quotations') }} /></Suspense>}
           {activeTab === 'reports' && <Suspense fallback={<LoadingFallback />}><Reports /></Suspense>}
@@ -856,7 +873,7 @@ function App(): React.JSX.Element {
               if (linkType === 'vessel') { setNavigateToVesselId(linkId); setNavigateBackTab('notifications'); setActiveTab('vessels') }
               else if (linkType === 'quotation') { setInitialQuotationId(linkId); setActiveTab('quotations') }
               else if (linkType === 'policy') { setSelectedPolicyId(linkId); setActiveTab('policy-detail') }
-              else if (linkType === 'entity') { setNavigateBackTab('notifications'); setActiveTab('directory') }
+              else if (linkType === 'entity') { setInitialEntityId(linkId); setNavigateBackTab('notifications'); setActiveTab('directory') }
             }} />
           </Suspense>}
           {activeTab === 'policy-setup' && policySetupQuotationId && <Suspense fallback={<LoadingFallback />}>

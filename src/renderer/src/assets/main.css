@@ -442,7 +442,9 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-.spinner {
+.spinner,
+.spin,
+.spinning {
   animation: spin 1s linear infinite;
 }
 

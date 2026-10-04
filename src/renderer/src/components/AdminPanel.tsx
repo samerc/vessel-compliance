@@ -2778,8 +2778,8 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 </p>
 
                     <div style={{ marginBottom: '24px' }}>
-                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Current Configuration File</div>
-                        <div className="px-4 py-3 bg-black/20 rounded-lg text-sm text-gray-300 font-mono border border-white/5 break-all">
+                        <div style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>Current Configuration File</div>
+                        <div style={{ padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontFamily: 'monospace', wordBreak: 'break-all', background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}>
                             {configPath || 'Not configured'}
                         </div>
                     </div>

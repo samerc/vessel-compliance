@@ -102,10 +102,14 @@ function jaroWinkler(s1: string, s2: string): number {
 
 export default function EntityDirectory({
   initialEntityId,
-  onInitialEntityConsumed
+  onInitialEntityConsumed,
+  openCreate,
+  onCreateConsumed
 }: {
   initialEntityId?: string | null
   onInitialEntityConsumed?: () => void
+  openCreate?: boolean
+  onCreateConsumed?: () => void
 }) {
   const [entities, setEntities] = useState<Entity[]>([])
   const [allEntities, setAllEntities] = useState<Entity[]>([])
@@ -123,6 +127,8 @@ export default function EntityDirectory({
 
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
+  // Customer entity id -> customer type, from ACTIVE policies (customer is policy-level)
+  const [policyCustomers, setPolicyCustomers] = useState<Map<string, string | null>>(new Map())
 
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(25)
@@ -167,6 +173,11 @@ export default function EntityDirectory({
   }>({ show: false, entity: null, message: '' })
 
   const [showCreateModal, setShowCreateModal] = useState(false)
+  useEffect(() => {
+    if (!openCreate) return
+    if (hasPermission('entities:create')) setShowCreateModal(true)
+    onCreateConsumed?.()
+  }, [openCreate])
   const [createForm, setCreateForm] = useState({
     name: '',
     type: 'company' as 'company' | 'person',
@@ -407,14 +418,15 @@ export default function EntityDirectory({
     const req = ++pageReqRef.current
     setIsLoading(true)
     try {
-      const [result, v, va, eu, allEnts, edTypes, allDocs] = await Promise.all([
+      const [result, v, va, eu, allEnts, edTypes, allDocs, pols] = await Promise.all([
         fetchPage(),
         window.api.getVessels(),
         window.api.getVesselAssureds(),
         window.api.getEntityUBOs(),
         window.api.getEntities(),
         window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments()
+        window.api.getEntityDocuments(),
+        window.api.getAllVesselDynamicPolicies()
       ])
       if (req === pageReqRef.current) applyPage(result)
       setVessels(Array.isArray(v) ? v : [])
@@ -425,6 +437,11 @@ export default function EntityDirectory({
         Array.isArray(edTypes) ? edTypes.filter((t: EntityDocumentType) => t.isActive) : []
       )
       setEntityDocs(Array.isArray(allDocs) ? allDocs : [])
+      const custMap = new Map<string, string | null>()
+      for (const p of Array.isArray(pols) ? pols : []) {
+        if (p.status === 'active' && p.customerEntityId) custMap.set(p.customerEntityId, p.customerType || null)
+      }
+      setPolicyCustomers(custMap)
     } finally {
       if (req === pageReqRef.current) setIsLoading(false)
     }
@@ -890,7 +907,7 @@ export default function EntityDirectory({
         }}
       >
         <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Entity Directory</h1>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px' }}>Entities</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             Assureds, UBOs, and beneficial owners across your fleet.
           </p>
@@ -1834,16 +1851,15 @@ export default function EntityDirectory({
                     </span>
                   )}
                 </div>
-                {vessels.some((v) => v.customerId === selectedEntity.id) && (
+                {policyCustomers.has(selectedEntity.id) && (
                   <button
                     onClick={async () => {
                       setExportingCompliance(true)
                       try {
-                        const cv = vessels.find((v) => v.customerId === selectedEntity.id)
                         await exportCustomerCompliancePDF(
                           selectedEntity.id,
                           selectedEntity.name,
-                          cv?.customerType || null
+                          policyCustomers.get(selectedEntity.id) ?? null
                         )
                       } finally {
                         setExportingCompliance(false)

@@ -244,7 +244,7 @@ export default function SurveyorDirectory() {
       {/* Header */}
       <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Surveyor Directory</h1>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px' }}>Surveyors</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage surveying companies, contacts, and their survey history.</p>
         </div>
         {canManage && (

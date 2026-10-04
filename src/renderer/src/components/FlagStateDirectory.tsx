@@ -280,7 +280,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
       {/* Header */}
       <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '4px' }}>Flag States</h1>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 4px' }}>Flag States</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Manage vessel flag state registries, conventions, and ports.</p>
         </div>
       </header>

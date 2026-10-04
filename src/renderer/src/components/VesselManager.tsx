@@ -29,7 +29,7 @@ function useDebounceValue<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel, onNavigateToQuotation }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string; onNavigateToQuotation?: (quotationId: string) => void } = {}) {
+export default function VesselManager({ initialVesselId, initialVesselSection, onClearInitialVessel, onNavigateBack, navigateBackLabel, onNavigateToQuotation, openCreate, onCreateConsumed }: { initialVesselId?: string | null; initialVesselSection?: 'documents' | 'assureds' | 'surveys' | 'policies' | 'timeline' | 'quotations'; onClearInitialVessel?: () => void; onNavigateBack?: () => void; navigateBackLabel?: string; onNavigateToQuotation?: (quotationId: string) => void; openCreate?: boolean; onCreateConsumed?: () => void } = {}) {
     const [vessels, setVessels] = useState<Vessel[]>([])
     const [fleets, setFleets] = useState<Fleet[]>([])
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null)
@@ -65,6 +65,11 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
     const [newVessel, setNewVessel] = useState({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' as '' | 'broker' | 'direct' })
     const [isAdding, setIsAdding] = useState(false)
     const [showQuickAdd, setShowQuickAdd] = useState(false)
+    useEffect(() => {
+        if (!openCreate) return
+        if (hasPermission('vessels:create')) setShowQuickAdd(true)
+        onCreateConsumed?.()
+    }, [openCreate])
 
     // Add-form fleet combo trigger position (dropdown rendered via portal to avoid clipping)
     const addFleetBtnRef = useRef<HTMLButtonElement>(null)

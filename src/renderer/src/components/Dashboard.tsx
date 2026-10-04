@@ -1238,9 +1238,9 @@ function QuickActionsWidget({ cardStyle, data }: { cardStyle: React.CSSPropertie
   const { onNavigate } = data
 
   const actions = [
-    { label: 'New Vessel', icon: Ship, tab: 'vessels', color: '#0ea5e9' },
-    { label: 'New Quotation', icon: FileText, tab: 'quotations', color: '#8b5cf6' },
-    { label: 'New Entity', icon: Building2, tab: 'directory', color: '#10b981' },
+    { label: 'New Vessel', icon: Ship, tab: 'new-vessel', color: '#0ea5e9' },
+    { label: 'New Quotation', icon: FileText, tab: 'new-quotation', color: '#8b5cf6' },
+    { label: 'New Entity', icon: Building2, tab: 'new-entity', color: '#10b981' },
     { label: 'Search', icon: () => <span style={{ fontSize: '0.7rem', fontWeight: '700' }}>Ctrl+K</span>, tab: 'search', color: '#f59e0b' }
   ]
 

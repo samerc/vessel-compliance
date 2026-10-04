@@ -25,6 +25,7 @@ const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
 
 const CATEGORY_TABS: Record<SettingsCategory, { id: SettingsTab; label: string; icon: any }[]> = {
     general: [
+        { id: 'quotationTypes', label: 'Quotation Types', icon: <List size={15} /> },
         { id: 'subjectivities', label: 'Subjectivities', icon: <FileText size={15} /> },
         { id: 'tradingCountries', label: 'Trading Countries', icon: <Globe size={15} /> },
         { id: 'tradingWarranty', label: 'Trading Warranty', icon: <Globe size={15} /> },

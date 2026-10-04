@@ -9,16 +9,18 @@ interface DirectoryProps {
     onNavigateToVessel?: (vesselId: string) => void
     initialEntityId?: string | null
     onInitialEntityConsumed?: () => void
+    openCreate?: boolean
+    onCreateConsumed?: () => void
 }
 
-export default function Directory({ onNavigateToVessel, initialEntityId, onInitialEntityConsumed }: DirectoryProps) {
+export default function Directory({ onNavigateToVessel, initialEntityId, onInitialEntityConsumed, openCreate, onCreateConsumed }: DirectoryProps) {
     const [activeView, setActiveView] = useState<'entities' | 'surveyors' | 'flag-states' | 'address-book'>('entities')
 
     return (
         <div className="fade-in">
             <header style={{ marginBottom: '24px' }}>
                 <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Directory</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Manage entities, surveyors, and flag states.</p>
+                <p style={{ color: 'var(--text-secondary)' }}>Entities, surveyors, flag states, and the contact address book.</p>
             </header>
 
             {/* Sub-navigation tabs */}
@@ -106,7 +108,7 @@ export default function Directory({ onNavigateToVessel, initialEntityId, onIniti
             </div>
 
             {/* Active view content */}
-            {activeView === 'entities' && <EntityDirectory initialEntityId={initialEntityId} onInitialEntityConsumed={onInitialEntityConsumed} />}
+            {activeView === 'entities' && <EntityDirectory initialEntityId={initialEntityId} onInitialEntityConsumed={onInitialEntityConsumed} openCreate={openCreate} onCreateConsumed={onCreateConsumed} />}
             {activeView === 'surveyors' && <SurveyorDirectory />}
             {activeView === 'flag-states' && <FlagStateDirectory onNavigateToVessel={onNavigateToVessel} />}
             {activeView === 'address-book' && <DynamicAddressBook />}

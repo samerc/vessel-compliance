@@ -16,9 +16,11 @@ interface QuotationManagerProps {
     policyContext?: { policyId: string; policyNumber: string } | null
     onClearPolicyContext?: () => void
     onReturnToPolicy?: (policyId: string) => void
+    openCreate?: boolean
+    onCreateConsumed?: () => void
 }
 
-export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy }: QuotationManagerProps) {
+export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolicySetup, initialQuotationId, onClearInitialQuotation, policyContext, onClearPolicyContext, onReturnToPolicy, openCreate, onCreateConsumed }: QuotationManagerProps) {
     const { hasPermission } = useAuth()
     const canSettings = hasPermission('quotations:settings')
     const [view, setView] = useState<QuotationView>('list')
@@ -108,7 +110,7 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
                 </div>
             )}
 
-            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} initialSearch={listSearch} onSearchChange={setListSearch} />}
+            {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} initialSearch={listSearch} onSearchChange={setListSearch} openCreate={openCreate} onCreateConsumed={onCreateConsumed} />}
             {view === 'settings' && canSettings && <QuotationSettings />}
             {view === 'editor' && editingQuotation && (
                 <QuotationEditor

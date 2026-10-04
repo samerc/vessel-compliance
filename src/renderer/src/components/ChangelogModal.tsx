@@ -3,6 +3,7 @@ import { X, ExternalLink, Calendar, ChevronRight, RefreshCw, AlertCircle } from 
 import { changelogService, ChangelogEntry } from '../services/ChangelogService'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { formatDateLong } from '../utils/dateUtils'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface ChangelogModalProps {
     onClose: () => void
@@ -13,6 +14,9 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [expandedVersion, setExpandedVersion] = useState<string | null>(null)
+    const [reloadKey, setReloadKey] = useState(0)
+    const { theme } = useTheme()
+    const isLight = theme === 'light' || theme === 'aurora'
 
     useEscapeKey(onClose)
 
@@ -33,7 +37,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
         }
 
         fetchChangelogs()
-    }, [])
+    }, [reloadKey])
 
     // Simple formatter to handle basic markdown-like syntax in GitHub notes
     const formatNotes = (notes: string) => {
@@ -77,15 +81,18 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
     }
 
     return (
-        <div className="modal-overlay" style={{ zIndex: 1000 }}>
-            <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-                <div className="modal-header">
+        <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}
+            onClick={e => { if (e.target === e.currentTarget) onClose() }}
+        >
+            <div style={{ background: isLight ? '#ffffff' : '#1a1d28', borderRadius: '16px', width: '100%', maxWidth: '700px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', border: '1px solid var(--glass-border-color)', boxShadow: '0 24px 64px rgba(0,0,0,0.35)', color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid var(--glass-border-color)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                             width: '40px',
                             height: '40px',
                             borderRadius: '10px',
-                            background: 'rgba(var(--accent-primary-rgb, 66, 133, 244), 0.1)',
+                            background: 'rgba(0, 170, 200, 0.12)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -98,12 +105,12 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                             <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.7 }}>What's new in Vessel Compliance</p>
                         </div>
                     </div>
-                    <button className="close-button" onClick={onClose} aria-label="Close modal">
+                    <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '6px', display: 'flex', borderRadius: '8px' }}>
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="modal-body" style={{ overflowY: 'auto', padding: '20px', flex: 1 }}>
+                <div style={{ overflowY: 'auto', padding: '20px', flex: 1 }}>
                     {loading && (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', opacity: 0.6 }}>
                             <RefreshCw size={32} className="spinning" style={{ marginBottom: '16px' }} />
@@ -127,7 +134,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                 <h3 style={{ margin: '0 0 8px 0', color: 'var(--danger)' }}>Connection Error</h3>
                                 <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9 }}>{error}</p>
                                 <button
-                                    onClick={() => window.location.reload()}
+                                    onClick={() => { setError(null); setReloadKey(k => k + 1) }}
                                     style={{
                                         marginTop: '16px',
                                         padding: '8px 16px',
@@ -171,7 +178,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     cursor: 'pointer',
-                                    background: expandedVersion === entry.version ? 'rgba(255,255,255,0.03)' : 'transparent'
+                                    background: expandedVersion === entry.version ? (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)') : 'transparent'
                                 }}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -214,7 +221,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                                     <div style={{ paddingTop: '16px' }}>
                                         {formatNotes(entry.notes)}
                                     </div>
-                                    <div style={{ marginTop: '20px', paddingTop: '12px', borderTop: '1px dashed var(--glass-border)' }}>
+                                    <div style={{ marginTop: '20px', paddingTop: '12px', borderTop: '1px dashed var(--glass-border-color)' }}>
                                         <a
                                             href={entry.url}
                                             target="_blank"
@@ -238,21 +245,14 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                     ))}
                 </div>
 
-                <div className="modal-footer" style={{ justifyContent: 'center', padding: '16px' }}>
-                    <button className="primary-button" onClick={onClose} style={{ minWidth: '120px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '16px', borderTop: '1px solid var(--glass-border-color)' }}>
+                    <button className="btn-primary" onClick={onClose} style={{ minWidth: '120px' }}>
                         Got it
                     </button>
                 </div>
             </div>
 
             <style>{`
-        .spinning {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
         .hover-underline:hover {
           text-decoration: underline;
         }

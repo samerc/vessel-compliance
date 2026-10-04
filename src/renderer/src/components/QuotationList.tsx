@@ -73,6 +73,8 @@ interface QuotationListProps {
   onOpenQuotation: (quotation: Quotation) => void
   initialSearch?: string
   onSearchChange?: (search: string) => void
+  openCreate?: boolean
+  onCreateConsumed?: () => void
 }
 
 interface PaginatedData {
@@ -92,7 +94,7 @@ interface SavedFilter {
   order: number
 }
 
-export default function QuotationList({ onOpenQuotation, initialSearch, onSearchChange }: QuotationListProps) {
+export default function QuotationList({ onOpenQuotation, initialSearch, onSearchChange, openCreate, onCreateConsumed }: QuotationListProps) {
   const [quotationTypes, setQuotationTypes] = useState<QuotationType[]>([])
   const [data, setData] = useState<PaginatedData>({
     rows: [],
@@ -159,6 +161,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
     deleteMode: 'single' | 'all'
   } | null>(null)
   const [showNewMenu, setShowNewMenu] = useState(false)
+  useEffect(() => {
+    if (!openCreate) return
+    setShowNewMenu(true)
+    onCreateConsumed?.()
+  }, [openCreate])
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
   const { hasPermission, user } = useAuth()
@@ -1183,7 +1190,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} size={15} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all quotations..." style={{ width: '100%', paddingLeft: '36px', fontSize: '0.83rem' }} />
-          {loading && <Loader2 size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-primary)', animation: 'spin 1s linear infinite' }} />}
+          {loading && <Loader2 size={14} className="spinner" style={{ position: 'absolute', right: '10px', top: 'calc(50% - 7px)', color: 'var(--accent-primary)' }} />}
           {isSearchActive && <span style={{ position: 'absolute', right: loading ? '30px' : '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>ALL</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
@@ -1477,13 +1484,12 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           {loading && (
             <Loader2
               size={14}
+              className="spinner"
               style={{
                 position: 'absolute',
                 right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--accent-primary)',
-                animation: 'spin 1s linear infinite'
+                top: 'calc(50% - 7px)',
+                color: 'var(--accent-primary)'
               }}
             />
           )}
@@ -1992,7 +1998,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
               right: 0,
               height: '2px',
               background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)',
-              animation: 'shimmer 1.5s infinite',
+              animation: 'ql-bar-slide 1.5s infinite',
               zIndex: 2
             }}
           />
@@ -2369,13 +2375,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
 
       {/* Keyframe for loading shimmer */}
       <style>{`
-        @keyframes shimmer {
+        @keyframes ql-bar-slide {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
-        }
-        @keyframes spin {
-          from { transform: translateY(-50%) rotate(0deg); }
-          to { transform: translateY(-50%) rotate(360deg); }
         }
       `}</style>
       </>}
