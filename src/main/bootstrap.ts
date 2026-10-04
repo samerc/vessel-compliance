@@ -56,12 +56,23 @@ try {
   require(appEntry)
 } catch (err) {
   if (appEntry === bundledEntry) throw err
-  // A broken hot-update must not crash the app on every launch: disable the cache (renamed,
-  // kept for diagnosis) and start the bundled code instead. The next update check re-downloads.
+  // A broken hot-update must not crash the app on every launch: disable the cache and start the
+  // bundled code instead. Its build number is BLOCKED (hot-update-blocked.json) so the updater does
+  // not download the same broken build again and restart into it (an endless restart loop).
+  // Only the latest broken copy is kept, for diagnosis.
   console.error('[bootstrap] Hot-update failed to load, falling back to bundled code:', err)
   try {
-    const { renameSync } = require('fs')
-    renameSync(HOT_UPDATE_DIR, `${HOT_UPDATE_DIR}-broken-${Date.now()}`)
+    const fs = require('fs')
+    const userData = app.getPath('userData')
+    let info: any = {}
+    try { info = JSON.parse(fs.readFileSync(join(HOT_UPDATE_DIR, 'version.json'), 'utf-8')) } catch { /* unknown build */ }
+    fs.writeFileSync(join(userData, 'hot-update-blocked.json'), JSON.stringify({
+      buildNumber: info.buildNumber ?? null, version: info.version ?? null,
+      at: new Date().toISOString(), error: String((err as Error)?.message || err).slice(0, 500)
+    }))
+    const brokenDir = `${HOT_UPDATE_DIR}-broken`
+    fs.rmSync(brokenDir, { recursive: true, force: true })
+    fs.renameSync(HOT_UPDATE_DIR, brokenDir)
   } catch { /* ignore — fallback still proceeds */ }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require(bundledEntry)

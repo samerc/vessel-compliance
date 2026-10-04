@@ -78,6 +78,15 @@ function olderThanInstalled(version: unknown): boolean {
   return false
 }
 
+/** A build the bootstrap could not load (see bootstrap.ts); never download or offer it again */
+function isBlockedBuild(buildNumber: number): boolean {
+  try {
+    const file = join(USER_DATA, 'hot-update-blocked.json')
+    if (!existsSync(file)) return false
+    return JSON.parse(readFileSync(file, 'utf-8')).buildNumber === buildNumber
+  } catch { return false }
+}
+
 class HotUpdateService {
   private checkInterval: ReturnType<typeof setInterval> | null = null
 
@@ -157,7 +166,7 @@ class HotUpdateService {
       const remote = await this.getRemoteVersion()
       if (remote) {
         availableBuild = remote.buildNumber
-        updateReady = remote.buildNumber > currentBuild && !olderThanInstalled(remote.version)
+        updateReady = remote.buildNumber > currentBuild && !olderThanInstalled(remote.version) && !isBlockedBuild(remote.buildNumber)
       }
     } catch { /* offline */ }
 
@@ -199,7 +208,7 @@ class HotUpdateService {
         return { updated: false }
       }
       // Built for an older installer: the bootstrap would ignore it, so don't download it
-      if (olderThanInstalled(remoteVersion.version)) {
+      if (olderThanInstalled(remoteVersion.version) || isBlockedBuild(remoteVersion.buildNumber)) {
         return { updated: false }
       }
 
@@ -280,7 +289,7 @@ class HotUpdateService {
         const remote = await this.getRemoteVersion()
         const local = this.getLocalVersion()
         const localBuild = local?.buildNumber ?? 0
-        if (remote && remote.buildNumber > localBuild && !olderThanInstalled(remote.version)) {
+        if (remote && remote.buildNumber > localBuild && !olderThanInstalled(remote.version) && !isBlockedBuild(remote.buildNumber)) {
           onUpdateAvailable(remote)
         }
       } catch { /* silent */ }

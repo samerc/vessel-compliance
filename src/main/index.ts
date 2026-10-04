@@ -1,6 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain, screen, Menu } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, Menu, utilityProcess } from 'electron'
 import { join, dirname, resolve, normalize, extname, basename } from 'path'
-import { Worker } from 'worker_threads'
 import { existsSync, writeFileSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { access as fsAccess } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -2038,54 +2037,62 @@ app.whenReady().then(() => {
 
   safeHandle('word:importDefects', async (event, surveyId: string, filePath: string) => {
     requireSession(event)
-    return new Promise((resolve) => {
-      // In production/dev, the worker file will be in the same output directory
-      // Always load parser from ASAR to ensure node_modules (pdf-parse) are accessible
-      const asarParserPath = join(app.getAppPath(), 'out', 'main', 'parser.js')
-      const workerPath = existsSync(asarParserPath) ? asarParserPath : join(__dirname, 'parser.js')
-      const worker = new Worker(workerPath)
+    if (typeof filePath !== 'string' || !filePath) throw new Error('Invalid file path')
+    // The parser runs in a separate utility PROCESS, not a worker thread: pdf.js inside a worker
+    // thread of the main process crashed the whole app (native crash) on repeated PDF imports.
+    // A utility process isolates it; if it dies only the import fails.
+    // Always load the parser from the ASAR so its node_modules (pdf-parse, mammoth) resolve.
+    const asarParserPath = join(app.getAppPath(), 'out', 'main', 'parser.js')
+    const parserPath = existsSync(asarParserPath) ? asarParserPath : join(__dirname, 'parser.js')
 
-      worker.postMessage({ filePath })
-
-      worker.on('message', async (message) => {
-        if (message.success) {
-          try {
-            // Import defects into database
-            let importCount = 0
-            for (const defect of message.defects) {
-              await db.addSurveyDefect({
-                surveyId,
-                defectNumber: defect.number,
-                description: defect.description,
-                severity: defect.severity as any,
-                status: 'OPEN',
-                dueDate: defect.dueDate
-              })
-              importCount++
-            }
-            resolve({ success: true, count: importCount })
-          } catch (error: any) {
-            resolve({ success: false, message: error.message, count: 0 })
-          }
-        } else {
-          resolve({ success: false, message: message.error, count: 0 })
-        }
-        worker.terminate()
-      })
-
-      worker.on('error', (error) => {
-        console.error('Worker error:', error)
-        resolve({ success: false, message: error.message, count: 0 })
-        worker.terminate()
-      })
-
-      worker.on('exit', (code) => {
-        if (code !== 0) {
-          console.error(`Worker stopped with exit code ${code} `)
-          resolve({ success: false, message: 'Worker stopped unexpectedly', count: 0 })
+    const parsed = await new Promise<{ success: boolean; defects?: any[]; error?: string }>((resolve) => {
+      const child = utilityProcess.fork(parserPath, [], { serviceName: 'Survey defect import', stdio: 'pipe' })
+      let stderr = ''
+      child.stderr?.on('data', (d: Buffer) => { stderr = (stderr + d.toString()).slice(-2000) })
+      let done = false
+      const finish = (r: { success: boolean; defects?: any[]; error?: string }): void => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve(r)
+        // let it exit on its own; kill only if it lingers
+        setTimeout(() => { try { child.kill() } catch { /* already gone */ } }, 15000).unref()
+      }
+      const timer = setTimeout(() => finish({ success: false, error: 'Reading the file timed out' }), 60000)
+      child.on('message', (message: any) => finish(message))
+      child.on('exit', (code) => {
+        if (!done) {
+          console.error('[defect import] parser process exited', code, stderr)
+          finish({ success: false, error: `The file reader stopped unexpectedly (code ${code})` })
         }
       })
+      child.postMessage({ filePath })
     })
+    if (!parsed.success) return { success: false, message: parsed.error, count: 0 }
+
+    // Import defects into database, skipping ones already on this survey (re-import of the
+    // same file must not duplicate them)
+    const norm = (t: unknown): string => String(t ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
+    const existing = new Set(
+      (await db.getSurveyDefects(surveyId)).map(d => `${norm(d.defectNumber)}|${norm(d.description)}`)
+    )
+    let importCount = 0
+    let skipped = 0
+    for (const defect of parsed.defects || []) {
+      const key = `${norm(defect.number)}|${norm(defect.description)}`
+      if (existing.has(key)) { skipped++; continue }
+      existing.add(key)
+      await db.addSurveyDefect({
+        surveyId,
+        defectNumber: defect.number,
+        description: defect.description,
+        severity: defect.severity as any,
+        status: 'OPEN',
+        dueDate: defect.dueDate
+      })
+      importCount++
+    }
+    return { success: true, count: importCount, skipped }
   })
 
   // User Management (admin only)

@@ -330,7 +330,8 @@ export default function ConditionSurveyManager({ vessel }: ConditionSurveyManage
     try {
       const result = await window.api.importDefectsFromWord(surveyId, filePath)
       if (result.success) {
-        showSuccess(`Imported ${result.count} defects successfully!`)
+        const skippedNote = result.skipped ? ` (${result.skipped} already on this survey, skipped)` : ''
+        showSuccess(`Imported ${result.count} defect${result.count === 1 ? '' : 's'}${skippedNote}`)
         setDefectRefreshKey(k => k + 1)
         refreshDefectCounts()
       } else {

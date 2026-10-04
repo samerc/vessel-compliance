@@ -148,7 +148,7 @@ export interface Api {
   dialogOpenFileAny: () => Promise<string | null>
   excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
   dialogOpenFileWord: () => Promise<string | null>
-  importDefectsFromWord: (surveyId: string, filePath: string) => Promise<{ success: boolean; message?: string; count: number }>
+  importDefectsFromWord: (surveyId: string, filePath: string) => Promise<{ success: boolean; message?: string; count: number; skipped?: number }>
 
   themeGet: () => Promise<'light' | 'dark' | 'premium'>
   themeSet: (theme: 'light' | 'dark' | 'premium') => Promise<void>
