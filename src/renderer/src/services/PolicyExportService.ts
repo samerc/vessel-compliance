@@ -1501,8 +1501,33 @@ function polBulletP(text: string) {
   })
 }
 
+// HTML to plain lines that KEEPS paragraph breaks (htmlToPlainText alone uses textContent,
+// which runs separate <p>s together into one paragraph)
+function polHtmlToLines(html: string): string {
+  return htmlToPlainText(html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n'))
+}
+
+// Blank-line paragraphs are tagged so a section can be cleaned up by polCollapseEmpty
+const polEmptyParas = new WeakSet<object>()
 function polEmptyP() {
-  return new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
+  const p = new Paragraph({ spacing: { after: 40, line: 240, lineRule: 'auto' as any }, children: [] })
+  polEmptyParas.add(p as unknown as object)
+  return p
+}
+
+// Same rule as the quotation export: a run of blank lines becomes ONE blank line, and a
+// section never starts or ends with a blank line. polSpacerPts gaps are not blank lines.
+function polCollapseEmpty(items: (Paragraph | Table)[]): (Paragraph | Table)[] {
+  const out: (Paragraph | Table)[] = []
+  for (const it of items) {
+    if (polEmptyParas.has(it as unknown as object)) {
+      const prev = out[out.length - 1]
+      if (!prev || polEmptyParas.has(prev as unknown as object)) continue
+    }
+    out.push(it)
+  }
+  while (out.length && polEmptyParas.has(out[out.length - 1] as unknown as object)) out.pop()
+  return out
 }
 
 // A precise, tiny vertical gap (exact line height in points) — used where a full blank line
@@ -1957,7 +1982,7 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
         if (!text) continue
         content.push(new Paragraph({
           numbering: { reference: 'dash-bullet', level: 0 },
-          spacing: { after: 40 },
+          spacing: { after: 100 },
           children: [
             ...(code ? [new TextRun({ text: decodeHtmlEntities(code) + ' ', size: POL_FONT_SIZE, font: 'Arial', color: '000000' })] : []),
             new TextRun({ text: decodeHtmlEntities(text), size: POL_FONT_SIZE, font: 'Arial', color: '000000' })
@@ -2248,7 +2273,8 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
       : '___'
     let lolText = ''
     if (data.quotation.limitOfLiabilityText) {
-      lolText = data.quotation.limitOfLiabilityText
+      const rawLol = decodeHtmlEntities(data.quotation.limitOfLiabilityText)
+      lolText = (polIsHtml(rawLol) ? polHtmlToLines(rawLol) : rawLol)
         .replace(/\{amount\}/g, lolAmountWithWords)
         .replace(/\{currency\}/g, resolvedLolCurrency)
     } else if (polSt(data, 'limitOfLiabilityDefaultText') && resolvedLolAmount != null) {
@@ -2262,24 +2288,36 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
     } else if (resolvedLolAmount != null) {
       lolText = `${polFormatCurrency(resolvedLolAmount, resolvedLolCurrency)} (${numberToWords(resolvedLolAmount, resolvedLolCurrency)}) all claims in the aggregate.`
     }
-    // Handle sub-limits
-    const subLimitLines = data.subLimits.map(sl =>
-      sl.text.replace(/\{amount\}/g, polFormatAmountOnly(sl.amount)).replace(/\{currency\}/g, sl.currency || 'USD')
-    )
-    if (lolText.includes('{sub_limits}')) {
-      if (subLimitLines.length > 0) {
-        lolText = lolText.replace('{sub_limits}', subLimitLines.join('\n'))
-      } else {
-        lolText = lolText.replace(/\n*\{sub_limits\}\n*/g, '\n')
-      }
-    } else if (subLimitLines.length > 0) {
-      lolText += '\n\n' + subLimitLines.join('\n')
-      lolText += '\n\nUnder no circumstances is the Combined Single Limit detailed above to be exceeded.'
+    // Layout matches the quotation export: intro → sub-limits → "Under no circumstances…", each
+    // block separated by exactly ONE blank line; sub-limit lines are a tight group (no gap).
+    const subLimitParas = data.subLimits.map(sl => new Paragraph({
+      spacing: { after: 0, line: 240, lineRule: 'auto' as any },
+      children: [new TextRun({
+        text: sl.text.replace(/\{amount\}/g, polFormatAmountOnly(sl.amount)).replace(/\{currency\}/g, sl.currency || 'USD'),
+        size: POL_FONT_SIZE, font: 'Arial', color: '000000'
+      })]
+    }))
+    const lolParas = (text: string): Paragraph[] =>
+      text.split('\n').map(l => l.trim()).filter(Boolean).map(l => polNp(l))
+    const pushBlock = (paras: Paragraph[]) => {
+      if (paras.length === 0) return
+      if (content.length > 0) content.push(polEmptyP())
+      content.push(...paras)
     }
-    if (lolText) {
-      for (const line of lolText.split('\n')) {
-        if (line.trim()) content.push(polNp(line.trim()))
-      }
+    const cleanLol = lolText.replace(/[ \t]{2,}/g, ' ').trim()
+    if (cleanLol.includes('{sub_limits}')) {
+      const [before, ...rest] = cleanLol.split('{sub_limits}')
+      pushBlock(lolParas(before))
+      pushBlock(subLimitParas)
+      pushBlock(lolParas(rest.join(' ')))
+    } else {
+      // The closing "Under no circumstances…" sentence stays last, after any sub-limits
+      const underNo = cleanLol.match(/(Under\s+no\s+circumstances[\s\S]*)/i)
+      const intro = underNo ? cleanLol.substring(0, underNo.index).trim() : cleanLol
+      pushBlock(lolParas(intro))
+      pushBlock(subLimitParas)
+      if (underNo) pushBlock(lolParas(underNo[1]))
+      else if (subLimitParas.length > 0) pushBlock([polNp('Under no circumstances is the Combined Single Limit detailed above to be exceeded.')])
     }
   } else if (typeCode === 'H') {
     const vesselCur = (data.vessel as any)?.agreedValueCurrency || null
@@ -2546,6 +2584,8 @@ function polBuildDeductiblesSection(data: PolicyExportData): (Paragraph | Table)
   if (dedAggText) { content.push(polEmptyP()); content.push(...polMp(dedAggText)) }
 
   if (data.textDeductibles.length > 0) {
+    // One blank line after the table / aggregate clause (as in the quotation)
+    content.push(polEmptyP())
     data.textDeductibles.forEach((td, i) => {
       content.push(...(i === data.textDeductibles.length - 1 ? polMpTight(td.text) : polMp(td.text)))
     })
@@ -2759,7 +2799,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
           margins: { top: 60, bottom: 200, left: 80, right: 80 },
-          children: content.length > 0 ? content : [polEmptyP()]
+          children: (c => c.length > 0 ? c : [polEmptyP()])(polCollapseEmpty(content))
         })
       ]
     })
@@ -2924,7 +2964,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // NCB (No Claims Bonus) — skip if this vessel is excluded from NCB
   if (data.quotation.ncbEnabled && data.quotation.ncbText && !data.vessel?.ncbExcluded) {
     const ncbContent: (Paragraph | Table)[] = []
-    let ncbText = decodeHtmlEntities(htmlToPlainText(data.quotation.ncbText))
+    let ncbText = decodeHtmlEntities(polHtmlToLines(data.quotation.ncbText))
     // {ncb_amount} follows the discount TYPE (mirrors the quotation export): a fixed amount
     // for amount-type, "X%" for percentage-type — a stale value of the other type is ignored.
     const ncbPct = data.quotation.ncbDiscountPercent
@@ -2941,7 +2981,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
   // UPCC (Upfront Continuity Credit) — skip if this vessel is excluded from UPCC
   if (data.quotation.upccEnabled && data.quotation.upccText && !data.vessel?.upccExcluded) {
     const upccContent: (Paragraph | Table)[] = []
-    let upccText = decodeHtmlEntities(htmlToPlainText(data.quotation.upccText))
+    let upccText = decodeHtmlEntities(polHtmlToLines(data.quotation.upccText))
     const upccIsAmount = data.quotation.upccDiscountType === 'amount'
     if (data.quotation.upccDiscountPercent != null) upccText = upccText.replace(/\{upcc_percent\}/g, String(data.quotation.upccDiscountPercent))
     if (upccIsAmount && data.quotation.upccDiscountAmount != null) upccText = upccText.replace(/\{upcc_amount\}/g, polFormatAmountOnly(data.quotation.upccDiscountAmount))
@@ -2965,7 +3005,7 @@ export async function exportPolicyDocx(policyId: string, totalPages?: number, in
       base -= ded
       if (!d.text) continue
       const pctStr = `${d.percent || 0}%`
-      const resolved = decodeHtmlEntities(htmlToPlainText(d.text))
+      const resolved = decodeHtmlEntities(polHtmlToLines(d.text))
         .replace(/\{amount\}/g, polFormatCurrency(Math.round(ded * 100) / 100, cur))
         .replace(/\{percentage\}/g, pctStr)
         .replace(/\{percent\}/g, pctStr)
@@ -4460,7 +4500,7 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
           width: { size: POL_BODY_W, type: WidthType.DXA },
           verticalAlign: VerticalAlign.TOP,
           borders: thinBorders(),
-          children: content.length > 0 ? content : [polEmptyP()]
+          children: (c => c.length > 0 ? c : [polEmptyP()])(polCollapseEmpty(content))
         })
       ]
     })
