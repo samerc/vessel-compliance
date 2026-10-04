@@ -79,12 +79,12 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.7)',
+        background: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000
+        zIndex: 1200
       }}
       onClick={onClose}
     >
@@ -93,18 +93,18 @@ export default function SanctionsModal({ searchedName, matches, onClose, onMarkC
         role="dialog"
         aria-modal="true"
         aria-labelledby="sanctions-modal-title"
-        className="glass-card"
         style={{
+          background: 'var(--bg-primary)',
+          border: 'var(--glass-border)',
+          borderRadius: '16px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
           width: '90%',
           maxWidth: '700px',
           maxHeight: '80vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          background: isLight ? '#ffffff' : 'rgba(30, 30, 40, 0.95)',
-          color: isLight ? '#1a1a1a' : '#ffffff',
-          boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.2)' : '0 10px 40px rgba(0,0,0,0.5)',
-          border: isLight ? '1px solid #e0e0e0' : '1px solid rgba(255,255,255,0.1)'
+          color: 'var(--text-primary)'
         }}
         onClick={e => e.stopPropagation()}
       >
