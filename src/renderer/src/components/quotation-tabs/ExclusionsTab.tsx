@@ -265,7 +265,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                 {visibleExclusions.map(e => {
                     const row = selectedRows.find((r: any) => r.piExclusionId === e.id)
                     return (
-                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
+                        <div key={e.id} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', background: selectedIds.has(e.id) ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'transparent' }}>
                             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                                 <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggle(e.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', marginTop: '2px' }} />
                                 <div style={{ flex: 1 }}>
@@ -325,7 +325,7 @@ export default function ExclusionsTab({ quotation, showSuccess, piAlternatives =
                 </div>
 
                 {customExclusions.map((ce, i) => (
-                    <div key={ce.id} draggable={editingCustomId !== ce.id} onDragStart={() => handleCustomDragStart(i)} onDragOver={e => e.preventDefault()} onDrop={() => handleCustomDrop(i)} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(0, 210, 255, 0.03)', cursor: editingCustomId === ce.id ? 'default' : 'grab' }}>
+                    <div key={ce.id} draggable={editingCustomId !== ce.id} onDragStart={() => handleCustomDragStart(i)} onDragOver={e => e.preventDefault()} onDrop={() => handleCustomDrop(i)} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--table-border)', marginBottom: '6px', background: 'rgba(var(--accent-primary-rgb), 0.03)', cursor: editingCustomId === ce.id ? 'default' : 'grab' }}>
                         {editingCustomId === ce.id ? (
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                                 <textarea value={editCustomText} onChange={e => setEditCustomText(e.target.value)} style={{ flex: 1, minHeight: '40px', resize: 'none' }} />

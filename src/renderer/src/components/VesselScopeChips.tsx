@@ -47,7 +47,7 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
           padding: '1px 6px',
           borderRadius: 3,
           border: `1px solid ${allSelected ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-          background: allSelected ? 'rgba(0,170,200,0.15)' : 'transparent',
+          background: allSelected ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'transparent',
           color: allSelected ? 'var(--accent-primary)' : 'var(--text-secondary)',
           cursor: 'pointer',
           lineHeight: '1.4'
@@ -67,7 +67,7 @@ export default function VesselScopeChips({ vessels, vesselScope, onChange }: Ves
               padding: '1px 6px',
               borderRadius: 3,
               border: `1px solid ${checked && !allSelected ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
-              background: checked && !allSelected ? 'rgba(0,170,200,0.15)' : 'transparent',
+              background: checked && !allSelected ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'transparent',
               color: checked && !allSelected ? 'var(--accent-primary)' : 'var(--text-secondary)',
               cursor: 'pointer',
               lineHeight: '1.4',

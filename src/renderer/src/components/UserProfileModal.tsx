@@ -99,7 +99,7 @@ export default function UserProfileModal({ onClose }: UserProfileModalProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         margin: '0 auto 16px',
-                        boxShadow: '0 8px 20px rgba(0, 210, 255, 0.3)'
+                        boxShadow: '0 8px 20px rgba(var(--accent-primary-rgb), 0.3)'
                     }}>
                         <UserIcon size={32} color="white" />
                     </div>

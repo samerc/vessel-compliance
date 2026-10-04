@@ -235,7 +235,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                 ? '1px solid var(--accent-primary)'
                 : '1px solid var(--input-border)',
               background: activeCategory === cat.id
-                ? 'rgba(0,210,255,0.1)'
+                ? 'rgba(var(--accent-primary-rgb), 0.1)'
                 : 'transparent',
               color: activeCategory === cat.id
                 ? 'var(--accent-primary)'
@@ -288,7 +288,7 @@ export default function DocumentTemplateManager(): React.JSX.Element {
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--table-border)',
                     background: selectedId === t.id
-                      ? 'rgba(0,210,255,0.06)'
+                      ? 'rgba(var(--accent-primary-rgb), 0.06)'
                       : 'transparent',
                     display: 'flex',
                     alignItems: 'center',

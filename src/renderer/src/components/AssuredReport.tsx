@@ -298,7 +298,7 @@ export default function AssuredReport() {
               style={{
                 padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer',
                 border: filterMode === mode ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                background: filterMode === mode ? 'rgba(0,210,255,0.08)' : 'transparent',
+                background: filterMode === mode ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                 color: filterMode === mode ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: filterMode === mode ? 600 : 400,
                 display: 'flex', alignItems: 'center', gap: '6px'
@@ -321,7 +321,7 @@ export default function AssuredReport() {
                 {filteredFleetOptions.map(f => (
                   <div key={f.id} onMouseDown={() => { setSelectedFleetId(f.id); setFleetSearch(f.name); setFleetDropdownOpen(false) }}
                     style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', fontWeight: selectedFleetId === f.id ? 600 : 400, color: selectedFleetId === f.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     {f.name}
                   </div>
@@ -338,7 +338,7 @@ export default function AssuredReport() {
             {selectedVesselNames.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
                 {selectedVesselNames.map(v => (
-                  <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px 3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.25)' }}>
+                  <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px 3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb), 0.25)' }}>
                     {v.name}
                     <button title="Remove" aria-label="Remove" onClick={() => setSelectedVesselIds(prev => { const n = new Set(prev); n.delete(v.id); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: '0 2px', display: 'flex' }}><X size={12} /></button>
                   </span>
@@ -354,7 +354,7 @@ export default function AssuredReport() {
                   {filteredVesselOptions.map(v => (
                     <div key={v.id} onMouseDown={() => { setSelectedVesselIds(prev => new Set(prev).add(v.id)); setVesselSearch(''); setVesselDropdownOpen(false) }}
                       style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <span style={{ fontWeight: 600 }}>{v.name}</span>
                       <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '0.78rem' }}>IMO: {v.imoNumber}</span>
@@ -416,7 +416,7 @@ export default function AssuredReport() {
             <tbody>
               {groupedByVessel.map((group, gi) => (
                 group.assureds.map((r, ri) => (
-                  <tr key={`${gi}-${ri}`} style={{ borderBottom: '1px solid var(--table-border)', background: ri === 0 && gi % 2 === 0 ? (isLight ? 'rgba(0,150,200,0.02)' : 'rgba(0,210,255,0.015)') : 'transparent' }}>
+                  <tr key={`${gi}-${ri}`} style={{ borderBottom: '1px solid var(--table-border)', background: ri === 0 && gi % 2 === 0 ? (isLight ? 'rgba(0,150,200,0.02)' : 'rgba(var(--accent-primary-rgb), 0.015)') : 'transparent' }}>
                     {ri === 0 ? (
                       <>
                         <td style={{ ...tdStyle, fontWeight: 600, textTransform: 'uppercase' }} rowSpan={group.assureds.length}>{group.vessel}</td>
@@ -425,7 +425,7 @@ export default function AssuredReport() {
                       </>
                     ) : null}
                     <td style={{ ...tdStyle, fontWeight: 500 }}>{r.assuredName || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No assureds</span>}</td>
-                    <td style={tdStyle}>{r.role && <span style={{ padding: '1px 6px', borderRadius: '6px', background: 'rgba(0,210,255,0.08)', color: 'var(--accent-primary)', fontSize: '0.75rem' }}>{r.role}</span>}</td>
+                    <td style={tdStyle}>{r.role && <span style={{ padding: '1px 6px', borderRadius: '6px', background: 'rgba(var(--accent-primary-rgb), 0.08)', color: 'var(--accent-primary)', fontSize: '0.75rem' }}>{r.role}</span>}</td>
                     <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.entityType}</td>
                     <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.email}</td>
                     <td style={{ ...tdStyle, fontSize: '0.78rem' }}>{r.phone}</td>

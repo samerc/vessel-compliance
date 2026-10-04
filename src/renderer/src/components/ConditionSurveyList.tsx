@@ -272,7 +272,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                   <div style={{ overflowY: 'auto' }}>
                     <div
                       onClick={() => { setSurveyorFilter(''); setSurveyorDropdownOpen(false) }}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: !surveyorFilter ? 700 : 500, background: !surveyorFilter ? 'rgba(0,210,255,0.08)' : 'transparent' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: !surveyorFilter ? 700 : 500, background: !surveyorFilter ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent' }}
                       onMouseEnter={e => { if (surveyorFilter) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
                       onMouseLeave={e => { if (surveyorFilter) e.currentTarget.style.background = 'transparent' }}
                     >
@@ -287,7 +287,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props) {
                           <div
                             key={sc.id}
                             onClick={() => { setSurveyorFilter(sc.id); setSurveyorDropdownOpen(false) }}
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: active ? 700 : 500, color: active ? 'var(--accent-primary)' : 'var(--text-primary)', background: active ? 'rgba(0,210,255,0.08)' : 'transparent' }}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: active ? 700 : 500, color: active ? 'var(--accent-primary)' : 'var(--text-primary)', background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent' }}
                             onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
                             onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                           >

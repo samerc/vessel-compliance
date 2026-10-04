@@ -4,13 +4,14 @@ import {
   Ship, FileText, Users, Shield, Wrench, Calendar, FileWarning,
   RefreshCw, Building2, User, TrendingUp, ChevronLeft, ChevronRight, Database,
   Settings, BarChart3, GitBranch, Zap, Layers,
-  ChevronUp, ChevronDown, RotateCcw, History
+  ChevronUp, ChevronDown, RotateCcw, History, LayoutDashboard
 } from 'lucide-react'
 import { Vessel, VesselDocument, DocumentType, Entity, SurveyWarranty, WorkflowStep, EntityDocumentType, EntityDocument } from '../../../shared/types'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort } from '../utils/dateUtils'
+import { PageHeader } from './ui'
 
 // ── Widget Registry ──────────────────────────────────────────────────────
 
@@ -479,7 +480,7 @@ export default function Dashboard({
   }, [layout, editFilter])
 
   return (
-    <div className="fade-in" style={{ padding: '0 2px' }}>
+    <div className="fade-in page">
 
       {/* ── Onboarding Overlay ── */}
       {showOnboarding && (
@@ -519,37 +520,30 @@ export default function Dashboard({
       )}
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '800', letterSpacing: '-0.02em' }}>Dashboard</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            {dateStr} · {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''} · {entities.length} entit{entities.length !== 1 ? 'ies' : 'y'}
-            {lastRefreshed && (
-              <span style={{ marginLeft: '10px', opacity: 0.6 }}>· Updated {relativeTime(lastRefreshed.toISOString())}</span>
-            )}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <PageHeader
+        icon={<LayoutDashboard size={26} />}
+        title="Dashboard"
+        subtitle={<>
+          {dateStr} · {activeVessels.length} active vessel{activeVessels.length !== 1 ? 's' : ''} · {entities.length} entit{entities.length !== 1 ? 'ies' : 'y'}
+          {lastRefreshed && (
+            <span style={{ marginLeft: '10px', opacity: 0.6 }}>· Updated {relativeTime(lastRefreshed.toISOString())}</span>
+          )}
+        </>}
+        actions={<>
           <button
             onClick={() => setEditMode(!editMode)}
-            className={editMode ? 'btn-primary' : 'btn-secondary'}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
+            className={`${editMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
             title="Customize dashboard"
           >
             <Settings size={14} />
             {editMode ? 'Done' : 'Customize'}
           </button>
-          <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '7px 14px' }}
-          >
-            <RefreshCw size={14} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+          <button onClick={loadData} disabled={isLoading} className="btn-secondary btn-sm">
+            <RefreshCw size={14} className={isLoading ? 'spinner' : undefined} />
             Refresh
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* ── Edit Mode ── */}
       {editMode && (
@@ -582,7 +576,7 @@ export default function Dashboard({
                   fontSize: '0.76rem',
                   fontWeight: '600',
                   border: `1px solid ${editFilter === cat.key ? 'var(--accent-primary)' : (isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)')}`,
-                  background: editFilter === cat.key ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  background: editFilter === cat.key ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                   color: editFilter === cat.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
@@ -607,7 +601,7 @@ export default function Dashboard({
                     borderRadius: '10px',
                     border: `1px solid ${w.enabled ? 'var(--accent-primary)' : (isLight ? '#e4e7ef' : 'rgba(255,255,255,0.08)')}`,
                     background: w.enabled
-                      ? (isLight ? 'rgba(0,170,200,0.04)' : 'rgba(0,170,200,0.06)')
+                      ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)')
                       : (isLight ? '#f8f9fb' : 'rgba(255,255,255,0.02)'),
                     opacity: w.enabled ? 1 : 0.7,
                     transition: 'all 0.15s ease'
@@ -1520,9 +1514,9 @@ function DeadlineCalendarWidget({ cardStyle, data }: { cardStyle: React.CSSPrope
                     justifyContent: 'center',
                     padding: '2px',
                     background: isSelected
-                      ? 'rgba(0,170,200,0.18)'
+                      ? 'rgba(var(--accent-primary-rgb), 0.18)'
                       : isToday
-                        ? 'rgba(0,170,200,0.08)'
+                        ? 'rgba(var(--accent-primary-rgb), 0.08)'
                         : 'transparent',
                     borderRadius: '6px',
                     cursor: hasEvents ? 'pointer' : 'default',

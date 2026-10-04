@@ -772,7 +772,7 @@ export default function PolicySetupWizard({ quotationId, onComplete, onCancel }:
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isCompleted ? 'var(--accent-primary)' : isCurrent ? 'var(--accent-primary)' : 'transparent',
                     border: isCurrent ? '3px solid var(--accent-primary)' : isCompleted ? 'none' : '2px solid var(--text-secondary)',
-                    boxShadow: isCurrent ? '0 0 0 4px rgba(0,170,200,0.2)' : 'none',
+                    boxShadow: isCurrent ? '0 0 0 4px rgba(var(--accent-primary-rgb), 0.2)' : 'none',
                     color: isCompleted || isCurrent ? '#fff' : 'var(--text-secondary)',
                     transition: 'all 0.2s'
                   }}>
@@ -1011,7 +1011,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '10px 14px', borderRadius: '10px',
                 border: selected ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                background: selected ? 'rgba(0,170,200,0.06)' : 'transparent',
+                background: selected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                 cursor: isConverted ? 'not-allowed' : (isMultiVessel ? 'pointer' : 'default'),
                 opacity: isConverted ? 0.55 : 1,
                 transition: 'all 0.15s'
@@ -1062,7 +1062,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 style={{
                   padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
                   border: data.selectedAltId === alt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedAltId === alt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  background: data.selectedAltId === alt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                   color: data.selectedAltId === alt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
@@ -1094,7 +1094,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 style={{
                   padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
                   border: data.selectedLolOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedLolOptionId === opt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  background: data.selectedLolOptionId === opt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                   color: data.selectedLolOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
@@ -1118,7 +1118,7 @@ function StepVesselAlternative({ qVessels, allAlts, hasAlts, isMultiVessel, data
                 style={{
                   padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 600,
                   border: data.selectedAgreedValueOptionId === opt.id ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                  background: data.selectedAgreedValueOptionId === opt.id ? 'rgba(0,170,200,0.1)' : 'transparent',
+                  background: data.selectedAgreedValueOptionId === opt.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                   color: data.selectedAgreedValueOptionId === opt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
@@ -1231,7 +1231,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
                   </div>
                 )
               })}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(0,170,200,0.06)', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(var(--accent-primary-rgb), 0.06)', fontSize: '0.82rem' }}>
                 <span style={{ fontWeight: 700 }}>Total</span>
                 <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{data.totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })} {quotation?.premiumCurrency || 'USD'}</span>
               </div>
@@ -1292,7 +1292,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         const cols = hasDiscount ? '1.2fr 1fr 1fr' : '1.2fr 1fr'
         return (
           <div style={{ marginBottom: '20px', border: '1px solid var(--glass-border-color)', borderRadius: '10px', overflow: 'hidden', maxWidth: '540px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', background: 'rgba(0,170,200,0.06)', ...labelUpper, marginBottom: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', background: 'rgba(var(--accent-primary-rgb), 0.06)', ...labelUpper, marginBottom: 0 }}>
               <span>Premium</span>
               {hasDiscount && <span style={{ textAlign: 'right' }}>Technical</span>}
               <span style={{ textAlign: 'right' }}>{hasDiscount ? 'Payable' : 'Amount'}</span>
@@ -1304,7 +1304,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
                 <span style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(hasDiscount ? r.pay : r.tech)}</span>
               </div>
             ))}
-            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border-color)', background: 'rgba(0,170,200,0.04)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '8px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--glass-border-color)', background: 'rgba(var(--accent-primary-rgb), 0.04)' }}>
               <span style={{ fontWeight: 700 }}>Total</span>
               {hasDiscount && <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(totalTech)}</span>}
               <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>{fmt(hasDiscount ? totalPay : totalTech)}</span>
@@ -1333,7 +1333,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             <span style={{
               fontSize: '0.82rem', color: 'var(--text-secondary)',
               minWidth: '32px', fontWeight: 700,
-              background: 'rgba(0,170,200,0.1)', padding: '2px 8px',
+              background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '2px 8px',
               borderRadius: '6px', textAlign: 'center'
             }}>
               #{i + 1}
@@ -1367,7 +1367,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(0,170,200,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.06)' }}>
         <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Total</span>
         <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
           {data.totalPremium.toLocaleString()} {quotation.premiumCurrency || 'USD'}
@@ -1387,7 +1387,7 @@ function StepInstalments({ data, quotation, isLight, onUpdate, recalcPremiumFrom
             return (
               <button key={String(opt.key)} type="button"
                 onClick={() => onUpdate({ nonRefundableType: opt.key })}
-                style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: active ? 700 : 400, border: active ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: active ? 'rgba(0,170,200,0.08)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: active ? 700 : 400, border: active ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                 {opt.label}
               </button>
             )
@@ -1541,7 +1541,7 @@ function StepDetails({ data, banks, hasBroker, premiumCurrency, baseCurrency, on
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
             {vesselIds.map(id => (
               <button key={id} type="button" onClick={() => setActiveVid(id)}
-                style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: id === vid ? 700 : 400, border: id === vid ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: id === vid ? 'rgba(0,170,200,0.08)' : 'transparent', color: id === vid ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: id === vid ? 700 : 400, border: id === vid ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)', background: id === vid ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: id === vid ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                 {vesselName(id)}
               </button>
             ))}
@@ -1719,7 +1719,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '10px 14px', borderRadius: '10px',
                 border: data.blueCards.includes(card) ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                background: data.blueCards.includes(card) ? 'rgba(0,170,200,0.06)' : 'transparent',
+                background: data.blueCards.includes(card) ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                 cursor: 'pointer', transition: 'all 0.15s'
               }}>
                 <input
@@ -1807,7 +1807,7 @@ function StepBlueCards({ data, qVessels, flagStates, isLight, onUpdate, ownerOpt
           display: 'flex', alignItems: 'center', gap: '10px',
           padding: '10px 14px', borderRadius: '10px',
           border: data.qrEnabled ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-          background: data.qrEnabled ? 'rgba(0,170,200,0.06)' : 'transparent',
+          background: data.qrEnabled ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
           cursor: 'pointer', transition: 'all 0.15s'
         }}>
           <input
@@ -1872,7 +1872,7 @@ function StepSubjectivities({ items, selectedIds, isLight, onUpdate }: {
                 display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px',
                 cursor: 'pointer',
                 border: `1px solid ${checked ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-                background: checked ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,170,200,0.10)') : 'transparent'
+                background: checked ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.10)') : 'transparent'
               }}
             >
               <input type="checkbox" checked={checked} onChange={() => toggle(it.id)} style={{ marginTop: '2px' }} />
@@ -2043,7 +2043,7 @@ function StepReview({ data, quotation, qVessels, allAlts, hasAlts, banks, isPI, 
                 {data.blueCards.map(card => (
                   <span key={card} style={{
                     padding: '3px 10px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600,
-                    background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)'
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
                   }}>
                     {card}
                   </span>

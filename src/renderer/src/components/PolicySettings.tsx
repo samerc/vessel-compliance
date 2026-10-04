@@ -268,7 +268,7 @@ function FontSizeTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
             style={{
               padding: '6px 16px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600,
               border: fontSize === pt ? '2px solid var(--accent-primary)' : '1px solid var(--input-border)',
-              background: fontSize === pt ? 'rgba(0,170,200,0.1)' : 'transparent',
+              background: fontSize === pt ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
               color: fontSize === pt ? 'var(--accent-primary)' : 'var(--text-secondary)',
               cursor: 'pointer'
             }}
@@ -351,14 +351,14 @@ function TimezonesTab({ showSuccess }: { showSuccess: (msg: string) => void }) {
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 12px', borderRadius: '6px',
             border: '1px solid var(--table-border)',
-            background: idx === 0 ? 'rgba(0,170,200,0.06)' : 'transparent'
+            background: idx === 0 ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent'
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <button title="Move up" aria-label="Move up" onClick={() => handleMove(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={12} /></button>
               <button title="Move down" aria-label="Move down" onClick={() => handleMove(idx, 1)} disabled={idx === timezones.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', opacity: idx === timezones.length - 1 ? 0.3 : 1 }}><ChevronDown size={12} /></button>
             </div>
             <span style={{ flex: 1, fontSize: '0.9rem' }}>{tz}</span>
-            {idx === 0 && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', fontWeight: 600 }}>DEFAULT</span>}
+            {idx === 0 && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', fontWeight: 600 }}>DEFAULT</span>}
             <button title="Delete" aria-label="Delete" onClick={() => handleRemove(tz)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
           </div>
         ))}
@@ -637,7 +637,7 @@ function BanksTab({ showSuccess, showError }: { showSuccess: (msg: string) => vo
               style={{
                 padding: '14px 16px', borderRadius: '10px',
                 border: '1px solid var(--table-border)',
-                background: editingBankId === bank.id ? 'rgba(0,210,255,0.04)' : 'transparent'
+                background: editingBankId === bank.id ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent'
               }}
             >
               {editingBankId === bank.id ? (
@@ -1146,7 +1146,7 @@ function TcTemplatesTab({ showSuccess, showError, isLight }: { showSuccess: (msg
                 <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{t.name}</span>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{t.kind === 'html' ? 'Rich text' : 'Word document'}{t.isDefault ? ' · Default' : ''}</span>
               </div>
-              <span style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', padding: '2px 7px', borderRadius: '5px', background: t.kind === 'html' ? 'rgba(0,170,200,0.12)' : 'rgba(180,100,255,0.12)', color: t.kind === 'html' ? 'var(--accent-primary)' : '#b464ff' }}>{t.kind === 'html' ? 'Rich' : 'DOCX'}</span>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', padding: '2px 7px', borderRadius: '5px', background: t.kind === 'html' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'rgba(180,100,255,0.12)', color: t.kind === 'html' ? 'var(--accent-primary)' : '#b464ff' }}>{t.kind === 'html' ? 'Rich' : 'DOCX'}</span>
               <button type="button" onClick={() => openPreview(t)} title="Preview" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 5 }}><Eye size={15} /></button>
               {t.kind === 'html'
                 ? <button type="button" onClick={() => openEdit(t)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', padding: 5 }}><Edit3 size={15} /></button>
@@ -1639,7 +1639,7 @@ function CommissionsTab({ showSuccess, showError, isLight }: { showSuccess: (m: 
           {entitySearch && filteredEntities.length > 0 && !newEntityId && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, maxHeight: '200px', overflowY: 'auto', background: isLight ? '#fff' : '#1a1d28', border: '1px solid var(--input-border)', borderRadius: '6px', marginTop: '2px' }}>
               {filteredEntities.slice(0, 10).map(e => (
-                <div key={e.id} onClick={() => { setNewEntityId(e.id); setEntitySearch(e.name) }} style={{ padding: '6px 10px', cursor: 'pointer', fontSize: '0.82rem' }} onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,170,200,0.1)')} onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>{e.name}</div>
+                <div key={e.id} onClick={() => { setNewEntityId(e.id); setEntitySearch(e.name) }} style={{ padding: '6px 10px', cursor: 'pointer', fontSize: '0.82rem' }} onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.1)')} onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>{e.name}</div>
               ))}
             </div>
           )}
@@ -1895,7 +1895,7 @@ function EndorsementSettingsTab({ showSuccess, showError, isLight }: { showSucce
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{t.name}</span>
-                <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0,170,200,0.1)', color: '#00aac8' }}>
+                <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>
                   {sectionOptions.find(o => o.key === t.sectionKey)?.label || t.sectionKey}
                 </span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>

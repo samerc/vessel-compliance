@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import QuotationSettings from './QuotationSettings'
 import QuotationList from './QuotationList'
 import QuotationEditor from './QuotationEditor'
+import { PageHeader, SegmentedControl } from './ui'
 
 type QuotationView = 'list' | 'settings' | 'editor'
 
@@ -59,55 +60,22 @@ export default function QuotationManager({ onNavigateToPolicy, onNavigateToPolic
     }
 
     return (
-        <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="page">
             {view !== 'editor' && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                    <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <FileText size={28} /> Quotations
-                    </h1>
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border-color)' }}>
-                        <button
-                            onClick={() => setView('list')}
-                            style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                fontWeight: view === 'list' ? '600' : '400',
-                                background: view === 'list' ? 'var(--accent-primary)' : 'transparent',
-                                color: view === 'list' ? '#fff' : 'var(--text-secondary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <List size={16} /> Quotations
-                        </button>
-                        {canSettings && (
-                            <button
-                                onClick={() => setView('settings')}
-                                style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    fontWeight: view === 'settings' ? '600' : '400',
-                                    background: view === 'settings' ? 'var(--accent-primary)' : 'transparent',
-                                    color: view === 'settings' ? '#fff' : 'var(--text-secondary)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <Settings size={16} /> Settings
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <PageHeader
+                    icon={<FileText size={26} />}
+                    title="Quotations"
+                    actions={canSettings && (
+                        <SegmentedControl
+                            value={view}
+                            onChange={setView}
+                            items={[
+                                { key: 'list', label: 'Quotations', icon: <List size={15} /> },
+                                { key: 'settings', label: 'Settings', icon: <Settings size={15} /> }
+                            ]}
+                        />
+                    )}
+                />
             )}
 
             {view === 'list' && <QuotationList key={listKey} onOpenQuotation={handleOpenEditor} initialSearch={listSearch} onSearchChange={setListSearch} openCreate={openCreate} onCreateConsumed={onCreateConsumed} />}

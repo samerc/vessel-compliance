@@ -22,7 +22,7 @@ const TAG_STYLES: Record<WhatsNewTag, { bg: string; color: string; lightBg: stri
     lightBg: 'rgba(0,140,70,0.1)', lightColor: '#007a3d',
   },
   Improved: {
-    bg: 'rgba(0,170,255,0.15)', color: 'var(--accent-primary)',
+    bg: 'rgba(var(--accent-primary-rgb), 0.15)', color: 'var(--accent-primary)',
     lightBg: 'rgba(0,119,163,0.1)', lightColor: 'var(--accent-primary)',
   },
   Fixed: {

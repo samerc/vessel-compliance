@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<WarrantyStatus, string> = {
 
 const STATUS_COLORS: Record<WarrantyStatus, { bg: string; color: string }> = {
   pending: { bg: 'rgba(255,165,0,0.12)', color: '#e6a800' },
-  survey_done: { bg: 'rgba(0,170,255,0.12)', color: '#00aaff' },
+  survey_done: { bg: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff' },
   completed: { bg: 'rgba(0,200,100,0.12)', color: '#00c864' },
   waived: { bg: 'rgba(128,128,128,0.1)', color: '#888' }
 }
@@ -415,7 +415,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
         {[
           { label: 'Active', value: activeCount, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' },
           { label: 'Overdue', value: overdueCount, color: 'var(--danger)', bg: 'rgba(255,77,77,0.08)' },
-          { label: 'Survey Carried Out', value: warranties.filter(w => w.status === 'survey_done').length, color: '#00aaff', bg: 'rgba(0,170,255,0.08)' },
+          { label: 'Survey Carried Out', value: warranties.filter(w => w.status === 'survey_done').length, color: '#00aaff', bg: 'rgba(var(--accent-primary-rgb), 0.08)' },
           { label: 'Unsent Endorsements', value: endorsementsDue.length, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' }
         ].map(s => (
           <div key={s.label} style={{
@@ -466,7 +466,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
 
         {/* Bulk action bar */}
         {selectMode && selectedIds.size > 0 && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.2)', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)', alignItems: 'center' }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{selectedIds.size} selected</span>
             <div style={{ flex: 1 }} />
             <button onClick={handleBulkMarkDone} className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.75rem' }}>Mark Done</button>
@@ -599,7 +599,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                               <button
                                 onClick={() => handleMarkSurveyDone(w)}
                                 className="btn-secondary"
-                                style={{ fontSize: '0.7rem', padding: '2px 7px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00aaff', borderColor: 'rgba(0,170,255,0.35)' }}
+                                style={{ fontSize: '0.7rem', padding: '2px 7px', display: 'flex', alignItems: 'center', gap: '3px', color: '#00aaff', borderColor: 'rgba(var(--accent-primary-rgb), 0.35)' }}
                                 title="Mark survey received"
                               >
                                 <Check size={11} /> Done
@@ -647,7 +647,7 @@ export default function SurveyFollowUp({ onNavigateToVessel }: SurveyFollowUpPro
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sent:</span>
                                       <span style={{ fontWeight: '700', whiteSpace: 'nowrap' }}>{formatDateOrDash(r.sentAt)}</span>
-                                      <span style={{ padding: '1px 6px', borderRadius: '5px', fontSize: '0.7rem', background: 'rgba(0,170,255,0.12)', color: '#00aaff', textTransform: 'uppercase' }}>{r.channel}</span>
+                                      <span style={{ padding: '1px 6px', borderRadius: '5px', fontSize: '0.7rem', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff', textTransform: 'uppercase' }}>{r.channel}</span>
                                       {r.reference && (
                                         <span style={{ padding: '1px 7px', borderRadius: '5px', fontSize: '0.7rem', background: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)', color: 'var(--text-primary)', fontFamily: 'monospace', fontWeight: '600' }}>
                                           Ref: {r.reference}

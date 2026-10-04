@@ -141,7 +141,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
             <div key={a.id} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--table-border)', marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {groups.length > 0 && (
                     <select value={a.groupId || ''} onChange={e => handleChangeGroup(a.id, e.target.value || null)}
-                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.72rem', background: 'rgba(0,210,255,0.08)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.2)', maxWidth: '100px' }}>
+                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.72rem', background: 'rgba(var(--accent-primary-rgb), 0.08)', color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)', maxWidth: '100px' }}>
                         <option value="">—</option>
                         {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
@@ -150,14 +150,14 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                     <select
                         value={a.vesselLabel || ''}
                         onChange={e => handleUpdateVesselLabel(a.id, e.target.value)}
-                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0,210,255,0.3)', minWidth: '52px' }}
+                        style={{ padding: '3px 6px', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)', minWidth: '52px' }}
                     >
                         <option value="">—</option>
                         {qVessels.map(v => <option key={v.id} value={v.vesselLabel}>{v.vesselLabel}</option>)}
                     </select>
                 )}
                 <span style={{ fontWeight: 600, flex: 1 }}>{a.name}</span>
-                {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
+                {a.role && <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{a.role}</span>}
                 <div style={{ display: 'flex', gap: '2px' }}>
                     <button title="Move up" aria-label="Move up" onClick={() => handleMove(i, 'up')} disabled={i === 0} className="btn-secondary" style={{ padding: '4px', opacity: i === 0 ? 0.3 : 1 }}><ChevronUp size={14} /></button>
                     <button title="Move down" aria-label="Move down" onClick={() => handleMove(i, 'down')} disabled={i === assureds.length - 1} className="btn-secondary" style={{ padding: '4px', opacity: i === assureds.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
@@ -177,7 +177,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 {(['broker', 'direct'] as const).map(ct => (
                     <button key={ct} type="button" onClick={() => { setCustomerType(ct); updateField('customerType', ct) }}
-                        style={{ padding: '5px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: customerType === ct ? 600 : 400, border: customerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: customerType === ct ? 'rgba(0,170,200,0.1)' : 'transparent', color: customerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
+                        style={{ padding: '5px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: customerType === ct ? 600 : 400, border: customerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: customerType === ct ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: customerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
                         {ct}
                     </button>
                 ))}
@@ -199,7 +199,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                                 key={e.id}
                                 onMouseDown={() => { setCoInputValue(e.name); setShowCoDropdown(false); updateField('coName', e.name); updateField('customerEntityId', e.id); if (!customerType) { setCustomerType('broker'); updateField('customerType', 'broker') } }}
                                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.08)')}
+                                onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)')}
                                 onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
                             >
                                 {e.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({e.type})</span>
@@ -274,7 +274,7 @@ export default function InsuredTab({ quotation, vessels: _vessels = [], showSucc
                                     key={e.id}
                                     onMouseDown={() => { setNewName(e.name); setNewEntityId(e.id); setShowEntityDropdown(false) }}
                                     style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                    onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.08)')}
+                                    onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)')}
                                     onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}
                                 >
                                     {e.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({e.type})</span>

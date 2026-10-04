@@ -96,7 +96,7 @@ function TreeNode({
           paddingLeft: depth * 16 + 8,
           cursor: 'pointer',
           borderRadius: 6,
-          background: isSelected ? 'rgba(0,210,255,0.1)' : 'transparent',
+          background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
           color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
           fontSize: '0.85rem',
           userSelect: 'none',
@@ -707,7 +707,7 @@ export default function FileManager() {
             paddingLeft: depth * 16 + 6,
             cursor: isSelf || isChild ? 'not-allowed' : 'pointer',
             borderRadius: 6,
-            background: isSelected ? 'rgba(0,210,255,0.12)' : 'transparent',
+            background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
             opacity: isSelf || isChild ? 0.4 : 1,
             fontSize: '0.83rem',
             color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
@@ -1068,7 +1068,7 @@ export default function FileManager() {
                       minHeight: 48,
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)')
+                      (e.currentTarget.style.background = isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')
                     }
                     onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : (isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.015)'))}
                     onDoubleClick={() => handleDoubleClickItem(item)}
@@ -1078,7 +1078,7 @@ export default function FileManager() {
                     <span style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
                       <span style={{
                         width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)')
+                        background: item.isDirectory ? 'rgba(255,176,32,0.12)' : (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)')
                       }}>
                         {item.isDirectory ? (
                           <Folder size={18} style={{ color: '#ffb020' }} />
@@ -1106,7 +1106,7 @@ export default function FileManager() {
                       {!item.isDirectory ? (
                         <button onClick={() => handleOpenFile(item.path)} title="Open file"
                           style={btnStyle('var(--accent-primary)')}
-                          onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.12)' : 'rgba(0,210,255,0.12)')}
+                          onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                           <ExternalLink size={15} />
                         </button>
@@ -1384,8 +1384,8 @@ export default function FileManager() {
                   marginTop: 12,
                   padding: '8px 12px',
                   borderRadius: 8,
-                  background: 'rgba(0,210,255,0.08)',
-                  border: '1px solid rgba(0,210,255,0.2)',
+                  background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                  border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                   fontSize: '0.83rem',
                   color: 'var(--text-primary)',
                 }}

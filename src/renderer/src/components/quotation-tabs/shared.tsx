@@ -74,7 +74,7 @@ export function AlternativeScopeChips({ alternatives, currentAltId, onChangeAltI
                 style={{
                     padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
                     border: !currentAltId ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                    background: !currentAltId ? 'rgba(0,170,200,0.12)' : 'transparent',
+                    background: !currentAltId ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
                     color: !currentAltId ? '#00aac8' : 'var(--text-secondary)',
                     cursor: 'pointer'
                 }}

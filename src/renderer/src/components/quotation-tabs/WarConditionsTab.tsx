@@ -121,7 +121,7 @@ export default function WarConditionsTab({ quotation, showError }: {
             </p>
 
             {warSettings && (
-                <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(0,170,200,0.06)', border: '1px solid rgba(0,170,200,0.15)', marginBottom: '14px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', marginBottom: '14px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     JWLA: <strong>{warSettings.jwlaCode}</strong> dated <strong>{warSettings.jwlaDate}</strong> &middot; T&C: <strong>{warSettings.tcText}</strong>
                 </div>
             )}
@@ -136,7 +136,7 @@ export default function WarConditionsTab({ quotation, showError }: {
                         const isSelected = selectedIds.has(cond.id)
                         const displayText = resolveText(overrides[cond.id] || cond.text)
                         return (
-                            <div key={cond.id} style={{ padding: '10px 14px', borderRadius: '8px', border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--table-border)'}`, background: isSelected ? 'rgba(0,170,200,0.04)' : 'transparent' }}>
+                            <div key={cond.id} style={{ padding: '10px 14px', borderRadius: '8px', border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--table-border)'}`, background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent' }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                                     <input
                                         type="checkbox"

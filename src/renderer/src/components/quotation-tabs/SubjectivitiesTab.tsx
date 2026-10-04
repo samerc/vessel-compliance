@@ -406,7 +406,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
 
             {/* Master picker dropdown */}
             {showMasterPicker && availableMasters.length > 0 && (
-                <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0, 210, 255, 0.05)' }}>
+                <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Select from master list:</span>
                         <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: '0.72rem' }} onClick={async () => {
@@ -427,7 +427,7 @@ export default function SubjectivitiesTab({ quotation, showSuccess, isLight }: {
                     </div>
                     {availableMasters.map(m => (
                         <div key={m.id} onClick={() => { handleAddFromMaster(m); setShowMasterPicker(false) }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', marginBottom: '4px', border: '1px solid var(--table-border)' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0, 210, 255, 0.08)')}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.08)')}
                             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                             {m.text}
                             {m.docTypeIds && m.docTypeIds.length > 0 && (

@@ -82,7 +82,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       case 'warning':
         return { background: 'rgba(255, 193, 7, 0.15)', border: '1px solid rgba(255, 193, 7, 0.3)', color: '#ffc107' }
       default:
-        return { background: 'rgba(0, 210, 255, 0.15)', border: '1px solid rgba(0, 210, 255, 0.3)', color: '#00d2ff' }
+        return { background: 'rgba(var(--accent-primary-rgb), 0.15)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)', color: '#00d2ff' }
     }
   }
 

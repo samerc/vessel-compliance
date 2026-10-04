@@ -273,7 +273,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
     marginBottom: '8px'
   }
 
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
+  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
 
   return (
     <div className="fade-in">
@@ -367,7 +367,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                       style={{
                         cursor: 'pointer',
                         borderBottom: '1px solid var(--table-border)',
-                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(0,210,255,0.06)') : 'transparent',
+                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent',
                         borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
                         transition: 'background 0.12s, border-color 0.12s'
                       }}
@@ -534,7 +534,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                         padding: '3px 10px',
                         borderRadius: '6px',
                         background: accentBg,
-                        border: `1px solid ${isLight ? 'rgba(26,115,232,0.15)' : 'rgba(0,210,255,0.15)'}`,
+                        border: `1px solid ${isLight ? 'rgba(26,115,232,0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`,
                         fontSize: '0.82rem',
                         color: 'var(--accent-primary)'
                       }}>{e.trim()}</span>
@@ -569,8 +569,8 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                         gap: '8px',
                         padding: '6px 10px',
                         borderRadius: '8px',
-                        background: port.isDefault ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,170,200,0.1)') : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)'),
-                        border: `1px solid ${port.isDefault ? 'rgba(0,170,200,0.25)' : 'var(--glass-border)'}`,
+                        background: port.isDefault ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.1)') : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)'),
+                        border: `1px solid ${port.isDefault ? 'rgba(var(--accent-primary-rgb), 0.25)' : 'var(--glass-border)'}`,
                         fontSize: '0.85rem'
                       }}>
                         {editingPortId === port.id ? (
@@ -598,7 +598,7 @@ export default function FlagStateDirectory(_props: FlagStateDirectoryProps) {
                                 fontSize: '0.62rem',
                                 padding: '1px 6px',
                                 borderRadius: '4px',
-                                background: 'rgba(0,170,200,0.2)',
+                                background: 'rgba(var(--accent-primary-rgb), 0.2)',
                                 color: 'var(--accent-primary)',
                                 fontWeight: 700,
                                 textTransform: 'uppercase',

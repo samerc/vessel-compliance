@@ -403,9 +403,9 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                         padding: '2px 10px',
                         borderRadius: '4px',
                         fontSize: '0.7rem',
-                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(0, 210, 255, 0.1)',
-                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(0, 210, 255, 0.3)',
-                        color: isLight ? '#0077a3' : '#00d2ff'
+                        background: isLight ? 'rgba(0, 150, 200, 0.15)' : 'rgba(var(--accent-primary-rgb), 0.1)',
+                        border: isLight ? '1px solid rgba(0, 150, 200, 0.4)' : '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+                        color: 'var(--accent-primary)'
                     }}
                 >
                     <Loader2 size={12} className="spinner" />
@@ -583,17 +583,17 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                         <div style={{ overflowY: 'auto', flex: 1 }}>
                                             <div
                                                 onClick={() => { setNewVessel({ ...newVessel, fleetId: '' }); setFleetComboOpen(null) }}
-                                                style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !newVessel.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: !newVessel.fleetId ? 600 : 400 }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
-                                                onMouseLeave={e => (e.currentTarget.style.background = !newVessel.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !newVessel.fleetId ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', fontWeight: !newVessel.fleetId ? 600 : 400 }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = !newVessel.fleetId ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent')}
                                             >Standalone</div>
                                             {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).filter(f => !fleetComboSearch || f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())).map(f => (
                                                 <div
                                                     key={f.id}
                                                     onClick={() => { setNewVessel({ ...newVessel, fleetId: f.id }); setFleetComboOpen(null) }}
-                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: newVessel.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: newVessel.fleetId === f.id ? 600 : 400 }}
-                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
-                                                    onMouseLeave={e => (e.currentTarget.style.background = newVessel.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: newVessel.fleetId === f.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', fontWeight: newVessel.fleetId === f.id ? 600 : 400 }}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')}
+                                                    onMouseLeave={e => (e.currentTarget.style.background = newVessel.fleetId === f.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent')}
                                                 >{f.name}</div>
                                             ))}
                                         </div>
@@ -716,7 +716,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
+                    background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)',
                     border: '1px solid var(--accent-primary)',
                     position: 'sticky',
                     top: 0,
@@ -915,7 +915,7 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                             {vessels.map(v => {
                                 const isBulkChecked = selectedVesselIds.has(v.id)
                                 return (
-                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)', background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.04)') : undefined }} className="hover-effect">
+                                    <tr key={v.id} style={{ borderBottom: '1px solid var(--table-border)', background: isBulkChecked ? (isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.04)') : undefined }} className="hover-effect">
                                         {selectMode && (
                                         <td style={{ padding: '16px 8px 16px 16px', width: '40px' }}>
                                             <div
@@ -1009,17 +1009,17 @@ export default function VesselManager({ initialVesselId, initialVesselSection, o
                                                             <div style={{ overflowY: 'auto', flex: 1 }}>
                                                                 <div
                                                                     onClick={() => { handleUpdateFleet(v.id, ''); setFleetComboOpen(null) }}
-                                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !v.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: !v.fleetId ? 600 : 400 }}
-                                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
-                                                                    onMouseLeave={e => (e.currentTarget.style.background = !v.fleetId ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                                    style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: !v.fleetId ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', fontWeight: !v.fleetId ? 600 : 400 }}
+                                                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')}
+                                                                    onMouseLeave={e => (e.currentTarget.style.background = !v.fleetId ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent')}
                                                                 >Standalone</div>
                                                                 {[...fleets].sort((a, b) => a.name.localeCompare(b.name)).filter(f => !fleetComboSearch || f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())).map(f => (
                                                                     <div
                                                                         key={f.id}
                                                                         onClick={() => { handleUpdateFleet(v.id, f.id); setFleetComboOpen(null) }}
-                                                                        style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: v.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent', fontWeight: v.fleetId === f.id ? 600 : 400 }}
-                                                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,210,255,0.06)')}
-                                                                        onMouseLeave={e => (e.currentTarget.style.background = v.fleetId === f.id ? 'rgba(0,210,255,0.08)' : 'transparent')}
+                                                                        style={{ padding: '6px 10px', fontSize: '0.85rem', cursor: 'pointer', background: v.fleetId === f.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', fontWeight: v.fleetId === f.id ? 600 : 400 }}
+                                                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.06)')}
+                                                                        onMouseLeave={e => (e.currentTarget.style.background = v.fleetId === f.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent')}
                                                                     >{f.name}</div>
                                                                 ))}
                                                             </div>

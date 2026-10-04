@@ -212,7 +212,7 @@ export default function PremiumCalculator() {
           <section className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Summary</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-              <div style={{ padding: '16px', background: 'rgba(0, 210, 255, 0.08)', borderRadius: '10px', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
+              <div style={{ padding: '16px', background: 'rgba(var(--accent-primary-rgb), 0.08)', borderRadius: '10px', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Policy Days</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)' }}>{calculation.days}</div>
               </div>

@@ -515,7 +515,7 @@ export default function EndorsementManager({
     fontWeight: 600 as const,
     cursor: 'pointer' as const,
     border: active ? '1.5px solid var(--accent-primary)' : '1.5px solid var(--glass-border-color)',
-    background: active ? 'rgba(0,170,200,0.1)' : 'transparent',
+    background: active ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
     color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
     transition: 'all 0.15s'
   })
@@ -545,7 +545,7 @@ export default function EndorsementManager({
     const s = signed ? 'signed' : status
     const colors: Record<string, { bg: string; color: string }> = {
       draft: { bg: 'rgba(150,150,150,0.15)', color: 'var(--text-secondary)' },
-      exported: { bg: 'rgba(0,170,200,0.15)', color: '#00aac8' },
+      exported: { bg: 'rgba(var(--accent-primary-rgb), 0.15)', color: 'var(--accent-primary)' },
       signed: { bg: 'rgba(76,175,80,0.15)', color: '#4caf50' }
     }
     const c = colors[s] || colors.draft
@@ -909,7 +909,7 @@ export default function EndorsementManager({
               {end.premiumAmount != null && Number(end.premiumAmount) !== 0 && (
                 <span style={{
                   fontSize: '0.75rem', padding: '2px 8px', borderRadius: '8px',
-                  background: Number(end.premiumAmount) > 0 ? 'rgba(0,170,200,0.1)' : 'rgba(255,77,77,0.1)',
+                  background: Number(end.premiumAmount) > 0 ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(255,77,77,0.1)',
                   color: Number(end.premiumAmount) > 0 ? '#00aac8' : 'var(--danger)'
                 }}>
                   {end.premiumCurrency || 'USD'} {Number(end.premiumAmount).toLocaleString()}

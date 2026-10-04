@@ -285,10 +285,10 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
             {/* Sub-tab bar */}
             <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '2px solid var(--table-border)', paddingBottom: '0' }}>
                 <button onClick={() => setSubTab('clauses')} style={{ padding: '8px 18px', fontSize: '0.88rem', fontWeight: 600, border: 'none', borderBottom: subTab === 'clauses' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: subTab === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px', transition: 'color 0.15s' }}>
-                    Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{selectedIds.size}</span>
+                    Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{selectedIds.size}</span>
                 </button>
                 <button onClick={() => setSubTab('additional')} style={{ padding: '8px 18px', fontSize: '0.88rem', fontWeight: 600, border: 'none', borderBottom: subTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: subTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px', transition: 'color 0.15s' }}>
-                    Additional Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{additionalClauses.length}</span>
+                    Additional Clauses <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', marginLeft: '6px' }}>{additionalClauses.length}</span>
                 </button>
             </div>
 
@@ -310,7 +310,7 @@ export default function ConditionsTab({ quotation, showSuccess, showError, piAlt
                         {allClauses.map(c => {
                             const checked = isClauseCheckedForAlt(c.id)
                             return (
-                            <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: checked ? 'rgba(0, 210, 255, 0.05)' : 'transparent' }}>
+                            <div key={c.id} style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--table-border)', background: checked ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'transparent' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                     <input type="checkbox" checked={checked} onChange={() => toggleClause(c.id)} style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)' }} />
                                     <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: '60px' }}>Cl. {c.clauseNumber}</span>

@@ -145,7 +145,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
 
   const modalBg = isLight ? '#ffffff' : '#1a1d28'
   const borderColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
-  const accentBg = isLight ? 'rgba(0,170,200,0.1)' : 'rgba(0,210,255,0.1)'
+  const accentBg = isLight ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
 
   let flatIdx = -1
 

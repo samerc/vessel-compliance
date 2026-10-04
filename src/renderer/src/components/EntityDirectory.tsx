@@ -762,9 +762,9 @@ export default function EntityDirectory({
             padding: '2px 8px',
             borderRadius: '4px',
             fontSize: '0.68rem',
-            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(0,210,255,0.1)',
-            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(0,210,255,0.3)',
-            color: isLight ? '#0077a3' : '#00d2ff'
+            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(var(--accent-primary-rgb), 0.1)',
+            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+            color: 'var(--accent-primary)'
           }}
         >
           <Loader2 size={11} className="spinner" /> CHECKING...
@@ -890,7 +890,7 @@ export default function EntityDirectory({
     )
   }
 
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
+  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
   const companyColor = 'var(--accent-primary)'
   const personColor = isLight ? '#9c27b0' : '#ba68c8'
 
@@ -1155,7 +1155,7 @@ export default function EntityDirectory({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(0,210,255,0.06)',
+            background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)',
             border: '1px solid var(--accent-primary)',
             position: 'sticky',
             top: 0,
@@ -1391,11 +1391,11 @@ export default function EntityDirectory({
                           background: isBulkChecked
                             ? isLight
                               ? 'rgba(0,150,200,0.06)'
-                              : 'rgba(0,210,255,0.04)'
+                              : 'rgba(var(--accent-primary-rgb), 0.04)'
                             : isSelected
                               ? isLight
                                 ? 'rgba(26,115,232,0.07)'
-                                : 'rgba(0,210,255,0.07)'
+                                : 'rgba(var(--accent-primary-rgb), 0.07)'
                               : 'transparent',
                           borderLeft: isSelected
                             ? '3px solid var(--accent-primary)'

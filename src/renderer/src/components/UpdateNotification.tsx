@@ -304,7 +304,7 @@ export function UpdateNotification(): React.ReactElement | null {
                                 <div style={{
                                     height: '6px',
                                     borderRadius: '3px',
-                                    background: 'rgba(0,210,255,0.1)',
+                                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
                                     overflow: 'hidden'
                                 }}>
                                     <div style={{

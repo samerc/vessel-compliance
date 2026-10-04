@@ -167,7 +167,7 @@ export default function SanctionsCheckReport() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '12px', flexWrap: 'wrap' }}>
           {selectedEntity ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '3px 10px', borderRadius: '12px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', padding: '3px 10px', borderRadius: '12px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>
               Linked entity: {selectedEntity.name}
               <X size={13} style={{ cursor: 'pointer' }} onClick={() => { setSelectedEntity(null); resetResults() }} />
             </span>

@@ -213,7 +213,7 @@ export default function SurveyorDirectory() {
   }
 
   // ── Style constants ──────────────────────────────────────────────────────────
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(0,210,255,0.1)'
+  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
   const closedColor = isLight ? '#008c46' : '#00c264'
   const closedBg = isLight ? 'rgba(0,140,70,0.1)' : 'rgba(0,194,100,0.1)'
   const openColor = isLight ? '#b45309' : '#f59e0b'
@@ -358,7 +358,7 @@ export default function SurveyorDirectory() {
                       style={{
                         cursor: 'pointer',
                         borderBottom: '1px solid var(--table-border)',
-                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(0,210,255,0.07)') : 'transparent',
+                        background: isSelected ? (isLight ? 'rgba(26,115,232,0.07)' : 'rgba(var(--accent-primary-rgb), 0.07)') : 'transparent',
                         borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
                         transition: 'background 0.12s, border-color 0.12s'
                       }}
@@ -590,7 +590,7 @@ export default function SurveyorDirectory() {
                             </span>
                           )}
                           {typeName && (
-                            <span style={{ fontSize: '0.73rem', padding: '1px 7px', borderRadius: '4px', background: accentBg, border: `1px solid ${isLight ? 'rgba(26,115,232,0.12)' : 'rgba(0,210,255,0.12)'}`, color: 'var(--accent-primary)', fontWeight: 500 }}>
+                            <span style={{ fontSize: '0.73rem', padding: '1px 7px', borderRadius: '4px', background: accentBg, border: `1px solid ${isLight ? 'rgba(26,115,232,0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)'}`, color: 'var(--accent-primary)', fontWeight: 500 }}>
                               {typeName}
                             </span>
                           )}

@@ -12,6 +12,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import ChangelogModal from './components/ChangelogModal'
 import WhatsNewModal from './components/WhatsNewModal'
 import GlobalSearch from './components/GlobalSearch'
+import { PageHeader, SegmentedControl } from './components/ui'
 import type { RecentItem } from '../../shared/types'
 
 // Heavy components — lazy loaded to reduce initial bundle size
@@ -482,7 +483,7 @@ function App(): React.JSX.Element {
                         onClick={() => setDensity(d)}
                         style={{
                           flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          background: density === d ? 'rgba(0,210,255,0.1)' : 'transparent',
+                          background: density === d ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                           border: density === d ? '1px solid var(--accent-primary)' : '1px solid transparent',
                           borderRadius: '6px', cursor: 'pointer',
                           color: density === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -521,7 +522,7 @@ function App(): React.JSX.Element {
                         onClick={() => { setThemeTo(t.id); setShowUserMenu(false) }}
                         style={{
                           flex: 1, padding: '5px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                          background: theme === t.id ? (accent ? `${accent}18` : 'rgba(0,210,255,0.1)') : 'transparent',
+                          background: theme === t.id ? (accent ? `${accent}18` : 'rgba(var(--accent-primary-rgb), 0.1)') : 'transparent',
                           border: theme === t.id ? (accent ? `1px solid ${accent}50` : '1px solid var(--accent-primary)') : '1px solid transparent',
                           borderRadius: '6px', cursor: 'pointer',
                           color: theme === t.id ? (accent || 'var(--accent-primary)') : 'var(--text-secondary)',
@@ -702,8 +703,8 @@ function App(): React.JSX.Element {
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
               padding: '8px 20px', fontSize: '0.82rem',
-              background: 'linear-gradient(90deg, rgba(0,170,200,0.12), rgba(0,170,200,0.06))',
-              borderBottom: '1px solid rgba(0,170,200,0.2)',
+              background: 'linear-gradient(90deg, rgba(var(--accent-primary-rgb), 0.12), rgba(var(--accent-primary-rgb), 0.06))',
+              borderBottom: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
               color: 'var(--text-primary)'
             }}>
               <span>A new update is ready.</span>
@@ -813,43 +814,22 @@ function App(): React.JSX.Element {
           {activeTab === 'analytics' && <Suspense fallback={<LoadingFallback />}><FleetAnalytics /></Suspense>}
           {activeTab === 'templates' && <Suspense fallback={<LoadingFallback />}><TemplatesPage /></Suspense>}
           {activeTab === 'policies-list' && <Suspense fallback={<LoadingFallback />}>
-            <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div>
-                  <h1 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-                    <FileCheck size={28} /> Policies
-                  </h1>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Insurance policy documents</p>
-                </div>
-                {hasPermission('admin:settings') && (
-                  <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', borderRadius: '10px', padding: '4px', border: '1px solid var(--glass-border-color)' }}>
-                    <button
-                      onClick={() => setPolicyView('list')}
-                      style={{
-                        padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem',
-                        fontWeight: policyView === 'list' ? '600' : '400',
-                        background: policyView === 'list' ? 'var(--accent-primary)' : 'transparent',
-                        color: policyView === 'list' ? '#fff' : 'var(--text-secondary)',
-                        display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s'
-                      }}
-                    >
-                      <List size={16} /> Policies
-                    </button>
-                    <button
-                      onClick={() => setPolicyView('settings')}
-                      style={{
-                        padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '0.85rem',
-                        fontWeight: policyView === 'settings' ? '600' : '400',
-                        background: policyView === 'settings' ? 'var(--accent-primary)' : 'transparent',
-                        color: policyView === 'settings' ? '#fff' : 'var(--text-secondary)',
-                        display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s'
-                      }}
-                    >
-                      <Settings size={16} /> Settings
-                    </button>
-                  </div>
+            <div className="page">
+              <PageHeader
+                icon={<FileCheck size={26} />}
+                title="Policies"
+                subtitle="Insurance policy documents"
+                actions={hasPermission('admin:settings') && (
+                  <SegmentedControl
+                    value={policyView}
+                    onChange={setPolicyView}
+                    items={[
+                      { key: 'list', label: 'Policies', icon: <List size={15} /> },
+                      { key: 'settings', label: 'Settings', icon: <Settings size={15} /> }
+                    ]}
+                  />
                 )}
-              </div>
+              />
               {policyView === 'list' && <PolicyList onSelectPolicy={(id) => { setSelectedPolicyId(id); setActiveTab('policy-detail') }} />}
               {policyView === 'settings' && <PolicySettings />}
             </div>

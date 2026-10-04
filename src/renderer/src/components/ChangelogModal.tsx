@@ -92,7 +92,7 @@ export default function ChangelogModal({ onClose }: ChangelogModalProps): React.
                             width: '40px',
                             height: '40px',
                             borderRadius: '10px',
-                            background: 'rgba(0, 170, 200, 0.12)',
+                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

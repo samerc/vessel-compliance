@@ -1546,11 +1546,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px', marginBottom: '8px' }}>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
                             <button type="button" onClick={() => setNewDocPolicyTypeIds([])}
-                                style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.length === 0 ? 'rgba(0,170,200,0.08)' : 'transparent', color: newDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
+                                style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.length === 0 ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: newDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
                                 All
                             </button>
                             {policyTypes.filter(pt => pt.code).map(pt => (
-                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', border: newDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: newDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', border: newDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newDocPolicyTypeIds.includes(pt.id) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: newDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                     <input type="checkbox" checked={newDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setNewDocPolicyTypeIds(prev => [...prev, pt.id]); else setNewDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
                                     {pt.name}
                                 </label>
@@ -1582,7 +1582,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                         style={{
                                             borderBottom: '1px solid var(--table-border)',
                                             opacity: dragDocIndex.current === index ? 0.5 : 1,
-                                            background: dragOverDocIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+                                            background: dragOverDocIndex === index ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                                             cursor: 'grab'
                                         }}
                                     >
@@ -1614,11 +1614,11 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Policy Types:</span>
                                                             <button type="button" onClick={() => setEditDocPolicyTypeIds([])}
-                                                                style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', border: editDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.length === 0 ? 'rgba(0,170,200,0.08)' : 'transparent', color: editDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: editDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
+                                                                style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', border: editDocPolicyTypeIds.length === 0 ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.length === 0 ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: editDocPolicyTypeIds.length === 0 ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: editDocPolicyTypeIds.length === 0 ? 600 : 400 }}>
                                                                 All
                                                             </button>
                                                             {policyTypes.filter(pt => pt.code).map(pt => (
-                                                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '4px', border: editDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.includes(pt.id) ? 'rgba(0,170,200,0.08)' : 'transparent', color: editDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                                                <label key={pt.id} style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px', borderRadius: '4px', border: editDocPolicyTypeIds.includes(pt.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editDocPolicyTypeIds.includes(pt.id) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: editDocPolicyTypeIds.includes(pt.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                                                     <input type="checkbox" checked={editDocPolicyTypeIds.includes(pt.id)} onChange={e => { if (e.target.checked) setEditDocPolicyTypeIds(prev => [...prev, pt.id]); else setEditDocPolicyTypeIds(prev => prev.filter(id => id !== pt.id)) }} style={{ width: '12px', height: '12px', accentColor: 'var(--accent-primary)' }} />
                                                                     {pt.name}
                                                                 </label>
@@ -1639,7 +1639,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                             ? <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,200,100,0.1)', color: '#00c864' }}>All Types</span>
                                                             : doc.policyTypeIds.map(ptId => {
                                                                 const pt = policyTypes.find(p => p.id === ptId)
-                                                                return pt ? <span key={ptId} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)' }}>{pt.name}</span> : null
+                                                                return pt ? <span key={ptId} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{pt.name}</span> : null
                                                             })
                                                         }
                                                     </div>
@@ -1705,7 +1705,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Scope:</span>
                             {(['company', 'person', 'both'] as const).map(s => (
-                                <button key={s} type="button" onClick={() => setNewEdtScope(s)} style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newEdtScope === s ? 'rgba(0,170,200,0.08)' : 'transparent', color: newEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newEdtScope === s ? 600 : 400, textTransform: 'capitalize' }}>
+                                <button key={s} type="button" onClick={() => setNewEdtScope(s)} style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', border: newEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newEdtScope === s ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: newEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: newEdtScope === s ? 600 : 400, textTransform: 'capitalize' }}>
                                     {s}
                                 </button>
                             ))}
@@ -1734,7 +1734,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         </thead>
                         <tbody>
                             {entityDocTypes.map((edt, index) => (
-                                <tr key={edt.id} draggable onDragStart={() => handleEdtDragStart(index)} onDragOver={(e) => handleEdtDragOver(e, index)} onDrop={(e) => handleEdtDrop(e, index)} onDragEnd={() => { dragEdtIndex.current = null; setDragOverEdtIndex(null) }} style={{ borderBottom: '1px solid var(--table-border)', opacity: dragEdtIndex.current === index ? 0.5 : 1, background: dragOverEdtIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent', cursor: 'grab' }}>
+                                <tr key={edt.id} draggable onDragStart={() => handleEdtDragStart(index)} onDragOver={(e) => handleEdtDragOver(e, index)} onDrop={(e) => handleEdtDrop(e, index)} onDragEnd={() => { dragEdtIndex.current = null; setDragOverEdtIndex(null) }} style={{ borderBottom: '1px solid var(--table-border)', opacity: dragEdtIndex.current === index ? 0.5 : 1, background: dragOverEdtIndex === index ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', cursor: 'grab' }}>
                                     <td style={{ padding: '20px 16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <GripVertical size={16} color="var(--text-secondary)" style={{ opacity: 0.5 }} />
@@ -1749,7 +1749,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Scope:</span>
                                                     {(['company', 'person', 'both'] as const).map(s => (
-                                                        <button key={s} type="button" onClick={() => setEditEdtScope(s)} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', cursor: 'pointer', border: editEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editEdtScope === s ? 'rgba(0,170,200,0.08)' : 'transparent', color: editEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                                                        <button key={s} type="button" onClick={() => setEditEdtScope(s)} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', cursor: 'pointer', border: editEdtScope === s ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: editEdtScope === s ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: editEdtScope === s ? 'var(--accent-primary)' : 'var(--text-secondary)', textTransform: 'capitalize' }}>
                                                             {s}
                                                         </button>
                                                     ))}
@@ -1771,13 +1771,13 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                         )}
                                     </td>
                                     <td style={{ padding: '20px 16px' }}>
-                                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.entityScope === 'company' ? 'rgba(100,100,255,0.1)' : edt.entityScope === 'person' ? 'rgba(255,100,200,0.1)' : 'rgba(0,170,200,0.1)', color: edt.entityScope === 'company' ? '#6464ff' : edt.entityScope === 'person' ? '#ff64c8' : 'var(--accent-primary)', textTransform: 'capitalize' }}>
+                                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.entityScope === 'company' ? 'rgba(100,100,255,0.1)' : edt.entityScope === 'person' ? 'rgba(255,100,200,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)', color: edt.entityScope === 'company' ? '#6464ff' : edt.entityScope === 'person' ? '#ff64c8' : 'var(--accent-primary)', textTransform: 'capitalize' }}>
                                             {edt.entityScope}
                                         </span>
                                     </td>
                                     <td style={{ padding: '20px 16px' }}>
                                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.isRequired ? 'rgba(0,170,200,0.1)' : 'rgba(100,100,100,0.1)', color: edt.isRequired ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, background: edt.isRequired ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(100,100,100,0.1)', color: edt.isRequired ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                                 {edt.isRequired ? 'REQUIRED' : 'OPTIONAL'}
                                             </span>
                                             <button onClick={() => handleEdtToggleActive(edt.id, edt.isActive)} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', border: 'none', background: edt.isActive ? 'rgba(0,200,100,0.1)' : 'rgba(255,77,77,0.1)', color: edt.isActive ? '#00c864' : 'var(--danger)' }}>
@@ -1842,7 +1842,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                         style={{
                                             borderBottom: '1px solid var(--table-border)',
                                             opacity: dragRoleIndex.current === index ? 0.5 : 1,
-                                            background: dragOverRoleIndex === index ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+                                            background: dragOverRoleIndex === index ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                                             cursor: 'grab'
                                         }}
                                     >
@@ -2041,7 +2041,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                 </label>
                             </div>
 
-                            <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(0, 210, 255, 0.05)', border: '1px solid rgba(0, 210, 255, 0.15)', borderRadius: '8px' }}>
+                            <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(var(--accent-primary-rgb), 0.05)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', borderRadius: '8px' }}>
                                 <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '10px', margin: '0 0 10px 0' }}>
                                     Manual pill check settings (applies to refresh buttons on sanctions badges):
                                 </p>
@@ -2057,7 +2057,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                             </div>
 
                             {complianceSettings.lastRunAt && (
-                                <div style={{ padding: '12px', background: 'rgba(0, 210, 255, 0.1)', border: '1px solid rgba(0, 210, 255, 0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
+                                <div style={{ padding: '12px', background: 'rgba(var(--accent-primary-rgb), 0.1)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
                                     <div style={{ marginBottom: '4px' }}>
                                         <strong>Last run:</strong> {formatDateTime(complianceSettings.lastRunAt)}
                                     </div>
@@ -2315,7 +2315,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                 style={{
                                     padding: '14px 16px', borderRadius: '10px',
                                     border: '1px solid var(--table-border)',
-                                    background: editingBankId === bank.id ? 'rgba(0,210,255,0.04)' : 'transparent'
+                                    background: editingBankId === bank.id ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent'
                                 }}
                             >
                                 {editingBankId === bank.id ? (
@@ -2539,7 +2539,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                     Automatically delete old activity log entries to keep the database lean. Cleanup runs on app startup and when saving.
                 </p>
 
-                <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileText size={16} color="var(--accent-primary)" />
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                         Current entries: <strong style={{ color: 'var(--text-primary)' }}>{logEntryCount.toLocaleString()}</strong>
@@ -2603,7 +2603,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                 </p>
 
                 {lastBackupDate && (
-                    <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Clock size={16} color="var(--accent-primary)" />
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                             Last backup: {formatDateTime(lastBackupDate)}
@@ -2756,7 +2756,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                         )}
 
                         {/* Last backup */}
-                        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.15)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                             Last backup: {dbHealth.lastBackup || 'No backup recorded'}
                         </div>
                     </>
@@ -3023,7 +3023,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                 </div>
                                             ) : (
                                                 <span onClick={() => toggleExpandPolicyType(pt.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {pt.code && <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(0,170,200,0.12)', color: 'var(--accent-primary)' }}>{pt.code}</span>}
+                                                    {pt.code && <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>{pt.code}</span>}
                                                     <span style={{ fontWeight: '600' }}>{pt.name}</span>
                                                 </span>
                                             )}
@@ -3062,7 +3062,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                                         {ptCharacteristics.map(c => (
                                                             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '4px', background: 'rgba(128,128,128,0.05)', border: '1px solid var(--table-border)' }}>
                                                                 <span style={{ flex: 1, fontSize: '0.85rem' }}>{c.name}</span>
-                                                                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{c.fieldType}</span>
+                                                                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{c.fieldType}</span>
                                                                 {c.isRequired && <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>req</span>}
                                                                 <button title="Remove" aria-label="Remove" onClick={() => handleDeleteCharacteristic(c.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0' }}><X size={14} /></button>
                                                             </div>
@@ -3328,7 +3328,7 @@ export default function AdminPanel({ isAdmin, onNavigateToVessel }: { isAdmin?: 
                                     style={{
                                         padding: '12px 14px', borderRadius: '8px', cursor: 'pointer',
                                         border: selectedNotifGroupId === g.id ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)',
-                                        background: selectedNotifGroupId === g.id ? 'rgba(0,210,255,0.06)' : 'transparent',
+                                        background: selectedNotifGroupId === g.id ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                                     }}
                                 >
                                     {editingNotifGroupId === g.id ? (

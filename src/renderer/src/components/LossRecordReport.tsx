@@ -469,7 +469,7 @@ export default function LossRecordReport() {
             textAlign: 'center',
             cursor: 'pointer',
             background: dragging
-              ? (isLight ? 'rgba(26,115,232,0.05)' : 'rgba(0,210,255,0.04)')
+              ? (isLight ? 'rgba(26,115,232,0.05)' : 'rgba(var(--accent-primary-rgb), 0.04)')
               : 'var(--bg-card)',
             transition: 'var(--transition)',
           }}

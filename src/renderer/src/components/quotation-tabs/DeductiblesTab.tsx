@@ -225,7 +225,7 @@ export default function DeductiblesTab({ quotation, showSuccess, updateField, se
                                 <MoneyInput value={d.secondaryAmount || undefined} onChange={val => setDeductibles(prev => prev.map(dd => dd.id === d.id ? { ...dd, secondaryAmount: val || 0 } : dd))} onBlur={val => handleUpdate(d.id, { secondaryAmount: val || 0 })} style={{ width: '120px', padding: '4px 6px', fontSize: '0.82rem', borderRadius: '4px', border: '1px solid var(--input-border)', background: 'var(--bg-input, var(--table-header-bg))', color: 'var(--text-primary)' }} />
                             </>
                         )}
-                        {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
+                        {!d.piDeductibleId && <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>custom</span>}
                         <div style={{ flex: 1 }} />
                         <button title="Edit" aria-label="Edit" onClick={() => { setEditingDescId(editingDescId === d.id ? null : d.id); setEditDescText(d.description) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}><Pencil size={12} /></button>
                         <button title="Delete" aria-label="Delete" onClick={async () => { await window.api.deleteQuotationDeductible(d.id); loadData() }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '2px' }}><Trash2 size={14} /></button>

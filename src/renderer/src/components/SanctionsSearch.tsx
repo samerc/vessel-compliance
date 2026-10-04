@@ -961,7 +961,7 @@ export default function SanctionsSearch() {
                                             style={{
                                                 padding: '4px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
                                                 border: `1px solid ${sicForm.remarks === t.text ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-                                                background: sicForm.remarks === t.text ? 'rgba(0,170,200,0.1)' : 'transparent',
+                                                background: sicForm.remarks === t.text ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                                                 color: sicForm.remarks === t.text ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                                 cursor: 'pointer', transition: 'all 0.15s'
                                             }}
@@ -1019,7 +1019,7 @@ export default function SanctionsSearch() {
                                 <div key={idx} style={{
                                     padding: '12px 14px', borderRadius: '10px',
                                     border: editingTemplateIdx === idx ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                                    background: editingTemplateIdx === idx ? (isLight ? 'rgba(0,170,200,0.04)' : 'rgba(0,170,200,0.06)') : 'transparent'
+                                    background: editingTemplateIdx === idx ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{t.label}</span>

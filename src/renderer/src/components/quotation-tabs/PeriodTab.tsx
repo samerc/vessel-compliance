@@ -51,7 +51,7 @@ export default function PeriodTab({ quotation, updateField, setQ }: { quotation:
                 Set the policy inception and expiry dates for this quotation.
             </p>
             {(suggestion || loading) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,210,255,0.07)', border: '1px solid rgba(0,210,255,0.2)', marginBottom: '16px', maxWidth: '640px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.07)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)', marginBottom: '16px', maxWidth: '640px' }}>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600, marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Auto-detected from P&I policies</div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{loading ? 'Loading…' : suggestion}</div>

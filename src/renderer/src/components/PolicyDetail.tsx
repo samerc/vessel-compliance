@@ -1443,9 +1443,9 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                 borderRadius: '8px',
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                background: 'rgba(0, 170, 200, 0.10)',
-                color: isLight ? '#006688' : '#00aac8',
-                border: '1px solid rgba(0, 170, 200, 0.25)'
+                background: 'rgba(var(--accent-primary-rgb), 0.10)',
+                color: 'var(--accent-primary)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.25)'
               }}
               title="Exports use frozen data captured at signing"
             >
@@ -1514,7 +1514,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
 
                       {/* Exports */}
-                      <button onClick={handleExportBundle} disabled={exportingBundle} style={{ ...actionItemStyle, fontWeight: 600, color: isLight ? '#007a91' : '#00d2ff' }} className="hover-effect">
+                      <button onClick={handleExportBundle} disabled={exportingBundle} style={{ ...actionItemStyle, fontWeight: 600, color: 'var(--accent-primary)' }} className="hover-effect">
                         <FileArchive size={15} /> {exportingBundle ? 'Zipping...' : 'Export All Documents (ZIP)'}
                       </button>
                       <button onClick={() => { setShowActionsMenu(false); handleExportPolicy() }} disabled={exportingPolicy} style={actionItemStyle} className="hover-effect">
@@ -1562,7 +1562,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
 
                       <div style={{ height: '1px', background: 'var(--glass-border)', margin: '4px 0' }} />
 
-                      <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: isLight ? '#007a91' : '#00aac8' }} className="hover-effect">
+                      <button onClick={() => { setShowActionsMenu(false); handleExportQuickBooks() }} disabled={exportingQB} style={{ ...actionItemStyle, color: 'var(--accent-primary)' }} className="hover-effect">
                         <FileSpreadsheet size={15} /> Export to QuickBooks
                       </button>
                     </>
@@ -2017,7 +2017,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.warranties ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Warranties</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageWarranties.length + coverageCustomWarranties.length}
                         </span>
                       </div>
@@ -2047,7 +2047,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.deductibles ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Deductibles</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageDeductibles.length}
                         </span>
                       </div>
@@ -2072,7 +2072,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.exclusions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Exclusions</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageExclusions.length}
                         </span>
                       </div>
@@ -2097,7 +2097,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.clauses ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Conditions / Clauses</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageClauses.length}
                         </span>
                       </div>
@@ -2122,7 +2122,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.subjectivities ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Subjectivities</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageSubjectivities.length}
                         </span>
                       </div>
@@ -2147,7 +2147,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.lolOptions ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>LOL Alternatives</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageLolOptions.length}
                         </span>
                       </div>
@@ -2175,7 +2175,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       >
                         <ChevronRight size={16} style={{ transform: coverageExpanded.customSections ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                         <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Custom Sections</span>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(0, 170, 200, 0.12)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>
                           {coverageCustomSections.length}
                         </span>
                       </div>
@@ -2587,7 +2587,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                         fontSize: '0.68rem',
                         fontWeight: 600,
                         textTransform: 'uppercase',
-                        background: 'rgba(0, 170, 200, 0.08)',
+                        background: 'rgba(var(--accent-primary-rgb), 0.08)',
                         color: 'var(--text-secondary)'
                       }}
                     >
@@ -2629,8 +2629,8 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   borderRadius: '10px',
                   fontSize: '0.72rem',
                   fontWeight: 600,
-                  background: 'rgba(0, 170, 200, 0.12)',
-                  color: isLight ? '#007a91' : '#00aac8'
+                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                  color: 'var(--accent-primary)'
                 }}
               >
                 {blueCards.length}
@@ -2742,14 +2742,14 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                               ? 'rgba(0,0,0,0.03)'
                               : 'rgba(255,255,255,0.02)'
                             : isLight
-                              ? 'rgba(0, 170, 200, 0.04)'
-                              : 'rgba(0, 170, 200, 0.06)',
+                              ? 'rgba(var(--accent-primary-rgb), 0.04)'
+                              : 'rgba(var(--accent-primary-rgb), 0.06)',
                           border: `1px solid ${
                             isSuperseded
                               ? 'var(--glass-border)'
                               : isLight
-                                ? 'rgba(0, 170, 200, 0.2)'
-                                : 'rgba(0, 170, 200, 0.15)'
+                                ? 'rgba(var(--accent-primary-rgb), 0.2)'
+                                : 'rgba(var(--accent-primary-rgb), 0.15)'
                           }`,
                           opacity: isSuperseded ? 0.65 : 1
                         }}
@@ -3009,10 +3009,10 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                   style={{
                     padding: '8px 12px',
                     borderRadius: '6px',
-                    background: 'rgba(0, 170, 200, 0.08)',
+                    background: 'rgba(var(--accent-primary-rgb), 0.08)',
                     fontSize: '0.85rem',
                     fontWeight: 600,
-                    color: isLight ? '#007a91' : '#00aac8'
+                    color: 'var(--accent-primary)'
                   }}
                 >
                   {bcForm.cardType} — {CARD_TYPE_LABELS[bcForm.cardType]}
@@ -3671,7 +3671,7 @@ export default function PolicyDetail({ policyId, onBack, onNavigateToVessel, onN
                       style={{
                         flex: 1, padding: '8px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600,
                         border: cancelMode === m ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                        background: cancelMode === m ? 'rgba(0,170,200,0.08)' : 'transparent',
+                        background: cancelMode === m ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                         color: cancelMode === m ? 'var(--accent-primary)' : 'var(--text-secondary)',
                         cursor: 'pointer'
                       }}>
@@ -3882,7 +3882,7 @@ function RevisionHistorySection({ policyNumber, currentPolicyId, onViewRevision 
           return (
             <tr key={rev.id} style={{
               borderBottom: '1px solid var(--table-border)',
-              background: isCurrent ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,170,200,0.08)') : 'transparent'
+              background: isCurrent ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent'
             }}>
               <td style={{ padding: '8px 12px', fontWeight: isCurrent ? 700 : 400 }}>
                 R{rev.revisionNumber}

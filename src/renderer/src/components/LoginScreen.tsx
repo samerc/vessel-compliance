@@ -53,7 +53,7 @@ export const LoginScreen: React.FC = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginBottom: '1rem',
-                        boxShadow: '0 4px 15px rgba(0, 210, 255, 0.3)'
+                        boxShadow: '0 4px 15px rgba(var(--accent-primary-rgb), 0.3)'
                     }}>
                         <Shield style={{ width: '32px', height: '32px', color: 'white' }} />
                     </div>

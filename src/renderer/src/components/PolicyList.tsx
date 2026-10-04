@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, FileCheck, RotateCw, Trash2 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
+import { Badge, EmptyState, Spinner } from './ui'
+import type { BadgeTone } from './ui'
 
 interface PolicyListItem {
     id: string
@@ -42,29 +43,27 @@ type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZE = 25
 
-const statusColors: Record<string, { bg: string; text: string }> = {
-    active: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
-    expired: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
-    cancelled: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
-    inactive: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
-    superseded: { bg: 'rgba(150, 150, 150, 0.15)', text: '#888' }
+const STATUS_TONES: Record<string, BadgeTone> = {
+    active: 'success',
+    expired: 'neutral',
+    cancelled: 'danger',
+    inactive: 'neutral',
+    superseded: 'neutral'
 }
 
-const typeColors: Record<string, { bg: string; text: string }> = {
-    'p&i': { bg: 'rgba(100, 100, 255, 0.12)', text: '#6464ff' },
-    'hull': { bg: 'rgba(255, 100, 200, 0.12)', text: '#ff64c8' },
-    'war': { bg: 'rgba(255, 176, 32, 0.12)', text: '#ffb020' },
-    'h&m': { bg: 'rgba(255, 100, 200, 0.12)', text: '#ff64c8' },
-    'fdd': { bg: 'rgba(0, 170, 200, 0.12)', text: '#00aac8' },
-    'loss': { bg: 'rgba(100, 100, 255, 0.12)', text: '#6464ff' }
-}
+// Policy type identity colors (theme tokens so they stay readable in light themes)
+const TYPE_COLORS: [string, string][] = [
+    ['p&i', 'var(--violet)'],
+    ['hull', '#d6409f'],
+    ['h&m', '#d6409f'],
+    ['war', 'var(--warning)'],
+    ['fdd', 'var(--accent-primary)'],
+    ['loss', 'var(--info)']
+]
 
-function getTypeBadgeColors(typeName: string): { bg: string; text: string } {
+function getTypeColor(typeName: string): string {
     const lower = (typeName || '').toLowerCase()
-    for (const [key, colors] of Object.entries(typeColors)) {
-        if (lower.includes(key)) return colors
-    }
-    return { bg: 'rgba(0, 170, 200, 0.12)', text: '#00aac8' }
+    return TYPE_COLORS.find(([key]) => lower.includes(key))?.[1] || 'var(--accent-primary)'
 }
 
 const POLICY_COLUMNS: ColumnDef[] = [
@@ -94,8 +93,6 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
     const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; policy: any }>({ show: false, policy: null })
     const { showError, showSuccess } = useToast()
     const { hasPermission } = useAuth()
-    const { theme } = useTheme()
-    const isLight = theme === 'light' || theme === 'aurora'
     const { visibleColumns, setVisibleColumns } = useColumnPrefs('policies', POLICY_COLUMNS)
     const visibleSet = new Set(visibleColumns)
 
@@ -241,10 +238,10 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
             {/* Stats strip */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
                 {[
-                    { label: 'Total Policies', value: stats.total, color: '#00aac8' },
-                    { label: 'Active', value: stats.byStatus['active'] || 0, color: '#00c864' },
-                    { label: 'Inactive', value: (stats.byStatus['inactive'] || 0) + (stats.byStatus['expired'] || 0) + (stats.byStatus['cancelled'] || 0), color: '#999' },
-                    { label: 'This Month', value: stats.thisMonth, color: '#6464ff' },
+                    { label: 'Total Policies', value: stats.total, color: 'var(--accent-primary)' },
+                    { label: 'Active', value: stats.byStatus['active'] || 0, color: 'var(--success)' },
+                    { label: 'Inactive', value: (stats.byStatus['inactive'] || 0) + (stats.byStatus['expired'] || 0) + (stats.byStatus['cancelled'] || 0), color: 'var(--text-secondary)' },
+                    { label: 'This Month', value: stats.thisMonth, color: 'var(--violet)' },
                 ].map(s => (
                     <div key={s.label} className="glass-card" style={{
                         padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '10px',
@@ -279,25 +276,11 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                     <option value="expired">Expired</option>
                     <option value="cancelled">Cancelled</option>
                 </select>
-                <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--input-border)' }}>
-                    <button
-                        onClick={() => setRegistryOnly(false)}
-                        style={{
-                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
-                            background: !registryOnly ? 'var(--accent-primary)' : 'transparent',
-                            color: !registryOnly ? '#fff' : 'var(--text-secondary)'
-                        }}
-                    >All</button>
-                    <button
-                        onClick={() => setRegistryOnly(true)}
-                        style={{
-                            padding: '8px 14px', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
-                            background: registryOnly ? 'var(--accent-primary)' : 'transparent',
-                            color: registryOnly ? '#fff' : 'var(--text-secondary)'
-                        }}
-                    >Registry Only</button>
+                <div className="segmented">
+                    <button className={!registryOnly ? 'active' : ''} onClick={() => setRegistryOnly(false)}>All</button>
+                    <button className={registryOnly ? 'active' : ''} onClick={() => setRegistryOnly(true)}>Registry Only</button>
                 </div>
-                <button onClick={loadData} className="btn-secondary" style={{ padding: '8px', flexShrink: 0 }} title="Refresh">
+                <button onClick={loadData} className="btn-secondary btn-icon" style={{ padding: '8px', flexShrink: 0 }} title="Refresh" aria-label="Refresh">
                     <RotateCw size={16} />
                 </button>
             </div>
@@ -368,16 +351,22 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                     <tbody>
                         {paginated.length === 0 ? (
                             <tr>
-                                <td colSpan={10} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                    <FileCheck size={36} style={{ opacity: 0.3, marginBottom: '10px' }} />
-                                    <div style={{ fontSize: '0.9rem' }}>
-                                        {loading ? 'Loading policies...' : policies.length === 0 ? 'No policies found' : 'No policies match your filters'}
-                                    </div>
+                                <td colSpan={10}>
+                                    {loading ? (
+                                        <div style={{ padding: '48px', textAlign: 'center' }}><Spinner size={20} label="Loading policies..." /></div>
+                                    ) : (
+                                        <EmptyState
+                                            icon={<FileCheck size={40} />}
+                                            title={policies.length === 0 ? 'No policies yet' : 'No policies match your filters'}
+                                            text={policies.length === 0 ? 'Policies are created by converting an approved quotation.' : undefined}
+                                            action={policies.length > 0 ? (
+                                                <button className="btn-secondary btn-sm" onClick={() => { setSearch(''); setTypeFilter('all'); setStatusFilter('all'); setRegistryOnly(false) }}>Clear filters</button>
+                                            ) : undefined}
+                                        />
+                                    )}
                                 </td>
                             </tr>
                         ) : paginated.map(p => {
-                            const sc = statusColors[p.status] || statusColors.inactive
-                            const tc = getTypeBadgeColors(p.policyTypeName)
                             return (
                                 <tr
                                     key={p.id}
@@ -386,21 +375,13 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     onClick={() => onSelectPolicy(p.id)}
                                 >
                                     {visibleSet.has('policyNo') && (
-                                    <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: (p.policyNumber || '').startsWith('POL-DRAFT-') ? (isLight ? '#888' : '#777') : (isLight ? '#007a91' : '#00aac8') }}>
+                                    <td style={{ padding: '12px 14px', fontWeight: 600, fontSize: '0.88rem', color: (p.policyNumber || '').startsWith('POL-DRAFT-') ? 'var(--text-secondary)' : 'var(--accent-primary)' }}>
                                         {p.policyNumber ? `${p.policyNumber}${(p as any).revisionNumber > 0 ? `-R${(p as any).revisionNumber}` : ''}` : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>--</span>}
                                     </td>
                                     )}
                                     {visibleSet.has('type') && (
                                     <td style={{ padding: '12px 14px' }}>
-                                        <span style={{
-                                            display: 'inline-block',
-                                            padding: '3px 10px', borderRadius: '6px',
-                                            fontSize: '0.72rem', fontWeight: 700,
-                                            background: tc.bg,
-                                            color: isLight ? tc.text.replace('ff', 'cc') : tc.text
-                                        }}>
-                                            {p.policyTypeName || '-'}
-                                        </span>
+                                        <Badge color={getTypeColor(p.policyTypeName)} style={{ borderRadius: '6px' }}>{p.policyTypeName || '-'}</Badge>
                                     </td>
                                     )}
                                     {visibleSet.has('vessel') && (
@@ -420,14 +401,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     )}
                                     {visibleSet.has('status') && (
                                     <td style={{ padding: '12px 14px' }}>
-                                        <span style={{
-                                            padding: '3px 9px', borderRadius: '10px',
-                                            fontSize: '0.7rem', fontWeight: 600,
-                                            textTransform: 'uppercase',
-                                            background: sc.bg, color: sc.text
-                                        }}>
-                                            {p.status}
-                                        </span>
+                                        <Badge tone={STATUS_TONES[p.status] || 'neutral'} dot style={{ textTransform: 'capitalize' }}>{p.status}</Badge>
                                     </td>
                                     )}
                                     {visibleSet.has('premium') && (
@@ -441,7 +415,7 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                     </td>
                                     )}
                                     {visibleSet.has('exported') && (
-                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: p.exportedAt ? (isLight ? '#047857' : '#34d399') : 'var(--text-secondary)' }}>
+                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap', color: p.exportedAt ? 'var(--success)' : 'var(--text-secondary)' }}>
                                         {p.exportedAt ? formatDateShort(p.exportedAt) : <span style={{ fontStyle: 'italic' }}>Not exported</span>}
                                     </td>
                                     )}
@@ -452,7 +426,8 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                                                     e.stopPropagation()
                                                     setDeleteConfirm({ show: true, policy: p })
                                                 }}
-                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
+                                                className="btn-ghost btn-icon btn-sm"
+                                                style={{ color: 'var(--danger)' }}
                                                 title="Delete policy"
                                             >
                                                 <Trash2 size={15} />
@@ -480,14 +455,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                         <button
                             onClick={() => setPage(0)}
                             disabled={page === 0}
-                            className="btn-secondary"
-                            style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                            className="btn-secondary btn-sm"
                         >First</button>
                         <button title="Previous" aria-label="Previous"
                             onClick={() => setPage(p => Math.max(0, p - 1))}
                             disabled={page === 0}
-                            className="btn-secondary"
-                            style={{ padding: '5px' }}
+                            className="btn-secondary btn-icon btn-sm"
                         ><ChevronLeft size={16} /></button>
                         <span style={{ padding: '0 8px', fontWeight: 600 }}>
                             {page + 1} / {totalPages}
@@ -495,14 +468,12 @@ export default function PolicyList({ onSelectPolicy }: PolicyListProps) {
                         <button title="Next" aria-label="Next"
                             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                             disabled={page >= totalPages - 1}
-                            className="btn-secondary"
-                            style={{ padding: '5px' }}
+                            className="btn-secondary btn-icon btn-sm"
                         ><ChevronRight size={16} /></button>
                         <button
                             onClick={() => setPage(totalPages - 1)}
                             disabled={page >= totalPages - 1}
-                            className="btn-secondary"
-                            style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                            className="btn-secondary btn-sm"
                         >Last</button>
                     </div>
                 </div>

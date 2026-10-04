@@ -689,8 +689,8 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
             {policyContext && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px', marginBottom: '12px',
-                    borderRadius: '10px', background: 'rgba(0, 170, 200, 0.1)', border: '1px solid rgba(0, 170, 200, 0.3)',
-                    color: isLight ? '#007a91' : '#00aac8', fontSize: '0.85rem', fontWeight: 600
+                    borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+                    color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 600
                 }}>
                     <FileText size={16} /> Editing coverage for Policy {policyContext.policyNumber || policyContext.policyId}
                     <button
@@ -783,7 +783,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
 
             {/* Type title */}
             {q.quotationTypeName && (
-                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: isLight ? '#007a91' : '#00aac8', margin: '0 0 14px', letterSpacing: '0.02em' }}>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--accent-primary)', margin: '0 0 14px', letterSpacing: '0.02em' }}>
                     {q.quotationTypeName} Quotation
                 </h2>
             )}
@@ -809,7 +809,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                     )}
                     {/* Type badge */}
                     {q.quotationTypeName && (
-                        <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(0,170,200,0.15)', color: isLight ? '#007a91' : '#00aac8' }}>
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, background: 'rgba(var(--accent-primary-rgb), 0.15)', color: 'var(--accent-primary)' }}>
                             {q.quotationTypeName}
                         </span>
                     )}
@@ -935,7 +935,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
                                                     padding: '10px 14px', border: 'none', borderRadius: '6px',
-                                                    background: rev.id === q.id ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,170,200,0.12)') : 'transparent',
+                                                    background: rev.id === q.id ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.12)') : 'transparent',
                                                     color: 'var(--text-primary)', cursor: rev.id === q.id ? 'default' : 'pointer',
                                                     fontSize: '0.85rem', textAlign: 'left'
                                                 }}
@@ -1149,7 +1149,7 @@ export default function QuotationEditor({ quotation, onBack, onOpenQuotation, on
                                             ? '2px solid var(--accent-primary)'
                                             : `1px solid ${isLight ? '#e0e0e0' : 'rgba(255,255,255,0.1)'}`,
                                         background: deleteModal.deleteMode === 'single'
-                                            ? (isLight ? 'rgba(0,170,200,0.05)' : 'rgba(0,170,200,0.08)')
+                                            ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'rgba(var(--accent-primary-rgb), 0.08)')
                                             : 'transparent'
                                     }}
                                     onClick={() => setDeleteModal(prev => prev ? { ...prev, deleteMode: 'single' } : prev)}
@@ -1514,7 +1514,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
                                         onClick={() => { setSourceId(fq.id); setShowDropdown(false); setSearchText('') }}
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', cursor: 'pointer',
-                                            background: fq.id === sourceId ? 'rgba(0,210,255,0.06)' : 'transparent',
+                                            background: fq.id === sourceId ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                                             fontSize: '0.83rem'
                                         }}
                                         className="hover-effect"
@@ -1537,7 +1537,7 @@ function CopyFromQuotationModal({ quotation, onClose, onCopied, showError, isLig
                             <label key={opt.key} style={{
                                 display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px',
                                 border: `1px solid ${selectedSections.has(opt.key) ? 'var(--accent)' : 'var(--input-border)'}`,
-                                background: selectedSections.has(opt.key) ? 'rgba(0,170,200,0.06)' : 'transparent',
+                                background: selectedSections.has(opt.key) ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                                 cursor: 'pointer', fontSize: '0.82rem', transition: 'all 0.15s'
                             }}>
                                 <input

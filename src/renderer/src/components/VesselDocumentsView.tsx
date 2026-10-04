@@ -292,7 +292,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
           borderRadius: '10px',
           border: isDragOver ? '2px dashed var(--accent-primary)' : cardBorder,
           borderLeft: isDragOver ? '4px solid var(--accent-primary)' : `4px solid ${meta.border}`,
-          background: isDragOver ? (isLight ? 'rgba(26,115,232,0.05)' : 'rgba(0,210,255,0.05)') : meta.bg,
+          background: isDragOver ? (isLight ? 'rgba(26,115,232,0.05)' : 'rgba(var(--accent-primary-rgb), 0.05)') : meta.bg,
           padding: '14px 16px',
           display: 'flex',
           flexDirection: 'column',
@@ -355,7 +355,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                 </div>
               )}
               {doc?.sent && (
-                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.12)', color: isLight ? '#0077a3' : 'var(--accent-primary)', fontWeight: '600' }}>
+                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(0,119,163,0.1)' : 'rgba(var(--accent-primary-rgb), 0.12)', color: isLight ? '#0077a3' : 'var(--accent-primary)', fontWeight: '600' }}>
                   Sent
                 </span>
               )}
@@ -381,8 +381,8 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
             {effectivePolicyExpiry && (
               <span style={{
                 fontSize: '0.7rem', fontWeight: 600, padding: '1px 7px', borderRadius: '4px',
-                background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)',
-                border: '1px solid rgba(0, 210, 255, 0.2)',
+                background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                 display: 'inline-flex', alignItems: 'center', gap: '4px', alignSelf: 'flex-start',
               }}>
                 P&I · {formatDate(effectivePolicyExpiry)}
@@ -481,11 +481,11 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
                   cursor: uploadingId === id ? 'not-allowed' : 'pointer',
                   opacity: uploadingId === id ? 0.65 : 1,
                   background: required
-                    ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)')
+                    ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)')
                     : 'transparent',
                   border: required
-                    ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(0,210,255,0.4)'}`
-                    : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(0,210,255,0.3)'}`,
+                    ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(var(--accent-primary-rgb), 0.4)'}`
+                    : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
                   color: isLight ? '#0077a3' : 'var(--accent-primary)',
                 }}
               >
@@ -568,7 +568,7 @@ export default function VesselDocumentsView({ vessel, dynamicPolicies, onReload 
       {piPolicies.length > 1 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
-          background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)',
+          background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)',
           borderRadius: '8px', fontSize: '0.85rem'
         }}>
           <Info size={16} color="var(--accent-primary)" />

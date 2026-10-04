@@ -21,7 +21,7 @@ const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
   DELETE_GROUP: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
   UPLOAD: { bg: 'rgba(14,165,233,0.15)', color: '#0ea5e9' },
   LOGIN: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6' },
-  EXPORT: { bg: 'rgba(0,170,200,0.15)', color: '#00aac8' },
+  EXPORT: { bg: 'rgba(var(--accent-primary-rgb), 0.15)', color: 'var(--accent-primary)' },
   RESTORE: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
   DUPLICATE: { bg: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
   CLOSE_DEFECT: { bg: 'rgba(234,179,8,0.15)', color: '#eab308' },

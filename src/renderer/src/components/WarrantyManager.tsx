@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<WarrantyStatus, string> = {
 
 const STATUS_COLORS: Record<WarrantyStatus, { bg: string; color: string }> = {
   pending: { bg: 'rgba(255,165,0,0.12)', color: '#e6a800' },
-  survey_done: { bg: 'rgba(0,170,255,0.12)', color: '#00aaff' },
+  survey_done: { bg: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff' },
   completed: { bg: 'rgba(0,200,100,0.12)', color: '#00c864' },
   waived: { bg: 'rgba(128,128,128,0.1)', color: '#888' }
 }
@@ -523,7 +523,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
           style={{
             display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
             cursor: 'pointer', userSelect: 'none',
-            background: isExpanded ? 'rgba(0,210,255,0.03)' : 'transparent'
+            background: isExpanded ? 'rgba(var(--accent-primary-rgb), 0.03)' : 'transparent'
           }}
         >
           <ChevronDown size={16} style={{ transform: isExpanded ? 'none' : 'rotate(-90deg)', transition: 'transform 0.2s', color: 'var(--text-secondary)', flexShrink: 0 }} />
@@ -532,7 +532,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
             <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', padding: '2px 8px', borderRadius: '6px', background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>{w.reference}</span>
           )}
           {w.policyTypeName && (
-            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{w.policyTypeName}</span>
+            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{w.policyTypeName}</span>
           )}
           {/* Status badge */}
           <span style={{
@@ -571,7 +571,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <span style={{
                   display: 'flex', alignItems: 'center', gap: '3px',
                   fontSize: '0.72rem', fontWeight: 700, padding: '1px 8px',
-                  borderRadius: '8px', background: 'rgba(0,170,200,0.12)', color: '#00aac8'
+                  borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)'
                 }}>
                   <Link2 size={11} /> Survey{lsc && total > 0 ? ` — ${lsc.closed}/${total} closed` : ''}
                 </span>
@@ -646,7 +646,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>Sent:</span>
                         <span style={{ fontWeight: '700' }}>{formatDateOrDash(r.sentAt)}</span>
-                        <span style={{ padding: '1px 6px', borderRadius: '6px', fontSize: '0.7rem', background: 'rgba(0,170,255,0.12)', color: '#00aaff', textTransform: 'uppercase' }}>
+                        <span style={{ padding: '1px 6px', borderRadius: '6px', fontSize: '0.7rem', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff', textTransform: 'uppercase' }}>
                           {r.channel}
                         </span>
                         {r.reference && (
@@ -682,7 +682,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => openConvertModal(w)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aac8', borderColor: 'rgba(0,170,200,0.35)' }}
+                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', borderColor: 'rgba(var(--accent-primary-rgb), 0.35)' }}
                 >
                   <ClipboardCheck size={13} /> Convert to Survey
                 </button>
@@ -700,7 +700,7 @@ export default function WarrantyManager({ vesselId, dynamicPolicies, isLight }: 
                 <button
                   onClick={() => handleMarkSurveyDone(w)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aaff', borderColor: 'rgba(0,170,255,0.35)' }}
+                  style={{ fontSize: '0.78rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#00aaff', borderColor: 'rgba(var(--accent-primary-rgb), 0.35)' }}
                 >
                   <Check size={13} /> Survey Carried Out
                 </button>

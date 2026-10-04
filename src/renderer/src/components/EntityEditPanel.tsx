@@ -81,7 +81,7 @@ export default function EntityEditPanel({
   const isLight = theme === 'light' || theme === 'aurora'
   const { hasPermission } = useAuth()
   const canUploadDocs = hasPermission('documents:upload')
-  const accentBg = isLight ? 'rgba(0,150,200,0.1)' : 'rgba(0,210,255,0.08)'
+  const accentBg = isLight ? 'rgba(0,150,200,0.1)' : 'rgba(var(--accent-primary-rgb), 0.08)'
 
   // ── Data ─────────────────────────────────────────────────────────────────────
   const [entities, setEntities] = useState<Entity[]>([])
@@ -575,9 +575,9 @@ export default function EntityEditPanel({
             padding: '2px 8px',
             borderRadius: '4px',
             fontSize: '0.68rem',
-            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(0,210,255,0.1)',
-            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(0,210,255,0.3)',
-            color: isLight ? '#0077a3' : '#00d2ff'
+            background: isLight ? 'rgba(0,150,200,0.15)' : 'rgba(var(--accent-primary-rgb), 0.1)',
+            border: isLight ? '1px solid rgba(0,150,200,0.4)' : '1px solid rgba(var(--accent-primary-rgb), 0.3)',
+            color: 'var(--accent-primary)'
           }}
         >
           <Loader2 size={11} className="spinner" /> CHECKING...
@@ -1494,7 +1494,7 @@ export default function EntityEditPanel({
                             fontSize: '0.6rem',
                             padding: '1px 4px',
                             borderRadius: '3px',
-                            background: 'rgba(0,170,200,0.1)',
+                            background: 'rgba(var(--accent-primary-rgb), 0.1)',
                             color: 'var(--accent-primary)'
                           }}
                         >

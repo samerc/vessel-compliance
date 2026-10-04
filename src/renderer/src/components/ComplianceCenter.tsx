@@ -930,7 +930,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                 onClick={() => setShowRuleSettings(!showRuleSettings)}
                                 title="Validation Rules Settings"
                                 style={{
-                                    background: showRuleSettings ? 'rgba(0,210,255,0.1)' : 'transparent',
+                                    background: showRuleSettings ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                                     border: showRuleSettings ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
                                     borderRadius: '6px', cursor: 'pointer', padding: '7px 10px',
                                     display: 'flex', alignItems: 'center', gap: '6px',
@@ -1021,7 +1021,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: '4px',
                                             padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
-                                            background: 'rgba(0,210,255,0.1)', border: '1px solid rgba(0,210,255,0.3)',
+                                            background: 'rgba(var(--accent-primary-rgb), 0.1)', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
                                             color: 'var(--accent-primary)', cursor: 'pointer'
                                         }}
                                     >
@@ -1264,7 +1264,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                     <td style={{ padding: '14px 16px' }}>
                                                         <span style={{
                                                             padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '600',
-                                                            background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', textTransform: 'uppercase'
+                                                            background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', textTransform: 'uppercase'
                                                         }}>
                                                             {rule.category}
                                                         </span>
@@ -1462,7 +1462,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                         padding: '2px 8px',
                                                         borderRadius: '4px',
                                                         fontSize: '0.75rem',
-                                                        background: result.entityType === 'vessel' ? 'rgba(0, 210, 255, 0.1)' : 'rgba(180, 140, 255, 0.1)',
+                                                        background: result.entityType === 'vessel' ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(180, 140, 255, 0.1)',
                                                         color: result.entityType === 'vessel' ? '#00d2ff' : '#b48cff',
                                                         textTransform: 'capitalize'
                                                     }}>
@@ -1589,7 +1589,7 @@ export default function ComplianceCenter({ onNavigateToVessel, initialTab, onTab
                                                 fontSize: '0.7rem',
                                                 fontWeight: '600',
                                                 background: log.status === 'completed' ? 'rgba(0, 255, 136, 0.1)' :
-                                                    log.status === 'failed' ? 'rgba(255, 77, 77, 0.1)' : 'rgba(0, 210, 255, 0.1)',
+                                                    log.status === 'failed' ? 'rgba(255, 77, 77, 0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)',
                                                 color: log.status === 'completed' ? 'var(--success)' :
                                                     log.status === 'failed' ? 'var(--danger)' : '#00d2ff',
                                                 textTransform: 'uppercase'

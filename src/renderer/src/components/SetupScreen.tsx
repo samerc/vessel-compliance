@@ -100,7 +100,7 @@ export const SetupScreen: React.FC = () => {
                     <div style={pathBox}>{currentConfigPath || 'Not set'}</div>
                 </div>
 
-                <div style={{ marginBottom: '28px', padding: '16px', borderRadius: '10px', border: '1px solid rgba(0, 170, 200, 0.3)', background: 'rgba(0, 170, 200, 0.06)' }}>
+                <div style={{ marginBottom: '28px', padding: '16px', borderRadius: '10px', border: '1px solid rgba(var(--accent-primary-rgb), 0.3)', background: 'rgba(var(--accent-primary-rgb), 0.06)' }}>
                     <h3 style={{ margin: '0 0 12px', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>Load Existing Configuration</h3>
                     <button type="button" onClick={handleBrowseConfigFile} disabled={loading} className="btn-primary" style={{ width: '100%' }}>
                         Browse for db-config.json

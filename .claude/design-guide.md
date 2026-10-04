@@ -4,6 +4,30 @@
 
 ---
 
+## 0. Shared Primitives (use these first)
+
+React components in `src/renderer/src/components/ui/` (import from `./ui`) and matching classes in `main.css`. New and touched UI should use them instead of hand-rolled inline styles.
+
+| Need | Use |
+|---|---|
+| Page wrapper | `<div className="page">` (max-width 1400, centered; `.main-content` already pads) |
+| Page title row | `<PageHeader icon={<Icon size={26} />} title="..." subtitle="..." actions={...} />` |
+| List / Settings switch in a header | `<SegmentedControl items value onChange />` (`.segmented`) |
+| View tabs inside a page | `<Tabs items value onChange trailing? />` or `.tabs` + `.tab.active` + `.tab-count` |
+| Status pill | `<Badge tone="success\|danger\|warning\|info\|accent\|violet\|neutral" dot?>` or `color="#hex/var"` for user-chosen colors |
+| Filter toggle pill | `<button className="chip active">` + `.chip-count` |
+| Empty list / no results | `<EmptyState icon title text action />` |
+| Loading | `<Spinner size label? />` |
+| Modal | `<Modal title icon onClose footer width closeOnOverlay>` (Escape closes) |
+| Buttons | `.btn-primary` / `.btn-secondary` / `.btn-danger` / `.btn-ghost` + size `.btn-sm`, icon-only `.btn-icon` (all inline-flex with 8px gap) |
+| Table | `.table-wrap` > `table.data-table` (sticky header, `.num` right-aligned, `tr.clickable`, `tr.selected`) |
+
+**Accent tokens** (theme-aware - never hardcode `#00aac8` / `rgba(0,170,200,x)`): `var(--accent-primary)` for accent text/icons, `rgba(var(--accent-primary-rgb), x)` for a custom tint, or `--accent-tint` (0.1) / `--accent-tint-strong` (0.18) / `--accent-border` (0.35) / `--row-hover` / `--row-selected`. Semantic text colors: `--success`, `--danger`, `--warning`, `--info`, `--violet` (all have readable light-theme values). Sticky table headers: `var(--bg-sticky-header)`.
+
+Fixed hex is still right for **identity colors** that must not follow the theme: alternative colors (`ALT_COLORS`), sanctions source colors, user-chosen group/workflow/renewal-status colors.
+
+---
+
 ## 1. CSS Variables (Theme Tokens)
 
 Always use CSS variables — never hardcode colors for themeable surfaces.

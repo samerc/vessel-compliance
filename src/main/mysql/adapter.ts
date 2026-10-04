@@ -12943,7 +12943,8 @@ export class MySQLAdapter {
              ORDER BY vpv.value_date ASC, v.name ASC`,
             [dateFrom, dateTo]
         )
-        return rows as any[]
+        // DECIMAL comes back as a string; the report sums it
+        return (rows as any[]).map(r => ({ ...r, premium: r.premium == null ? null : Number(r.premium) }))
     }
 
     // --- Policy Renewal Notes ---

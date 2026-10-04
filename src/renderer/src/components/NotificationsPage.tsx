@@ -267,7 +267,7 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
                   borderLeft: notif.isRead ? '3px solid transparent' : `3px solid ${typeColor}`,
                   background: notif.isRead
                     ? 'transparent'
-                    : (isLight ? 'rgba(0,170,200,0.04)' : 'rgba(0,170,200,0.06)'),
+                    : (isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)'),
                   transition: 'background 0.15s ease',
                 }}
                 className="hover-effect"

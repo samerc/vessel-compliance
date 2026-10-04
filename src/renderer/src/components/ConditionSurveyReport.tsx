@@ -375,7 +375,7 @@ export default function ConditionSurveyReport() {
                 cursor: 'pointer',
                 border:
                   statusFilter === f.key ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                background: statusFilter === f.key ? 'rgba(0,210,255,0.08)' : 'transparent',
+                background: statusFilter === f.key ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                 color: statusFilter === f.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontWeight: statusFilter === f.key ? 600 : 400
               }}
@@ -474,7 +474,7 @@ export default function ConditionSurveyReport() {
                       colSpan={8}
                       style={{
                         padding: '8px 12px',
-                        background: isLight ? 'rgba(0,150,200,0.07)' : 'rgba(0,210,255,0.05)',
+                        background: isLight ? 'rgba(0,150,200,0.07)' : 'rgba(var(--accent-primary-rgb), 0.05)',
                         borderTop: '1px solid var(--table-border)',
                         borderBottom: '1px solid var(--table-border)',
                         fontWeight: 700,

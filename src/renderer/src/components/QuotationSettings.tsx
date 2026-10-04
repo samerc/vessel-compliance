@@ -404,7 +404,7 @@ function QuotationTypesTab({ showSuccess, showError }: TabProps) {
                                         borderRadius: '4px',
                                         fontSize: '0.8rem',
                                         fontWeight: 700,
-                                        background: 'rgba(0, 170, 200, 0.12)',
+                                        background: 'rgba(var(--accent-primary-rgb), 0.12)',
                                         color: 'var(--accent-primary)'
                                     }}>{t.code}</span>
                                 )}
@@ -670,7 +670,7 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps) {
                                     style={{
                                         padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer',
                                         border: setClauseIds.has(c.id) ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                                        background: setClauseIds.has(c.id) ? 'rgba(0, 210, 255, 0.15)' : 'transparent',
+                                        background: setClauseIds.has(c.id) ? 'rgba(var(--accent-primary-rgb), 0.15)' : 'transparent',
                                         color: setClauseIds.has(c.id) ? 'var(--accent-primary)' : 'var(--text-secondary)'
                                     }}
                                 >
@@ -810,7 +810,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
         return (
             <span key={tagId} onClick={onClick} style={{
                 fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', cursor: 'pointer',
-                background: selected ? 'rgba(0, 210, 255, 0.2)' : 'transparent',
+                background: selected ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'transparent',
                 border: `1px solid ${selected ? 'var(--accent-primary)' : 'var(--glass-border)'}`,
                 color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)'
             }}>{tag.name}</span>
@@ -970,8 +970,8 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                 <button key={f} onClick={() => setWarrantyTypeFilter(f)} style={{
                                     padding: '3px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                                     border: warrantyTypeFilter === f ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                                    background: warrantyTypeFilter === f ? 'rgba(0,170,200,0.12)' : 'transparent',
-                                    color: warrantyTypeFilter === f ? (isLight ? '#007a91' : '#00aac8') : 'var(--text-secondary)'
+                                    background: warrantyTypeFilter === f ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
+                                    color: warrantyTypeFilter === f ? ('var(--accent-primary)') : 'var(--text-secondary)'
                                 }}>{f === 'show_all' ? 'All' : f === 'pi' ? 'P&I' : f === 'hull' ? 'Hull' : 'War'}</button>
                             ))}
                         </div>
@@ -982,7 +982,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                     </div>
                 </div>
                 {bulkMode && (
-                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{bulkSelected.size} selected</span>
                         <button onClick={bulkSelectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Select All</button>
                         <button onClick={bulkDeselectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Deselect All</button>
@@ -991,7 +991,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                         {tags.map(t => (
                             <span key={t.id} onClick={() => bulkSelected.size > 0 && bulkAssignTag(t.id)} style={{
                                 fontSize: '0.72rem', padding: '2px 8px', borderRadius: '10px', cursor: bulkSelected.size > 0 ? 'pointer' : 'default',
-                                background: 'rgba(0, 210, 255, 0.15)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
+                                background: 'rgba(var(--accent-primary-rgb), 0.15)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
                                 opacity: bulkSelected.size > 0 ? 1 : 0.4
                             }}>+ {t.name}</span>
                         ))}
@@ -1030,7 +1030,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                         const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
                                         setNewTypeScope(next.length === 0 ? 'all' : next.join(','))
                                     }
-                                }} style={{ padding: '2px 8px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                                }} style={{ padding: '2px 8px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
                             })}
                         </div>
                         {tags.length > 0 && (
@@ -1043,7 +1043,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                 </form>
 
                 {filteredWarranties.map((w) => (
-                    <div key={w.id} draggable onDragStart={() => handleWarrantySettingsDragStart(w.id)} onDragOver={e => e.preventDefault()} onDrop={() => handleWarrantySettingsDrop(w.id)} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent', cursor: 'grab' }}>
+                    <div key={w.id} draggable onDragStart={() => handleWarrantySettingsDragStart(w.id)} onDragOver={e => e.preventDefault()} onDrop={() => handleWarrantySettingsDrop(w.id)} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(w.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(w.id) ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent', cursor: 'grab' }}>
                         {bulkMode && (
                             <input type="checkbox" checked={bulkSelected.has(w.id)} onChange={() => toggleBulkSelect(w.id)} style={{ ...ckStyle, marginTop: '3px', flexShrink: 0 }} />
                         )}
@@ -1066,7 +1066,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                                 const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
                                                 setEditTypeScope(next.length === 0 ? 'all' : next.join(','))
                                             }
-                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
                                     })}
                                     {tags.length > 0 && tags.map(t => tagChip(t.id, editTagIds.includes(t.id), () => toggleTagId(t.id, editTagIds, setEditTagIds)))}
                                     <div style={{ flex: 1 }} />
@@ -1088,7 +1088,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps) {
                                         })}
                                         {(w.tagIds || []).map(tid => {
                                             const tag = tags.find(t => t.id === tid)
-                                            return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
+                                            return tag ? <span key={tid} style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
                                         })}
                                     </div>
                                 </div>
@@ -1223,7 +1223,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '4px' }}>P&I Deductibles</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define deductible types here. Amounts are set per quotation. For multi-value deductibles, use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency} {amount}'}</code> in the secondary description to position the second amount.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define deductible types here. Amounts are set per quotation. For multi-value deductibles, use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)' }}>{'{currency} {amount}'}</code> in the secondary description to position the second amount.</p>
             <form onSubmit={handleAdd} style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title (e.g. Crew Claims)" style={{ width: '200px' }} required />
@@ -1267,7 +1267,7 @@ function DeductiblesTab({ showSuccess }: TabProps) {
                             <div style={{ flex: 1 }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{d.title}</span>
                                 {d.letterCode && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 176, 32, 0.15)', color: '#b07a10', marginLeft: '6px', fontWeight: 700, fontFamily: 'monospace' }}>{d.letterCode}</span>}
-                                {d.hasSecondary && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)', marginLeft: '6px' }}>Multi-value</span>}
+                                {d.hasSecondary && <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)', marginLeft: '6px' }}>Multi-value</span>}
                                 {d.description && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{d.description}</div>}
                                 {d.hasSecondary && d.secondaryDescription && (
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px', paddingLeft: '12px' }}>
@@ -1462,7 +1462,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define exclusion clauses that remove specific risks from coverage. Exclusions can be linked to vessel types to auto-apply based on the vessel in a quotation.</p>
 
             {bulkMode && (
-                <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid var(--accent-primary)', marginBottom: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{bulkSelected.size} selected</span>
                     <button onClick={bulkSelectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Select All</button>
                     <button onClick={bulkDeselectAll} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>Deselect All</button>
@@ -1507,7 +1507,7 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps) {
             </form>
 
             {exclusions.map((ex, i) => (
-                <div key={ex.id} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(ex.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(ex.id) ? 'rgba(0, 210, 255, 0.04)' : 'transparent' }}>
+                <div key={ex.id} style={{ padding: '10px 14px', borderRadius: '8px', border: bulkMode && bulkSelected.has(ex.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start', background: bulkMode && bulkSelected.has(ex.id) ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent' }}>
                     {bulkMode && (
                         <input type="checkbox" checked={bulkSelected.has(ex.id)} onChange={() => toggleBulkSelect(ex.id)} style={{ ...ckStyle, marginTop: '3px', flexShrink: 0 }} />
                     )}
@@ -1600,7 +1600,7 @@ function SubLimitsTab({ showSuccess }: TabProps) {
     return (<div>
         <section className="glass-card" style={{ padding: '20px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>Limits of Liability Templates</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define sub-limit templates that cap liability for specific risk categories. Use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{amount}'}</code> and <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0, 210, 255, 0.1)' }}>{'{currency}'}</code> as placeholders — actual values are set per quotation.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>Define sub-limit templates that cap liability for specific risk categories. Use <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)' }}>{'{amount}'}</code> and <code style={{ fontSize: '0.75rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)' }}>{'{currency}'}</code> as placeholders — actual values are set per quotation.</p>
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <input type="text" value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder='e.g., Liability for crew sub-limited to {currency} {amount} any one accident...' style={{ flex: 1 }} required />
                 <input type="text" value={newCurrency} onChange={e => setNewCurrency(e.target.value)} placeholder="CCY" style={{ width: '70px' }} />
@@ -1787,7 +1787,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                             const c = clauses.find(x => x.id === id)
                                             if (!c) return null
                                             return (
-                                                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(0,210,255,0.07)', marginBottom: '3px' }}>
+                                                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.07)', marginBottom: '3px' }}>
                                                     <button title="Move up" aria-label="Move up" onClick={() => moveSetClause(idx, 'up')} disabled={idx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === 0 ? 0.3 : 1 }}><ChevronUp size={13} /></button>
                                                     <button title="Move down" aria-label="Move down" onClick={() => moveSetClause(idx, 'down')} disabled={idx === editSetOrder.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-secondary)', opacity: idx === editSetOrder.length - 1 ? 0.3 : 1 }}><ChevronDown size={13} /></button>
                                                     {c.title && <span style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)' }}>{c.title}</span>}
@@ -1805,7 +1805,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '12px', maxHeight: '200px', overflowY: 'auto' }}>
                                     {clauses.filter(c => !editSetOrder.includes(c.id)).map(c => (
                                         <div key={c.id} onClick={() => toggleSetClause(c.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--table-border)' }}
-                                            onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(0,210,255,0.05)')}
+                                            onMouseEnter={ev => (ev.currentTarget.style.background = 'rgba(var(--accent-primary-rgb), 0.05)')}
                                             onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
                                             <Plus size={13} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--accent-primary)' }} />
                                             {c.title && <span style={{ fontWeight: 600, flexShrink: 0, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{c.title}</span>}
@@ -1828,7 +1828,7 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps) {
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         {s.name}
-                                        {s.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)', fontWeight: 700 }}>DEFAULT</span>}
+                                        {s.defaultSelected && <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)', fontWeight: 700 }}>DEFAULT</span>}
                                     </div>
                                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                         {(s.clauseIds?.length || 0)} clause{(s.clauseIds?.length || 0) !== 1 ? 's' : ''}
@@ -2124,7 +2124,7 @@ function DefaultExcludedCountriesPerType({ countries, showSuccess, showError }: 
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Excluded</label>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                 {excluded.map(c => (
-                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(0,170,200,0.08)' : 'transparent' }}>
+                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent' }}>
                                         <input type="checkbox" checked={isSelected(c.name, c.listType)} onChange={() => toggleCountry(c.name, c.listType)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
                                         {c.name}
                                     </label>
@@ -2138,7 +2138,7 @@ function DefaultExcludedCountriesPerType({ countries, showSuccess, showError }: 
                             <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>DDQ Required</label>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                 {ddq.map(c => (
-                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(0,170,200,0.08)' : 'transparent' }}>
+                                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', border: isSelected(c.name, c.listType) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: isSelected(c.name, c.listType) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent' }}>
                                         <input type="checkbox" checked={isSelected(c.name, c.listType)} onChange={() => toggleCountry(c.name, c.listType)} style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)' }} />
                                         {c.name}
                                     </label>
@@ -2348,7 +2348,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
             </div>
 
             {showAdd && (
-                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)', marginBottom: '16px' }}>
                     <input
                         type="text"
                         value={newName}
@@ -2381,7 +2381,7 @@ function TradingWarrantyTemplatesTab({ showSuccess, showError }: TabProps) {
                     borderRadius: '8px',
                     border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
                     marginBottom: '8px',
-                    background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(0,170,200,0.06)') : 'transparent'
+                    background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent'
                 }}>
                     {editingId === t.id ? (
                         <>
@@ -2497,7 +2497,7 @@ function TradingCustomTextsTab({ showSuccess, showError }: TabProps) {
             </div>
 
             {showAdd && (
-                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)', marginBottom: '16px' }}>
                     <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Template name (e.g. Tanker Trading)" style={{ width: '100%', marginBottom: '8px' }} />
                     <RichTextEditor value={newText} onChange={setNewText} />
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -2643,7 +2643,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
                 </div>
 
                 {showAdd && (
-                    <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(0,170,200,0.06)', marginBottom: '16px' }}>
+                    <div style={{ padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--accent-primary)', background: isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)', marginBottom: '16px' }}>
                         <input
                             type="text"
                             value={newName}
@@ -2676,7 +2676,7 @@ function PremiumTextTemplatesTab({ showSuccess, showError }: TabProps) {
                         borderRadius: '8px',
                         border: `1px solid ${editingId === t.id ? 'var(--accent-primary)' : 'var(--table-border)'}`,
                         marginBottom: '8px',
-                        background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(0,170,200,0.06)') : 'transparent'
+                        background: editingId === t.id ? (isLight ? '#f0faff' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent'
                     }}>
                         {editingId === t.id ? (
                             <>
@@ -2799,7 +2799,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
     const chipStyle = (selected: boolean) => ({
         padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer',
         border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        background: selected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         fontWeight: selected ? 600 : 400
     })
@@ -2862,7 +2862,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                                 const next = active ? parts.filter(p => p !== s.v) : [...parts, s.v]
                                                 setEditTypeScope(next.length === 0 ? 'all' : next.join(','))
                                             }
-                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
+                                        }} style={{ padding: '2px 6px', borderRadius: '4px', border: active ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: '0.72rem' }}>{s.l}</button>
                                     })}
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -2885,7 +2885,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps) {
                                     {s.typeScope && s.typeScope !== 'all' && <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.typeScope === 'pi' ? 'rgba(100, 100, 255, 0.15)' : s.typeScope === 'hull' ? 'rgba(255, 100, 200, 0.15)' : 'rgba(255, 176, 32, 0.15)', color: s.typeScope === 'pi' ? '#6464ff' : s.typeScope === 'hull' ? '#ff64c8' : '#ffb020' }}>{s.typeScope === 'pi' ? 'P&I' : s.typeScope === 'hull' ? 'Hull' : 'War'}</span>}
                                     {(s.docTypeIds || []).map(dtId => {
                                         const dt = docTypes.find(d => d.id === dtId)
-                                        return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(0, 210, 255, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(0, 210, 255, 0.2)' }}>{dt.name}</span> : null
+                                        return dt ? <span key={dtId} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)' }}>{dt.name}</span> : null
                                     })}
                                 </div>
                             </div>
@@ -3127,8 +3127,8 @@ function StandardTextsTab({ showSuccess }: TabProps) {
                         fontWeight: 600,
                         padding: '8px 14px',
                         borderRadius: '8px',
-                        border: `2px solid ${isLight ? 'rgba(0,210,255,0.3)' : 'rgba(0,210,255,0.2)'}`,
-                        background: isLight ? '#f0f8ff' : 'rgba(0,210,255,0.06)',
+                        border: `2px solid ${isLight ? 'rgba(var(--accent-primary-rgb), 0.3)' : 'rgba(var(--accent-primary-rgb), 0.2)'}`,
+                        background: isLight ? '#f0f8ff' : 'rgba(var(--accent-primary-rgb), 0.06)',
                         color: 'var(--text-primary)',
                         cursor: 'pointer',
                         minWidth: '220px'
@@ -3341,7 +3341,7 @@ function SectionOrderTab({ showSuccess }: TabProps) {
                             <button key={t.code} onClick={() => setSelectedType(t.code)} style={{
                                 padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: selectedType === t.code ? 600 : 400,
                                 border: selectedType === t.code ? '2px solid var(--accent-primary)' : '1px solid var(--table-border)',
-                                background: selectedType === t.code ? 'rgba(0, 170, 200, 0.1)' : 'transparent',
+                                background: selectedType === t.code ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                                 color: selectedType === t.code ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer'
                             }}>{t.label}</button>
                         ))}
@@ -3648,7 +3648,7 @@ function HullClausesTab({ showSuccess, showError }: TabProps) {
                     <div key={c.id} style={{
                         padding: '10px 14px', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer',
                         border: selectedClauseId === c.id ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)',
-                        background: selectedClauseId === c.id ? 'rgba(0, 210, 255, 0.06)' : 'transparent',
+                        background: selectedClauseId === c.id ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                         display: 'flex', alignItems: 'center', gap: '10px'
                     }} onClick={() => setSelectedClauseId(c.id)}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }} onClick={e => e.stopPropagation()}>
@@ -3859,11 +3859,11 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginRight: '2px' }}>Clauses:</span>
                             <button type="button" onClick={() => setNewClauseIds(prev => prev.length === hullClauses.length ? [] : hullClauses.map(hc => hc.id))}
-                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', color: newClauseIds.length === 0 || newClauseIds.length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
                             >All</button>
                             {hullClauses.map(hc => (
                                 <button key={hc.id} type="button" onClick={() => setNewClauseIds(prev => prev.includes(hc.id) ? prev.filter(id => id !== hc.id) : [...prev, hc.id])}
-                                    style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.includes(hc.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.includes(hc.id) ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: newClauseIds.includes(hc.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                    style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: newClauseIds.includes(hc.id) ? '1px solid var(--accent-primary)' : '1px solid var(--table-border)', background: newClauseIds.includes(hc.id) ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', color: newClauseIds.includes(hc.id) ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
                                 >{hc.code}</button>
                             ))}
                         </div>
@@ -3924,13 +3924,13 @@ function HullAdditionalConditionsTab({ showSuccess, showError }: TabProps) {
                                 const updated = current.length === allIds.length ? [] : allIds
                                 window.api.hullUpdateAdditionalCondition(c.id, { hullClauseIds: updated }).then(() => loadData())
                             }}
-                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', color: (c.hullClauseIds || []).length === 0 || (c.hullClauseIds || []).length === hullClauses.length ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
                             >All</button>
                             {hullClauses.map(hc => {
                                 const linked = (c.hullClauseIds || []).includes(hc.id)
                                 return (
                                     <button key={hc.id} type="button" onClick={() => toggleClauseLink(c.id, hc.id)}
-                                        style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: linked ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: linked ? 'rgba(0, 170, 200, 0.12)' : 'transparent', color: linked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                                        style={{ padding: '3px 10px', fontSize: '0.72rem', borderRadius: '10px', cursor: 'pointer', border: linked ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.18)', background: linked ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', color: linked ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
                                     >{hc.code}</button>
                                 )
                             })}
@@ -4026,7 +4026,7 @@ function WarConditionsTab({ showSuccess, showError, isLight }: TabProps) {
             <h3 style={{ fontSize: '1rem', marginBottom: '6px' }}>War Risk Conditions</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
                 Manage conditions for War Risk quotations. Default conditions are auto-selected for new quotations.
-                Use <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_code}'}</code> and <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_date}'}</code> placeholders for JWLA references, and <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{tc_text}'}</code> for the Terms &amp; Conditions line.
+                Use <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_code}'}</code> and <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{jwla_date}'}</code> placeholders for JWLA references, and <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '0.78rem' }}>{'{tc_text}'}</code> for the Terms &amp; Conditions line.
             </p>
 
             <form onSubmit={handleAdd} style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'flex-start' }}>
@@ -4190,7 +4190,7 @@ function WarSettingsTab({ showSuccess, showError }: TabProps) {
                     style={{ width: '100%', fontSize: '0.85rem', padding: '8px 10px' }}
                 />
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    This text is rendered as a standalone line in the Conditions section. Use <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{tc_text}'}</code> placeholder in conditions to reference it.
+                    This text is rendered as a standalone line in the Conditions section. Use <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{tc_text}'}</code> placeholder in conditions to reference it.
                 </p>
             </div>
 
@@ -4203,7 +4203,7 @@ function WarSettingsTab({ showSuccess, showError }: TabProps) {
                     style={{ width: '100%', minHeight: '80px', fontSize: '0.85rem', padding: '8px 10px' }}
                 />
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    Placeholders: <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_code}'}</code>, <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_date}'}</code>
+                    Placeholders: <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_code}'}</code>, <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px' }}>{'{jwla_date}'}</code>
                 </p>
             </div>
 
@@ -4475,7 +4475,7 @@ function WorkflowDesignerTab({ showSuccess, showError, isLight }: TabProps) {
                                         step.isInitial ? (
                                             <span style={{
                                                 padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
-                                                background: 'rgba(0, 170, 200, 0.12)', color: 'var(--accent-primary)'
+                                                background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)'
                                             }}>INITIAL</span>
                                         ) : null
                                     )}
@@ -4727,7 +4727,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
     }
 
     const placeholderColor = (p: string) => {
-        if (p === '{deadline}') return { bg: 'rgba(0,170,200,0.15)', text: '#00aac8' }
+        if (p === '{deadline}') return { bg: 'rgba(var(--accent-primary-rgb), 0.15)', text: 'var(--accent-primary)' }
         if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
         if (p === '{event}') return { bg: 'rgba(255,100,200,0.15)', text: '#ff64c8' }
         return { bg: 'rgba(180,180,180,0.15)', text: 'var(--text-secondary)' }
@@ -4817,7 +4817,7 @@ function SurveyWarrantyTemplatesTab({ showSuccess, showError, isLight, readOnly 
             {/* Section 1: Templates */}
             <div style={{ marginBottom: '32px' }}>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
-                    Define reusable survey warranty text templates. Use placeholders: <code style={{ background: 'rgba(0,170,200,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#00aac8' }}>{'{deadline}'}</code> (e.g. &quot;prior inception&quot;, &quot;within 30 days&quot;), <code style={{ background: 'rgba(100,100,255,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#6464ff' }}>{'{days}'}</code> (number), <code style={{ background: 'rgba(255,100,200,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#ff64c8' }}>{'{event}'}</code> (e.g. &quot;prior sailing&quot;).
+                    Define reusable survey warranty text templates. Use placeholders: <code style={{ background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 4px', borderRadius: '3px', color: 'var(--accent-primary)' }}>{'{deadline}'}</code> (e.g. &quot;prior inception&quot;, &quot;within 30 days&quot;), <code style={{ background: 'rgba(100,100,255,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#6464ff' }}>{'{days}'}</code> (number), <code style={{ background: 'rgba(255,100,200,0.1)', padding: '1px 4px', borderRadius: '3px', color: '#ff64c8' }}>{'{event}'}</code> (e.g. &quot;prior sailing&quot;).
                 </div>
 
                 {/* Template list */}

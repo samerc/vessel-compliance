@@ -950,7 +950,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                                             setVesselClassificationIds(prev => new Set(prev).add(cs.id))
                                                                         }
                                                                     }}
-                                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', cursor: 'pointer', background: checked ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
                                                                 >
                                                                     <input type="checkbox" readOnly checked={checked} style={{ accentColor: 'var(--accent-primary)', pointerEvents: 'none', flexShrink: 0 }} />
                                                                     <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
@@ -1020,7 +1020,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                 <div style={{ overflowY: 'auto', flex: 1 }}>
                                                     <div
                                                         onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(''); setFlagDropdownOpen(false); setFlagSearch('') }}
-                                                        style={{ display: 'flex', alignItems: 'center', padding: '7px 12px', cursor: 'pointer', background: !selectedFlagStateId ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                        style={{ display: 'flex', alignItems: 'center', padding: '7px 12px', cursor: 'pointer', background: !selectedFlagStateId ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
                                                     >
                                                         <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No flag</span>
                                                     </div>
@@ -1030,7 +1030,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                             <div
                                                                 key={fs.id}
                                                                 onMouseDown={e => { e.preventDefault(); setSelectedFlagStateId(fs.id); setFlagDropdownOpen(false); setFlagSearch('') }}
-                                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', cursor: 'pointer', background: selectedFlagStateId === fs.id ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
+                                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', cursor: 'pointer', background: selectedFlagStateId === fs.id ? (isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)') : 'transparent', borderBottom: '1px solid var(--table-border)' }}
                                                             >
                                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                                                                     {fs.name} <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>({fs.iso3Code})</span>
@@ -1531,8 +1531,8 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     <button
                                         onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
                                         style={{
-                                            background: isLight ? 'rgba(0, 119, 163, 0.12)' : 'rgba(0, 210, 255, 0.12)',
-                                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
+                                            background: isLight ? 'rgba(0, 119, 163, 0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)',
+                                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
                                             borderRadius: '6px',
                                             padding: '3px 8px',
                                             cursor: 'pointer',
@@ -1589,7 +1589,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                             borderBottom: '1px solid var(--table-border)',
                                             borderLeft: `4px solid ${getRowBorderColor()}`,
                                             background: dragOverId === rowType.id
-                                                ? 'rgba(0, 210, 255, 0.2)'
+                                                ? 'rgba(var(--accent-primary-rgb), 0.2)'
                                                 : (isRequired && !rowHasFile && !isExtra) ? 'rgba(255, 77, 77, 0.1)' : 'transparent',
                                             outline: dragOverId === rowType.id ? '2px dashed var(--accent-primary)' : 'none',
                                             outlineOffset: '-2px',
@@ -1681,9 +1681,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                         borderRadius: '6px',
                                                         fontSize: '0.75rem',
                                                         fontWeight: '500',
-                                                        background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(0, 210, 255, 0.05)',
-                                                        border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
-                                                        color: isLight ? '#0077a3' : '#00d2ff',
+                                                        background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(var(--accent-primary-rgb), 0.05)',
+                                                        border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                                        color: 'var(--accent-primary)',
                                                         textTransform: 'uppercase',
                                                         cursor: 'pointer'
                                                     }}
@@ -1848,7 +1848,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                     style={{
                                         borderBottom: '1px solid var(--table-border)',
                                         background: dragOverId === customType.id
-                                            ? 'rgba(0, 210, 255, 0.2)'
+                                            ? 'rgba(var(--accent-primary-rgb), 0.2)'
                                             : (!rowHasFile) ? 'rgba(255, 77, 77, 0.05)' : 'transparent',
                                         outline: dragOverId === customType.id ? '2px dashed var(--accent-primary)' : 'none',
                                         outlineOffset: '-2px',
@@ -1929,9 +1929,9 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                                     borderRadius: '6px',
                                                     fontSize: '0.75rem',
                                                     fontWeight: '500',
-                                                    background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(0, 210, 255, 0.05)',
-                                                    border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(0, 210, 255, 0.3)'}`,
-                                                    color: isLight ? '#0077a3' : '#00d2ff',
+                                                    background: isLight ? 'rgba(0, 119, 163, 0.05)' : 'rgba(var(--accent-primary-rgb), 0.05)',
+                                                    border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                                    color: 'var(--accent-primary)',
                                                     textTransform: 'uppercase',
                                                     cursor: 'pointer'
                                                 }}
@@ -2157,7 +2157,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                                 {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
                                 <span style={{
                                     fontSize: '0.72rem', padding: '1px 6px', borderRadius: '8px',
-                                    background: 'rgba(0,170,200,0.1)', color: '#00aac8'
+                                    background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
                                 }}>
                                     Endorsement No. {p.nextEndNum}
                                 </span>
@@ -2305,7 +2305,7 @@ export default function VesselDetail({ vessel, onBack, backLabel = 'Back to Vess
                             <label key={pt.id} style={{
                                 display: 'flex', alignItems: 'center', gap: '10px', padding: '10px',
                                 borderRadius: '8px', cursor: 'pointer', marginBottom: '4px',
-                                background: assignedPolicyTypeIds.has(pt.id) ? 'rgba(0, 210, 255, 0.08)' : 'transparent'
+                                background: assignedPolicyTypeIds.has(pt.id) ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent'
                             }}>
                                 <input
                                     type="checkbox"
@@ -2855,7 +2855,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                         return (
                             <div key={p.id} className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
                                 {/* Header */}
-                                <div onClick={() => toggleCollapse(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: isCollapsed ? 'transparent' : 'rgba(0,210,255,0.03)' }}>
+                                <div onClick={() => toggleCollapse(p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: isCollapsed ? 'transparent' : 'rgba(var(--accent-primary-rgb), 0.03)' }}>
                                     <ChevronDown size={16} style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s', color: 'var(--text-secondary)' }} />
                                     <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.policyTypeName}</span>
                                     {(() => {
@@ -2865,7 +2865,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                             ? <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>#{headerNum.replace(' (RENEWED - PLEASE VERIFY)', '')}</span>
                                             : null
                                     })()}
-                                    {p.conditionName && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{p.conditionName}</span>}
+                                    {p.conditionName && <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{p.conditionName}</span>}
                                     <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: sc.bg, color: sc.color, fontWeight: '600', textTransform: 'uppercase' }}>{p.status}</span>
                                     {p.policyNumber && p.policyNumber.includes('RENEWED') && (
                                         <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: 'var(--danger)', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2982,7 +2982,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                     <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                                         {(['broker', 'direct'] as const).map(ct => (
                                             <button key={ct} type="button" onClick={() => setFormCustomerType(ct)}
-                                                style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: formCustomerType === ct ? 600 : 400, border: formCustomerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: formCustomerType === ct ? 'rgba(0,170,200,0.1)' : 'transparent', color: formCustomerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
+                                                style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: formCustomerType === ct ? 600 : 400, border: formCustomerType === ct ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)', background: formCustomerType === ct ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent', color: formCustomerType === ct ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', textTransform: 'capitalize' }}>
                                                 {ct}
                                             </button>
                                         ))}
@@ -3009,7 +3009,7 @@ function DynamicPoliciesView({ vesselId, dynamicPolicies, isLight, onReload, sho
                                                     <div
                                                         key={e.id}
                                                         onMouseDown={() => { setFormBrokerId(e.id); if (!formCustomerType) setFormCustomerType('broker'); setBrokerDropdownOpen(false); setBrokerSearch('') }}
-                                                        style={{ padding: '8px 12px', cursor: 'pointer', color: e.id === formBrokerId ? 'var(--accent-primary)' : 'var(--text-primary)', background: e.id === formBrokerId ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)') : 'transparent', fontSize: '0.9rem' }}
+                                                        style={{ padding: '8px 12px', cursor: 'pointer', color: e.id === formBrokerId ? 'var(--accent-primary)' : 'var(--text-primary)', background: e.id === formBrokerId ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)') : 'transparent', fontSize: '0.9rem' }}
                                                     >
                                                         {e.name}
                                                     </div>
@@ -3164,7 +3164,7 @@ function VesselTemplateGenerateModal({ vesselId, vesselName, isLight, onClose, s
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
                                     <span style={{
                                         padding: '1px 5px', borderRadius: '3px', fontSize: '0.68rem',
-                                        background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)'
+                                        background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)'
                                     }}>{t.category}</span>
                                     {t.placeholders?.length > 0 && <span>{t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}</span>}
                                 </div>
@@ -3503,7 +3503,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                 <span style={{
                     padding: '2px 10px',
                     borderRadius: '12px',
-                    background: 'rgba(0,210,255,0.1)',
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
                     color: 'var(--accent-primary)',
                     fontSize: '0.78rem',
                     fontWeight: 600
@@ -3530,7 +3530,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                         padding: '4px 12px',
                         borderRadius: '14px',
                         border: typeFilter === 'all' ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                        background: typeFilter === 'all' ? 'rgba(0,210,255,0.12)' : 'transparent',
+                        background: typeFilter === 'all' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
                         color: typeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
                         fontSize: '0.78rem',
                         fontWeight: 600,
@@ -3606,7 +3606,7 @@ function VesselTimeline({ vesselId, isLight }: { vesselId: string; isLight: bool
                     top: '0',
                     bottom: '0',
                     width: '2px',
-                    background: isLight ? 'rgba(0,170,200,0.2)' : 'rgba(0,210,255,0.15)'
+                    background: isLight ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'rgba(var(--accent-primary-rgb), 0.15)'
                 }} />
 
                 {monthGroups.map(group => (

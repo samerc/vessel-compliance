@@ -700,7 +700,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                     <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vesselName}</span>
                     {r.policyTypeName && (
-                        <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 600, background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                             {r.policyTypeName}
                         </span>
                     )}
@@ -837,7 +837,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                 transition: 'background 0.12s'
                             }}
                             title="Create renewal quotation"
-                            onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.08)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)' }}
                             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                         >
                             <RefreshCw size={14} style={renewLoading === r.id ? { animation: 'spin 1s linear infinite' } : undefined} />
@@ -1055,7 +1055,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                             fontWeight: policyTypeFilter === 'all' ? 600 : 400,
                             cursor: 'pointer',
                             border: policyTypeFilter === 'all' ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                            background: policyTypeFilter === 'all' ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
+                            background: policyTypeFilter === 'all' ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                             color: policyTypeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)',
                             transition: 'all 0.15s',
                         }}
@@ -1073,7 +1073,7 @@ export default function PolicyRenewals({ onNavigateToVessel, onCreateRenewalQuot
                                 fontWeight: policyTypeFilter === pt.id ? 600 : 400,
                                 cursor: 'pointer',
                                 border: policyTypeFilter === pt.id ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)',
-                                background: policyTypeFilter === pt.id ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
+                                background: policyTypeFilter === pt.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                                 color: policyTypeFilter === pt.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                 transition: 'all 0.15s',
                             }}

@@ -379,11 +379,11 @@ export default function FleetManager() {
             <span
               style={{
                 fontSize: '0.75rem',
-                background: 'rgba(0,210,255,0.1)',
+                background: 'rgba(var(--accent-primary-rgb), 0.1)',
                 color: 'var(--accent-primary)',
                 padding: '2px 8px',
                 borderRadius: '4px',
-                border: '1px solid rgba(0,210,255,0.2)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
               }}
             >
               {fleet.name}
@@ -426,7 +426,7 @@ export default function FleetManager() {
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: 'linear-gradient(135deg, rgba(0,210,255,0.25), rgba(0,210,255,0.08))',
+              background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.25), rgba(var(--accent-primary-rgb), 0.08))',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -530,9 +530,9 @@ export default function FleetManager() {
                 fontSize: '0.7rem',
                 padding: '2px 8px',
                 borderRadius: '10px',
-                background: 'rgba(0,210,255,0.1)',
+                background: 'rgba(var(--accent-primary-rgb), 0.1)',
                 color: 'var(--accent-primary)',
-                border: '1px solid rgba(0,210,255,0.2)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                 fontWeight: 600,
               }}
             >
@@ -569,7 +569,7 @@ export default function FleetManager() {
             label: 'Total Fleets',
             value: fleets.length,
             icon: <Folder size={20} color="#00d2ff" />,
-            bg: 'rgba(0,210,255,0.15)',
+            bg: 'rgba(var(--accent-primary-rgb), 0.15)',
           },
           {
             label: 'Assigned Vessels',
@@ -848,7 +848,7 @@ export default function FleetManager() {
                           onClick={() => openPanel(fleet)}
                           style={{
                             borderBottom: idx < sortedFleets.length - 1 ? '1px solid var(--table-border)' : 'none',
-                            background: isSelected ? 'rgba(0,210,255,0.06)' : 'transparent',
+                            background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.15s',
                             borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
@@ -864,13 +864,13 @@ export default function FleetManager() {
                                   height: 36,
                                   borderRadius: 9,
                                   background: isSelected
-                                    ? 'linear-gradient(135deg, rgba(0,210,255,0.35), rgba(0,210,255,0.15))'
-                                    : 'linear-gradient(135deg, rgba(0,210,255,0.18), rgba(0,210,255,0.06))',
+                                    ? 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.35), rgba(var(--accent-primary-rgb), 0.15))'
+                                    : 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.18), rgba(var(--accent-primary-rgb), 0.06))',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   flexShrink: 0,
-                                  border: isSelected ? '1px solid rgba(0,210,255,0.3)' : '1px solid transparent',
+                                  border: isSelected ? '1px solid rgba(var(--accent-primary-rgb), 0.3)' : '1px solid transparent',
                                 }}
                               >
                                 <Folder size={16} color="var(--accent-primary)" />
@@ -900,8 +900,8 @@ export default function FleetManager() {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '5px',
-                                  background: 'rgba(0,210,255,0.08)',
-                                  border: '1px solid rgba(0,210,255,0.18)',
+                                  background: 'rgba(var(--accent-primary-rgb), 0.08)',
+                                  border: '1px solid rgba(var(--accent-primary-rgb), 0.18)',
                                   borderRadius: '20px',
                                   padding: '3px 10px 3px 7px',
                                   fontSize: '0.8rem',
@@ -996,12 +996,12 @@ export default function FleetManager() {
                         width: 40,
                         height: 40,
                         borderRadius: 10,
-                        background: 'linear-gradient(135deg, rgba(0,210,255,0.4), rgba(0,210,255,0.12))',
+                        background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.4), rgba(var(--accent-primary-rgb), 0.12))',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
-                        border: '1px solid rgba(0,210,255,0.25)',
+                        border: '1px solid rgba(var(--accent-primary-rgb), 0.25)',
                       }}
                     >
                       <Folder size={19} color="var(--accent-primary)" />
@@ -1103,8 +1103,8 @@ export default function FleetManager() {
                       <div
                         style={{
                           flex: 1,
-                          background: 'rgba(0,210,255,0.06)',
-                          border: '1px solid rgba(0,210,255,0.15)',
+                          background: 'rgba(var(--accent-primary-rgb), 0.06)',
+                          border: '1px solid rgba(var(--accent-primary-rgb), 0.15)',
                           borderRadius: '8px',
                           padding: '7px 10px',
                           textAlign: 'center',
@@ -1304,7 +1304,7 @@ export default function FleetManager() {
                                   gap: '9px',
                                   padding: '8px 14px',
                                   cursor: 'pointer',
-                                  background: checked ? 'rgba(0,210,255,0.07)' : 'transparent',
+                                  background: checked ? 'rgba(var(--accent-primary-rgb), 0.07)' : 'transparent',
                                   borderLeft: checked
                                     ? '2px solid var(--accent-primary)'
                                     : '2px solid transparent',

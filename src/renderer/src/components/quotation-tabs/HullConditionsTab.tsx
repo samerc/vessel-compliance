@@ -81,11 +81,11 @@ function HullClauseDropdown({ clauses, selectedId, onChange, description, hideLa
                                         color: active ? 'var(--accent-primary)' : (isLight ? '#1c1e21' : '#e8e8e8'),
                                         fontWeight: active ? 600 : 400,
                                         fontSize: '0.86rem',
-                                        background: active ? 'rgba(0, 170, 200, 0.08)' : 'transparent',
+                                        background: active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent',
                                         borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`
                                     }}
                                     onMouseEnter={e => { if (!active) e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = active ? 'rgba(0, 170, 200, 0.08)' : 'transparent' }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = active ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent' }}
                                 >
                                     <span style={{ fontWeight: 600 }}>{hc.code}</span> — {hc.name}
                                     {hc.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{hc.description}</div>}
@@ -174,7 +174,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                                 }}>
                                     <div style={{ padding: '6px 10px', borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`, display: 'flex', gap: '6px', position: 'sticky', top: 0, background: bg, zIndex: 1 }}>
                                         <button type="button" onClick={() => { items.forEach(i => { if (!selectedIds.has(i.id)) onToggle(i.id) }) }}
-                                            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid var(--accent-primary)', background: 'rgba(0,170,200,0.08)', color: 'var(--accent-primary)', cursor: 'pointer' }}>Select All</button>
+                                            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid var(--accent-primary)', background: 'rgba(var(--accent-primary-rgb), 0.08)', color: 'var(--accent-primary)', cursor: 'pointer' }}>Select All</button>
                                         <button type="button" onClick={() => { items.forEach(i => { if (selectedIds.has(i.id)) onToggle(i.id) }) }}
                                             style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '4px', border: '1px solid var(--table-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Deselect All</button>
                                     </div>
@@ -182,7 +182,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                                         const checked = selectedIds.has(item.id)
                                         return (
                                             <div key={item.id} onClick={() => onToggle(item.id)}
-                                                style={{ padding: '5px 10px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.03)', background: checked ? 'rgba(0,170,200,0.05)' : 'transparent' }}>
+                                                style={{ padding: '5px 10px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.03)', background: checked ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'transparent' }}>
                                                 <input type="checkbox" checked={checked} readOnly style={{ width: '14px', height: '14px', accentColor: 'var(--accent-primary)', pointerEvents: 'none' }} />
                                                 <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem' }}>
                                                     {item.label && <span style={{ fontWeight: 600, marginRight: '4px' }}>{item.label}</span>}
@@ -200,7 +200,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                     {selectedItems.map(item => {
                         const isExpanded = expandedId === item.id
                         return (
-                        <div key={item.id} style={{ marginBottom: '2px', borderRadius: '4px', border: '1px solid rgba(0,170,200,0.15)', background: 'rgba(0,170,200,0.03)' }}>
+                        <div key={item.id} style={{ marginBottom: '2px', borderRadius: '4px', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)', background: 'rgba(var(--accent-primary-rgb), 0.03)' }}>
                             {/* Compact row */}
                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 8px', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : item.id)}>
                                 <button type="button" onClick={e => { e.stopPropagation(); onToggle(item.id) }} title="Remove"
@@ -214,7 +214,7 @@ function HullConditionPicker({ label, items, selectedIds, onToggle, overrides, o
                             </div>
                             {/* Expanded detail */}
                             {isExpanded && (
-                                <div style={{ padding: '6px 8px 8px 28px', borderTop: '1px solid rgba(0,170,200,0.1)' }}>
+                                <div style={{ padding: '6px 8px 8px 28px', borderTop: '1px solid rgba(var(--accent-primary-rgb), 0.1)' }}>
                                     <textarea
                                         value={overrides[item.id] || ''}
                                         onChange={e => onOverrideChange(item.id, e.target.value)}
@@ -1059,7 +1059,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                     Conditions
                 </button>
                 <button onClick={() => setHullSubTab('additional')} style={{ padding: '8px 16px', fontSize: '0.86rem', fontWeight: 600, border: 'none', borderBottom: hullSubTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent', background: 'transparent', color: hullSubTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '-2px' }}>
-                    Additional Conditions <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,170,200,0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length + customConditions.length}</span>
+                    Additional Conditions <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', marginLeft: '4px' }}>{filteredAdditional.filter(ac => selectedAddIds.has(ac.id)).length + customConditions.length}</span>
                 </button>
             </div>
 
@@ -1103,7 +1103,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                             padding: '6px 14px',
                             borderRadius: '6px',
                             border: selectedVesselScope === null ? '2px solid var(--accent)' : '1px solid var(--input-border)',
-                            background: selectedVesselScope === null ? 'rgba(0,170,200,0.1)' : 'transparent',
+                            background: selectedVesselScope === null ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
                             color: selectedVesselScope === null ? 'var(--accent)' : 'var(--text-primary)',
                             cursor: 'pointer',
                             fontSize: '0.8rem',
@@ -1553,7 +1553,7 @@ export default function HullConditionsTab({ quotation, updateField, showSuccess,
                                         border: '1px solid var(--table-border)', cursor: 'grab',
                                         fontSize: '0.8rem',
                                         background: item.kind === 'custom'
-                                            ? (isLight ? 'rgba(0,170,200,0.05)' : 'rgba(0,170,200,0.06)')
+                                            ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.05)' : 'rgba(var(--accent-primary-rgb), 0.06)')
                                             : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)')
                                     }}
                                 >

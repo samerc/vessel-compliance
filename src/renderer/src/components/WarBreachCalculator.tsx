@@ -438,8 +438,8 @@ export default function WarBreachCalculator() {
     width: '100%',
   }
 
-  const accentBg = isLight ? 'rgba(0,119,163,0.07)' : 'rgba(0,210,255,0.07)'
-  const accentBorder = isLight ? 'rgba(0,119,163,0.18)' : 'rgba(0,210,255,0.18)'
+  const accentBg = isLight ? 'rgba(0,119,163,0.07)' : 'rgba(var(--accent-primary-rgb), 0.07)'
+  const accentBorder = isLight ? 'rgba(0,119,163,0.18)' : 'rgba(var(--accent-primary-rgb), 0.18)'
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
@@ -470,7 +470,7 @@ export default function WarBreachCalculator() {
           <button
             onClick={() => setShowHistory(v => !v)}
             className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: showHistory ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(0,210,255,0.1)') : undefined }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: showHistory ? (isLight ? 'rgba(0,119,163,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)') : undefined }}
           >
             <History size={16} /> History
           </button>

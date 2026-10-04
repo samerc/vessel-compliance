@@ -457,7 +457,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                   ? '1px solid var(--accent-primary)'
                   : '1px solid var(--input-border)',
                 background: statusFilter === f
-                  ? (isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(0, 210, 255, 0.1)')
+                  ? (isLight ? 'rgba(26, 115, 232, 0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)')
                   : 'transparent',
                 color: statusFilter === f ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontSize: '12px',
@@ -485,7 +485,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
 
       {/* Bulk action bar */}
       {selectMode && selectedIds.size > 0 && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)', border: '1px solid rgba(0,210,255,0.2)', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.2)', alignItems: 'center' }}>
           <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{selectedIds.size} selected</span>
           <button onClick={toggleSelectAll} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
             {filteredDefects.filter(d => d.status === 'OPEN').every(d => selectedIds.has(d.id)) ? 'Deselect All' : 'Select All Open'}
@@ -706,7 +706,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                     alignItems: 'flex-start',
                     gap: '12px',
                     background: isExpanded
-                      ? (isLight ? 'rgba(0, 119, 163, 0.04)' : 'rgba(0, 210, 255, 0.04)')
+                      ? (isLight ? 'rgba(0, 119, 163, 0.04)' : 'rgba(var(--accent-primary-rgb), 0.04)')
                       : 'transparent'
                   }}
                 >
@@ -929,7 +929,7 @@ export default function DefectManager({ survey, vessel, onUpdate, refreshKey }: 
                   <div style={{
                     padding: '0 16px 14px 52px',
                     borderTop: '1px solid var(--table-border)',
-                    background: isLight ? 'rgba(0, 119, 163, 0.03)' : 'rgba(0, 210, 255, 0.03)'
+                    background: isLight ? 'rgba(0, 119, 163, 0.03)' : 'rgba(var(--accent-primary-rgb), 0.03)'
                   }}>
                     <DefectAttachments
                       defectId={defect.id}
@@ -1330,7 +1330,7 @@ function DefectAttachments({ defectId, canManage, isLight, uploadedBy, showError
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={handlePick}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '6px', border: `1px dashed ${dragOver ? 'var(--accent-primary)' : 'var(--input-border)'}`, background: dragOver ? 'rgba(0,210,255,0.06)' : 'transparent', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '6px', border: `1px dashed ${dragOver ? 'var(--accent-primary)' : 'var(--input-border)'}`, background: dragOver ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent', fontSize: '0.76rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
           >
             <Paperclip size={12} /> {busy ? 'Uploading…' : 'Drop or attach file'}
           </div>

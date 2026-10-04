@@ -138,7 +138,7 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
     }
 
     const placeholderColor = (p: string) => {
-        if (p === '{deadline}') return { bg: 'rgba(0,170,200,0.15)', text: '#00aac8' }
+        if (p === '{deadline}') return { bg: 'rgba(var(--accent-primary-rgb), 0.15)', text: 'var(--accent-primary)' }
         if (p === '{days}') return { bg: 'rgba(100,100,255,0.15)', text: '#6464ff' }
         if (p === '{event}') return { bg: 'rgba(255,100,200,0.15)', text: '#ff64c8' }
         if (p === '{surveyor}') return { bg: 'rgba(0,200,100,0.15)', text: '#00c864' }
@@ -322,8 +322,8 @@ export default function SurveyWarrantiesTab({ quotation, showSuccess, showError,
                                 {!item.customText && placeholders.length > 0 && (
                                     <div style={{
                                         marginTop: '8px', padding: '6px 10px', borderRadius: '6px',
-                                        background: hasUnresolved ? 'rgba(255,176,32,0.08)' : 'rgba(0,170,200,0.06)',
-                                        border: `1px solid ${hasUnresolved ? 'rgba(255,176,32,0.2)' : 'rgba(0,170,200,0.15)'}`,
+                                        background: hasUnresolved ? 'rgba(255,176,32,0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)',
+                                        border: `1px solid ${hasUnresolved ? 'rgba(255,176,32,0.2)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`,
                                         fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5
                                     }}>
                                         <span style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', color: hasUnresolved ? '#ffb020' : '#00aac8', marginRight: '6px' }}>Preview:</span>

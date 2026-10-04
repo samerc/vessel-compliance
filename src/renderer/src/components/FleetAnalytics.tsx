@@ -81,7 +81,7 @@ function Chip({ label, selected, onClick }: { label: string; selected: boolean; 
         fontWeight: selected ? 600 : 400,
         cursor: 'pointer',
         border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        background: selected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         transition: 'all 0.15s',
         whiteSpace: 'nowrap',
@@ -365,7 +365,7 @@ function ProgressBar({ pct }: { pct: number }) {
   return (
     <div style={{
       height: '6px', borderRadius: '3px',
-      background: 'rgba(0,170,200,0.15)',
+      background: 'rgba(var(--accent-primary-rgb), 0.15)',
       flex: 1, minWidth: '60px',
     }}>
       <div style={{
@@ -1417,8 +1417,8 @@ export default function FleetAnalytics() {
             {hasQueried && (
               <span style={{
                 padding: '3px 12px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700,
-                background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent-primary)',
-                border: '1px solid rgba(0, 210, 255, 0.2)',
+                background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)',
+                border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
               }}>
                 {pool.length} vessel{pool.length !== 1 ? 's' : ''}
               </span>
@@ -1875,7 +1875,7 @@ export default function FleetAnalytics() {
                     padding: '6px 14px', borderRadius: '8px',
                     border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
                     background: exportFormat === fmt
-                      ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,170,200,0.12)')
+                      ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.12)')
                       : 'transparent',
                   }}>
                     <input

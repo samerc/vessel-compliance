@@ -136,14 +136,14 @@ export default function TradingTab({ quotation, showSuccess, showError, updateFi
                 {qVessels.length >= 2 && (
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
                         <button onClick={() => setSelectedVesselId(null)}
-                            style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: selectedVesselId === null ? 700 : 400, border: selectedVesselId === null ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)', background: selectedVesselId === null ? 'rgba(0,210,255,0.08)' : 'transparent', color: selectedVesselId === null ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                            style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: selectedVesselId === null ? 700 : 400, border: selectedVesselId === null ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border-color)', background: selectedVesselId === null ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'transparent', color: selectedVesselId === null ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                             All Vessels
                         </button>
                         {qVessels.map(v => {
                             const hasOverride = tradingIntros.some(ti => ti.vesselScope && ti.vesselScope.includes(v.id))
                             return (
                                 <button key={v.id} onClick={() => setSelectedVesselId(v.id)}
-                                    style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: selectedVesselId === v.id ? 700 : 400, border: selectedVesselId === v.id ? '2px solid var(--accent-primary)' : hasOverride ? '1.5px solid rgba(0,210,255,0.4)' : '1px solid var(--glass-border-color)', background: selectedVesselId === v.id ? 'rgba(0,210,255,0.08)' : hasOverride ? 'rgba(0,210,255,0.03)' : 'transparent', color: selectedVesselId === v.id ? 'var(--accent-primary)' : hasOverride ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                    style={{ padding: '5px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: selectedVesselId === v.id ? 700 : 400, border: selectedVesselId === v.id ? '2px solid var(--accent-primary)' : hasOverride ? '1.5px solid rgba(var(--accent-primary-rgb), 0.4)' : '1px solid var(--glass-border-color)', background: selectedVesselId === v.id ? 'rgba(var(--accent-primary-rgb), 0.08)' : hasOverride ? 'rgba(var(--accent-primary-rgb), 0.03)' : 'transparent', color: selectedVesselId === v.id ? 'var(--accent-primary)' : hasOverride ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                     {v.vesselLabel} {(v.name || '').toUpperCase()}
                                     {hasOverride && <span style={{ marginLeft: '4px', fontSize: '0.65rem' }}>●</span>}
                                 </button>

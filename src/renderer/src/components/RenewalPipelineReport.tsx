@@ -55,7 +55,9 @@ function daysUntil(dateStr: string): number {
 function formatPremium(value: number | null, currency: string | null): string {
   if (value == null) return '-'
   const sym = currency === 'EUR' ? '\u20AC' : currency === 'GBP' ? '\u00A3' : '$'
-  return `${sym}${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  const n = Number(value)
+  const decimals = Number.isInteger(n) ? 0 : 2
+  return `${sym}${n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
 }
 
 
@@ -227,7 +229,7 @@ export default function RenewalPipelineReport() {
       ? yearRenewals.filter(r => r.policyTypeId === policyTypeFilter)
       : yearRenewals
     const total = yearData.length
-    const totalPremium = yearData.reduce((sum, r) => sum + (r.premium || 0), 0)
+    const totalPremium = yearData.reduce((sum, r) => sum + (Number(r.premium) || 0), 0)
     const avgPremium = total > 0 ? totalPremium / total : 0
     const withStatus = yearData.filter(r => r.renewalStatusName)
     const renewalRate = total > 0 ? Math.round((withStatus.length / total) * 100) : 0
@@ -584,9 +586,9 @@ export default function RenewalPipelineReport() {
                           borderRadius: '6px',
                           fontSize: '0.78rem',
                           fontWeight: 500,
-                          background: 'rgba(0, 210, 255, 0.08)',
+                          background: 'rgba(var(--accent-primary-rgb), 0.08)',
                           color: 'var(--accent-primary)',
-                          border: '1px solid rgba(0, 210, 255, 0.2)',
+                          border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                         }}>
                           {r.policyTypeName}
                         </span>
@@ -639,7 +641,7 @@ export default function RenewalPipelineReport() {
             <span>{filtered.length} renewal{filtered.length !== 1 ? 's' : ''} shown</span>
             <span>
               Total premium: <strong style={{ color: 'var(--text-primary)' }}>
-                ${Math.round(filtered.reduce((s, r) => s + (r.premium || 0), 0)).toLocaleString()}
+                ${Math.round(filtered.reduce((s, r) => s + (Number(r.premium) || 0), 0)).toLocaleString()}
               </strong>
             </span>
           </div>

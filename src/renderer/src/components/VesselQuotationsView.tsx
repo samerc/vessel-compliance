@@ -337,7 +337,7 @@ export default function VesselQuotationsView({ vessel, onNavigateToQuotation }: 
                     cursor: 'pointer',
                     transition: 'background 0.15s'
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(0,210,255,0.04)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(var(--accent-primary-rgb), 0.04)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
                   <td style={{ padding: '12px 14px' }}>

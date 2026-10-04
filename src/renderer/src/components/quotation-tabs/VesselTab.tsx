@@ -448,7 +448,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
             </div>
 
             {showAddForm && (
-                <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border-color)', marginBottom: '20px', background: 'rgba(0,210,255,0.03)' }}>
+                <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border-color)', marginBottom: '20px', background: 'rgba(var(--accent-primary-rgb), 0.03)' }}>
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                         <button onClick={() => setAddMode('existing')} className={addMode === 'existing' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px' }}>From Registry</button>
                         <button onClick={() => { setAddMode('fleet'); loadFleets() }} className={addMode === 'fleet' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '5px' }}><Layers size={13} /> Add Fleet</button>
@@ -479,11 +479,11 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                             key={f.id}
                                             onClick={() => !addingFleet && handleAddFleet(f.id)}
                                             style={{ padding: '10px 14px', cursor: addingFleet ? 'wait' : 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'background 0.15s', opacity: addingFleet ? 0.6 : 1 }}
-                                            onMouseEnter={e => { if (!addingFleet) e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)' }}
+                                            onMouseEnter={e => { if (!addingFleet) e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)' }}
                                             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                         >
                                             <span style={{ fontWeight: 600 }}>{f.name}</span>
-                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'rgba(0,210,255,0.1)', padding: '2px 8px', borderRadius: '10px' }}>{f.vesselCount} vessel{f.vesselCount !== 1 ? 's' : ''}</span>
+                                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '2px 8px', borderRadius: '10px' }}>{f.vesselCount} vessel{f.vesselCount !== 1 ? 's' : ''}</span>
                                         </div>
                                     ))
                                 })()}
@@ -512,7 +512,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                             {filtered.slice(0, 20).map(v => (
                                                 <div key={v.id} onClick={() => { setSelectedVesselId(v.id); setVesselSearch(`${v.name} (IMO: ${v.imoNumber})`); setVesselDropdownOpen(false) }}
                                                     style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)', transition: 'background 0.15s' }}
-                                                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                    onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                                                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                 >
                                                     <span style={{ fontWeight: 600 }}>{v.name}</span>
@@ -569,7 +569,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                                 {filtered.map((f: any) => (
                                                     <div key={f.id} onMouseDown={() => { setNewData(p => ({ ...p, flag: f.name })); setFlagDropdownOpen(false) }}
                                                         style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                     >
                                                         {f.name}{f.iso3Code ? <span style={{ color: 'var(--text-secondary)', marginLeft: '6px', fontSize: '0.8rem' }}>({f.iso3Code})</span> : null}
@@ -601,7 +601,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                                 {filtered.map((t: any) => (
                                                     <div key={t.id} onMouseDown={() => { setNewData(p => ({ ...p, vesselType: t.name })); setTypeDropdownOpen(false) }}
                                                         style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                     >
                                                         {t.name}
@@ -633,7 +633,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                                 {filtered.map((c: any) => (
                                                     <div key={c.id} onMouseDown={() => { setNewData(p => ({ ...p, classification: c.name })); setClassDropdownOpen(false) }}
                                                         style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--table-border)' }}
-                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(0,210,255,0.06)')}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)')}
                                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                     >
                                                         {c.name}
@@ -679,7 +679,7 @@ export default function VesselTab({ quotation, vessels, showSuccess, showError, 
                                 <button title="Move down" aria-label="Move down" onClick={() => handleMoveVessel(qv.id, 'down')} disabled={qVessels.indexOf(qv) === qVessels.length - 1} className="btn-secondary" style={{ padding: '2px', opacity: qVessels.indexOf(qv) === qVessels.length - 1 ? 0.3 : 1 }}><ChevronDown size={14} /></button>
                             </div>
                         )}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(0,210,255,0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '38px', height: '38px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'monospace', flexShrink: 0 }}>
                             {qv.vesselLabel}
                         </div>
                         {isEditing ? (

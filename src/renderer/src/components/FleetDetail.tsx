@@ -516,7 +516,7 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps) {
                                         borderRadius: '8px',
                                         cursor: 'pointer',
                                         background: zipSelectedIds.has(v.id)
-                                            ? (isLight ? 'rgba(0,170,200,0.08)' : 'rgba(0,210,255,0.06)')
+                                            ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)')
                                             : 'transparent',
                                         transition: 'background 0.15s'
                                     }}

@@ -17,7 +17,7 @@ function Chip({ label, selected, onClick }: { label: string; selected: boolean; 
         fontWeight: selected ? 600 : 400,
         cursor: 'pointer',
         border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        background: selected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         transition: 'all 0.15s',
         whiteSpace: 'nowrap',
@@ -387,9 +387,9 @@ export default function DynamicAddressBook() {
                   borderRadius: '10px',
                   fontSize: '0.75rem',
                   fontWeight: 700,
-                  background: 'rgba(0, 210, 255, 0.12)',
+                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
                   color: 'var(--accent-primary)',
-                  border: '1px solid rgba(0, 210, 255, 0.2)',
+                  border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                 }}>
                   {filteredResults.length} contact{filteredResults.length !== 1 ? 's' : ''}
                 </span>
@@ -526,9 +526,9 @@ export default function DynamicAddressBook() {
                           borderRadius: '10px',
                           fontSize: '0.72rem',
                           fontWeight: 700,
-                          background: r.entityType === 'company' ? 'rgba(0, 210, 255, 0.1)' : 'rgba(192, 132, 252, 0.12)',
+                          background: r.entityType === 'company' ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'rgba(192, 132, 252, 0.12)',
                           color: r.entityType === 'company' ? 'var(--accent-primary)' : '#c084fc',
-                          border: `1px solid ${r.entityType === 'company' ? 'rgba(0, 210, 255, 0.2)' : 'rgba(192, 132, 252, 0.25)'}`,
+                          border: `1px solid ${r.entityType === 'company' ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'rgba(192, 132, 252, 0.25)'}`,
                           textTransform: 'capitalize',
                         }}>
                           {r.entityType}

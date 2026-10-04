@@ -647,7 +647,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                     style={{
                       borderBottom: '1px solid var(--table-border)',
                       cursor: 'pointer',
-                      background: isSelected ? 'rgba(0,210,255,0.06)' : 'transparent',
+                      background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'transparent',
                       transition: 'background 0.15s'
                     }}
                     className="hover-effect"
@@ -778,7 +778,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps) {
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(0,170,200,0.15), rgba(0,170,200,0.05))',
+                  background: 'linear-gradient(135deg, rgba(var(--accent-primary-rgb), 0.15), rgba(var(--accent-primary-rgb), 0.05))',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'

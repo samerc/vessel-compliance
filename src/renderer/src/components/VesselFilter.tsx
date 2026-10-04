@@ -541,7 +541,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
     const chip = (selected: boolean) => ({
         padding: '4px 12px', borderRadius: '14px',
         border: selected ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-        background: selected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+        background: selected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
         color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
         cursor: 'pointer', fontSize: '0.78rem',
         fontWeight: selected ? 600 : 400,
@@ -865,7 +865,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps) 
                                             </td>
                                         </tr>
                                     ) : displayedVessels.map(v => (
-                                        <tr key={v.id} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default', background: comparedVesselIds.includes(v.id) ? 'rgba(0,210,255,0.06)' : undefined }}>
+                                        <tr key={v.id} className="hover-effect" style={{ borderBottom: '1px solid var(--table-border)', cursor: onNavigateToVessel ? 'pointer' : 'default', background: comparedVesselIds.includes(v.id) ? 'rgba(var(--accent-primary-rgb), 0.06)' : undefined }}>
                                             <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                                                 <input
                                                     type="checkbox"

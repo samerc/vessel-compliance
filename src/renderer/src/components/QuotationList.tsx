@@ -36,22 +36,16 @@ import ConfirmationModal from './ConfirmationModal'
 import ColumnSelector, { useColumnPrefs, ColumnDef } from './ColumnSelector'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
+import { Badge } from './ui'
+import type { BadgeTone } from './ui'
 
-const statusColorsDark: Record<string, { bg: string; text: string }> = {
-  draft: { bg: 'rgba(150, 150, 150, 0.15)', text: '#999' },
-  sent: { bg: 'rgba(0, 150, 255, 0.15)', text: '#0096ff' },
-  approved: { bg: 'rgba(0, 200, 100, 0.15)', text: '#00c864' },
-  exported: { bg: 'rgba(0, 170, 200, 0.15)', text: '#00aac8' },
-  rejected: { bg: 'rgba(255, 77, 77, 0.15)', text: 'var(--danger)' },
-  converted: { bg: 'rgba(180, 100, 255, 0.15)', text: '#b464ff' }
-}
-const statusColorsLight: Record<string, { bg: string; text: string }> = {
-  draft: { bg: 'rgba(100, 100, 100, 0.12)', text: '#666' },
-  sent: { bg: 'rgba(0, 100, 200, 0.12)', text: '#0064c8' },
-  approved: { bg: 'rgba(0, 140, 70, 0.12)', text: '#006630' },
-  exported: { bg: 'rgba(0, 120, 150, 0.12)', text: '#00788c' },
-  rejected: { bg: 'rgba(200, 0, 0, 0.1)', text: '#c00000' },
-  converted: { bg: 'rgba(120, 60, 180, 0.12)', text: '#6b2fa0' }
+const STATUS_TONES: Record<string, BadgeTone> = {
+  draft: 'neutral',
+  sent: 'info',
+  approved: 'success',
+  exported: 'accent',
+  rejected: 'danger',
+  converted: 'violet'
 }
 
 type SortField =
@@ -697,8 +691,6 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   }
 
   const renderRow = (q: any, showFavStar = true) => {
-    const statusColors = isLight ? statusColorsLight : statusColorsDark
-    const sc = statusColors[q.status] || statusColors.draft
     const isFav = favorites.has(q.id)
     return (
       <tr
@@ -706,7 +698,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         style={{
           borderBottom: '1px solid var(--table-border)',
           cursor: 'pointer',
-          background: selectedIds.has(q.id) ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)') : undefined
+          background: selectedIds.has(q.id) ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)') : undefined
         }}
         className="hover-effect"
         onClick={() => {
@@ -751,12 +743,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
               fontWeight: 600,
               fontSize: '0.88rem',
               color: (q.referenceNumber || '').startsWith('DRAFT-')
-                ? isLight
-                  ? '#888'
-                  : '#777'
-                : isLight
-                  ? '#007a91'
-                  : '#00aac8'
+                ? 'var(--text-secondary)'
+                : 'var(--accent-primary)'
             }}
           >
             {q.lockedBy && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginRight: '6px', padding: '1px 6px', borderRadius: '4px', background: isLight ? 'rgba(180,120,0,0.1)' : 'rgba(255,176,32,0.1)', border: isLight ? '1px solid rgba(180,120,0,0.3)' : '1px solid rgba(255,176,32,0.25)', fontSize: '0.68rem', color: isLight ? '#8a6500' : '#ffb020', fontWeight: 600 }} title={`Locked by ${q.lockedByName || 'user'}`}>
@@ -788,8 +776,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                   borderRadius: '4px',
                   fontSize: '0.6rem',
                   fontWeight: 700,
-                  background: 'rgba(0, 170, 200, 0.12)',
-                  color: isLight ? '#007a91' : '#00aac8'
+                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                  color: 'var(--accent-primary)'
                 }}
               >
                 REN
@@ -810,8 +798,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                   borderRadius: '5px',
                   fontSize: '0.72rem',
                   fontWeight: 700,
-                  background: 'rgba(0, 170, 200, 0.12)',
-                  color: isLight ? '#007a91' : '#00aac8'
+                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                  color: 'var(--accent-primary)'
                 }}
               >
                 {q.quotationTypeCode}
@@ -911,44 +899,9 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {qVisibleSet.has('status') && (
           <td style={{ padding: '12px 14px' }}>
             {q.workflowStepName ? (
-              <span
-                style={{
-                  padding: '3px 9px',
-                  borderRadius: '10px',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  background: (q.workflowStepColor || '#6b7280') + '22',
-                  color: q.workflowStepColor || '#6b7280',
-                  border: `1px solid ${q.workflowStepColor || '#6b7280'}40`,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: q.workflowStepColor || '#6b7280'
-                  }}
-                />
-                {q.workflowStepName}
-              </span>
+              <Badge color={q.workflowStepColor || '#6b7280'} dot>{q.workflowStepName}</Badge>
             ) : (
-              <span
-                style={{
-                  padding: '3px 9px',
-                  borderRadius: '10px',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  background: sc.bg,
-                  color: sc.text
-                }}
-              >
-                {q.status}
-              </span>
+              <Badge tone={STATUS_TONES[q.status] || 'neutral'} style={{ textTransform: 'capitalize' }}>{q.status}</Badge>
             )}
           </td>
         )}
@@ -1100,30 +1053,24 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
   return (
     <div>
       {/* ═══ View Tabs ═══ */}
-      <div style={{ display: 'flex', gap: '2px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="tabs" style={{ marginBottom: '14px' }}>
         {(['active', 'converted', 'all'] as const).map(vf => {
           const labels: Record<string, string> = { active: 'Active', converted: 'Converted', all: 'All' }
           const active = viewFilter === vf && !savedFilters.some(sf => sf.id === viewFilter)
           return (
-            <button key={vf} onClick={() => { setViewFilter(vf); setActiveGroupId(null) }}
-              style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: active ? 700 : 400, background: active ? 'var(--bg-card)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent' }}>
+            <button key={vf} className={`tab${active ? ' active' : ''}`} onClick={() => { setViewFilter(vf); setActiveGroupId(null) }}>
               {labels[vf]}
             </button>
           )
         })}
-        <button onClick={() => { setViewFilter('deleted'); loadDeletedQuotations() }}
-          style={{ padding: '8px 16px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: viewFilter === 'deleted' ? 700 : 400, background: viewFilter === 'deleted' ? 'var(--bg-card)' : 'transparent', color: viewFilter === 'deleted' ? 'var(--danger)' : 'var(--text-secondary)', borderBottom: viewFilter === 'deleted' ? '2px solid var(--danger)' : '2px solid transparent', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-          <Trash size={13} /> Recycle Bin {deletedQuotations.length > 0 && `(${deletedQuotations.length})`}
-        </button>
         {savedFilters.map(sf => (
-          <button key={sf.id} onClick={() => applyFilter(sf.filters)}
-            style={{ padding: '8px 12px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 400, background: 'transparent', color: 'var(--text-secondary)', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button key={sf.id} className="tab" onClick={() => applyFilter(sf.filters)}>
             {sf.name}
             <X size={12} style={{ opacity: 0.4 }} onClick={e => deleteSavedFilter(sf.id, e)} />
           </button>
         ))}
         {hasActiveFilters && !showSaveFilterInput && (
-          <button onClick={() => setShowSaveFilterInput(true)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px dashed var(--input-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button onClick={() => setShowSaveFilterInput(true)} className="btn-ghost btn-sm" style={{ color: 'var(--accent-primary)', marginLeft: '6px' }}>
             <Plus size={12} /> Save View
           </button>
         )}
@@ -1134,6 +1081,11 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             <button title="Cancel" aria-label="Cancel" onClick={() => { setShowSaveFilterInput(false); setNewFilterName('') }} className="btn-secondary" style={{ padding: '5px' }}><X size={12} /></button>
           </div>
         )}
+        <button onClick={() => { setViewFilter('deleted'); loadDeletedQuotations() }}
+          className={`tab${viewFilter === 'deleted' ? ' active' : ''}`}
+          style={{ marginLeft: 'auto', ...(viewFilter === 'deleted' ? { color: 'var(--danger)', borderBottomColor: 'var(--danger)' } : {}) }}>
+          <Trash size={13} /> Recycle Bin {deletedQuotations.length > 0 && <span className="tab-count">{deletedQuotations.length}</span>}
+        </button>
       </div>
 
       {viewFilter === 'deleted' ? (
@@ -1194,15 +1146,15 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           {isSearchActive && <span style={{ position: 'absolute', right: loading ? '30px' : '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>ALL</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isSearchActive ? 0.3 : 1, pointerEvents: isSearchActive ? 'none' : 'auto' }}>
-          <button title="Previous" aria-label="Previous" onClick={() => navigateMonth(-1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronLeft size={16} /></button>
+          <button title="Previous" aria-label="Previous" onClick={() => navigateMonth(-1)} className="btn-secondary btn-icon"><ChevronLeft size={16} /></button>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '180px', textAlign: 'center', whiteSpace: 'nowrap' }}>{navLabel}</span>
-          <button title="Next" aria-label="Next" onClick={() => navigateMonth(1)} className="btn-secondary" style={{ padding: '6px 8px' }}><ChevronRight size={16} /></button>
-          <button onClick={goToToday} className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>Today</button>
+          <button title="Next" aria-label="Next" onClick={() => navigateMonth(1)} className="btn-secondary btn-icon"><ChevronRight size={16} /></button>
+          <button onClick={goToToday} className="btn-secondary btn-sm">Today</button>
         </div>
-        <button onClick={loadData} className="btn-secondary" style={{ padding: '7px', flexShrink: 0 }} title="Refresh"><RotateCw size={16} /></button>
+        <button onClick={loadData} className="btn-secondary btn-icon" style={{ flexShrink: 0 }} title="Refresh" aria-label="Refresh"><RotateCw size={16} /></button>
         {hasPermission('quotations:create') && (
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowNewMenu(!showNewMenu)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+            <button onClick={() => setShowNewMenu(!showNewMenu)} className="btn-primary" style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
               <Plus size={16} /> New Quotation
             </button>
             {showNewMenu && (
@@ -1211,7 +1163,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                 <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100, background: isLight ? '#ffffff' : '#1a1d28', border: '1px solid var(--glass-border-color)', borderRadius: '10px', padding: '6px', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
                   {quotationTypes.map(qt => (
                     <button key={qt.id} onClick={() => handleCreate(qt.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none', borderRadius: '6px', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }} className="hover-effect">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '20px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(0,170,200,0.12)', color: isLight ? '#007a91' : '#00aac8' }}>{qt.code}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '20px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' }}>{qt.code}</span>
                       {qt.name}
                     </button>
                   ))}
@@ -1222,375 +1174,56 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         )}
       </div>
 
-      {/* ═══ Compact Stats + Filter Chips ═══ */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* ═══ Filter Chips ═══ */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Status chips */}
         {[
-          { label: 'Draft', key: 'draft', color: '#999' },
-          { label: 'Sent', key: 'sent', color: '#0096ff' },
-          { label: 'Approved', key: 'approved', color: '#00c864' },
-          { label: 'Exported', key: 'exported', color: '#00aac8' },
-          { label: 'Rejected', key: 'rejected', color: '#ff4d4d' },
+          { label: 'Draft', key: 'draft', color: 'var(--text-secondary)' },
+          { label: 'Sent', key: 'sent', color: 'var(--info)' },
+          { label: 'Approved', key: 'approved', color: 'var(--success)' },
+          { label: 'Exported', key: 'exported', color: 'var(--accent-primary)' },
+          { label: 'Rejected', key: 'rejected', color: 'var(--danger)' },
         ].map(s => {
           const count = data.stats.byStatus?.[s.key] || 0
           const active = statusFilter === s.key
           return (
-            <button key={s.key} onClick={() => setStatusFilter(prev => prev === s.key ? 'all' : s.key)}
-              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', border: active ? `1.5px solid ${s.color}` : '1px solid var(--table-border)', background: active ? `${s.color}15` : 'transparent', color: active ? s.color : 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: active ? 600 : 400 }}>
+            <button key={s.key} className={`chip${active ? ' active' : ''}`} onClick={() => setStatusFilter(prev => prev === s.key ? 'all' : s.key)}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />
               {s.label}
-              {count > 0 && <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{count}</span>}
+              {count > 0 && <span className="chip-count">{count}</span>}
             </button>
           )
         })}
-        <span style={{ color: 'var(--table-border)', margin: '0 2px' }}>|</span>
+        <span style={{ width: 1, height: 18, background: 'var(--table-border)', margin: '0 4px' }} />
         {/* Type chips */}
         {quotationTypes.map(qt => {
           const active = typeFilter === qt.id
           const count = (data.stats.byType as any[])?.find((t: any) => t.code === qt.code)?.count || 0
           return (
-            <button key={qt.id} onClick={() => setTypeFilter(prev => prev === qt.id ? 'all' : qt.id)}
-              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', border: active ? '1.5px solid var(--accent-primary)' : '1px solid var(--table-border)', background: active ? 'rgba(0,170,200,0.1)' : 'transparent', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: active ? 600 : 400 }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0 3px', borderRadius: '3px', background: 'rgba(0,170,200,0.12)', color: isLight ? '#007a91' : '#00aac8' }}>{qt.code}</span>
+            <button key={qt.id} className={`chip${active ? ' active' : ''}`} onClick={() => setTypeFilter(prev => prev === qt.id ? 'all' : qt.id)}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0 4px', borderRadius: '3px', background: 'var(--accent-tint)', color: 'var(--accent-primary)' }}>{qt.code}</span>
               {qt.name}
-              {count > 0 && <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{count}</span>}
+              {count > 0 && <span className="chip-count">{count}</span>}
             </button>
           )
         })}
-        <span style={{ color: 'var(--table-border)', margin: '0 2px' }}>|</span>
-        {/* Renewal filter */}
-        <select value={renewalFilter} onChange={e => setRenewalFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem', padding: '4px 8px' }}>
-          <option value="all">All</option>
-          <option value="new">New</option>
-          <option value="renewal">Renewal</option>
+      </div>
+
+      {/* Second toolbar row: grouping, favorites toggle, select, actions */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* New / renewal */}
+        <select value={renewalFilter} onChange={e => setRenewalFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem' }} title="New or renewal">
+          <option value="all">New &amp; Renewal</option>
+          <option value="new">New only</option>
+          <option value="renewal">Renewals only</option>
         </select>
         {/* Created by */}
         {creators.length > 1 && (
-          <select value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem', padding: '4px 8px' }}>
+          <select value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} style={{ ...selectStyle, fontSize: '0.78rem' }} title="Created by">
             <option value="all">All Users</option>
             {creators.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
-        {/* Compact total */}
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-          {data.total} quotation{data.total !== 1 ? 's' : ''}
-        </span>
-        {hasActiveFilters && (
-          <button onClick={clearAllFilters} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--danger)' }}>Clear</button>
-        )}
-      </div>
-
-      {/* ═══ Toolbar (group, favorites, select, bulk) ═══ */}
-      {/* Keep existing saved filters chips area for backward compat — now empty since moved to tabs */}
-      {false && savedFilters.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '6px',
-            marginBottom: '10px',
-            flexWrap: 'wrap',
-            alignItems: 'center'
-          }}
-        >
-          <span
-            style={{
-              fontSize: '0.72rem',
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              marginRight: '4px'
-            }}
-          >
-            Saved:
-          </span>
-          {savedFilters.map((sf) => (
-            <button
-              key={sf.id}
-              onClick={() => applyFilter(sf.filters)}
-              style={{
-                padding: '3px 10px',
-                borderRadius: '14px',
-                fontSize: '0.73rem',
-                border: '1px solid var(--accent-primary)',
-                background: 'rgba(0, 170, 200, 0.08)',
-                color: isLight ? '#007a91' : '#00aac8',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: 500
-              }}
-            >
-              {sf.name}
-              <span
-                onClick={(e) => deleteSavedFilter(sf.id, e)}
-                style={{
-                  cursor: 'pointer',
-                  opacity: 0.6,
-                  fontSize: '0.85rem',
-                  lineHeight: 1,
-                  marginLeft: '2px'
-                }}
-                title="Delete filter"
-              >
-                x
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Stats strip (replaced by compact chips above) */}
-      {false && <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {[
-          { label: 'Total', value: data.stats.total || 0, color: '#00aac8', status: 'all' },
-          {
-            label: 'Draft',
-            value: data.stats.byStatus?.['draft'] || 0,
-            color: '#999',
-            status: 'draft'
-          },
-          {
-            label: 'Sent',
-            value: data.stats.byStatus?.['sent'] || 0,
-            color: '#0096ff',
-            status: 'sent'
-          },
-          {
-            label: 'Approved',
-            value: data.stats.byStatus?.['approved'] || 0,
-            color: '#00c864',
-            status: 'approved'
-          },
-          {
-            label: 'Rejected',
-            value: data.stats.byStatus?.['rejected'] || 0,
-            color: '#ff4d4d',
-            status: 'rejected'
-          },
-          {
-            label: 'Converted',
-            value: data.stats.byStatus?.['converted'] || 0,
-            color: '#b464ff',
-            status: 'converted'
-          }
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="glass-card"
-            style={{
-              padding: '10px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              flex: '1 1 0',
-              minWidth: '100px',
-              cursor: 'pointer',
-              border:
-                statusFilter === s.status && s.status !== 'all' ? `1px solid ${s.color}` : undefined
-            }}
-            onClick={() => {
-              if (s.status === 'all') setStatusFilter('all')
-              else setStatusFilter((prev) => (prev === s.status ? 'all' : s.status))
-            }}
-          >
-            <span style={{ fontSize: '1.3rem', fontWeight: 700, color: s.color }}>{s.value}</span>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                fontWeight: 600
-              }}
-            >
-              {s.label}
-            </span>
-          </div>
-        ))}
-        {/* Type badges */}
-        {Array.isArray(data.stats.byType) &&
-          data.stats.byType.length > 0 &&
-          data.stats.byType.map((t) => (
-            <div
-              key={t.code}
-              className="glass-card"
-              style={{
-                padding: '10px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                border: typeFilter === t.code ? '1px solid var(--accent-primary)' : undefined
-              }}
-              onClick={() =>
-                setTypeFilter((prev) => {
-                  // Find the quotation type ID by code
-                  const qt = quotationTypes.find((q) => q.code === t.code)
-                  if (!qt) return prev
-                  return prev === qt.id ? 'all' : qt.id
-                })
-              }
-            >
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '22px',
-                  height: '18px',
-                  borderRadius: '4px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  background: 'rgba(0, 170, 200, 0.12)',
-                  color: isLight ? '#007a91' : '#00aac8'
-                }}
-              >
-                {t.code}
-              </span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>{t.count}</span>
-            </div>
-          ))}
-      </div>}
-
-      {/* Filter bar (replaced by compact chips + search above) */}
-      {false && <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '14px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}
-      >
-        <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
-          <Search
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-secondary)'
-            }}
-            size={15}
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search reference, vessel, customer, title, user..."
-            style={{ width: '100%', paddingLeft: '36px', fontSize: '0.83rem' }}
-          />
-          {loading && (
-            <Loader2
-              size={14}
-              className="spinner"
-              style={{
-                position: 'absolute',
-                right: '10px',
-                top: 'calc(50% - 7px)',
-                color: 'var(--accent-primary)'
-              }}
-            />
-          )}
-        </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="all">All Types</option>
-          {quotationTypes.map((qt) => (
-            <option key={qt.id} value={qt.id}>
-              {qt.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="all">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="converted">Converted</option>
-        </select>
-        <select
-          value={renewalFilter}
-          onChange={(e) => setRenewalFilter(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="all">All</option>
-          <option value="new">New Business</option>
-          <option value="renewal">Renewal</option>
-        </select>
-        <select
-          value={createdByFilter}
-          onChange={(e) => setCreatedByFilter(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="all">All Users</option>
-          {creators.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          style={{ ...selectStyle, width: '130px' }}
-          title="Date from"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          style={{ ...selectStyle, width: '130px' }}
-          title="Date to"
-        />
-        <div
-          style={{
-            display: 'flex',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            border: '1px solid var(--input-border)'
-          }}
-        >
-          {(['all', 'registry', 'drafts'] as const).map(vf => (
-            <button
-              key={vf}
-              onClick={() => setViewFilter(vf)}
-              style={{
-                padding: '7px 12px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.76rem',
-                fontWeight: 600,
-                background: viewFilter === vf ? 'var(--accent-primary)' : 'transparent',
-                color: viewFilter === vf ? '#fff' : 'var(--text-secondary)'
-              }}
-            >
-              {vf === 'all' ? 'All' : vf === 'registry' ? 'Registry' : 'Drafts'}
-            </button>
-          ))}
-        </div>
-      </div>}
-
-      {/* Second toolbar row: grouping, favorites toggle, select, actions */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '16px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}
-      >
         {/* Group by */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Layers size={14} style={{ color: 'var(--text-secondary)' }} />
@@ -1609,14 +1242,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {/* Favorites toggle */}
         <button
           onClick={() => setShowFavoritesOnly((v) => !v)}
-          className={showFavoritesOnly ? 'btn-primary' : 'btn-secondary'}
-          style={{
-            padding: '7px 12px',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}
+          className={`${showFavoritesOnly ? 'btn-primary' : 'btn-secondary'} btn-sm`}
         >
           <Star size={13} fill={showFavoritesOnly ? '#fff' : 'none'} />
           Favorites
@@ -1639,14 +1265,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         {/* Select mode toggle */}
         <button
           onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()) }}
-          className={selectMode ? 'btn-primary' : 'btn-secondary'}
-          style={{
-            padding: '7px 12px',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}
+          className={`${selectMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+          title="Select quotations for bulk actions"
         >
           <CheckSquare size={13} />
           Select
@@ -1661,15 +1281,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
             {hasPermission('quotations:bulkDelete') && (
               <button
                 onClick={() => setBulkDeleteModal(true)}
-                className="btn-secondary"
-                style={{
-                  padding: '7px 12px',
-                  fontSize: '0.78rem',
-                  color: 'var(--danger)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
+                className="btn-danger btn-sm"
               >
                 <Trash2 size={13} />
                 Delete Selected
@@ -1679,14 +1291,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowAddToGroup(v => !v)}
-                  className="btn-secondary"
-                  style={{
-                    padding: '7px 12px',
-                    fontSize: '0.78rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
+                  className="btn-secondary btn-sm"
                 >
                   <FolderPlus size={13} />
                   Add to Group
@@ -1729,25 +1334,19 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         )}
 
         <div style={{ flex: 1 }} />
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          {data.total} quotation{data.total !== 1 ? 's' : ''}
+        </span>
+        {hasActiveFilters && (
+          <button onClick={clearAllFilters} className="btn-ghost btn-sm" style={{ color: 'var(--danger)' }}>Clear filters</button>
+        )}
       </div>
 
       {/* Quotation groups chips */}
       {qGroups.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <Tag size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-          <button
-            onClick={() => setActiveGroupId(null)}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '14px',
-              fontSize: '0.73rem',
-              fontWeight: 600,
-              border: activeGroupId === null ? '1px solid var(--accent-primary)' : '1px solid var(--input-border)',
-              background: activeGroupId === null ? 'rgba(0, 170, 200, 0.12)' : 'transparent',
-              color: activeGroupId === null ? (isLight ? '#007a91' : '#00aac8') : 'var(--text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
+          <button onClick={() => setActiveGroupId(null)} className={`chip${activeGroupId === null ? ' active' : ''}`}>
             All
           </button>
           {qGroups.map(g => (
@@ -1761,7 +1360,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                 fontWeight: 600,
                 border: activeGroupId === g.id ? `1px solid ${g.color || 'var(--accent-primary)'}` : '1px solid var(--input-border)',
                 background: activeGroupId === g.id ? (g.color || '#00aac8') + '20' : 'transparent',
-                color: activeGroupId === g.id ? (g.color || (isLight ? '#007a91' : '#00aac8')) : 'var(--text-secondary)',
+                color: activeGroupId === g.id ? (g.color || ('var(--accent-primary)')) : 'var(--text-secondary)',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1784,18 +1383,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
           ))}
           <button
             onClick={() => setShowGroupManager(v => !v)}
-            style={{
-              padding: '4px 8px',
-              borderRadius: '14px',
-              fontSize: '0.73rem',
-              border: '1px dashed var(--input-border)',
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
+            className="chip"
+            style={{ borderStyle: 'dashed' }}
             title="Manage groups"
           >
             <Edit3 size={11} /> Manage
@@ -1920,14 +1509,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
         <div style={{ marginBottom: '12px' }}>
           <button
             onClick={() => setShowGroupManager(true)}
-            className="btn-secondary"
-            style={{
-              padding: '5px 12px',
-              fontSize: '0.76rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
+            className="btn-secondary btn-sm"
           >
             <Tag size={13} /> Create Group
           </button>
@@ -1987,7 +1569,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
       )}
 
       {/* Main table */}
-      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+      <div className="glass-card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
         {/* Loading overlay */}
         {loading && (
           <div
@@ -2036,7 +1618,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                       colSpan={colCount}
                       style={{
                         padding: '10px 16px',
-                        background: isLight ? 'rgba(0, 170, 200, 0.04)' : 'rgba(0, 170, 200, 0.06)',
+                        background: isLight ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'rgba(var(--accent-primary-rgb), 0.06)',
                         borderBottom: '1px solid var(--table-border)',
                         borderTop: '1px solid var(--table-border)'
                       }}
@@ -2045,7 +1627,7 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                         style={{
                           fontWeight: 700,
                           fontSize: '0.82rem',
-                          color: isLight ? '#007a91' : '#00aac8'
+                          color: 'var(--accent-primary)'
                         }}
                       >
                         {groupName}
@@ -2054,8 +1636,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                         style={{
                           marginLeft: '8px',
                           fontSize: '0.72rem',
-                          background: 'rgba(0, 170, 200, 0.12)',
-                          color: isLight ? '#007a91' : '#00aac8',
+                          background: 'rgba(var(--accent-primary-rgb), 0.12)',
+                          color: 'var(--accent-primary)',
                           padding: '2px 8px',
                           borderRadius: '8px',
                           fontWeight: 600
@@ -2252,8 +1834,8 @@ export default function QuotationList({ onOpenQuotation, initialSearch, onSearch
                     background:
                       deleteModal.deleteMode === 'single'
                         ? isLight
-                          ? 'rgba(0,170,200,0.05)'
-                          : 'rgba(0,170,200,0.08)'
+                          ? 'rgba(var(--accent-primary-rgb), 0.05)'
+                          : 'rgba(var(--accent-primary-rgb), 0.08)'
                         : 'transparent'
                   }}
                   onClick={() =>

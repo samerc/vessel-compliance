@@ -36,7 +36,7 @@ export default function Calculators() {
               padding: '12px 20px',
               borderRadius: '10px',
               border: activeCalc === calc.id ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-              background: activeCalc === calc.id ? 'rgba(0, 210, 255, 0.1)' : 'transparent',
+              background: activeCalc === calc.id ? 'rgba(var(--accent-primary-rgb), 0.1)' : 'transparent',
               color: activeCalc === calc.id ? 'var(--text-primary)' : 'var(--text-secondary)',
               cursor: 'pointer',
               fontWeight: activeCalc === calc.id ? '600' : '400',

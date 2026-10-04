@@ -391,7 +391,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                                 {ws.defaultSelected && (
                                                     <span style={{ fontSize: '0.58rem', padding: '0px 4px', borderRadius: '3px', background: 'rgba(0, 200, 100, 0.12)', color: isLight ? '#007a3d' : '#00c864', fontWeight: 600, whiteSpace: 'nowrap' }}>DEFAULT</span>
                                                 )}
-                                                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(0,210,255,0.08)', padding: '0px 5px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{ws.warrantyIds?.length || 0}</span>
+                                                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(var(--accent-primary-rgb), 0.08)', padding: '0px 5px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{ws.warrantyIds?.length || 0}</span>
                                                 {fullyApplied ? (
                                                     <span style={{ fontSize: '0.68rem', color: isLight ? '#007a3d' : '#00c864', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '2px' }}>
                                                         <Check size={10} /> Applied
@@ -408,7 +408,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
 
                             {/* Tag filter chips */}
                             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                <button onClick={() => setActiveTab('all')} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === 'all' ? 'rgba(0,210,255,0.12)' : 'transparent', border: `1px solid ${activeTab === 'all' ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                <button onClick={() => setActiveTab('all')} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === 'all' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', border: `1px solid ${activeTab === 'all' ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                     All ({visibleWarranties.length})
                                 </button>
                                 {tags.map(tag => {
@@ -417,13 +417,13 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                     const count = visibleWarranties.filter(matchesTag).length
                                     if (count === 0) return null
                                     return (
-                                        <button key={tag.id} onClick={() => setActiveTab(tag.id)} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === tag.id ? 'rgba(0,210,255,0.12)' : 'transparent', border: `1px solid ${activeTab === tag.id ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === tag.id ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                        <button key={tag.id} onClick={() => setActiveTab(tag.id)} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === tag.id ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', border: `1px solid ${activeTab === tag.id ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === tag.id ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                             {tag.name} ({count})
                                         </button>
                                     )
                                 })}
                                 {untaggedCount > 0 && (
-                                    <button onClick={() => setActiveTab('untagged')} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === 'untagged' ? 'rgba(0,210,255,0.12)' : 'transparent', border: `1px solid ${activeTab === 'untagged' ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === 'untagged' ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                                    <button onClick={() => setActiveTab('untagged')} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', cursor: 'pointer', background: activeTab === 'untagged' ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent', border: `1px solid ${activeTab === 'untagged' ? 'var(--accent-primary)' : 'var(--table-border)'}`, color: activeTab === 'untagged' ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                                         Other ({untaggedCount})
                                     </button>
                                 )}
@@ -458,7 +458,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                                     {w.isCargoRelated && <span style={{ fontSize: '0.58rem', padding: '0px 4px', borderRadius: '3px', background: 'rgba(255,180,0,0.15)', color: '#ffb400' }}>Cargo</span>}
                                                     {(w.tagIds || []).map(tid => {
                                                         const tag = tags.find(t => t.id === tid)
-                                                        return tag ? <span key={tid} style={{ fontSize: '0.58rem', padding: '0px 4px', borderRadius: '3px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
+                                                        return tag ? <span key={tid} style={{ fontSize: '0.58rem', padding: '0px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)' }}>{tag.name}</span> : null
                                                     })}
                                                 </div>
                                             )}
@@ -479,7 +479,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         <div style={{ padding: '10px 10px 6px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>Selected</span>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', background: 'rgba(0,210,255,0.1)', padding: '1px 8px', borderRadius: '10px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '1px 8px', borderRadius: '10px' }}>
                                 {selectedIds.length + customWarranties.length}
                             </span>
                         </div>
@@ -495,10 +495,10 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                 return (
                                     <div key={as.set.id} style={{ marginBottom: '6px', borderRadius: '6px', border: '1px solid var(--table-border)', overflow: 'hidden' }}>
                                         {/* Set group header */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 8px', background: 'rgba(0,210,255,0.05)', cursor: 'pointer' }} onClick={() => toggleSetCollapse(as.set.id)}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 8px', background: 'rgba(var(--accent-primary-rgb), 0.05)', cursor: 'pointer' }} onClick={() => toggleSetCollapse(as.set.id)}>
                                             <ChevronDown size={13} style={{ color: 'var(--text-secondary)', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s', flexShrink: 0 }} />
                                             <span style={{ fontSize: '0.8rem', fontWeight: 600, flex: 1 }}>{as.set.name}</span>
-                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(0,210,255,0.1)', padding: '0px 6px', borderRadius: '8px' }}>{as.idsInSelected.length}</span>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', background: 'rgba(var(--accent-primary-rgb), 0.1)', padding: '0px 6px', borderRadius: '8px' }}>{as.idsInSelected.length}</span>
                                             <div style={{ display: 'flex', gap: '2px' }} onClick={e => e.stopPropagation()}>
                                                 <button onClick={() => moveSetGroup(as.set.id, 'up')} disabled={asIdx === 0 && as.startIdx === 0} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: asIdx === 0 && as.startIdx === 0 ? 0.2 : 0.6, lineHeight: 1 }} title="Move group up"><ChevronUp size={12} /></button>
                                                 <button onClick={() => moveSetGroup(as.set.id, 'down')} disabled={as.endIdx >= selectedIds.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: as.endIdx >= selectedIds.length - 1 ? 0.2 : 0.6, lineHeight: 1 }} title="Move group down"><ChevronDown size={12} /></button>
@@ -579,7 +579,7 @@ export default function WarrantiesTab({ quotation, showSuccess, showError, updat
                                                                     <button title="Move down" aria-label="Move down" onClick={() => moveCustom(i, 'down')} disabled={i === customWarranties.length - 1} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0', color: 'var(--text-secondary)', opacity: i === customWarranties.length - 1 ? 0.2 : 0.6, lineHeight: 1 }}><ChevronDown size={10} /></button>
                                                                 </div>
                                                                 <span style={{ flex: 1, whiteSpace: 'pre-wrap', lineHeight: 1.3 }}>{cw.text}</span>
-                                                                <span style={{ fontSize: '0.58rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(0,210,255,0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', alignSelf: 'center' }}>Custom</span>
+                                                                <span style={{ fontSize: '0.58rem', padding: '1px 4px', borderRadius: '3px', background: 'rgba(var(--accent-primary-rgb), 0.1)', color: 'var(--accent-primary)', whiteSpace: 'nowrap', alignSelf: 'center' }}>Custom</span>
                                                                 <button title="Edit" aria-label="Edit" onClick={() => { setEditingCustomId(cw.id); setEditCustomText(cw.text) }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '1px', opacity: 0.6 }}><Pencil size={10} /></button>
                                                                 <button title="Delete" aria-label="Delete" onClick={() => deleteCustom(cw.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '1px', opacity: 0.6 }}><Trash2 size={10} /></button>
                                                             </>

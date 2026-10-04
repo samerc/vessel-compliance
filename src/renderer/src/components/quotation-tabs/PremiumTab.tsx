@@ -506,7 +506,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                                             <MoneyInput value={quotation.previousPremiumAmount} onChange={val => setQ(p => ({ ...p, previousPremiumAmount: val || undefined }))} onBlur={val => updateField('previousPremiumAmount', val || null)} placeholder="—" style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }} showZero />
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', background: 'rgba(0,170,200,0.04)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--table-border)', background: 'rgba(var(--accent-primary-rgb), 0.04)' }}>
                                         <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', minWidth: '140px' }}>Pro-Rata Premium</label>
                                         <MoneyInput value={quotation.premiumAmount} onChange={val => setQ(p => ({ ...p, premiumAmount: val || undefined }))} onBlur={val => updateField('premiumAmount', val || null)} placeholder="Calculated" style={{ flex: 1, maxWidth: '200px' }} />
                                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{currency}</span>
@@ -729,7 +729,7 @@ export default function PremiumTab({ quotation, updateField, setQ, getEffectiveT
                 const altColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
                 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 return (
-                    <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.06)', border: '1px solid rgba(0, 210, 255, 0.15)' }}>
+                    <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(var(--accent-primary-rgb), 0.06)', border: '1px solid rgba(var(--accent-primary-rgb), 0.15)' }}>
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: anyMultiAlt ? '8px' : '0' }}>
                             Payable Premium ({discountLabel})
                         </div>

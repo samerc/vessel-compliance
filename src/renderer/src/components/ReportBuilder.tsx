@@ -1160,7 +1160,7 @@ export default function ReportBuilder() {
                   fontSize: '0.7rem',
                   padding: '1px 8px',
                   borderRadius: '10px',
-                  background: 'rgba(0,210,255,0.1)',
+                  background: 'rgba(var(--accent-primary-rgb), 0.1)',
                   color: 'var(--accent-primary)',
                   fontWeight: '600'
                 }}
@@ -1395,7 +1395,7 @@ export default function ReportBuilder() {
                     fontSize: '0.72rem',
                     padding: '2px 10px',
                     borderRadius: '10px',
-                    background: 'rgba(0,210,255,0.1)',
+                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
                     color: 'var(--accent-primary)',
                     fontWeight: '600'
                   }}
@@ -1753,7 +1753,7 @@ export default function ReportBuilder() {
                           fontSize: '0.7rem',
                           padding: '1px 8px',
                           borderRadius: '10px',
-                          background: 'rgba(0,210,255,0.1)',
+                          background: 'rgba(var(--accent-primary-rgb), 0.1)',
                           color: 'var(--accent-primary)',
                           fontWeight: '600'
                         }}
@@ -2005,7 +2005,7 @@ function ResultsTable({
                   <td key={col.key} style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                     <span style={{
                       padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: '600',
-                      background: mandatory ? 'rgba(255,160,0,0.1)' : 'rgba(0,210,255,0.1)',
+                      background: mandatory ? 'rgba(255,160,0,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)',
                       color: mandatory ? (isLight ? '#b45309' : '#ffaa00') : 'var(--accent-primary)'
                     }}>
                       {val || ''}
@@ -2051,7 +2051,7 @@ function ResultsTable({
                               ? 'rgba(255,204,0,0.1)'
                               : val === 'inactive' || val === 'cancelled' || val === 'superseded'
                                 ? 'rgba(255,77,77,0.1)'
-                                : 'rgba(0,210,255,0.1)',
+                                : 'rgba(var(--accent-primary-rgb), 0.1)',
                         color:
                           val === 'active' || val === 'Closed' || val === 'completed'
                             ? isLight ? '#008c46' : '#00ff88'

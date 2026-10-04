@@ -572,7 +572,7 @@ function ReceiptModal({ isLight, modalBg, editing, lockedVesselId, lockedVesselN
                       <button key={p.id} onClick={() => togglePolicy(p)} style={{
                         padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'monospace',
                         border: on ? '1.5px solid var(--accent-primary)' : '1px solid var(--input-border)',
-                        background: on ? 'rgba(0,170,200,0.12)' : 'transparent',
+                        background: on ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
                         color: on ? 'var(--accent-primary)' : 'var(--text-secondary)'
                       }}>
                         {p.policyNumber}{p.typeName ? ` · ${p.typeName}` : ''}{p.source === 'dynamic' ? ' ·' : ''}

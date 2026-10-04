@@ -82,7 +82,7 @@ function InstituteClauseDropdown({ clauses, selectedId, onChange }: {
                                         color: active ? 'var(--accent-primary)' : (isLight ? '#1c1e21' : '#e8e8e8'),
                                         fontWeight: active ? 600 : 400,
                                         fontSize: '0.85rem',
-                                        background: active ? (isLight ? 'rgba(0,170,200,0.06)' : 'rgba(0,210,255,0.06)') : 'transparent',
+                                        background: active ? (isLight ? 'rgba(var(--accent-primary-rgb), 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)') : 'transparent',
                                         borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}`
                                     }}
                                     onMouseEnter={e => { if (!active) (e.target as HTMLElement).style.background = isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)' }}

@@ -43,8 +43,8 @@ export default function TLORateCalculator() {
   const cardStyle = {
     padding: '16px 20px',
     borderRadius: '12px',
-    background: isLight ? 'rgba(0, 119, 163, 0.06)' : 'rgba(0, 210, 255, 0.06)',
-    border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.15)' : 'rgba(0, 210, 255, 0.15)'}`
+    background: isLight ? 'rgba(0, 119, 163, 0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)',
+    border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`
   }
 
   return (
@@ -116,7 +116,7 @@ export default function TLORateCalculator() {
               <span style={{ color: 'var(--text-secondary)' }}>Step 4: Additional Premium = Value Difference x Adjusted Rate</span>
               <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(calculation.additionalPremium)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,119,163,0.08)' : 'rgba(0,210,255,0.08)', border: `1px solid ${isLight ? 'rgba(0,119,163,0.2)' : 'rgba(0,210,255,0.2)'}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', background: isLight ? 'rgba(0,119,163,0.08)' : 'rgba(var(--accent-primary-rgb), 0.08)', border: `1px solid ${isLight ? 'rgba(0,119,163,0.2)' : 'rgba(var(--accent-primary-rgb), 0.2)'}` }}>
               <span style={{ fontWeight: '600' }}>Step 5: New Premium = Current Premium + Additional Premium</span>
               <span style={{ fontWeight: '700', fontFamily: 'monospace', color: 'var(--accent-primary)' }}>{fmt(calculation.newPremium)}</span>
             </div>
