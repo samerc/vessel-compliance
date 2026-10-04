@@ -4365,6 +4365,11 @@ export async function loadDeclarationFields(policyId: string): Promise<Declarati
 }
 
 export async function exportDeclarationDocx(policyId: string, fields: DeclarationFields): Promise<void> {
+  // A declaration is issued once per policy: a signed policy re-exports its stored declaration
+  // (field edits are ignored). A changed declaration needs a policy revision (new policy row).
+  const declKey = 'decl'
+  const storedDecl = await polStoredFile(policyId, declKey)
+  if (storedDecl) { polDownloadBlob(storedDecl.blob, storedDecl.fileName); return }
   const data = await loadFrozenExportData(policyId)
 
   const FONT = 'Arial'
@@ -4480,7 +4485,9 @@ export async function exportDeclarationDocx(policyId: string, fields: Declaratio
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Declaration).docx`)
+  const declFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Declaration).docx` }
+  await polStoreFile(policyId, declKey, declFile)
+  polDownloadBlob(declFile.blob, declFile.fileName)
 }
 
 // ============================================================================
@@ -4497,6 +4504,9 @@ async function loadEndorsementExportData(policyId: string, endorsementId: string
 }
 
 export async function exportEndorsementDocx(policyId: string, endorsementId: string): Promise<void> {
+  // A signed endorsement re-exports its stored file (see polFrozenFile)
+  const storedEnd = await polStoredFile(policyId, `end:${endorsementId}`)
+  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
   await loadPolicyFontSize()
   const { data, endorsement, sections } = await loadEndorsementExportData(policyId, endorsementId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -4673,10 +4683,15 @@ export async function exportEndorsementDocx(policyId: string, endorsementId: str
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx`)
+  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber}).docx` }
+  await polStoreFile(policyId, `end:${endorsementId}`, endFile)
+  polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
 export async function exportEndorsementDADocx(policyId: string, endorsementId: string): Promise<void> {
+  // A signed endorsement re-exports its stored file (see polFrozenFile)
+  const storedEnd = await polStoredFile(policyId, `end-da:${endorsementId}`)
+  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
   await loadPolicyFontSize()
   const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -4857,10 +4872,15 @@ export async function exportEndorsementDADocx(policyId: string, endorsementId: s
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx`)
+  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} DA).docx` }
+  await polStoreFile(policyId, `end-da:${endorsementId}`, endFile)
+  polDownloadBlob(endFile.blob, endFile.fileName)
 }
 
 export async function exportEndorsementCADocx(policyId: string, endorsementId: string): Promise<void> {
+  // A signed endorsement re-exports its stored file (see polFrozenFile)
+  const storedEnd = await polStoredFile(policyId, `end-ca:${endorsementId}`)
+  if (storedEnd) { polDownloadBlob(storedEnd.blob, storedEnd.fileName); return }
   await loadPolicyFontSize()
   const { data, endorsement, instalments } = await loadEndorsementExportData(policyId, endorsementId)
   const typeCode = data.quotation.quotationTypeCode || 'P'
@@ -4985,5 +5005,7 @@ export async function exportEndorsementCADocx(policyId: string, endorsementId: s
 
   const blob = await Packer.toBlob(document)
   const vName = data.vesselInfo?.name || ''
-  polDownloadBlob(blob, `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx`)
+  const endFile = { blob, fileName: `${data.policy.policyNumber} - ${vName} (Endorsement ${endorsement.endorsementNumber} CA).docx` }
+  await polStoreFile(policyId, `end-ca:${endorsementId}`, endFile)
+  polDownloadBlob(endFile.blob, endFile.fileName)
 }

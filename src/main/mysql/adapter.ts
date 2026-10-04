@@ -12140,11 +12140,17 @@ export class MySQLAdapter {
         return r ? { fileName: r.fileName, data: r.data } : null
     }
 
-    /** Stores the file only when the policy is signed; returns whether it was stored. */
+    /**
+     * Stores the file only when its document is signed: the endorsement for an endorsement file
+     * (doc_key end:, end-da:, end-ca: + endorsement id), otherwise the policy. Returns whether stored.
+     */
     async savePolicyExportFile(policyId: string, docKey: string, fileName: string, data: Buffer): Promise<boolean> {
         if (!this.pool) return false
-        const [pol] = await this.pool.query('SELECT signed_at FROM policy_documents WHERE id = ?', [policyId])
-        if (!(pol as any[])[0]?.signed_at) return false
+        const endMatch = /^end(?:-da|-ca)?:(.+)$/.exec(docKey)
+        const [signedRows] = endMatch
+            ? await this.pool.query('SELECT signed_at FROM policy_endorsements WHERE id = ? AND policy_doc_id = ?', [endMatch[1], policyId])
+            : await this.pool.query('SELECT signed_at FROM policy_documents WHERE id = ?', [policyId])
+        if (!(signedRows as any[])[0]?.signed_at) return false
         await this.pool.execute(
             `INSERT INTO policy_export_files (id, policy_doc_id, doc_key, file_name, data) VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE id = id`,
@@ -12153,9 +12159,19 @@ export class MySQLAdapter {
         return true
     }
 
+    /** Clears the policy's own files (policy, PDF, DA, CA, blue cards, declarations). A signed
+     *  endorsement is its own document and keeps its files. */
     async clearPolicyExportFiles(policyId: string): Promise<void> {
         if (!this.pool) return
-        await this.pool.execute('DELETE FROM policy_export_files WHERE policy_doc_id = ?', [policyId])
+        await this.pool.execute("DELETE FROM policy_export_files WHERE policy_doc_id = ? AND doc_key NOT LIKE 'end%'", [policyId])
+    }
+
+    async clearEndorsementExportFiles(endorsementId: string): Promise<void> {
+        if (!this.pool) return
+        await this.pool.execute(
+            'DELETE FROM policy_export_files WHERE doc_key IN (?, ?, ?)',
+            [`end:${endorsementId}`, `end-da:${endorsementId}`, `end-ca:${endorsementId}`]
+        )
     }
 
     async setPolicyInstalments(policyId: string, instalments: { instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number; isNonRefundable: boolean }[]): Promise<void> {
@@ -16180,12 +16196,25 @@ export class MySQLAdapter {
         if (updates.premiumCurrency !== undefined) { fields.push('premium_currency = ?'); values.push(updates.premiumCurrency) }
         if (updates.commissionPercent !== undefined) { fields.push('commission_percent = ?'); values.push(updates.commissionPercent) }
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status) }
-        if (updates.exportedAt !== undefined) { fields.push('exported_at = ?'); values.push(updates.exportedAt) }
+        // DATETIME columns: an ISO string (2026-10-04T07:20:54.890Z) is rejected by MariaDB strict mode
+        // (stored as local time, like the CURRENT_TIMESTAMP columns)
+        const toDbDateTime = (v: string | null) => {
+            if (!v) return null
+            const d = new Date(v)
+            if (isNaN(d.getTime())) return String(v).slice(0, 19)
+            const p = (n: number) => String(n).padStart(2, '0')
+            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+        }
+        if (updates.exportedAt !== undefined) { fields.push('exported_at = ?'); values.push(toDbDateTime(updates.exportedAt)) }
         if (updates.signedBy !== undefined) { fields.push('signed_by = ?'); values.push(updates.signedBy) }
-        if (updates.signedAt !== undefined) { fields.push('signed_at = ?'); values.push(updates.signedAt) }
+        if (updates.signedAt !== undefined) { fields.push('signed_at = ?'); values.push(toDbDateTime(updates.signedAt)) }
         if (fields.length === 0) return
         values.push(id)
         await this.pool.execute(`UPDATE policy_endorsements SET ${fields.join(', ')} WHERE id = ?`, values)
+        // Any real change (content, signing) drops the stored files; marking it exported does not
+        if (Object.keys(updates).some(k => k !== 'status' && k !== 'exportedAt' && (updates as any)[k] !== undefined)) {
+            await this.clearEndorsementExportFiles(id)
+        }
     }
 
     async deleteEndorsement(id: string): Promise<void> {
@@ -16193,6 +16222,7 @@ export class MySQLAdapter {
         await this.pool.execute('DELETE FROM endorsement_sections WHERE endorsement_id = ?', [id])
         await this.pool.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [id])
         await this.pool.execute('DELETE FROM policy_endorsements WHERE id = ?', [id])
+        await this.clearEndorsementExportFiles(id)
     }
 
     async getEndorsementSections(endorsementId: string): Promise<any[]> {
@@ -16211,6 +16241,7 @@ export class MySQLAdapter {
         id?: string; sectionKey: string; sectionTitle: string; content: string; isEnabled: boolean; isFullWidth?: boolean; orderIndex: number
     }>): Promise<void> {
         if (!this.pool) return
+        await this.clearEndorsementExportFiles(endorsementId)
         await this.pool.execute('DELETE FROM endorsement_sections WHERE endorsement_id = ?', [endorsementId])
         for (const s of sections) {
             await this.pool.execute(
@@ -16236,6 +16267,7 @@ export class MySQLAdapter {
         instalmentNumber: number; dueDate: string; premiumAmount: number; commissionAmount: number
     }>): Promise<void> {
         if (!this.pool) return
+        await this.clearEndorsementExportFiles(endorsementId)
         await this.pool.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [endorsementId])
         for (const inst of instalments) {
             await this.pool.execute(
