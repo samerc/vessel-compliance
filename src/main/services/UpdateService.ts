@@ -104,7 +104,7 @@ export class UpdateService {
   /**
    * Send event to renderer process
    */
-  private sendToRenderer(channel: string, data?: any): void {
+  private sendToRenderer(channel: string, data?: unknown): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send(channel, data)
     }
@@ -156,13 +156,13 @@ export class UpdateService {
   /**
    * Fetch changelogs from GitHub Releases API
    */
-  async getChangelogs(): Promise<any[]> {
+  async getChangelogs(): Promise<Changelog[]> {
     try {
       const response = await fetch('https://api.github.com/repos/samerc/vessel-compliance/releases')
       if (!response.ok) {
         throw new Error(`Failed to fetch releases: ${response.statusText}`)
       }
-      const releases = (await response.json()) as any[]
+      const releases = (await response.json()) as GitHubRelease[]
       return releases
         .filter((r) => r.tag_name !== 'code-latest')
         .map((r) => ({
@@ -177,6 +177,23 @@ export class UpdateService {
       throw error
     }
   }
+}
+
+/** Fields read from a GitHub Releases API entry. */
+interface GitHubRelease {
+  tag_name: string
+  name: string | null
+  published_at: string | null
+  body: string | null
+  html_url: string
+}
+
+export interface Changelog {
+  version: string
+  name: string | null
+  date: string | null
+  notes: string | null
+  url: string
 }
 
 // Export singleton instance

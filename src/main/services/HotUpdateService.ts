@@ -8,7 +8,7 @@
  */
 import { app } from 'electron'
 import { net } from 'electron'
-import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, renameSync } from 'fs'
 import { join, resolve, dirname, sep } from 'path'
 
 const USER_DATA = app.getPath('userData')
@@ -140,7 +140,7 @@ class HotUpdateService {
         'User-Agent': 'vessel-compliance-updater'
       })
       const release = JSON.parse(buf.toString('utf-8'))
-      const asset = release.assets?.find((a: any) => a.name === 'code-update.zip')
+      const asset = release.assets?.find((a: { name: string }) => a.name === 'code-update.zip')
       return asset?.browser_download_url || null
     } catch {
       return null
@@ -244,7 +244,7 @@ class HotUpdateService {
       mkdirSync(extractDir, { recursive: true })
 
       // Use JSZip (already a dependency) to extract
-      const JSZip = require('jszip')
+      const { default: JSZip } = await import('jszip')
       const zip = await JSZip.loadAsync(zipBuffer)
       const entries = Object.keys(zip.files)
 
@@ -272,18 +272,16 @@ class HotUpdateService {
         rmSync(backupDir, { recursive: true, force: true })
       }
       if (existsSync(HOT_UPDATE_DIR)) {
-        const { renameSync } = require('fs')
         renameSync(HOT_UPDATE_DIR, backupDir)
       }
-      const { renameSync } = require('fs')
       renameSync(stagingDir, HOT_UPDATE_DIR)
       if (existsSync(backupDir)) {
         rmSync(backupDir, { recursive: true, force: true })
       }
 
       return { updated: true, version: remoteVersion }
-    } catch (err: any) {
-      return { updated: false, error: err.message || 'Update failed' }
+    } catch (err) {
+      return { updated: false, error: (err instanceof Error ? err.message : '') || 'Update failed' }
     }
   }
 

@@ -167,7 +167,7 @@ export async function setDocxPageStart(
   policyTypeTitle?: string,
   totalPages?: number
 ): Promise<Buffer> {
-  const JSZip = require('jszip')
+  const { default: JSZip } = await import('jszip')
   const zip = await JSZip.loadAsync(docxBuffer)
 
   const docXmlFile = zip.file('word/document.xml')

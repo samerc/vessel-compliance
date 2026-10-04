@@ -29,6 +29,29 @@ export interface DataUpdate {
   release_date: string | null
 }
 
+/** Raw `entities` row: list columns hold JSON text. */
+interface EntityRow {
+  id: number
+  source: string
+  source_id: string | null
+  entity_type: string
+  name: string
+  name_normalized: string
+  aliases: string | null
+  date_of_birth: string | null
+  nationality: string | null
+  addresses: string | null
+  identifications: string | null
+  programs: string | null
+  vessel_imo: string | null
+  remarks: string | null
+  listed_date: string | null
+  mother_name?: string | null
+  father_name?: string | null
+}
+
+type SqlValue = string | number | null
+
 export class SanctionsDatabase {
   private db: Database.Database | null = null
 
@@ -82,8 +105,8 @@ export class SanctionsDatabase {
     `)
     // Migration: add mother_name, father_name columns
     try {
-      const cols = this.db!.prepare('PRAGMA table_info(entities)').all() as any[]
-      const colNames = cols.map((c: any) => c.name)
+      const cols = this.db!.prepare('PRAGMA table_info(entities)').all() as { name: string }[]
+      const colNames = cols.map((c) => c.name)
       if (!colNames.includes('mother_name')) {
         this.db!.exec('ALTER TABLE entities ADD COLUMN mother_name TEXT')
       }
@@ -97,7 +120,7 @@ export class SanctionsDatabase {
 
   getAllEntities(): SanctionsEntity[] {
     if (!this.db) return []
-    const rows = this.db.prepare('SELECT * FROM entities').all() as any[]
+    const rows = this.db.prepare('SELECT * FROM entities').all() as EntityRow[]
     return rows.map((r) => this.deserializeEntity(r))
   }
 
@@ -106,10 +129,11 @@ export class SanctionsDatabase {
     if (source) {
       const row = this.db
         .prepare('SELECT COUNT(*) as cnt FROM entities WHERE source = ?')
-        .get(source) as any
+        .get(source) as { cnt: number } | undefined
       return row?.cnt || 0
     }
-    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM entities').get() as any
+    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM entities').get() as
+      { cnt: number } | undefined
     return row?.cnt || 0
   }
 
@@ -117,7 +141,7 @@ export class SanctionsDatabase {
     if (!this.db) return []
     const normalizedQuery = query.toLowerCase().trim()
     let sql = `SELECT * FROM entities WHERE (name_normalized LIKE ? OR aliases LIKE ? OR (vessel_imo IS NOT NULL AND vessel_imo = ?) OR mother_name LIKE ? OR father_name LIKE ?)`
-    const params: any[] = [
+    const params: SqlValue[] = [
       `%${normalizedQuery}%`,
       `%${normalizedQuery}%`,
       query.trim(),
@@ -130,7 +154,7 @@ export class SanctionsDatabase {
     }
     sql += ' LIMIT ?'
     params.push(options.limit || 100)
-    const rows = this.db.prepare(sql).all(...params) as any[]
+    const rows = this.db.prepare(sql).all(...params) as EntityRow[]
     return rows.map((r) => this.deserializeEntity(r))
   }
 
@@ -201,7 +225,7 @@ export class SanctionsDatabase {
     if (!this.db) return []
     const rows = this.db
       .prepare("SELECT * FROM entities WHERE source = 'SIC' ORDER BY name")
-      .all() as any[]
+      .all() as EntityRow[]
     return rows.map((r) => this.deserializeEntity(r))
   }
 
@@ -209,7 +233,7 @@ export class SanctionsDatabase {
     if (!this.db) return null
     const row = this.db
       .prepare('SELECT * FROM entities WHERE id = ? AND source = ?')
-      .get(id, 'SIC') as any
+      .get(id, 'SIC') as EntityRow | undefined
     return row ? this.deserializeEntity(row) : null
   }
 
@@ -247,7 +271,7 @@ export class SanctionsDatabase {
   updateSicEntity(id: number, e: Partial<SanctionsEntity>): void {
     if (!this.db) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (e.name !== undefined) {
       fields.push('name = ?')
       values.push(e.name)
@@ -311,7 +335,7 @@ export class SanctionsDatabase {
     this.upsertDataUpdate('SIC', count, 'success', null)
   }
 
-  private deserializeEntity(row: any): SanctionsEntity {
+  private deserializeEntity(row: EntityRow): SanctionsEntity {
     return {
       id: row.id,
       source: row.source,
@@ -333,7 +357,7 @@ export class SanctionsDatabase {
     }
   }
 
-  private parseJson(val: any, fallback: any): any {
+  private parseJson<T>(val: string | null, fallback: T): T {
     if (!val) return fallback
     try {
       return JSON.parse(val)

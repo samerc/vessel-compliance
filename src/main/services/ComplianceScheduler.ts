@@ -90,10 +90,10 @@ class ComplianceScheduler {
 
       // Filter out already cleared if skipCleared is enabled
       const entitiesToCheck = settings.skipCleared
-        ? entities.filter((e: any) => e.ofacStatus !== 'CLEARED' && e.ofacStatus !== 'MATCH')
+        ? entities.filter((e) => e.ofacStatus !== 'CLEARED' && e.ofacStatus !== 'MATCH')
         : entities
       const vesselsToCheck = settings.skipCleared
-        ? vessels.filter((v: any) => v.ofacStatus !== 'CLEARED' && v.ofacStatus !== 'MATCH')
+        ? vessels.filter((v) => v.ofacStatus !== 'CLEARED' && v.ofacStatus !== 'MATCH')
         : vessels
 
       const totalToCheck = entitiesToCheck.length + vesselsToCheck.length
@@ -109,7 +109,7 @@ class ComplianceScheduler {
       const threshold = settings.threshold / 100 // Convert to decimal
 
       // Check entities
-      const yieldToEventLoop = () => new Promise<void>((r) => setImmediate(r))
+      const yieldToEventLoop = (): Promise<void> => new Promise<void>((r) => setImmediate(r))
       for (const entity of entitiesToCheck) {
         checkedCount++
         this.sendProgress(checkedCount, totalToCheck, entity.name)
@@ -253,7 +253,7 @@ class ComplianceScheduler {
       console.log(
         `Compliance check completed: ${totalToCheck} checked, ${matchesFound} matches found`
       )
-    } catch (error: any) {
+    } catch (error) {
       console.error('Compliance check failed:', error)
       if (trigger === 'manual') throw error
     } finally {
@@ -320,7 +320,7 @@ class ComplianceScheduler {
     }
   }
 
-  stop() {
+  stop(): void {
     this.stopped = true
     if (this.checkTimer) {
       clearTimeout(this.checkTimer)

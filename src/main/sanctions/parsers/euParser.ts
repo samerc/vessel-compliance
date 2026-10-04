@@ -54,7 +54,7 @@ function parseCSVLine(line: string): string[] {
 }
 
 function parseEuRow(row: string[], colIndex: Record<string, number>): SanctionsEntity | null {
-  const getValue = (col: string) => {
+  const getValue = (col: string): string => {
     const idx = colIndex[col]
     return idx !== undefined ? row[idx] || '' : ''
   }

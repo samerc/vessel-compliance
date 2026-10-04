@@ -13,7 +13,7 @@ export function parseSicExcel(buffer: Buffer): {
   // Cols: Last Name, First Name, Father's Name, Mother's Name, Nationality, DOB, (optional record ref)
   if (wb.SheetNames.length > 0) {
     const ws = wb.Sheets[wb.SheetNames[0]]
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
     for (let i = 1; i < data.length; i++) {
       const row = data[i]
       if (!row || (!row[0] && !row[1])) continue
@@ -52,7 +52,7 @@ export function parseSicExcel(buffer: Buffer): {
   // Cols: Date, Full name, Mother's Name, Nationality, DOB, Subject
   if (wb.SheetNames.length > 1) {
     const ws = wb.Sheets[wb.SheetNames[1]]
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
     let lastDate: string | null = null
     let lastSubject: string | null = null
 
@@ -124,7 +124,7 @@ function extractAliases(fullName: string): { primary: string; aliases: string[] 
   return { primary, aliases }
 }
 
-function parseDob(val: any): string | null {
+function parseDob(val: unknown): string | null {
   if (val == null) return null
   if (typeof val === 'number') {
     if (val > 10000) return excelDateToString(val)
@@ -143,7 +143,7 @@ function excelDateToString(serial: number): string {
   return `${year}-${month}-${day}`
 }
 
-function cleanText(val: any): string {
+function cleanText(val: unknown): string {
   if (val == null) return ''
   if (typeof val === 'number') return String(val)
   return String(val).trim().replace(/\s+/g, ' ')

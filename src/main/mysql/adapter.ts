@@ -1,70 +1,201 @@
 import { createPool, Pool, PoolConnection } from 'mysql2/promise'
+import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise'
+import type {
+  AddedQuotationClause,
+  AddedQuotationExclusion,
+  AnalyticsData,
+  BankRow,
+  CalendarEvents,
+  DashboardActivity,
+  DataValidationRuleResult,
+  DefectAttachmentRow,
+  GlobalSearchResults,
+  NullableFields,
+  PolicyRevisionRow,
+  QueryRows,
+  QuotationAdditionalClauseRow,
+  QuotationClauseRef,
+  QuotationExclusionRef,
+  QuotationGroup,
+  QuotationHullCustomCondition,
+  QuotationInformationItem,
+  QuotationListItem,
+  QuotationListPage,
+  QuotationLolOption,
+  QuotationTradingIntro,
+  QuotationWarrantyRef,
+  Row,
+  SqlValue,
+  StoredComplianceSchedule,
+  StoredFilePath,
+  SurveyWarrantyTemplateRow,
+  UserSignatureListRow,
+  UserSignatureRow,
+  VesselRef,
+  WithId
+} from './rowTypes'
 import { randomUUID as uuidv4 } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
 import {
-  DocumentType,
-  Fleet,
-  Vessel,
-  VesselDocument,
-  Entity,
+  ActivityLogEntry,
+  AnalyticsFilters,
+  AnalyticsPolicyCoverage,
+  AnalyticsPreset,
+  AnalyticsVesselRow,
   AssuredRole,
-  VesselAssured,
-  EntityUBO,
-  User,
-  ConditionSurvey,
-  SurveyDefect,
-  SurveyAttachment,
-  Surveyor,
-  PaginatedResult,
-  VesselQueryParams,
-  EntityQueryParams,
-  SurveyorQueryParams,
+  CargoClause,
+  CargoClauseSet,
+  CargoInstituteClause,
+  ClassificationSociety,
+  ComplianceCheckLog,
+  ComplianceCheckResult,
   ComplianceResultQueryParams,
-  VesselCustomDocType,
-  PolicyType,
-  VesselPolicy,
+  ConditionSurvey,
+  ConvertedPolicy,
+  CustomValidationRule,
   DABQueryCriteria,
+  DABResult,
+  DefectAttachmentRecord,
+  DeletedQuotationRow,
+  DocumentTemplate,
+  DocumentType,
+  EmailTemplate,
+  EndorsementDueRow,
+  EndorsementInstalment,
+  EndorsementSection,
+  EndorsementTemplate,
+  EndorsementTriggerField,
+  Entity,
+  EntityAddress,
+  EntityDocument,
+  EntityDocumentType,
+  EntityQueryParams,
+  EntityUBO,
+  FlagState,
+  FlagStatePort,
+  Fleet,
+  HullAdditionalCondition,
+  HullAgreedValueText,
+  HullAltVesselPremium,
+  HullClause,
+  HullClauseCondition,
+  HullConditionSection,
+  InstalmentDefaults,
+  Notification,
+  NotificationGroup,
+  OpenDefectRow,
+  PIAdditionalClause,
+  PIAdditionalClauseSet,
   PIClause,
   PIClauseSet,
-  PIWarranty,
-  PIWarrantyTag,
   PIDeductible,
   PIDeductibleSet,
   PIDeductibleSetItem,
   PIExclusion,
-  PISubLimitTemplate,
-  PIAdditionalClause,
-  PIAdditionalClauseSet,
-  TradingExcludedCountry,
-  TradingWarrantyTemplate,
-  Quotation,
   PISanctionsVersion,
-  InstalmentDefaults,
-  ClassificationSociety,
-  VesselClassification,
-  VesselType,
-  VesselAuditEntry,
+  PISectionTexts,
+  PISubLimitTemplate,
+  PISubjectivity,
+  PITextDeductible,
+  PIWarranty,
+  PIWarrantySet,
+  PIWarrantyTag,
+  PaginatedResult,
+  PolicyBlueCard,
+  PolicyBlueCardUpdate,
+  PolicyDocAddress,
+  PolicyDocInstalment,
+  PolicyDocument,
+  PolicyEndorsement,
+  PolicyExpiryRow,
+  PolicyListRow,
+  PolicyRenewalNote,
+  PolicyRenewalRow,
+  PolicyType,
   PolicyTypeCharacteristic,
   PolicyTypeCondition,
-  VesselDynamicPolicy,
-  VesselPolicyValue,
-  QuotationVessel,
-  QuotationType,
-  EntityAddress,
-  UserGroup,
-  AnalyticsPreset,
-  AnalyticsFilters,
   PremiumTextTemplate,
-  TradingCustomText,
-  SavedReport,
+  Quotation,
+  QuotationAgreedValueItem,
+  QuotationAgreedValueOption,
+  QuotationAssured,
+  QuotationAssuredGroup,
+  QuotationCargoClause,
+  QuotationCargoCustomClause,
+  QuotationCustomExclusion,
+  QuotationCustomSection,
+  QuotationCustomWarranty,
+  QuotationDeductible,
+  QuotationDiscount,
+  QuotationExcludedCountry,
+  QuotationHullAdditionalCondition,
+  QuotationHullAlternative,
+  QuotationHullCondition,
+  QuotationInstalment,
+  QuotationListRow,
+  QuotationNewVessel,
+  QuotationNote,
+  QuotationPIAlternative,
+  QuotationSavedFilter,
+  QuotationSavedFilterValues,
+  QuotationSubLimit,
+  QuotationSubjectivity,
+  QuotationSurveyWarranty,
+  QuotationTextDeductible,
+  QuotationType,
+  QuotationVessel,
+  QuotationWarCondition,
+  QuotationWorkflowLog,
+  Receipt,
+  ReceiptInput,
+  ReceiptPolicy,
+  RecentItem,
+  RenewalStatusType,
   ReportConfig,
-  EntityDocumentType,
-  EntityDocument
+  ReportResultRow,
+  SanctionsReportCheck,
+  SanctionsReportCheckInput,
+  SavedReport,
+  SurveyAttachment,
+  SurveyDefect,
+  SurveyHistoryRow,
+  SurveyWarranty,
+  SurveyWarrantyReminder,
+  SurveyWarrantyTemplateSet,
+  Surveyor,
+  SurveyorQueryParams,
+  TcTemplateDetail,
+  TcTemplateMeta,
+  TcTemplateSummary,
+  TradingCustomText,
+  TradingExcludedCountry,
+  TradingWarrantyTemplate,
+  User,
+  UserGroup,
+  Vessel,
+  VesselAssured,
+  VesselAuditEntry,
+  VesselClassification,
+  VesselCustomDocType,
+  VesselDocument,
+  VesselDynamicPolicy,
+  VesselInsurancePolicy,
+  VesselNameHistory,
+  VesselNote,
+  VesselPolicy,
+  VesselPolicyValue,
+  VesselQueryParams,
+  VesselQuotationRow,
+  VesselType,
+  WarBreachRecord,
+  WarCondition,
+  WarSettings,
+  WorkflowStep,
+  WorkflowTransition
 } from '../../shared/types'
 import { formatDateForMySQL } from './utils'
 import { addMonthsISO } from '../../shared/premium'
-// @ts-ignore
 import schemaSql from './schema.sql?raw'
 
 // Parse a JSON column without letting ONE corrupt row break a whole list/load.
@@ -176,7 +307,7 @@ export class MySQLAdapter {
     return this.configPath
   }
 
-  setConfigPath(path: string) {
+  setConfigPath(path: string): void {
     this.configPath = path
   }
 
@@ -301,7 +432,7 @@ export class MySQLAdapter {
     const conn = await this.pool.getConnection()
     try {
       const [r] = await conn.query('SELECT GET_LOCK(?, ?) AS got', [name, timeoutSec])
-      if (Number((r as any[])[0]?.got) !== 1) {
+      if (Number((r as RowDataPacket[])[0]?.got) !== 1) {
         throw new Error(
           'Another user is assigning a number right now. Please try again in a moment.'
         )
@@ -333,7 +464,7 @@ export class MySQLAdapter {
       'SELECT COLUMN_TYPE AS t, IS_NULLABLE AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
       [table, column]
     )
-    const col = (rows as any[])[0]
+    const col = (rows as RowDataPacket[])[0]
     if (!col) return
     const sameType = String(col.t).toLowerCase() === want.type.toLowerCase()
     const sameNull = (String(col.n).toUpperCase() === 'YES') === want.nullable
@@ -343,14 +474,14 @@ export class MySQLAdapter {
 
   private async convertTableIfNeeded(
     table: string,
-    runner?: { query: (sql: string, values?: any) => Promise<any> }
+    runner?: { query: (sql: string) => Promise<unknown> }
   ): Promise<void> {
     if (!this.pool) return
     const [rows] = await this.pool.query(
       'SELECT TABLE_COLLATION AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
       [table]
     )
-    const coll = (rows as any[])[0]?.c
+    const coll = (rows as RowDataPacket[])[0]?.c
     if (!coll || coll === 'utf8mb4_unicode_ci') return
     await (runner || this.pool).query(
       `ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
@@ -364,7 +495,7 @@ export class MySQLAdapter {
     const conn = await this.pool.getConnection()
     try {
       const [r] = await conn.query('SELECT GET_LOCK(?, 0) AS got', [name])
-      if (Number((r as any[])[0]?.got) !== 1) {
+      if (Number((r as RowDataPacket[])[0]?.got) !== 1) {
         conn.release()
         return null
       }
@@ -396,7 +527,7 @@ export class MySQLAdapter {
       // here ensures all new tables (from schema.sql and migration blocks)
       // inherit utf8mb4_unicode_ci without needing per-table COLLATE clauses.
       try {
-        const [[dbRow]] = (await this.pool.query('SELECT DATABASE() as name')) as any
+        const [[dbRow]] = (await this.pool.query('SELECT DATABASE() as name')) as QueryRows
         if (dbRow?.name) {
           // COLLATE is required: without it MariaDB 11 picks utf8mb4_uca1400_ai_ci as
           // the default, so every new table got the wrong collation (the root cause
@@ -443,9 +574,9 @@ export class MySQLAdapter {
                     WHERE TABLE_SCHEMA = DATABASE()
                     AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
                     AND TABLE_TYPE = 'BASE TABLE'
-                `)) as any[]
+                `)) as QueryRows
         const mismatchedSet = new Set(
-          (mismatchedRows as any[]).map((r: any) => r.TABLE_NAME as string)
+          (mismatchedRows as RowDataPacket[]).map((r) => r.TABLE_NAME as string)
         )
 
         if (mismatchedSet.size > 0) {
@@ -466,7 +597,7 @@ export class MySQLAdapter {
                         WHERE kcu.TABLE_SCHEMA = DATABASE()
                         AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
                         ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
-                    `)) as any[]
+                    `)) as QueryRows
 
           // Group columns by constraint key
           type FKDef = {
@@ -479,7 +610,7 @@ export class MySQLAdapter {
             deleteRule: string
           }
           const fkMap = new Map<string, FKDef>()
-          for (const row of fkRows as any[]) {
+          for (const row of fkRows as RowDataPacket[]) {
             const key = `${row.TABLE_NAME}.${row.CONSTRAINT_NAME}`
             if (!fkMap.has(key)) {
               fkMap.set(key, {
@@ -559,13 +690,13 @@ export class MySQLAdapter {
 
       // Migration: Add description to document_types if it doesn't exist
       const [cols] = await this.pool.query('SHOW COLUMNS FROM document_types LIKE "description"')
-      if ((cols as any[]).length === 0) {
+      if ((cols as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE document_types ADD COLUMN description TEXT AFTER name')
       }
       const [arCols] = await this.pool.query(
         'SHOW COLUMNS FROM document_types LIKE "annual_renewal"'
       )
-      if ((arCols as any[]).length === 0) {
+      if ((arCols as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE document_types ADD COLUMN annual_renewal BOOLEAN DEFAULT FALSE AFTER required'
         )
@@ -575,11 +706,11 @@ export class MySQLAdapter {
       try {
         // Check if table exists first
         const [surveyTable] = await this.pool.query("SHOW TABLES LIKE 'condition_surveys'")
-        if ((surveyTable as any[]).length > 0) {
+        if ((surveyTable as RowDataPacket[]).length > 0) {
           const [refCol] = await this.pool.query(
             'SHOW COLUMNS FROM condition_surveys LIKE "reference"'
           )
-          if ((refCol as any[]).length === 0) {
+          if ((refCol as RowDataPacket[]).length === 0) {
             console.log('Migrating: Adding reference column to condition_surveys')
             await this.pool.query(
               'ALTER TABLE condition_surveys ADD COLUMN reference VARCHAR(255) AFTER survey_type'
@@ -600,7 +731,7 @@ export class MySQLAdapter {
             `)
       // Migration: Add email and phone to entities if they don't exist
       const [entityCols] = await this.pool.query('SHOW COLUMNS FROM entities')
-      const entityColNames = (entityCols as any[]).map((c) => c.Field)
+      const entityColNames = (entityCols as RowDataPacket[]).map((c) => c.Field)
       if (!entityColNames.includes('email')) {
         await this.pool.query('ALTER TABLE entities ADD COLUMN email VARCHAR(255) AFTER identifier')
       }
@@ -625,7 +756,7 @@ export class MySQLAdapter {
 
       // Migration: Add OFAC columns to vessels if they don't exist
       const [vesselCols] = await this.pool.query('SHOW COLUMNS FROM vessels')
-      const vesselColNames = (vesselCols as any[]).map((c) => c.Field)
+      const vesselColNames = (vesselCols as RowDataPacket[]).map((c) => c.Field)
       if (!vesselColNames.includes('ofac_checked_at')) {
         await this.pool.query(
           'ALTER TABLE vessels ADD COLUMN ofac_checked_at DATETIME AFTER fleet_id'
@@ -649,7 +780,7 @@ export class MySQLAdapter {
 
       // Migration: Add theme_preference to users if it doesn't exist
       const [userCols] = await this.pool.query('SHOW COLUMNS FROM users')
-      const userColNames = (userCols as any[]).map((c) => c.Field)
+      const userColNames = (userCols as RowDataPacket[]).map((c) => c.Field)
       if (!userColNames.includes('theme_preference')) {
         await this.pool.query(
           "ALTER TABLE users ADD COLUMN theme_preference VARCHAR(10) DEFAULT 'dark' AFTER role"
@@ -660,7 +791,7 @@ export class MySQLAdapter {
 
       // Migration: Add surveyors table
       const [surveyorsTables] = await this.pool.query("SHOW TABLES LIKE 'surveyors'")
-      if ((surveyorsTables as any[]).length === 0) {
+      if ((surveyorsTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE IF NOT EXISTS surveyors (
                     id VARCHAR(36) PRIMARY KEY,
                     company_name VARCHAR(255) NOT NULL,
@@ -678,7 +809,7 @@ export class MySQLAdapter {
       const [contactPersonCol] = await this.pool.query(
         "SHOW COLUMNS FROM surveyors LIKE 'contact_person'"
       )
-      if ((contactPersonCol as any[]).length === 0) {
+      if ((contactPersonCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           `ALTER TABLE surveyors ADD COLUMN contact_person VARCHAR(255) AFTER country`
         )
@@ -688,7 +819,7 @@ export class MySQLAdapter {
       const [coiCol] = await this.pool.query(
         "SHOW COLUMNS FROM entities LIKE 'certificate_of_incorporation_path'"
       )
-      if ((coiCol as any[]).length === 0) {
+      if ((coiCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           `ALTER TABLE entities ADD COLUMN certificate_of_incorporation_path TEXT AFTER passport_file_path`
         )
@@ -697,7 +828,7 @@ export class MySQLAdapter {
       const [aoaCol] = await this.pool.query(
         "SHOW COLUMNS FROM entities LIKE 'articles_of_association_path'"
       )
-      if ((aoaCol as any[]).length === 0) {
+      if ((aoaCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           `ALTER TABLE entities ADD COLUMN articles_of_association_path TEXT AFTER certificate_of_incorporation_path`
         )
@@ -705,7 +836,7 @@ export class MySQLAdapter {
 
       // Migration: Add kyc_file_path column to entities
       const [kycCol] = await this.pool.query("SHOW COLUMNS FROM entities LIKE 'kyc_file_path'")
-      if ((kycCol as any[]).length === 0) {
+      if ((kycCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           `ALTER TABLE entities ADD COLUMN kyc_file_path TEXT AFTER articles_of_association_path`
         )
@@ -713,7 +844,7 @@ export class MySQLAdapter {
 
       // Migration: Add condition surveys tables
       const [csTables] = await this.pool.query("SHOW TABLES LIKE 'condition_surveys'")
-      if ((csTables as any[]).length === 0) {
+      if ((csTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE IF NOT EXISTS condition_surveys (
                     id VARCHAR(36) PRIMARY KEY,
                     vessel_id VARCHAR(36) NOT NULL,
@@ -761,7 +892,7 @@ export class MySQLAdapter {
         const [columns] = await this.pool.query(
           "SHOW COLUMNS FROM condition_surveys LIKE 'surveyor_name'"
         )
-        if ((columns as any[]).length > 0) {
+        if ((columns as RowDataPacket[]).length > 0) {
           // Old schema detected - migrate data
           // First, create a default "Unknown" surveyor for existing surveys
           const unknownSurveyorId = '00000000-0000-0000-0000-000000000000'
@@ -789,14 +920,14 @@ export class MySQLAdapter {
 
       // Migration: Add notes column to survey_defects
       const [defectCols] = await this.pool.query("SHOW COLUMNS FROM survey_defects LIKE 'notes'")
-      if ((defectCols as any[]).length === 0) {
+      if ((defectCols as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE survey_defects ADD COLUMN notes TEXT AFTER due_date')
       }
 
       // Migration: Make severity nullable in survey_defects
       const [sevCols] = (await this.pool.query(
         "SHOW COLUMNS FROM survey_defects WHERE Field = 'severity'"
-      )) as any[]
+      )) as QueryRows
       if (sevCols.length > 0 && sevCols[0].Null === 'NO') {
         await this.pool.query('ALTER TABLE survey_defects MODIFY COLUMN severity VARCHAR(20) NULL')
       }
@@ -846,10 +977,10 @@ export class MySQLAdapter {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 
       // Add decision column if it doesn't exist
-      const [resultCols]: any[] = await this.pool.query(
+      const [resultCols] = await this.pool.query<RowDataPacket[]>(
         'SHOW COLUMNS FROM compliance_check_results'
       )
-      const resultColNames = resultCols.map((c: any) => c.Field)
+      const resultColNames = resultCols.map((c) => c.Field)
       if (!resultColNames.includes('decision')) {
         await this.pool.query(
           'ALTER TABLE compliance_check_results ADD COLUMN decision VARCHAR(20) AFTER status'
@@ -865,7 +996,7 @@ export class MySQLAdapter {
         indexName: string,
         columns: string
       ): Promise<void> => {
-        const [rows]: any[] = await this.pool!.query(
+        const [rows] = await this.pool!.query<RowDataPacket[]>(
           `SELECT COUNT(1) as cnt FROM INFORMATION_SCHEMA.STATISTICS WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`,
           [table, indexName]
         )
@@ -894,7 +1025,7 @@ export class MySQLAdapter {
       if (vesselColNames.includes('policy_expiry_date')) {
         const [peColType] = (await this.pool.query(
           "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vessels' AND COLUMN_NAME = 'policy_expiry_date'"
-        )) as any[]
+        )) as QueryRows
         if (peColType.length > 0 && peColType[0].COLUMN_TYPE === 'date') {
           await this.pool.query(
             'ALTER TABLE vessels MODIFY COLUMN policy_expiry_date VARCHAR(30) NULL'
@@ -909,7 +1040,7 @@ export class MySQLAdapter {
       await addIndexIfNotExists('vessels', 'idx_vessels_imo', 'imo_number')
       // Migration: Add vessel_name_history table
       const [nameHistoryTable] = await this.pool.query("SHOW TABLES LIKE 'vessel_name_history'")
-      if ((nameHistoryTable as any[]).length === 0) {
+      if ((nameHistoryTable as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE vessel_name_history (
                     id VARCHAR(36) PRIMARY KEY,
                     vessel_id VARCHAR(36) NOT NULL,
@@ -924,7 +1055,7 @@ export class MySQLAdapter {
 
       // Migration: Add order_index to assured_roles
       const [arOrderCols] = await this.pool.query('SHOW COLUMNS FROM assured_roles')
-      const arColNames = (arOrderCols as any[]).map((c) => c.Field)
+      const arColNames = (arOrderCols as RowDataPacket[]).map((c) => c.Field)
       if (!arColNames.includes('order_index')) {
         await this.pool.query('ALTER TABLE assured_roles ADD COLUMN order_index INT DEFAULT 0')
       }
@@ -942,7 +1073,7 @@ export class MySQLAdapter {
 
       // Migration: Add flag_state_id to vessels
       const [vFlagCols] = await this.pool.query("SHOW COLUMNS FROM vessels LIKE 'flag_state_id'")
-      if ((vFlagCols as any[]).length === 0) {
+      if ((vFlagCols as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE vessels ADD COLUMN flag_state_id VARCHAR(36) NULL')
       }
 
@@ -989,7 +1120,7 @@ export class MySQLAdapter {
       const [qStoCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'section_texts_override'"
       )
-      if ((qStoCol as any[]).length === 0) {
+      if ((qStoCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN section_texts_override MEDIUMTEXT NULL'
         )
@@ -1005,7 +1136,7 @@ export class MySQLAdapter {
       const [qSanOvCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'sanctions_text_override'"
       )
-      if ((qSanOvCol as any[]).length === 0) {
+      if ((qSanOvCol as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE quotations ADD COLUMN sanctions_text_override TEXT NULL')
       }
       // Widen sanctions_clause_version for custom version keys
@@ -1020,7 +1151,7 @@ export class MySQLAdapter {
       const [qiNrCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotation_instalments LIKE 'non_refundable'"
       )
-      if ((qiNrCol as any[]).length === 0) {
+      if ((qiNrCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotation_instalments ADD COLUMN non_refundable BOOLEAN DEFAULT FALSE'
         )
@@ -1033,7 +1164,7 @@ export class MySQLAdapter {
       const [wDefSelCol] = await this.pool.query(
         "SHOW COLUMNS FROM pi_warranties LIKE 'default_selected'"
       )
-      if ((wDefSelCol as any[]).length === 0) {
+      if ((wDefSelCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE pi_warranties ADD COLUMN default_selected BOOLEAN DEFAULT FALSE'
         )
@@ -1043,7 +1174,7 @@ export class MySQLAdapter {
       const [qDiscCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'discount_percent'"
       )
-      if ((qDiscCol as any[]).length === 0) {
+      if ((qDiscCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN discount_percent DECIMAL(5,2) NULL'
         )
@@ -1054,7 +1185,7 @@ export class MySQLAdapter {
       const [qcDescCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotation_clauses LIKE 'description_override'"
       )
-      if ((qcDescCol as any[]).length === 0) {
+      if ((qcDescCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotation_clauses ADD COLUMN description_override TEXT NULL'
         )
@@ -1064,7 +1195,7 @@ export class MySQLAdapter {
       const [tradDdqCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'trading_show_ddq_list'"
       )
-      if ((tradDdqCol as any[]).length === 0) {
+      if ((tradDdqCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN trading_show_ddq_list BOOLEAN DEFAULT TRUE'
         )
@@ -1080,7 +1211,7 @@ export class MySQLAdapter {
       const [tradExclCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'trading_show_excluded'"
       )
-      if ((tradExclCol as any[]).length === 0) {
+      if ((tradExclCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN trading_show_excluded BOOLEAN DEFAULT TRUE'
         )
@@ -1089,7 +1220,7 @@ export class MySQLAdapter {
       const [tCustModeCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotations LIKE 'trading_custom_mode'"
       )
-      if ((tCustModeCol as any[]).length === 0) {
+      if ((tCustModeCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotations ADD COLUMN trading_custom_mode BOOLEAN DEFAULT FALSE'
         )
@@ -1097,13 +1228,13 @@ export class MySQLAdapter {
       }
       // Migration: Add co_name to quotations
       const [qCoNameCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'co_name'")
-      if ((qCoNameCol as any[]).length === 0) {
+      if ((qCoNameCol as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE quotations ADD COLUMN co_name VARCHAR(255) NULL')
       }
 
       // Migration: Add title to quotations
       const [qTitleCol] = await this.pool.query("SHOW COLUMNS FROM quotations LIKE 'title'")
-      if ((qTitleCol as any[]).length === 0) {
+      if ((qTitleCol as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE quotations ADD COLUMN title VARCHAR(500) NULL')
       }
 
@@ -1111,7 +1242,7 @@ export class MySQLAdapter {
       const [qaVlCol] = await this.pool.query(
         "SHOW COLUMNS FROM quotation_assureds LIKE 'vessel_label'"
       )
-      if ((qaVlCol as any[]).length === 0) {
+      if ((qaVlCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE quotation_assureds ADD COLUMN vessel_label VARCHAR(20) NULL'
         )
@@ -1121,7 +1252,7 @@ export class MySQLAdapter {
       const [acCodeCol] = await this.pool.query(
         "SHOW COLUMNS FROM pi_additional_clauses LIKE 'code'"
       )
-      if ((acCodeCol as any[]).length === 0) {
+      if ((acCodeCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE pi_additional_clauses ADD COLUMN code VARCHAR(50) NULL AFTER id'
         )
@@ -1131,7 +1262,7 @@ export class MySQLAdapter {
       const [acDefCol] = await this.pool.query(
         "SHOW COLUMNS FROM pi_additional_clauses LIKE 'default_selected'"
       )
-      if ((acDefCol as any[]).length === 0) {
+      if ((acDefCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE pi_additional_clauses ADD COLUMN default_selected BOOLEAN DEFAULT FALSE'
         )
@@ -1141,7 +1272,7 @@ export class MySQLAdapter {
       const [acTitleCol] = await this.pool.query(
         "SHOW COLUMNS FROM pi_additional_clauses LIKE 'title'"
       )
-      if ((acTitleCol as any[]).length === 0) {
+      if ((acTitleCol as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE pi_additional_clauses ADD COLUMN title VARCHAR(255) NULL AFTER id'
         )
@@ -1170,12 +1301,12 @@ export class MySQLAdapter {
       // Data migration: move existing quotations.vessel_id + quotation_new_vessels into quotation_vessels
       {
         const [existingQv] = await this.pool.query('SELECT COUNT(*) as cnt FROM quotation_vessels')
-        if ((existingQv as any[])[0].cnt === 0) {
+        if ((existingQv as RowDataPacket[])[0].cnt === 0) {
           // Migrate existing vessel_id references
           const [quotationsWithVessel] = await this.pool.query(
             'SELECT id, vessel_id FROM quotations WHERE vessel_id IS NOT NULL'
           )
-          for (const q of quotationsWithVessel as any[]) {
+          for (const q of quotationsWithVessel as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index) VALUES (?, ?, ?, ?, ?)',
               [uuidv4(), q.id, q.vessel_id, 'V1', 0]
@@ -1183,12 +1314,12 @@ export class MySQLAdapter {
           }
           // Migrate quotation_new_vessels
           const [newVessels] = await this.pool.query('SELECT * FROM quotation_new_vessels')
-          for (const nv of newVessels as any[]) {
+          for (const nv of newVessels as RowDataPacket[]) {
             const [alreadyMigrated] = await this.pool.query(
               'SELECT id FROM quotation_vessels WHERE quotation_id = ? AND vessel_id IS NULL',
               [nv.quotation_id]
             )
-            if ((alreadyMigrated as any[]).length === 0) {
+            if ((alreadyMigrated as RowDataPacket[]).length === 0) {
               await this.pool.execute(
                 `INSERT INTO quotation_vessels (id, quotation_id, vessel_label, order_index, name, imo_number, built_year, gross_tonnage, flag, vessel_type, classification, call_sign)
                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1216,7 +1347,7 @@ export class MySQLAdapter {
       {
         const [qvPremCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'premium_amount'"
-        )) as any[]
+        )) as QueryRows
         if (qvPremCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN premium_amount DECIMAL(15,2) NULL'
@@ -1228,7 +1359,7 @@ export class MySQLAdapter {
       {
         const [qvRebuiltCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'rebuilt_year'"
-        )) as any[]
+        )) as QueryRows
         if (qvRebuiltCol.length === 0) {
           await this.pool.query('ALTER TABLE quotation_vessels ADD COLUMN rebuilt_year INT NULL')
         }
@@ -1238,7 +1369,7 @@ export class MySQLAdapter {
       {
         const [qvAvCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'agreed_value'"
-        )) as any[]
+        )) as QueryRows
         if (qvAvCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN agreed_value DECIMAL(15,2) DEFAULT NULL'
@@ -1246,7 +1377,7 @@ export class MySQLAdapter {
         }
         const [qvIvCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'iv_value'"
-        )) as any[]
+        )) as QueryRows
         if (qvIvCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN iv_value DECIMAL(15,2) DEFAULT NULL'
@@ -1254,7 +1385,7 @@ export class MySQLAdapter {
         }
         const [qvAvCurCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'agreed_value_currency'"
-        )) as any[]
+        )) as QueryRows
         if (qvAvCurCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN agreed_value_currency VARCHAR(10) DEFAULT NULL'
@@ -1281,7 +1412,7 @@ export class MySQLAdapter {
         const [acsiOrdCol] = await this.pool.query(
           "SHOW COLUMNS FROM pi_additional_clause_set_items LIKE 'order_index'"
         )
-        if ((acsiOrdCol as any[]).length === 0) {
+        if ((acsiOrdCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_additional_clause_set_items ADD COLUMN order_index INT DEFAULT 0'
           )
@@ -1293,7 +1424,7 @@ export class MySQLAdapter {
         const [acsDefCol] = await this.pool.query(
           "SHOW COLUMNS FROM pi_additional_clause_sets LIKE 'default_selected'"
         )
-        if ((acsDefCol as any[]).length === 0) {
+        if ((acsDefCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_additional_clause_sets ADD COLUMN default_selected BOOLEAN DEFAULT FALSE'
           )
@@ -1306,13 +1437,13 @@ export class MySQLAdapter {
         const [legacyRows] = await this.pool.query(
           'SELECT COUNT(*) as cnt FROM vessel_insurance_policies'
         )
-        const legacyCount = (legacyRows as any[])[0]?.cnt || 0
+        const legacyCount = (legacyRows as RowDataPacket[])[0]?.cnt || 0
         if (legacyCount > 0) {
           // Check if we already migrated (if dynamic policies exist, skip)
           const [dynCount] = await this.pool.query(
             'SELECT COUNT(*) as cnt FROM vessel_dynamic_policies'
           )
-          if ((dynCount as any[])[0]?.cnt === 0) {
+          if ((dynCount as RowDataPacket[])[0]?.cnt === 0) {
             console.log(`Migrating ${legacyCount} legacy insurance policies to dynamic system...`)
 
             // Ensure Hull, P&I, War policy types exist
@@ -1323,8 +1454,8 @@ export class MySQLAdapter {
                 'SELECT id FROM policy_types WHERE name = ?',
                 [name]
               )
-              if ((existing as any[]).length > 0) {
-                ptIds[cat] = (existing as any[])[0].id
+              if ((existing as RowDataPacket[]).length > 0) {
+                ptIds[cat] = (existing as RowDataPacket[])[0].id
               } else {
                 const ptId = uuidv4()
                 await this.pool.execute(
@@ -1381,7 +1512,7 @@ export class MySQLAdapter {
                 'SELECT id, name FROM policy_type_characteristics WHERE policy_type_id = ?',
                 [ptId]
               )
-              for (const c of existingChars as any[]) {
+              for (const c of existingChars as RowDataPacket[]) {
                 charMap.set(c.name.toLowerCase(), c.id)
               }
               for (let i = 0; i < fields.length; i++) {
@@ -1390,7 +1521,14 @@ export class MySQLAdapter {
                   const cId = uuidv4()
                   await this.pool.execute(
                     'INSERT INTO policy_type_characteristics (id, policy_type_id, name, field_type, is_required, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-                    [cId, ptId, f.name, f.type, false, (existingChars as any[]).length + i]
+                    [
+                      cId,
+                      ptId,
+                      f.name,
+                      f.type,
+                      false,
+                      (existingChars as RowDataPacket[]).length + i
+                    ]
                   )
                   charMap.set(f.name.toLowerCase(), cId)
                 }
@@ -1444,11 +1582,11 @@ export class MySQLAdapter {
             // Build entity name→id map for broker matching
             const [entityRows] = await this.pool.query('SELECT id, name FROM entities')
             const entityNameMap = new Map<string, string>()
-            for (const e of entityRows as any[]) {
+            for (const e of entityRows as RowDataPacket[]) {
               entityNameMap.set(e.name.toLowerCase(), e.id)
             }
 
-            for (const row of allLegacy as any[]) {
+            for (const row of allLegacy as RowDataPacket[]) {
               const cat = row.policy_category as string
               const ptId = ptIds[cat]
               if (!ptId) continue
@@ -1470,7 +1608,7 @@ export class MySQLAdapter {
               )
 
               // Map legacy columns to dynamic values
-              const colMap: Record<string, any> = {
+              const colMap: Record<string, SqlValue> = {
                 coverageCode: row.coverage_code,
                 inceptionDate: row.inception_date,
                 endDate: row.end_date,
@@ -1535,7 +1673,7 @@ export class MySQLAdapter {
                        AND vpv.value_date IS NOT NULL
                        AND vpv.value_date NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`
         )
-        const dateRows = dateVals as any[]
+        const dateRows = dateVals as RowDataPacket[]
         let fixedCount = 0
         for (const row of dateRows) {
           const val = row.value_date
@@ -1578,7 +1716,7 @@ export class MySQLAdapter {
 
       // Migration: Add renewal_status_types table
       const [rstTable] = await this.pool.query("SHOW TABLES LIKE 'renewal_status_types'")
-      if ((rstTable as any[]).length === 0) {
+      if ((rstTable as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE renewal_status_types (
                     id VARCHAR(36) PRIMARY KEY,
                     name VARCHAR(100) NOT NULL,
@@ -1592,7 +1730,7 @@ export class MySQLAdapter {
       const [vdpCols] = await this.pool.query(
         "SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'renewal_status_id'"
       )
-      if ((vdpCols as any[]).length === 0) {
+      if ((vdpCols as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE vessel_dynamic_policies ADD COLUMN renewal_status_id VARCHAR(36) NULL'
         )
@@ -1600,7 +1738,7 @@ export class MySQLAdapter {
 
       // Migration: Add policy_renewal_notes table
       const [prnTable] = await this.pool.query("SHOW TABLES LIKE 'policy_renewal_notes'")
-      if ((prnTable as any[]).length === 0) {
+      if ((prnTable as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE policy_renewal_notes (
                     id VARCHAR(36) PRIMARY KEY,
                     policy_id VARCHAR(36) NOT NULL,
@@ -1617,20 +1755,22 @@ export class MySQLAdapter {
       const [userSidebarCols] = await this.pool.query(
         "SHOW COLUMNS FROM users LIKE 'sidebar_collapsed'"
       )
-      if ((userSidebarCols as any[]).length === 0) {
+      if ((userSidebarCols as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE users ADD COLUMN sidebar_collapsed TINYINT(1) DEFAULT 0')
         await this.pool.query('ALTER TABLE users ADD COLUMN collapsed_groups TEXT DEFAULT NULL')
       }
 
       // Migration: Add last_login_at to users
       const [userLoginCols] = await this.pool.query("SHOW COLUMNS FROM users LIKE 'last_login_at'")
-      if ((userLoginCols as any[]).length === 0) {
+      if ((userLoginCols as RowDataPacket[]).length === 0) {
         await this.pool.query('ALTER TABLE users ADD COLUMN last_login_at DATETIME DEFAULT NULL')
       }
 
       // Migration: Drop FK on document_type_id in vessel_documents (allows custom doc type IDs)
       try {
-        const [ctRows]: any[] = await this.pool.query('SHOW CREATE TABLE vessel_documents')
+        const [ctRows] = await this.pool.query<RowDataPacket[]>(
+          'SHOW CREATE TABLE vessel_documents'
+        )
         const createSql: string =
           (ctRows[0] && (ctRows[0]['Create Table'] || ctRows[0].create_table)) || ''
         const fkMatch = createSql.match(/CONSTRAINT `([^`]+)` FOREIGN KEY \(`document_type_id`\)/)
@@ -1643,7 +1783,7 @@ export class MySQLAdapter {
 
       // Migration: Add vessel_notes table
       const [vnTable] = await this.pool.query("SHOW TABLES LIKE 'vessel_notes'")
-      if ((vnTable as any[]).length === 0) {
+      if ((vnTable as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE vessel_notes (
                     id VARCHAR(36) PRIMARY KEY,
                     vessel_id VARCHAR(36) NOT NULL,
@@ -1659,7 +1799,7 @@ export class MySQLAdapter {
       const [qsdCols] = await this.pool.query(
         "SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'quotation_sent_date'"
       )
-      if ((qsdCols as any[]).length === 0) {
+      if ((qsdCols as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE vessel_dynamic_policies ADD COLUMN quotation_sent_date DATE NULL'
         )
@@ -1669,16 +1809,16 @@ export class MySQLAdapter {
       try {
         const [custColVdp] = (await this.pool.query(
           "SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'customer_entity_id'"
-        )) as any[]
-        if ((custColVdp as any[]).length === 0) {
+        )) as QueryRows
+        if ((custColVdp as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_entity_id VARCHAR(36) NULL'
           )
           // Check if customer_type already exists before adding
           const [ctColVdp] = (await this.pool.query(
             "SHOW COLUMNS FROM vessel_dynamic_policies LIKE 'customer_type'"
-          )) as any[]
-          if ((ctColVdp as any[]).length === 0) {
+          )) as QueryRows
+          if ((ctColVdp as RowDataPacket[]).length === 0) {
             await this.pool.query(
               'ALTER TABLE vessel_dynamic_policies ADD COLUMN customer_type VARCHAR(10) NULL'
             )
@@ -1701,20 +1841,20 @@ export class MySQLAdapter {
       try {
         const [qCustCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'customer_entity_id'"
-        )) as any[]
-        if ((qCustCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((qCustCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN customer_entity_id VARCHAR(36) NULL'
           )
           await this.pool.query('ALTER TABLE quotations ADD COLUMN customer_type VARCHAR(10) NULL')
           // Migrate: try to match co_name text to an entity
-          const [ents] = (await this.pool.query('SELECT id, name FROM entities')) as any[]
+          const [ents] = (await this.pool.query('SELECT id, name FROM entities')) as QueryRows
           const nameMap = new Map<string, string>()
-          for (const e of ents as any[]) nameMap.set(e.name.toLowerCase().trim(), e.id)
+          for (const e of ents as RowDataPacket[]) nameMap.set(e.name.toLowerCase().trim(), e.id)
           const [qRows] = (await this.pool.query(
             "SELECT id, co_name FROM quotations WHERE co_name IS NOT NULL AND co_name != '' AND customer_entity_id IS NULL"
-          )) as any[]
-          for (const q of qRows as any[]) {
+          )) as QueryRows
+          for (const q of qRows as RowDataPacket[]) {
             const matched = nameMap.get(q.co_name.toLowerCase().trim())
             if (matched) {
               await this.pool.execute(
@@ -1737,7 +1877,9 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0,
                     INDEX idx_qlo_quotation (quotation_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: widen type_scope columns to support comma-separated multi-type values
       try {
@@ -1765,14 +1907,16 @@ export class MySQLAdapter {
           { type: 'varchar(50)', nullable: true },
           'ALTER TABLE pi_warranty_sets MODIFY COLUMN type_scope VARCHAR(50) DEFAULT NULL'
         )
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: war excess fields on quotations + quotation_vessels
       try {
         const [weCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'war_excess_enabled'"
-        )) as any[]
-        if ((weCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((weCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN war_excess_enabled BOOLEAN DEFAULT FALSE'
           )
@@ -1791,16 +1935,16 @@ export class MySQLAdapter {
         // Migration: war_section2_only toggle
         const [ws2Col] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'war_section2_only'"
-        )) as any[]
-        if ((ws2Col as any[]).length === 0) {
+        )) as QueryRows
+        if ((ws2Col as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN war_section2_only BOOLEAN DEFAULT FALSE'
           )
         }
         const [weVCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'war_excess_amount'"
-        )) as any[]
-        if ((weVCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((weVCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN war_excess_amount DECIMAL(15,2) NULL'
           )
@@ -1832,7 +1976,7 @@ export class MySQLAdapter {
         const [vtDescCols] = await this.pool.query(
           "SHOW COLUMNS FROM vessel_types LIKE 'description'"
         )
-        if ((vtDescCols as any[]).length === 0) {
+        if ((vtDescCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE vessel_types ADD COLUMN description TEXT NULL AFTER name'
           )
@@ -1848,13 +1992,14 @@ export class MySQLAdapter {
           // Migrate existing text values to FK references
           const [existingTypes] = (await this.pool.query(
             'SELECT id, name FROM vessel_types'
-          )) as any[]
+          )) as QueryRows
           const typeMap = new Map<string, string>()
-          for (const t of existingTypes as any[]) typeMap.set(t.name.toLowerCase().trim(), t.id)
+          for (const t of existingTypes as RowDataPacket[])
+            typeMap.set(t.name.toLowerCase().trim(), t.id)
           const [vesselRows] = (await this.pool.query(
             'SELECT id, vessel_type FROM vessels WHERE vessel_type IS NOT NULL AND vessel_type != ""'
-          )) as any[]
-          for (const v of vesselRows as any[]) {
+          )) as QueryRows
+          for (const v of vesselRows as RowDataPacket[]) {
             const key = (v.vessel_type || '').toLowerCase().trim()
             let typeId = typeMap.get(key)
             if (!typeId) {
@@ -1862,10 +2007,10 @@ export class MySQLAdapter {
               const newId = uuidv4()
               const [maxRow] = (await this.pool.query(
                 'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM vessel_types'
-              )) as any[]
+              )) as QueryRows
               await this.pool.execute(
                 'INSERT INTO vessel_types (id, name, order_index) VALUES (?, ?, ?)',
-                [newId, v.vessel_type.trim(), (maxRow as any[])[0].nextOrder]
+                [newId, v.vessel_type.trim(), (maxRow as RowDataPacket[])[0].nextOrder]
               )
               typeMap.set(key, newId)
               typeId = newId
@@ -1884,7 +2029,7 @@ export class MySQLAdapter {
       const [csCompletedCols] = await this.pool.query(
         "SHOW COLUMNS FROM condition_surveys LIKE 'completed_at'"
       )
-      if ((csCompletedCols as any[]).length === 0) {
+      if ((csCompletedCols as RowDataPacket[]).length === 0) {
         await this.pool.query(
           'ALTER TABLE condition_surveys ADD COLUMN completed_at DATETIME NULL, ADD COLUMN completed_by VARCHAR(36) NULL, ADD COLUMN endorsement_issued TINYINT(1) NULL, ADD COLUMN endorsement_reminder_date DATE NULL'
         )
@@ -1892,7 +2037,7 @@ export class MySQLAdapter {
 
       // Migration: Create survey_warranties table
       const [swTables] = await this.pool.query("SHOW TABLES LIKE 'survey_warranties'")
-      if ((swTables as any[]).length === 0) {
+      if ((swTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE survey_warranties (
                     id VARCHAR(36) PRIMARY KEY,
                     vessel_id VARCHAR(36) NOT NULL,
@@ -1920,7 +2065,7 @@ export class MySQLAdapter {
         const [swColCsi] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'condition_survey_id'"
         )
-        if ((swColCsi as any[]).length === 0) {
+        if ((swColCsi as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranties ADD COLUMN condition_survey_id VARCHAR(36) NULL`
           )
@@ -1928,7 +2073,7 @@ export class MySQLAdapter {
         const [swColCn] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'completion_notes'"
         )
-        if ((swColCn as any[]).length === 0) {
+        if ((swColCn as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranties ADD COLUMN completion_notes TEXT NULL`
           )
@@ -1936,13 +2081,13 @@ export class MySQLAdapter {
         const [swColWr] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'waiver_reason'"
         )
-        if ((swColWr as any[]).length === 0) {
+        if ((swColWr as RowDataPacket[]).length === 0) {
           await this.pool.query(`ALTER TABLE survey_warranties ADD COLUMN waiver_reason TEXT NULL`)
         }
         const [swColCa] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'completed_at'"
         )
-        if ((swColCa as any[]).length === 0) {
+        if ((swColCa as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranties ADD COLUMN completed_at DATETIME NULL`
           )
@@ -1950,7 +2095,7 @@ export class MySQLAdapter {
         const [swColCr] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'created_at'"
         )
-        if ((swColCr as any[]).length === 0) {
+        if ((swColCr as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranties ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`
           )
@@ -1958,7 +2103,7 @@ export class MySQLAdapter {
         const [swColRef] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'reference'"
         )
-        if ((swColRef as any[]).length === 0) {
+        if ((swColRef as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranties ADD COLUMN reference VARCHAR(50) NULL`
           )
@@ -1967,7 +2112,7 @@ export class MySQLAdapter {
         const [swStatusInfo] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranties LIKE 'status'"
         )
-        const swStatusCol = (swStatusInfo as any[])[0]
+        const swStatusCol = (swStatusInfo as RowDataPacket[])[0]
         if (swStatusCol && !String(swStatusCol.Type).includes('completed')) {
           await this.pool.query(
             `ALTER TABLE survey_warranties MODIFY COLUMN status ENUM('pending','survey_done','completed','waived') NOT NULL DEFAULT 'pending'`
@@ -1977,7 +2122,7 @@ export class MySQLAdapter {
 
       // Migration: Create survey_warranty_reminders table
       const [swrTables] = await this.pool.query("SHOW TABLES LIKE 'survey_warranty_reminders'")
-      if ((swrTables as any[]).length === 0) {
+      if ((swrTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE survey_warranty_reminders (
                     id VARCHAR(36) PRIMARY KEY,
                     warranty_id VARCHAR(36) NOT NULL,
@@ -1997,7 +2142,7 @@ export class MySQLAdapter {
         const [swrCols] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranty_reminders LIKE 'reference'"
         )
-        if ((swrCols as any[]).length === 0) {
+        if ((swrCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranty_reminders ADD COLUMN reference VARCHAR(255) NULL AFTER channel`
           )
@@ -2006,7 +2151,7 @@ export class MySQLAdapter {
         const [swrColCa] = await this.pool.query(
           "SHOW COLUMNS FROM survey_warranty_reminders LIKE 'created_at'"
         )
-        if ((swrColCa as any[]).length === 0) {
+        if ((swrColCa as RowDataPacket[]).length === 0) {
           await this.pool.query(
             `ALTER TABLE survey_warranty_reminders ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`
           )
@@ -2015,7 +2160,7 @@ export class MySQLAdapter {
 
       // Migration: Create classification_societies table if it doesn't exist
       const [classSocTables] = await this.pool.query("SHOW TABLES LIKE 'classification_societies'")
-      if ((classSocTables as any[]).length === 0) {
+      if ((classSocTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE classification_societies (
                     id VARCHAR(36) PRIMARY KEY,
                     name VARCHAR(100) NOT NULL,
@@ -2029,7 +2174,7 @@ export class MySQLAdapter {
 
       // Migration: Create vessel_classifications table if it doesn't exist
       const [vesselClassTables] = await this.pool.query("SHOW TABLES LIKE 'vessel_classifications'")
-      if ((vesselClassTables as any[]).length === 0) {
+      if ((vesselClassTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE vessel_classifications (
                     id VARCHAR(36) PRIMARY KEY,
                     vessel_id VARCHAR(36) NOT NULL,
@@ -2043,7 +2188,7 @@ export class MySQLAdapter {
 
       // Migration: Create war_breach_records table
       const [wbrTables] = await this.pool.query("SHOW TABLES LIKE 'war_breach_records'")
-      if ((wbrTables as any[]).length === 0) {
+      if ((wbrTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE war_breach_records (
                     id VARCHAR(36) PRIMARY KEY,
                     cover_note_no VARCHAR(200) NULL,
@@ -2060,7 +2205,7 @@ export class MySQLAdapter {
 
       // Migration: Create sanctions_report_checks table (ad-hoc named screening reports)
       const [srcTables] = await this.pool.query("SHOW TABLES LIKE 'sanctions_report_checks'")
-      if ((srcTables as any[]).length === 0) {
+      if ((srcTables as RowDataPacket[]).length === 0) {
         await this.pool.query(`CREATE TABLE sanctions_report_checks (
                     id VARCHAR(36) PRIMARY KEY,
                     subject_name VARCHAR(255) NOT NULL,
@@ -2078,7 +2223,7 @@ export class MySQLAdapter {
       // Migration: Create receipts + receipt_policies tables (payment receipts)
       {
         const [rTables] = await this.pool.query("SHOW TABLES LIKE 'receipts'")
-        if ((rTables as any[]).length === 0) {
+        if ((rTables as RowDataPacket[]).length === 0) {
           await this.pool.query(`CREATE TABLE receipts (
                         id VARCHAR(36) PRIMARY KEY,
                         receipt_number VARCHAR(50) NOT NULL,
@@ -2104,7 +2249,7 @@ export class MySQLAdapter {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
         }
         const [rpTables] = await this.pool.query("SHOW TABLES LIKE 'receipt_policies'")
-        if ((rpTables as any[]).length === 0) {
+        if ((rpTables as RowDataPacket[]).length === 0) {
           await this.pool.query(`CREATE TABLE receipt_policies (
                         id VARCHAR(36) PRIMARY KEY,
                         receipt_id VARCHAR(36) NOT NULL,
@@ -2119,7 +2264,7 @@ export class MySQLAdapter {
       // Migration: generic per-quotation discounts (beyond NCB/UPCC)
       {
         const [dt] = await this.pool.query("SHOW TABLES LIKE 'quotation_discounts'")
-        if ((dt as any[]).length === 0) {
+        if ((dt as RowDataPacket[]).length === 0) {
           const fk = await this.fkOff()
           try {
             await fk.query(`CREATE TABLE quotation_discounts (
@@ -2144,7 +2289,7 @@ export class MySQLAdapter {
           const [qdCols] = await this.pool.query(
             "SHOW COLUMNS FROM quotation_discounts LIKE 'target_section'"
           )
-          if ((qdCols as any[]).length === 0) {
+          if ((qdCols as RowDataPacket[]).length === 0) {
             await this.pool.query(
               'ALTER TABLE quotation_discounts ADD COLUMN target_section VARCHAR(50) NULL'
             )
@@ -2155,7 +2300,7 @@ export class MySQLAdapter {
       // Migration: per-vessel premium under a hull alternative (fleet quotes with alternatives)
       {
         const [t] = await this.pool.query("SHOW TABLES LIKE 'quotation_hull_alt_vessel_premiums'")
-        if ((t as any[]).length === 0) {
+        if ((t as RowDataPacket[]).length === 0) {
           const fk = await this.fkOff()
           try {
             await fk.query(`CREATE TABLE quotation_hull_alt_vessel_premiums (
@@ -2175,7 +2320,7 @@ export class MySQLAdapter {
 
       // Warranty sets tables (disable FK checks to avoid collation mismatch)
       {
-        const [t] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'")) as any[]
+        const [t] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'")) as QueryRows
         if (t.length === 0) {
           {
             const fk = await this.fkOff()
@@ -2190,7 +2335,9 @@ export class MySQLAdapter {
             }
           }
         }
-        const [t2] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_set_items'")) as any[]
+        const [t2] = (await this.pool.query(
+          "SHOW TABLES LIKE 'pi_warranty_set_items'"
+        )) as QueryRows
         if (t2.length === 0) {
           {
             const fk = await this.fkOff()
@@ -2228,7 +2375,7 @@ export class MySQLAdapter {
       {
         const [t] = (await this.pool.query(
           "SHOW TABLES LIKE 'quotation_custom_warranties'"
-        )) as any[]
+        )) as QueryRows
         if (t.length === 0) {
           {
             const fk = await this.fkOff()
@@ -2251,7 +2398,7 @@ export class MySQLAdapter {
       {
         const [cols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_warranties LIKE 'order_index'"
-        )) as any[]
+        )) as QueryRows
         if (cols.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_warranties ADD COLUMN order_index INT DEFAULT 0'
@@ -2261,11 +2408,11 @@ export class MySQLAdapter {
 
       // Add default_selected to pi_warranty_sets if missing
       {
-        const [t] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'")) as any[]
+        const [t] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'")) as QueryRows
         if (t.length > 0) {
           const [dsCols] = (await this.pool.query(
             "SHOW COLUMNS FROM pi_warranty_sets LIKE 'default_selected'"
-          )) as any[]
+          )) as QueryRows
           if (dsCols.length === 0) {
             await this.pool.query(
               'ALTER TABLE pi_warranty_sets ADD COLUMN default_selected BOOLEAN DEFAULT FALSE'
@@ -2287,7 +2434,7 @@ export class MySQLAdapter {
       {
         const [ptdCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_text_deductibles LIKE 'pi_text_deductible_id'"
-        )) as any[]
+        )) as QueryRows
         if (ptdCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_text_deductibles ADD COLUMN pi_text_deductible_id VARCHAR(36) NULL AFTER quotation_id'
@@ -2299,7 +2446,7 @@ export class MySQLAdapter {
       {
         const [pdtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_deductibles LIKE 'title'"
-        )) as any[]
+        )) as QueryRows
         if (pdtCol.length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER id"
@@ -2311,7 +2458,7 @@ export class MySQLAdapter {
       {
         const [qdtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_deductibles LIKE 'title'"
-        )) as any[]
+        )) as QueryRows
         if (qdtCol.length === 0) {
           await this.pool.query(
             "ALTER TABLE quotation_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER pi_deductible_id"
@@ -2323,7 +2470,7 @@ export class MySQLAdapter {
       {
         const [ptdtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_text_deductibles LIKE 'title'"
-        )) as any[]
+        )) as QueryRows
         if (ptdtCol.length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_text_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER id"
@@ -2335,7 +2482,7 @@ export class MySQLAdapter {
       {
         const [qtdtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_text_deductibles LIKE 'title'"
-        )) as any[]
+        )) as QueryRows
         if (qtdtCol.length === 0) {
           await this.pool.query(
             "ALTER TABLE quotation_text_deductibles ADD COLUMN title VARCHAR(255) DEFAULT '' AFTER pi_text_deductible_id"
@@ -2347,7 +2494,7 @@ export class MySQLAdapter {
       {
         const [daeCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'deductible_aggregate_enabled'"
-        )) as any[]
+        )) as QueryRows
         if (daeCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN deductible_aggregate_enabled BOOLEAN DEFAULT TRUE AFTER vdr_deductible_enabled'
@@ -2359,7 +2506,7 @@ export class MySQLAdapter {
       {
         const [piSubjTable] = (await this.pool.query(
           "SHOW TABLES LIKE 'pi_subjectivities'"
-        )) as any[]
+        )) as QueryRows
         if (piSubjTable.length === 0) {
           {
             const fk = await this.fkOff()
@@ -2386,7 +2533,7 @@ export class MySQLAdapter {
       {
         const [psCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_subjectivities LIKE 'pi_subjectivity_id'"
-        )) as any[]
+        )) as QueryRows
         if (psCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_subjectivities ADD COLUMN pi_subjectivity_id VARCHAR(36) AFTER quotation_id'
@@ -2404,7 +2551,7 @@ export class MySQLAdapter {
       {
         const [nrtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'non_refundable_type'"
-        )) as any[]
+        )) as QueryRows
         if (nrtCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN non_refundable_type VARCHAR(20) DEFAULT NULL'
@@ -2431,7 +2578,7 @@ export class MySQLAdapter {
         for (const tbl of vscopeTables) {
           const [vsCols] = (await this.pool.query(
             `SHOW COLUMNS FROM ${tbl} LIKE 'vessel_scope'`
-          )) as any[]
+          )) as QueryRows
           if (vsCols.length === 0) {
             await this.pool.query(`ALTER TABLE ${tbl} ADD COLUMN vessel_scope TEXT DEFAULT NULL`)
           }
@@ -2442,7 +2589,7 @@ export class MySQLAdapter {
       {
         const [soCol] = (await this.pool.query(
           `SHOW COLUMNS FROM quotations LIKE 'section_order'`
-        )) as any[]
+        )) as QueryRows
         if (soCol.length === 0) {
           await this.pool.query('ALTER TABLE quotations ADD COLUMN section_order TEXT DEFAULT NULL')
         }
@@ -2464,7 +2611,7 @@ export class MySQLAdapter {
       {
         const [exCols] = (await this.pool.query(
           `SHOW COLUMNS FROM pi_exclusions LIKE 'is_cargo_related'`
-        )) as any[]
+        )) as QueryRows
         if (exCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_exclusions ADD COLUMN is_cargo_related BOOLEAN DEFAULT FALSE AFTER text'
@@ -2506,7 +2653,7 @@ export class MySQLAdapter {
         // Seed default quotation types if table is empty
         const [qtRows] = (await this.pool.query(
           'SELECT COUNT(*) as cnt FROM quotation_types'
-        )) as any[]
+        )) as QueryRows
         if (qtRows[0].cnt === 0) {
           const defaults = [
             { name: 'P&I', code: 'P', order: 0 },
@@ -2525,7 +2672,7 @@ export class MySQLAdapter {
         // Add quotation_type_id column to quotations if missing
         const [qtCols] = (await this.pool.query(
           `SHOW COLUMNS FROM quotations LIKE 'quotation_type_id'`
-        )) as any[]
+        )) as QueryRows
         if (qtCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN quotation_type_id VARCHAR(36) AFTER reference_number'
@@ -2533,7 +2680,7 @@ export class MySQLAdapter {
           // Migrate existing quotations to P&I type
           const [piType] = (await this.pool.query(
             `SELECT id FROM quotation_types WHERE code = 'P' LIMIT 1`
-          )) as any[]
+          )) as QueryRows
           if (piType.length > 0) {
             await this.pool.execute(
               'UPDATE quotations SET quotation_type_id = ? WHERE quotation_type_id IS NULL',
@@ -2547,8 +2694,8 @@ export class MySQLAdapter {
       try {
         const [dtptTables] = (await this.pool.query(
           "SHOW TABLES LIKE 'document_type_policy_types'"
-        )) as any[]
-        if ((dtptTables as any[]).length === 0) {
+        )) as QueryRows
+        if ((dtptTables as RowDataPacket[]).length === 0) {
           await this.pool.query(`CREATE TABLE IF NOT EXISTS document_type_policy_types (
                         document_type_id VARCHAR(36) NOT NULL,
                         policy_type_id VARCHAR(36) NOT NULL,
@@ -2563,8 +2710,8 @@ export class MySQLAdapter {
       {
         const [ptCodeCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_types LIKE 'code'"
-        )) as any[]
-        if ((ptCodeCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ptCodeCol as RowDataPacket[]).length === 0) {
           await this.pool.query('ALTER TABLE policy_types ADD COLUMN code VARCHAR(10) NULL')
         }
         // Map existing policy types to codes by name (case-insensitive)
@@ -2579,8 +2726,10 @@ export class MySQLAdapter {
           war: 'W',
           'war risk': 'W'
         }
-        const [ptRows] = (await this.pool.query('SELECT id, name, code FROM policy_types')) as any[]
-        for (const pt of ptRows as any[]) {
+        const [ptRows] = (await this.pool.query(
+          'SELECT id, name, code FROM policy_types'
+        )) as QueryRows
+        for (const pt of ptRows as RowDataPacket[]) {
           if (!pt.code) {
             const mappedCode = ptCodeMappings[pt.name.toLowerCase().trim()]
             if (mappedCode) {
@@ -2594,14 +2743,16 @@ export class MySQLAdapter {
         // Seed missing types from quotation_types that don't exist in policy_types
         const [qtAll] = (await this.pool.query(
           'SELECT id, name, code, order_index FROM quotation_types'
-        )) as any[]
-        const [ptAll] = (await this.pool.query('SELECT id, name, code FROM policy_types')) as any[]
-        const ptCodes = new Set((ptAll as any[]).map((r) => r.code).filter(Boolean))
+        )) as QueryRows
+        const [ptAll] = (await this.pool.query(
+          'SELECT id, name, code FROM policy_types'
+        )) as QueryRows
+        const ptCodes = new Set((ptAll as RowDataPacket[]).map((r) => r.code).filter(Boolean))
         const [ptMaxRow] = (await this.pool.query(
           'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types'
-        )) as any[]
-        let ptNextOrder = (ptMaxRow as any[])[0].nextOrder
-        for (const qt of qtAll as any[]) {
+        )) as QueryRows
+        let ptNextOrder = (ptMaxRow as RowDataPacket[])[0].nextOrder
+        for (const qt of qtAll as RowDataPacket[]) {
           if (qt.code && !ptCodes.has(qt.code)) {
             await this.pool.execute(
               'INSERT INTO policy_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
@@ -2613,10 +2764,10 @@ export class MySQLAdapter {
         // Migrate quotation_type_id: remap from quotation_types IDs to policy_types IDs
         const [ptFresh] = (await this.pool.query(
           'SELECT id, code FROM policy_types WHERE code IS NOT NULL'
-        )) as any[]
+        )) as QueryRows
         const codeToNewId = new Map<string, string>()
-        for (const pt of ptFresh as any[]) codeToNewId.set(pt.code, pt.id)
-        for (const qt of qtAll as any[]) {
+        for (const pt of ptFresh as RowDataPacket[]) codeToNewId.set(pt.code, pt.id)
+        for (const qt of qtAll as RowDataPacket[]) {
           const newId = codeToNewId.get(qt.code)
           if (newId && newId !== qt.id) {
             await this.pool.execute(
@@ -2640,8 +2791,8 @@ export class MySQLAdapter {
                             AND TABLE_COLLATION != 'utf8mb4_unicode_ci'
                             AND TABLE_TYPE = 'BASE TABLE'
                             ORDER BY TABLE_NAME ASC
-                        `)) as any[]
-            for (const row of mismatchedFinal as any[]) {
+                        `)) as QueryRows
+            for (const row of mismatchedFinal as RowDataPacket[]) {
               try {
                 await fk.query(
                   `ALTER TABLE \`${row.TABLE_NAME}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
@@ -2665,8 +2816,8 @@ export class MySQLAdapter {
       {
         const [ndtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'ncb_discount_type'"
-        )) as any[]
-        if ((ndtCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ndtCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE quotations ADD COLUMN ncb_discount_type VARCHAR(20) DEFAULT 'percentage'"
           )
@@ -2686,8 +2837,8 @@ export class MySQLAdapter {
       {
         const [csiCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_clause_set_items LIKE 'description_override'"
-        )) as any[]
-        if ((csiCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((csiCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_clause_set_items ADD COLUMN description_override TEXT DEFAULT NULL'
           )
@@ -2698,8 +2849,8 @@ export class MySQLAdapter {
       {
         const [avCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'agreed_value'"
-        )) as any[]
-        if ((avCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((avCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN agreed_value DECIMAL(15,2) DEFAULT NULL'
           )
@@ -2792,7 +2943,7 @@ export class MySQLAdapter {
         const [hacTitleCol] = await this.pool.query(
           "SHOW COLUMNS FROM hull_additional_conditions LIKE 'title'"
         )
-        if ((hacTitleCol as any[]).length === 0) {
+        if ((hacTitleCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE hull_additional_conditions ADD COLUMN title VARCHAR(255) NULL AFTER id'
           )
@@ -2810,16 +2961,16 @@ export class MySQLAdapter {
       {
         const [wsCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_warranties LIKE 'type_scope'"
-        )) as any[]
-        if ((wsCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((wsCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_warranties ADD COLUMN type_scope VARCHAR(10) DEFAULT 'both'"
           )
         }
         const [ssCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_subjectivities LIKE 'type_scope'"
-        )) as any[]
-        if ((ssCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ssCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_subjectivities ADD COLUMN type_scope VARCHAR(10) DEFAULT 'both'"
           )
@@ -2830,16 +2981,16 @@ export class MySQLAdapter {
       {
         const [tsCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_warranty_tags LIKE 'type_scope'"
-        )) as any[]
-        if ((tsCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((tsCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_warranty_tags ADD COLUMN type_scope VARCHAR(10) DEFAULT 'all'"
           )
         }
         const [ssCol2] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_warranty_sets LIKE 'type_scope'"
-        )) as any[]
-        if ((ssCol2 as any[]).length === 0) {
+        )) as QueryRows
+        if ((ssCol2 as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE pi_warranty_sets ADD COLUMN type_scope VARCHAR(10) DEFAULT 'all'"
           )
@@ -2863,24 +3014,24 @@ export class MySQLAdapter {
       {
         const [cs1] = (await this.pool.query(
           "SHOW COLUMNS FROM hull_clause_conditions LIKE 'condition_section'"
-        )) as any[]
-        if ((cs1 as any[]).length === 0) {
+        )) as QueryRows
+        if ((cs1 as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE hull_clause_conditions ADD COLUMN condition_section VARCHAR(10) DEFAULT 'both'"
           )
         }
         const [cs2] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_conditions LIKE 'condition_section'"
-        )) as any[]
-        if ((cs2 as any[]).length === 0) {
+        )) as QueryRows
+        if ((cs2 as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE quotation_hull_conditions ADD COLUMN condition_section VARCHAR(10) DEFAULT 'both'"
           )
         }
         const [ivv] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'iv_value'"
-        )) as any[]
-        if ((ivv as any[]).length === 0) {
+        )) as QueryRows
+        if ((ivv as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN iv_value DECIMAL(15,2) DEFAULT NULL'
           )
@@ -2893,16 +3044,16 @@ export class MySQLAdapter {
         }
         const [ive] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'iv_enabled'"
-        )) as any[]
-        if ((ive as any[]).length === 0) {
+        )) as QueryRows
+        if ((ive as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN iv_enabled BOOLEAN DEFAULT FALSE'
           )
         }
         const [ivc] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'iv_clause_id'"
-        )) as any[]
-        if ((ivc as any[]).length === 0) {
+        )) as QueryRows
+        if ((ivc as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN iv_clause_id VARCHAR(36) DEFAULT NULL'
           )
@@ -2913,16 +3064,16 @@ export class MySQLAdapter {
       {
         const [hcs] = (await this.pool.query(
           "SHOW COLUMNS FROM hull_clauses LIKE 'condition_section'"
-        )) as any[]
-        if ((hcs as any[]).length === 0) {
+        )) as QueryRows
+        if ((hcs as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE hull_clauses ADD COLUMN condition_section VARCHAR(10) DEFAULT 'hm'"
           )
         }
         const [ham] = (await this.pool.query(
           "SHOW COLUMNS FROM hull_clause_conditions LIKE 'has_amount'"
-        )) as any[]
-        if ((ham as any[]).length === 0) {
+        )) as QueryRows
+        if ((ham as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE hull_clause_conditions ADD COLUMN has_amount BOOLEAN DEFAULT FALSE'
           )
@@ -2932,24 +3083,24 @@ export class MySQLAdapter {
         }
         const [qca] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_conditions LIKE 'amount'"
-        )) as any[]
-        if ((qca as any[]).length === 0) {
+        )) as QueryRows
+        if ((qca as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_conditions ADD COLUMN amount DECIMAL(15,2) DEFAULT NULL'
           )
         }
         const [avs] = (await this.pool.query(
           "SHOW COLUMNS FROM hull_agreed_value_texts LIKE 'section'"
-        )) as any[]
-        if ((avs as any[]).length === 0) {
+        )) as QueryRows
+        if ((avs as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE hull_agreed_value_texts ADD COLUMN section VARCHAR(10) DEFAULT 'hm'"
           )
         }
         const [qas] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_agreed_value_items LIKE 'section'"
-        )) as any[]
-        if ((qas as any[]).length === 0) {
+        )) as QueryRows
+        if ((qas as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "ALTER TABLE quotation_agreed_value_items ADD COLUMN section VARCHAR(10) DEFAULT 'hm'"
           )
@@ -2960,8 +3111,8 @@ export class MySQLAdapter {
       {
         const [vaCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_conditions LIKE 'vessel_amounts'"
-        )) as any[]
-        if ((vaCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((vaCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_conditions ADD COLUMN vessel_amounts TEXT DEFAULT NULL'
           )
@@ -2972,8 +3123,8 @@ export class MySQLAdapter {
       {
         const [hacAmt] = (await this.pool.query(
           "SHOW COLUMNS FROM hull_additional_conditions LIKE 'has_amount'"
-        )) as any[]
-        if ((hacAmt as any[]).length === 0) {
+        )) as QueryRows
+        if ((hacAmt as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE hull_additional_conditions ADD COLUMN has_amount BOOLEAN DEFAULT FALSE'
           )
@@ -2983,8 +3134,8 @@ export class MySQLAdapter {
         }
         const [qhacAmt] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_additional_conditions LIKE 'amount'"
-        )) as any[]
-        if ((qhacAmt as any[]).length === 0) {
+        )) as QueryRows
+        if ((qhacAmt as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_additional_conditions ADD COLUMN amount DECIMAL(15,2) DEFAULT NULL'
           )
@@ -3009,16 +3160,16 @@ export class MySQLAdapter {
         }
         const [altCol1] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_conditions LIKE 'alternative_id'"
-        )) as any[]
-        if ((altCol1 as any[]).length === 0) {
+        )) as QueryRows
+        if ((altCol1 as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_conditions ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL'
           )
         }
         const [altCol2] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_additional_conditions LIKE 'alternative_id'"
-        )) as any[]
-        if ((altCol2 as any[]).length === 0) {
+        )) as QueryRows
+        if ((altCol2 as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_additional_conditions ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL'
           )
@@ -3029,11 +3180,11 @@ export class MySQLAdapter {
                     FROM quotations q
                     LEFT JOIN quotation_hull_alternatives qha ON qha.quotation_id = q.id
                     WHERE q.hull_clause_id IS NOT NULL AND qha.id IS NULL
-                `)) as any[]
-        if ((existingHull as any[]).length > 0) {
+                `)) as QueryRows
+        if ((existingHull as RowDataPacket[]).length > 0) {
           const fk = await this.fkOff()
           try {
-            for (const q of existingHull as any[]) {
+            for (const q of existingHull as RowDataPacket[]) {
               const altId = uuidv4()
               await fk.execute(
                 'INSERT INTO quotation_hull_alternatives (id, quotation_id, hull_clause_id, premium_amount, order_index) VALUES (?, ?, ?, ?, 0)',
@@ -3129,8 +3280,8 @@ export class MySQLAdapter {
         for (const tbl of piAltTables) {
           const [cols] = (await this.pool.query(
             `SHOW COLUMNS FROM ${tbl} LIKE 'alternative_id'`
-          )) as any[]
-          if ((cols as any[]).length === 0) {
+          )) as QueryRows
+          if ((cols as RowDataPacket[]).length === 0) {
             await this.pool.query(
               `ALTER TABLE ${tbl} ADD COLUMN alternative_id VARCHAR(36) DEFAULT NULL`
             )
@@ -3141,8 +3292,8 @@ export class MySQLAdapter {
         {
           const [wsCols] = (await this.pool.query(
             "SHOW COLUMNS FROM pi_warranty_sets LIKE 'alternative_scope'"
-          )) as any[]
-          if ((wsCols as any[]).length === 0) {
+          )) as QueryRows
+          if ((wsCols as RowDataPacket[]).length === 0) {
             await this.pool.query(
               'ALTER TABLE pi_warranty_sets ADD COLUMN alternative_scope VARCHAR(20) DEFAULT NULL'
             )
@@ -3154,8 +3305,8 @@ export class MySQLAdapter {
       {
         const [revCols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'revision_number'"
-        )) as any[]
-        if ((revCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((revCols as RowDataPacket[]).length === 0) {
           await this.pool.query('ALTER TABLE quotations ADD COLUMN revision_number INT DEFAULT 0')
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN revision_group_id VARCHAR(36) DEFAULT NULL'
@@ -3197,7 +3348,7 @@ export class MySQLAdapter {
         const [addrCols] = await this.pool.query(
           "SHOW COLUMNS FROM vessel_assureds LIKE 'address_id'"
         )
-        if ((addrCols as any[]).length === 0) {
+        if ((addrCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE vessel_assureds ADD COLUMN address_id VARCHAR(36) DEFAULT NULL'
           )
@@ -3243,7 +3394,7 @@ export class MySQLAdapter {
         const [existingGroups] = await this.pool.query(
           'SELECT id FROM user_groups WHERE is_system = TRUE'
         )
-        if ((existingGroups as any[]).length === 0) {
+        if ((existingGroups as RowDataPacket[]).length === 0) {
           const adminGroupId = uuidv4()
           const userGroupId = uuidv4()
           const fk = await this.fkOff()
@@ -3274,7 +3425,7 @@ export class MySQLAdapter {
             }
             // Assign existing admin users to Administrator group, others to User group
             const [allUsers] = await fk.query('SELECT id, role FROM users')
-            for (const u of allUsers as any[]) {
+            for (const u of allUsers as RowDataPacket[]) {
               const gid = u.role === 'admin' ? adminGroupId : userGroupId
               await fk.execute(
                 'INSERT IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)',
@@ -3291,9 +3442,9 @@ export class MySQLAdapter {
       try {
         const [adminGrp] = (await this.pool.query(
           "SELECT id FROM user_groups WHERE name = 'Administrator' AND is_system = TRUE LIMIT 1"
-        )) as any[]
-        if ((adminGrp as any[]).length > 0) {
-          const adminGrpId = (adminGrp as any[])[0].id
+        )) as QueryRows
+        if ((adminGrp as RowDataPacket[]).length > 0) {
+          const adminGrpId = (adminGrp as RowDataPacket[])[0].id
           const { ALL_PERMISSION_KEYS } = await import('../../shared/types')
           for (const key of ALL_PERMISSION_KEYS) {
             await this.pool.execute(
@@ -3302,12 +3453,14 @@ export class MySQLAdapter {
             )
           }
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Seed default email templates if table is empty
       {
         const [etRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates')
-        if ((etRows as any[])[0].cnt === 0) {
+        if ((etRows as RowDataPacket[])[0].cnt === 0) {
           const seedTemplates = [
             {
               name: 'Renewal Reminder',
@@ -3341,7 +3494,7 @@ export class MySQLAdapter {
       // Add workflow columns to quotations
       {
         const [qCols] = await this.pool.query('SHOW COLUMNS FROM quotations')
-        const qColNames = (qCols as any[]).map((c: any) => c.Field)
+        const qColNames = (qCols as RowDataPacket[]).map((c) => c.Field)
         if (!qColNames.includes('workflow_step_id'))
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN workflow_step_id VARCHAR(36) NULL'
@@ -3382,7 +3535,7 @@ export class MySQLAdapter {
         const [wsRows] = await this.pool.query(
           'SELECT COUNT(*) AS cnt FROM quotation_workflow_steps'
         )
-        if ((wsRows as any[])[0].cnt === 0) {
+        if ((wsRows as RowDataPacket[])[0].cnt === 0) {
           const draftId = uuidv4(),
             reviewId = uuidv4(),
             approvedId = uuidv4(),
@@ -3465,12 +3618,12 @@ export class MySQLAdapter {
         const [convRows] = await this.pool.query(
           "SELECT id FROM quotation_workflow_steps WHERE name = 'Converted'"
         )
-        if ((convRows as any[]).length === 0) {
+        if ((convRows as RowDataPacket[]).length === 0) {
           const convertedId = uuidv4()
           const [maxOrdRows] = await this.pool.query(
             'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_workflow_steps'
           )
-          const nextOrder = (maxOrdRows as any[])[0].nextOrder
+          const nextOrder = (maxOrdRows as RowDataPacket[])[0].nextOrder
           await this.pool.execute(
             'INSERT INTO quotation_workflow_steps (id, name, color, order_index, can_edit, can_export, is_lock_point, is_initial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [convertedId, 'Converted', '#22c55e', nextOrder, false, true, true, false]
@@ -3479,8 +3632,8 @@ export class MySQLAdapter {
           const [sentRows] = await this.pool.query(
             "SELECT id FROM quotation_workflow_steps WHERE name = 'Sent'"
           )
-          if ((sentRows as any[]).length > 0) {
-            const sentId = (sentRows as any[])[0].id
+          if ((sentRows as RowDataPacket[]).length > 0) {
+            const sentId = (sentRows as RowDataPacket[])[0].id
             await this.pool.execute(
               'INSERT INTO quotation_workflow_transitions (id, from_step_id, to_step_id, permission_key, auto_create_revision) VALUES (?, ?, ?, ?, ?)',
               [uuidv4(), sentId, convertedId, null, false]
@@ -3524,7 +3677,7 @@ export class MySQLAdapter {
         const [pdPremCol] = await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'premium_amount'"
         )
-        if ((pdPremCol as any[]).length === 0) {
+        if ((pdPremCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN premium_amount DECIMAL(15,2) NULL'
           )
@@ -3535,7 +3688,7 @@ export class MySQLAdapter {
         const [pdAltCol] = await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'selected_alternative_id'"
         )
-        if ((pdAltCol as any[]).length === 0) {
+        if ((pdAltCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN selected_alternative_id VARCHAR(36) NULL'
           )
@@ -3546,7 +3699,7 @@ export class MySQLAdapter {
         const [cols] = await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'exported_at'"
         )
-        if ((cols as any[]).length === 0) {
+        if ((cols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN exported_at TIMESTAMP NULL'
           )
@@ -3596,8 +3749,10 @@ export class MySQLAdapter {
 
       // Migrate policy_blue_cards — add owner/port/addressedTo/status columns
       {
-        const [bcMigCols] = (await this.pool.query('SHOW COLUMNS FROM policy_blue_cards')) as any[]
-        const bcMigColNames = bcMigCols.map((c: any) => c.Field)
+        const [bcMigCols] = (await this.pool.query(
+          'SHOW COLUMNS FROM policy_blue_cards'
+        )) as QueryRows
+        const bcMigColNames = bcMigCols.map((c) => c.Field)
         const bcNewCols: [string, string][] = [
           ['status', `VARCHAR(20) DEFAULT 'active'`],
           ['owner_entity_id', 'VARCHAR(36) NULL'],
@@ -3618,7 +3773,7 @@ export class MySQLAdapter {
 
       // Migration: Add ratification flags and authority details to flag_states
       const [fsCols] = await this.pool.query('SHOW COLUMNS FROM flag_states')
-      const fsColNames = (fsCols as any[]).map((c: any) => c.Field)
+      const fsColNames = (fsCols as RowDataPacket[]).map((c) => c.Field)
       if (!fsColNames.includes('ratified_bunker')) {
         await this.pool.query(
           'ALTER TABLE flag_states ADD COLUMN ratified_bunker BOOLEAN DEFAULT FALSE'
@@ -3657,7 +3812,7 @@ export class MySQLAdapter {
       // Migration: add renewed_from_policy_id and renewed_from_policy_number to quotations
       {
         const [qCols] = await this.pool.query('SHOW COLUMNS FROM quotations')
-        const qColNames = (qCols as any[]).map((c: any) => c.Field)
+        const qColNames = (qCols as RowDataPacket[]).map((c) => c.Field)
         if (!qColNames.includes('renewed_from_policy_id')) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN renewed_from_policy_id VARCHAR(36) DEFAULT NULL'
@@ -3674,7 +3829,7 @@ export class MySQLAdapter {
       {
         const [lcCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_deductibles LIKE 'letter_code'"
-        )) as any[]
+        )) as QueryRows
         if (lcCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_deductibles ADD COLUMN letter_code VARCHAR(10) DEFAULT NULL AFTER title'
@@ -3686,7 +3841,7 @@ export class MySQLAdapter {
       {
         const [erCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'exchange_rate'"
-        )) as any[]
+        )) as QueryRows
         if (erCol.length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN exchange_rate DECIMAL(10,6) DEFAULT 1.000000'
@@ -3718,7 +3873,7 @@ export class MySQLAdapter {
       {
         const [pnCols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_notes LIKE 'parent_note_id'"
-        )) as any[]
+        )) as QueryRows
         if (pnCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_notes ADD COLUMN parent_note_id VARCHAR(36) DEFAULT NULL'
@@ -3739,7 +3894,7 @@ export class MySQLAdapter {
       try {
         const [vnPnCols] = (await this.pool.query(
           "SHOW COLUMNS FROM vessel_notes LIKE 'parent_note_id'"
-        )) as any[]
+        )) as QueryRows
         if (vnPnCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE vessel_notes ADD COLUMN parent_note_id VARCHAR(36) DEFAULT NULL'
@@ -3753,7 +3908,7 @@ export class MySQLAdapter {
       try {
         const [wsiCols] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_warranty_set_items LIKE 'order_index'"
-        )) as any[]
+        )) as QueryRows
         if (wsiCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_warranty_set_items ADD COLUMN order_index INT DEFAULT 0'
@@ -3767,7 +3922,7 @@ export class MySQLAdapter {
       try {
         const [ngTables] = (await this.pool.query(
           "SHOW TABLES LIKE 'notification_groups'"
-        )) as any[]
+        )) as QueryRows
         if (ngTables.length === 0) {
           await this.pool.query(`CREATE TABLE IF NOT EXISTS notification_groups (
                         id VARCHAR(36) PRIMARY KEY,
@@ -3861,13 +4016,13 @@ export class MySQLAdapter {
           const [has] = (await this.pool.query(
             `SHOW INDEX FROM \`${ix.table}\` WHERE Key_name = ?`,
             [ix.name]
-          )) as any[]
-          if ((has as any[]).length === 0)
+          )) as QueryRows
+          if ((has as RowDataPacket[]).length === 0)
             await this.pool.query(
               `ALTER TABLE \`${ix.table}\` ADD INDEX \`${ix.name}\` (${ix.cols})`
             )
         } catch (e) {
-          console.error(`index ${ix.name}:`, (e as any)?.message)
+          console.error(`index ${ix.name}:`, (e as Error | null)?.message)
         }
       }
 
@@ -3886,13 +4041,13 @@ export class MySQLAdapter {
           const [hasIdx] = (await this.pool.query(
             `SHOW INDEX FROM \`${u.table}\` WHERE Key_name = ?`,
             [u.index]
-          )) as any[]
-          if ((hasIdx as any[]).length > 0) continue
+          )) as QueryRows
+          if ((hasIdx as RowDataPacket[]).length > 0) continue
           const colList = u.columns.map((c) => `\`${c}\``).join(', ')
           const [dups] = (await this.pool.query(
             `SELECT ${colList} FROM \`${u.table}\` GROUP BY ${colList} HAVING COUNT(*) > 1 LIMIT 5`
-          )) as any[]
-          if ((dups as any[]).length > 0) {
+          )) as QueryRows
+          if ((dups as RowDataPacket[]).length > 0) {
             console.warn(
               `[migration] ${u.table} (${u.columns.join(', ')}) has duplicates, UNIQUE index not added:`,
               dups
@@ -3911,7 +4066,7 @@ export class MySQLAdapter {
       try {
         const [dboCols] = (await this.pool.query(
           "SHOW COLUMNS FROM users LIKE 'dashboard_onboarded'"
-        )) as any[]
+        )) as QueryRows
         if (dboCols.length === 0) {
           await this.pool.query(
             'ALTER TABLE users ADD COLUMN dashboard_onboarded BOOLEAN DEFAULT FALSE'
@@ -3977,7 +4132,7 @@ export class MySQLAdapter {
       try {
         const [dtCols] = (await this.pool.query(
           "SHOW COLUMNS FROM document_templates LIKE 'body'"
-        )) as any[]
+        )) as QueryRows
         if (dtCols.length === 0) {
           await this.pool.query('ALTER TABLE document_templates ADD COLUMN body TEXT DEFAULT NULL')
         }
@@ -4007,8 +4162,8 @@ export class MySQLAdapter {
       {
         const [vsiCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'vessel_scope_id'"
-        )) as any[]
-        if ((vsiCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((vsiCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_alternatives ADD COLUMN vessel_scope_id VARCHAR(36) DEFAULT NULL'
           )
@@ -4019,8 +4174,8 @@ export class MySQLAdapter {
       try {
         const [avCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'agreed_value'"
-        )) as any[]
-        if ((avCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((avCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_alternatives ADD COLUMN agreed_value DECIMAL(15,2) DEFAULT NULL'
           )
@@ -4028,38 +4183,44 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_hull_alternatives ADD COLUMN agreed_value_currency VARCHAR(10) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: is_optional on pi_subjectivities
       try {
         const [ioCol] = (await this.pool.query(
           "SHOW COLUMNS FROM pi_subjectivities LIKE 'is_optional'"
-        )) as any[]
-        if ((ioCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ioCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE pi_subjectivities ADD COLUMN is_optional TINYINT(1) DEFAULT 0 NOT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: include_in_shared on quotation_hull_alternatives
       try {
         const [iisCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'include_in_shared'"
-        )) as any[]
-        if ((iisCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((iisCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_hull_alternatives ADD COLUMN include_in_shared TINYINT(1) DEFAULT 1 NOT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: ncb_excluded and upcc_excluded on quotation_vessels
       try {
         const [neCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'ncb_excluded'"
-        )) as any[]
-        if ((neCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((neCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN ncb_excluded TINYINT(1) DEFAULT 0 NOT NULL'
           )
@@ -4067,7 +4228,9 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_vessels ADD COLUMN upcc_excluded TINYINT(1) DEFAULT 0 NOT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_trading_intros table for per-vessel trading warranty intro text
       try {
@@ -4086,30 +4249,36 @@ export class MySQLAdapter {
             await fk.done()
           }
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: reopen_reason on survey_defects
       try {
         const [rrCol] = (await this.pool.query(
           "SHOW COLUMNS FROM survey_defects LIKE 'reopen_reason'"
-        )) as any[]
-        if ((rrCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((rrCol as RowDataPacket[]).length === 0) {
           await this.pool.query('ALTER TABLE survey_defects ADD COLUMN reopen_reason TEXT NULL')
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: due_event on survey_defects - a deadline that is an event, not a date
       // ("Before next sailing", "At next dry dock"), from the survey report's time scale
       try {
         const [deCol] = (await this.pool.query(
           "SHOW COLUMNS FROM survey_defects LIKE 'due_event'"
-        )) as any[]
-        if ((deCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((deCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE survey_defects ADD COLUMN due_event VARCHAR(255) NULL AFTER due_date'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: defect_attachments table
       try {
@@ -4122,26 +4291,30 @@ export class MySQLAdapter {
                     uploaded_by VARCHAR(255),
                     FOREIGN KEY (defect_id) REFERENCES survey_defects(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: follow_up_survey_id on condition_surveys
       try {
         const [fuCol] = (await this.pool.query(
           "SHOW COLUMNS FROM condition_surveys LIKE 'follow_up_survey_id'"
-        )) as any[]
-        if ((fuCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((fuCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE condition_surveys ADD COLUMN follow_up_survey_id VARCHAR(36) NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: make hull_clause_id nullable on quotation_hull_alternatives
       try {
         const [hciCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_hull_alternatives LIKE 'hull_clause_id'"
-        )) as any[]
-        const colInfo = (hciCol as any[])[0]
+        )) as QueryRows
+        const colInfo = (hciCol as RowDataPacket[])[0]
         if (colInfo && (colInfo.Null === 'NO' || colInfo.NULL === 'NO' || colInfo.null === 'NO')) {
           const fk = await this.fkOff()
           try {
@@ -4152,13 +4325,15 @@ export class MySQLAdapter {
             await fk.done()
           }
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migrate email_templates rows into document_templates (email category)
       try {
         const [etRows] = (await this.pool.query(
           'SELECT COUNT(*) AS cnt FROM email_templates'
-        )) as any[]
+        )) as QueryRows
         if (etRows[0].cnt > 0) {
           await this.pool.query(`
                         INSERT INTO document_templates (id, name, body, category, order_index, created_at, created_by)
@@ -4167,7 +4342,7 @@ export class MySQLAdapter {
                         WHERE id NOT IN (SELECT id FROM document_templates)
                     `)
         }
-      } catch (e) {
+      } catch {
         /* email_templates table may not exist */
       }
 
@@ -4190,7 +4365,7 @@ export class MySQLAdapter {
       // Migration: add signed_by and signed_at to policy_documents
       {
         const [sbCol] = await this.pool.query("SHOW COLUMNS FROM policy_documents LIKE 'signed_by'")
-        if ((sbCol as any[]).length === 0) {
+        if ((sbCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN signed_by VARCHAR(36) DEFAULT NULL'
           )
@@ -4240,8 +4415,10 @@ export class MySQLAdapter {
 
       // Migration: extend policy_tc_templates for rich-text (html) + multiple named templates per type
       try {
-        const [tcCols] = (await this.pool.query('SHOW COLUMNS FROM policy_tc_templates')) as any[]
-        const tcColNames = (tcCols as any[]).map((c) => c.Field)
+        const [tcCols] = (await this.pool.query(
+          'SHOW COLUMNS FROM policy_tc_templates'
+        )) as QueryRows
+        const tcColNames = (tcCols as RowDataPacket[]).map((c) => c.Field)
         if (!tcColNames.includes('name'))
           await this.pool.query('ALTER TABLE policy_tc_templates ADD COLUMN name VARCHAR(255) NULL')
         if (!tcColNames.includes('kind'))
@@ -4280,8 +4457,8 @@ export class MySQLAdapter {
         try {
           const [idx] = (await this.pool.query(
             "SHOW INDEX FROM policy_tc_templates WHERE Key_name = 'idx_tc_type'"
-          )) as any[]
-          if ((idx as any[]).length > 0)
+          )) as QueryRows
+          if ((idx as RowDataPacket[]).length > 0)
             await this.pool.query('ALTER TABLE policy_tc_templates DROP INDEX idx_tc_type')
         } catch {
           /* index already gone */
@@ -4311,7 +4488,7 @@ export class MySQLAdapter {
           const [realCountRows] = await this.pool.query(
             "SELECT COUNT(*) as cnt FROM quotations WHERE reference_number IS NOT NULL AND reference_number NOT LIKE 'DRAFT-%'"
           )
-          const realCount = (realCountRows as any[])[0]?.cnt || 0
+          const realCount = (realCountRows as RowDataPacket[])[0]?.cnt || 0
           await this.setSetting('real_quotation_seq', String(realCount))
         }
         const existingDraftSeq = await this.getSetting('draft_quotation_seq')
@@ -4331,7 +4508,7 @@ export class MySQLAdapter {
         const [snapCols] = await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'export_snapshot'"
         )
-        if ((snapCols as any[]).length === 0) {
+        if ((snapCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN export_snapshot MEDIUMTEXT DEFAULT NULL'
           )
@@ -4374,16 +4551,16 @@ export class MySQLAdapter {
       {
         const [dvaCols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_deductibles LIKE 'vessel_amounts'"
-        )) as any[]
-        if ((dvaCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((dvaCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_deductibles ADD COLUMN vessel_amounts TEXT DEFAULT NULL'
           )
         }
         const [dvsaCols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_deductibles LIKE 'vessel_secondary_amounts'"
-        )) as any[]
-        if ((dvsaCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((dvsaCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_deductibles ADD COLUMN vessel_secondary_amounts TEXT DEFAULT NULL'
           )
@@ -4394,8 +4571,8 @@ export class MySQLAdapter {
       {
         const [lolVaCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'limit_of_liability_vessel_amounts'"
-        )) as any[]
-        if ((lolVaCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((lolVaCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN limit_of_liability_vessel_amounts TEXT DEFAULT NULL'
           )
@@ -4423,32 +4600,38 @@ export class MySQLAdapter {
           try {
             const [cargoCols] = (await this.pool.query(
               `SHOW COLUMNS FROM quotations LIKE '${colName}'`
-            )) as any[]
-            if ((cargoCols as any[]).length === 0) {
+            )) as QueryRows
+            if ((cargoCols as RowDataPacket[]).length === 0) {
               await this.pool.query(`ALTER TABLE quotations ADD COLUMN ${field}`)
             }
-          } catch {}
+          } catch {
+            /* idempotent migration: already applied or not applicable */
+          }
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: cargo_clause_id on quotations
       try {
         const [cciCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'cargo_clause_id'"
-        )) as any[]
-        if ((cciCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((cciCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN cargo_clause_id VARCHAR(36) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: amount fields on cargo_clauses
       try {
         const [haCol] = (await this.pool.query(
           "SHOW COLUMNS FROM cargo_clauses LIKE 'has_amount'"
-        )) as any[]
-        if ((haCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((haCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE cargo_clauses ADD COLUMN has_amount BOOLEAN DEFAULT FALSE'
           )
@@ -4456,19 +4639,23 @@ export class MySQLAdapter {
             'ALTER TABLE cargo_clauses ADD COLUMN amount_placeholder VARCHAR(100) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: amount on quotation_cargo_clauses
       try {
         const [amtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_cargo_clauses LIKE 'amount'"
-        )) as any[]
-        if ((amtCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((amtCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_cargo_clauses ADD COLUMN amount DECIMAL(15,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: cargo clause sets (named bundles of cargo clauses, scoped per section)
       try {
@@ -4485,14 +4672,16 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0,
                     INDEX idx_ccsi_set (set_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Seed Cargo type if not exists (now in policy_types, legacy quotation_types kept for migration)
       try {
         const [existingCargo] = (await this.pool.query(
           "SELECT id FROM policy_types WHERE code = 'C'"
-        )) as any[]
-        if ((existingCargo as any[]).length === 0) {
+        )) as QueryRows
+        if ((existingCargo as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "INSERT INTO policy_types (id, name, code, order_index) VALUES (UUID(), 'Cargo', 'C', 5)"
           )
@@ -4500,25 +4689,29 @@ export class MySQLAdapter {
         // Also seed in quotation_types for migration compatibility
         const [existingCargoQt] = (await this.pool.query(
           "SELECT id FROM quotation_types WHERE code = 'C'"
-        )) as any[]
-        if ((existingCargoQt as any[]).length === 0) {
+        )) as QueryRows
+        if ((existingCargoQt as RowDataPacket[]).length === 0) {
           await this.pool.query(
             "INSERT INTO quotation_types (id, name, code, order_index) VALUES (UUID(), 'Cargo', 'C', 5)"
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: exclude_types on trading_excluded_countries
       try {
         const [etCol] = (await this.pool.query(
           "SHOW COLUMNS FROM trading_excluded_countries LIKE 'exclude_types'"
-        )) as any[]
-        if ((etCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((etCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE trading_excluded_countries ADD COLUMN exclude_types VARCHAR(50) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_saved_filters table
       try {
@@ -4527,7 +4720,9 @@ export class MySQLAdapter {
                     filters TEXT NOT NULL, order_index INT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_qsf_user (user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_favorites table
       try {
@@ -4537,7 +4732,9 @@ export class MySQLAdapter {
                     UNIQUE KEY uniq_user_quotation (user_id, quotation_id),
                     INDEX idx_qf_user (user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_assured_groups table
       try {
@@ -4545,19 +4742,23 @@ export class MySQLAdapter {
                     id VARCHAR(36) PRIMARY KEY, quotation_id VARCHAR(36) NOT NULL, name VARCHAR(100) NOT NULL,
                     order_index INT DEFAULT 0, INDEX idx_qag_quotation (quotation_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: group_id on quotation_assureds
       try {
         const [gidCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_assureds LIKE 'group_id'"
-        )) as any[]
-        if ((gidCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((gidCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_assureds ADD COLUMN group_id VARCHAR(36) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_agreed_value_options table
       try {
@@ -4568,44 +4769,52 @@ export class MySQLAdapter {
                     order_index INT DEFAULT 0,
                     INDEX idx_qavo_quotation (quotation_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       // Migration: premium_amount on quotation_agreed_value_options
       try {
         const [paCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_agreed_value_options LIKE 'premium_amount'"
-        )) as any[]
-        if ((paCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((paCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_agreed_value_options ADD COLUMN premium_amount DECIMAL(15,2) DEFAULT NULL AFTER currency'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: force_password_reset on users
       try {
         const [fprCol] = (await this.pool.query(
           "SHOW COLUMNS FROM users LIKE 'force_password_reset'"
-        )) as any[]
-        if ((fprCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((fprCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN DEFAULT FALSE'
           )
           // Force all existing users to reset on this update
           await this.pool.query('UPDATE users SET force_password_reset = TRUE')
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: add order_index to quotation_exclusions for reordering
       try {
         const [qeOiCols] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_exclusions LIKE 'order_index'"
-        )) as any[]
-        if ((qeOiCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((qeOiCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_exclusions ADD COLUMN order_index INT DEFAULT 0'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_groups table
       try {
@@ -4618,7 +4827,9 @@ export class MySQLAdapter {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_qg_user (user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation_group_members table
       try {
@@ -4630,14 +4841,16 @@ export class MySQLAdapter {
                     INDEX idx_qgm_group (group_id),
                     INDEX idx_qgm_quotation (quotation_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: per-alternative LOL on quotation_pi_alternatives
       try {
         const [lolCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_pi_alternatives LIKE 'lol_amount'"
-        )) as any[]
-        if ((lolCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((lolCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_pi_alternatives ADD COLUMN lol_amount DECIMAL(15,2) DEFAULT NULL'
           )
@@ -4645,14 +4858,16 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_pi_alternatives ADD COLUMN lol_currency VARCHAR(10) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: previous_* columns for renewal comparison
       try {
         const [pvCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_vessels LIKE 'previous_premium'"
-        )) as any[]
-        if ((pvCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((pvCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_vessels ADD COLUMN previous_premium DECIMAL(15,2) DEFAULT NULL'
           )
@@ -4663,24 +4878,28 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_vessels ADD COLUMN previous_section2_premium DECIMAL(15,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       try {
         const [pqCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'previous_premium_amount'"
-        )) as any[]
-        if ((pqCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((pqCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN previous_premium_amount DECIMAL(15,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       try {
         const [pdCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_deductibles LIKE 'previous_amount'"
-        )) as any[]
-        if ((pdCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((pdCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_deductibles ADD COLUMN previous_amount DECIMAL(15,2) DEFAULT NULL'
           )
@@ -4688,14 +4907,16 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_deductibles ADD COLUMN previous_secondary_amount DECIMAL(15,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: policy_documents section_order + LOL/agreed value option IDs
       try {
         const [polCols] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'section_order'"
-        )) as any[]
-        if ((polCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((polCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN section_order TEXT DEFAULT NULL'
           )
@@ -4706,7 +4927,9 @@ export class MySQLAdapter {
             'ALTER TABLE policy_documents ADD COLUMN selected_agreed_value_option_id VARCHAR(36) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: commission defaults and customer overrides
       try {
@@ -4716,7 +4939,9 @@ export class MySQLAdapter {
                     commission_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
                     UNIQUE KEY uq_ptc_type (policy_type_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       try {
         await this.pool.query(`CREATE TABLE IF NOT EXISTS entity_commission_overrides (
                     id VARCHAR(36) PRIMARY KEY,
@@ -4725,29 +4950,35 @@ export class MySQLAdapter {
                     commission_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
                     UNIQUE KEY uq_eco_entity_type (entity_id, policy_type_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: order column on policy_doc_addresses
       try {
         const [oCols] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_doc_addresses LIKE 'order'"
-        )) as any[]
-        if ((oCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((oCols as RowDataPacket[]).length === 0) {
           await this.pool.query('ALTER TABLE policy_doc_addresses ADD COLUMN `order` INT DEFAULT 0')
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: entity_name column on policy_doc_addresses (holds custom insured names with no linked entity)
       try {
         const [enCols] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_doc_addresses LIKE 'entity_name'"
-        )) as any[]
-        if ((enCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((enCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_doc_addresses ADD COLUMN entity_name VARCHAR(255) NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: custom hull additional conditions per quotation
       try {
@@ -4760,39 +4991,45 @@ export class MySQLAdapter {
                     vessel_scope TEXT DEFAULT NULL,
                     alternative_id VARCHAR(36) DEFAULT NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: our_share on policy_documents for war declarations
       try {
         const [osCols] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'our_share'"
-        )) as any[]
-        if ((osCols as any[]).length === 0) {
+        )) as QueryRows
+        if ((osCols as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN our_share DECIMAL(5,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: quotation locking
       try {
         const [lkCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'locked_by'"
-        )) as any[]
-        if ((lkCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((lkCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN locked_by VARCHAR(36) DEFAULT NULL'
           )
           await this.pool.query('ALTER TABLE quotations ADD COLUMN locked_at DATETIME DEFAULT NULL')
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: outstanding premium + pro-rata fields on quotations
       try {
         const [opCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'outstanding_premium_enabled'"
-        )) as any[]
-        if ((opCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((opCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN outstanding_premium_enabled BOOLEAN DEFAULT FALSE'
           )
@@ -4806,12 +5043,14 @@ export class MySQLAdapter {
             'ALTER TABLE quotations ADD COLUMN outstanding_premium_underline BOOLEAN DEFAULT TRUE'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       try {
         const [prCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'is_pro_rata'"
-        )) as any[]
-        if ((prCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((prCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN is_pro_rata BOOLEAN DEFAULT FALSE'
           )
@@ -4822,13 +5061,15 @@ export class MySQLAdapter {
             'ALTER TABLE quotations ADD COLUMN pro_rata_months DECIMAL(5,1) NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       // Migration: surveyor_value + date_of_survey_value on quotation_survey_warranties
       try {
         const [svCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotation_survey_warranties LIKE 'surveyor_value'"
-        )) as any[]
-        if ((svCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((svCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotation_survey_warranties ADD COLUMN surveyor_value VARCHAR(255) DEFAULT NULL'
           )
@@ -4836,35 +5077,43 @@ export class MySQLAdapter {
             'ALTER TABLE quotation_survey_warranties ADD COLUMN date_of_survey_value VARCHAR(255) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: title on survey_warranty_templates
       try {
         const [swtCol] = (await this.pool.query(
           "SHOW COLUMNS FROM survey_warranty_templates LIKE 'title'"
-        )) as any[]
-        if ((swtCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((swtCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE survey_warranty_templates ADD COLUMN title VARCHAR(255) DEFAULT NULL AFTER id'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: full_name on users
       try {
-        const [fnCol] = (await this.pool.query("SHOW COLUMNS FROM users LIKE 'full_name'")) as any[]
-        if ((fnCol as any[]).length === 0) {
+        const [fnCol] = (await this.pool.query(
+          "SHOW COLUMNS FROM users LIKE 'full_name'"
+        )) as QueryRows
+        if ((fnCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE users ADD COLUMN full_name VARCHAR(255) DEFAULT NULL AFTER username'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       try {
         const [fpCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'full_premium_loss_enabled'"
-        )) as any[]
-        if ((fpCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((fpCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN full_premium_loss_enabled BOOLEAN DEFAULT FALSE'
           )
@@ -4872,14 +5121,16 @@ export class MySQLAdapter {
             'ALTER TABLE quotations ADD COLUMN full_premium_loss_text TEXT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: seed entity_document_types + migrate legacy entity file paths
       try {
         const [edtRows] = (await this.pool.query(
           'SELECT COUNT(*) as cnt FROM entity_document_types'
-        )) as any[]
-        if ((edtRows as any[])[0].cnt === 0) {
+        )) as QueryRows
+        if ((edtRows as RowDataPacket[])[0].cnt === 0) {
           const seedTypes = [
             { id: uuidv4(), name: 'Certificate of Incorporation', scope: 'company', order: 1 },
             { id: uuidv4(), name: 'Articles of Association', scope: 'company', order: 2 },
@@ -4896,13 +5147,13 @@ export class MySQLAdapter {
           // Migrate existing entity file paths to entity_documents
           const [entities] = (await this.pool.query(
             'SELECT id, passport_file_path, certificate_of_incorporation_path, articles_of_association_path, kyc_file_path FROM entities'
-          )) as any[]
+          )) as QueryRows
           const coiType = seedTypes.find((t) => t.name === 'Certificate of Incorporation')!
           const aoaType = seedTypes.find((t) => t.name === 'Articles of Association')!
           const kycType = seedTypes.find((t) => t.name === 'KYC')!
           const passType = seedTypes.find((t) => t.name === 'ID / Passport')!
 
-          for (const ent of entities as any[]) {
+          for (const ent of entities as RowDataPacket[]) {
             const mappings = [
               { path: ent.certificate_of_incorporation_path, typeId: coiType.id },
               { path: ent.articles_of_association_path, typeId: aoaType.id },
@@ -4927,8 +5178,8 @@ export class MySQLAdapter {
       try {
         const [delCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'deleted_at'"
-        )) as any[]
-        if ((delCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((delCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE quotations ADD COLUMN deleted_at DATETIME DEFAULT NULL'
           )
@@ -4944,27 +5195,31 @@ export class MySQLAdapter {
       try {
         const [sdCol] = (await this.pool.query(
           "SHOW COLUMNS FROM quotations LIKE 'subjectivity_days'"
-        )) as any[]
-        if ((sdCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((sdCol as RowDataPacket[]).length === 0) {
           await this.pool.query('ALTER TABLE quotations ADD COLUMN subjectivity_days INT DEFAULT 0')
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       try {
         const [sdpCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'subjectivity_days'"
-        )) as any[]
-        if ((sdpCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((sdpCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN subjectivity_days INT DEFAULT 7'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       // Outstanding-premium override (NULL = inherit from quotation)
       try {
         const [opeCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'outstanding_premium_enabled'"
-        )) as any[]
-        if ((opeCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((opeCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN outstanding_premium_enabled BOOLEAN DEFAULT NULL'
           )
@@ -4972,14 +5227,16 @@ export class MySQLAdapter {
             'ALTER TABLE policy_documents ADD COLUMN outstanding_premium_text TEXT DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Non-refundable override on policy_documents (NULL type = inherit from quotation)
       try {
         const [nrtpCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'non_refundable_type'"
-        )) as any[]
-        if ((nrtpCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((nrtpCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN non_refundable_type VARCHAR(20) DEFAULT NULL'
           )
@@ -4987,14 +5244,16 @@ export class MySQLAdapter {
             'ALTER TABLE policy_documents ADD COLUMN non_refundable_percent DECIMAL(5,2) DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // QR verification code toggle on policy_documents (NULL/0 = off; per-policy choice set in wizard)
       try {
         const [qreCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'qr_enabled'"
-        )) as any[]
-        if ((qreCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((qreCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN qr_enabled TINYINT(1) DEFAULT NULL'
           )
@@ -5003,25 +5262,29 @@ export class MySQLAdapter {
         // NULL = legacy/all; [] = explicitly none (renders "NIL"); [ids] = only those.
         const [ssiCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'selected_subjectivity_ids'"
-        )) as any[]
-        if ((ssiCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ssiCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN selected_subjectivity_ids TEXT DEFAULT NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Hide-broker toggle on policy_documents — suppress the "c/o broker" line on policy + DA/CA
       try {
         const [hbCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_documents LIKE 'hide_broker'"
-        )) as any[]
-        if ((hbCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((hbCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_documents ADD COLUMN hide_broker TINYINT(1) DEFAULT 0'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // ---- Policy Endorsements tables ----
       await this.pool.query(`CREATE TABLE IF NOT EXISTS policy_endorsements (
@@ -5085,7 +5348,7 @@ export class MySQLAdapter {
       {
         const [etfRows] = (await this.pool.query(
           'SELECT COUNT(*) as cnt FROM endorsement_trigger_fields'
-        )) as any[]
+        )) as QueryRows
         if (etfRows[0].cnt === 0) {
           await this.pool.query(
             `INSERT INTO endorsement_trigger_fields (id, field_key, field_label, is_active) VALUES
@@ -5101,20 +5364,22 @@ export class MySQLAdapter {
       try {
         const [fwCol] = (await this.pool.query(
           "SHOW COLUMNS FROM endorsement_sections LIKE 'is_full_width'"
-        )) as any[]
-        if ((fwCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((fwCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE endorsement_sections ADD COLUMN is_full_width TINYINT(1) DEFAULT 0'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: add pro-rata and cancellation columns to policy_endorsements
       try {
         const [prCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_endorsements LIKE 'is_pro_rata'"
-        )) as any[]
-        if ((prCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((prCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_endorsements ADD COLUMN is_pro_rata TINYINT(1) DEFAULT 0'
           )
@@ -5122,17 +5387,21 @@ export class MySQLAdapter {
             'ALTER TABLE policy_endorsements ADD COLUMN annual_premium DECIMAL(15,2) NULL'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
       try {
         const [ccCol] = (await this.pool.query(
           "SHOW COLUMNS FROM policy_endorsements LIKE 'is_cancellation'"
-        )) as any[]
-        if ((ccCol as any[]).length === 0) {
+        )) as QueryRows
+        if ((ccCol as RowDataPacket[]).length === 0) {
           await this.pool.query(
             'ALTER TABLE policy_endorsements ADD COLUMN is_cancellation TINYINT(1) DEFAULT 0'
           )
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: heal quotations stuck on the "Converted" workflow step with no policy
       // documents (their policy was deleted before delete reverted the step). Without this
@@ -5141,12 +5410,12 @@ export class MySQLAdapter {
         const [convStepRows] = await this.pool.query(
           "SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1"
         )
-        const convStep = (convStepRows as any[])[0]
+        const convStep = (convStepRows as RowDataPacket[])[0]
         if (convStep) {
           const [stepRows] = await this.pool.query(
             'SELECT id, name, is_initial, order_index FROM quotation_workflow_steps'
           )
-          const steps = stepRows as any[]
+          const steps = stepRows as RowDataPacket[]
           const target =
             steps.find((s) => String(s.name).toLowerCase() === 'approved') ||
             steps
@@ -5162,7 +5431,9 @@ export class MySQLAdapter {
             )
           }
         }
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
 
       // Migration: backfill the "addressed to" (flag maritime authority) on existing BBC/WRC
       // blue cards that were created before conversion auto-filled it. Only fills blank ones,
@@ -5181,7 +5452,9 @@ export class MySQLAdapter {
                       AND ((bc.card_type = 'BBC' AND fs.ratified_bunker = 1)
                         OR (bc.card_type = 'WRC' AND fs.ratified_wreck = 1))
                 `)
-      } catch {}
+      } catch {
+        /* idempotent migration: already applied or not applicable */
+      }
     } catch (error) {
       console.error('Schema initialization failed:', error)
       throw error
@@ -5200,7 +5473,7 @@ export class MySQLAdapter {
       'SELECT q.locked_by, q.locked_at, u.username as lockedByName FROM quotations q LEFT JOIN users u ON q.locked_by = u.id WHERE q.id = ?',
       [quotationId]
     )
-    const row = (rows as any[])[0]
+    const row = (rows as RowDataPacket[])[0]
     if (row?.locked_by && row.locked_by !== userId) {
       const lockedAt = new Date(row.locked_at)
       const elapsed = Date.now() - lockedAt.getTime()
@@ -5234,7 +5507,7 @@ export class MySQLAdapter {
       'UPDATE quotations SET locked_at = NOW(), updated_at = updated_at WHERE id = ? AND locked_by = ?',
       [quotationId, userId]
     )
-    return { success: (result as any).affectedRows > 0 }
+    return { success: (result as ResultSetHeader).affectedRows > 0 }
   }
 
   async forceUnlockQuotation(quotationId: string): Promise<void> {
@@ -5253,7 +5526,7 @@ export class MySQLAdapter {
       'SELECT q.locked_by as lockedBy, q.locked_at as lockedAt, u.username as lockedByName FROM quotations q LEFT JOIN users u ON q.locked_by = u.id WHERE q.id = ?',
       [quotationId]
     )
-    const r = (rows as any[])[0]
+    const r = (rows as RowDataPacket[])[0]
     if (!r?.lockedBy) return { lockedBy: null, lockedByName: null, lockedAt: null }
     // Check expiry
     const elapsed = Date.now() - new Date(r.lockedAt).getTime()
@@ -5266,23 +5539,23 @@ export class MySQLAdapter {
     'id, type_code AS typeCode, name, kind, is_default AS isDefault, order_index AS orderIndex, file_name AS fileName, page_count AS pageCount, updated_at AS updatedAt, uploaded_at AS uploadedAt'
 
   // List templates for a type (metadata only — no html/blob)
-  async getTcTemplatesByType(typeCode: string): Promise<any[]> {
+  async getTcTemplatesByType(typeCode: string): Promise<TcTemplateMeta[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT ${this.tcMetaCols} FROM policy_tc_templates WHERE type_code = ? ORDER BY is_default DESC, order_index ASC, name ASC`,
       [typeCode]
     )
-    return (rows as any[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
+    return (rows as Row<TcTemplateMeta>[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
   }
 
   // Full template by id, including html content (never the file blob)
-  async getTcTemplateById(id: string): Promise<any | null> {
+  async getTcTemplateById(id: string): Promise<TcTemplateDetail | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT ${this.tcMetaCols}, content_html AS contentHtml, (file_data IS NOT NULL) AS hasFile FROM policy_tc_templates WHERE id = ?`,
       [id]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<TcTemplateDetail>[]
     if (arr.length === 0) return null
     return { ...arr[0], isDefault: Boolean(arr[0].isDefault), hasFile: Boolean(arr[0].hasFile) }
   }
@@ -5292,19 +5565,19 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT file_data FROM policy_tc_templates WHERE id = ?', [
       id
     ])
-    const arr = rows as any[]
+    const arr = rows as RowDataPacket[]
     return arr.length > 0 ? arr[0].file_data : null
   }
 
   // The default (or only) template for a type — used by the export resolver
-  async getDefaultTcTemplate(typeCode: string): Promise<any | null> {
+  async getDefaultTcTemplate(typeCode: string): Promise<TcTemplateDetail | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT ${this.tcMetaCols}, content_html AS contentHtml, (file_data IS NOT NULL) AS hasFile
              FROM policy_tc_templates WHERE type_code = ? ORDER BY is_default DESC, order_index ASC LIMIT 1`,
       [typeCode]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<TcTemplateDetail>[]
     if (arr.length === 0) return null
     return { ...arr[0], isDefault: Boolean(arr[0].isDefault), hasFile: Boolean(arr[0].hasFile) }
   }
@@ -5356,7 +5629,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const vals: any[] = []
+    const vals: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       vals.push(updates.name)
@@ -5384,7 +5657,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT type_code FROM policy_tc_templates WHERE id = ?', [
       id
     ])
-    const tc = (rows as any[])[0]?.type_code
+    const tc = (rows as RowDataPacket[])[0]?.type_code
     if (!tc) return
     await this.pool.query('UPDATE policy_tc_templates SET is_default = 0 WHERE type_code = ?', [tc])
     await this.pool.query('UPDATE policy_tc_templates SET is_default = 1 WHERE id = ?', [id])
@@ -5396,7 +5669,7 @@ export class MySQLAdapter {
       'SELECT type_code, is_default FROM policy_tc_templates WHERE id = ?',
       [id]
     )
-    const row = (rows as any[])[0]
+    const row = (rows as RowDataPacket[])[0]
     await this.pool.query('DELETE FROM policy_tc_templates WHERE id = ?', [id])
     // If we removed the default, promote the next template of that type
     if (row && row.is_default) {
@@ -5404,7 +5677,7 @@ export class MySQLAdapter {
         'SELECT id FROM policy_tc_templates WHERE type_code = ? ORDER BY order_index ASC LIMIT 1',
         [row.type_code]
       )
-      const next = (nextRows as any[])[0]
+      const next = (nextRows as RowDataPacket[])[0]
       if (next)
         await this.pool.query('UPDATE policy_tc_templates SET is_default = 1 WHERE id = ?', [
           next.id
@@ -5413,7 +5686,7 @@ export class MySQLAdapter {
   }
 
   // --- Legacy shims (kept so existing export paths keep working) ---
-  async getTcTemplate(typeCode: string): Promise<any | null> {
+  async getTcTemplate(typeCode: string): Promise<TcTemplateSummary | null> {
     const t = await this.getDefaultTcTemplate(typeCode)
     if (!t) return null
     return {
@@ -5435,12 +5708,12 @@ export class MySQLAdapter {
     return this.getTcTemplateFileById(t.id)
   }
 
-  async getAllTcTemplates(): Promise<any[]> {
+  async getAllTcTemplates(): Promise<TcTemplateMeta[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT ${this.tcMetaCols} FROM policy_tc_templates ORDER BY type_code, is_default DESC, order_index ASC`
     )
-    return (rows as any[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
+    return (rows as Row<TcTemplateMeta>[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
   }
 
   async updateTcTemplatePageCount(typeCode: string, pageCount: number): Promise<void> {
@@ -5459,7 +5732,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, description, required, annual_renewal as annualRenewal, order_index as `order` FROM document_types ORDER BY order_index ASC'
     )
-    const docs = (rows as any[]).map((r) => ({
+    const docs = (rows as Row<DocumentType>[]).map((r) => ({
       ...r,
       required: Boolean(r.required),
       annualRenewal: Boolean(r.annualRenewal),
@@ -5471,7 +5744,7 @@ export class MySQLAdapter {
         const [ptRows] = await this.pool.query(
           'SELECT document_type_id, policy_type_id FROM document_type_policy_types'
         )
-        for (const r of ptRows as any[]) {
+        for (const r of ptRows as RowDataPacket[]) {
           const doc = docs.find((d) => d.id === r.document_type_id)
           if (doc) doc.policyTypeIds.push(r.policy_type_id)
         }
@@ -5511,7 +5784,7 @@ export class MySQLAdapter {
   async updateDocumentType(id: string, updates: Partial<DocumentType>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (updates.name !== undefined) {
       fields.push('name = ?')
@@ -5611,7 +5884,7 @@ export class MySQLAdapter {
       const [rows] = await this.pool.query(
         'SELECT v.id, v.name, v.imo_number as imoNumber, v.fleet_id as fleetId, v.ofac_checked_at as ofacCheckedAt, v.ofac_match_found as ofacMatchFound, v.ofac_status as ofacStatus, v.is_active as isActive, v.customer_id as customerId, v.customer_type as customerType, v.policy_expiry_date as policyExpiryDate, v.notes, v.flag_state_id as flagStateId, v.built_year as builtYear, v.rebuilt_year as rebuiltYear, v.gross_tonnage as grossTonnage, COALESCE(vt.name, v.vessel_type) as vesselType, v.vessel_type_id as vesselTypeId, v.classification_society as classificationSociety, v.call_sign as callSign FROM vessels v LEFT JOIN vessel_types vt ON v.vessel_type_id = vt.id'
       )
-      return (rows as any[]).map((r) => ({
+      return (rows as Row<Vessel>[]).map((r) => ({
         ...r,
         ofacMatchFound: Boolean(r.ofacMatchFound),
         isActive: Boolean(r.isActive),
@@ -5624,7 +5897,7 @@ export class MySQLAdapter {
       const [rows] = await this.pool.query(
         'SELECT id, name, imo_number as imoNumber, fleet_id as fleetId, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus, is_active as isActive, customer_id as customerId, customer_type as customerType, policy_expiry_date as policyExpiryDate, notes, flag_state_id as flagStateId, built_year as builtYear, rebuilt_year as rebuiltYear, gross_tonnage as grossTonnage, vessel_type as vesselType, classification_society as classificationSociety, call_sign as callSign FROM vessels'
       )
-      return (rows as any[]).map((r) => ({
+      return (rows as Row<Vessel>[]).map((r) => ({
         ...r,
         ofacMatchFound: Boolean(r.ofacMatchFound),
         isActive: Boolean(r.isActive),
@@ -5654,7 +5927,7 @@ export class MySQLAdapter {
       'SELECT vessels.id, vessels.name, vessels.imo_number as imoNumber, vessels.fleet_id as fleetId, vessels.ofac_checked_at as ofacCheckedAt, vessels.ofac_match_found as ofacMatchFound, vessels.ofac_status as ofacStatus, vessels.is_active as isActive, vessels.customer_id as customerId, vessels.customer_type as customerType, vessels.policy_expiry_date as policyExpiryDate, vessels.notes, vessels.flag_state_id as flagStateId, vessels.built_year as builtYear, vessels.rebuilt_year as rebuiltYear, vessels.gross_tonnage as grossTonnage, COALESCE(vt.name, vessels.vessel_type) as vesselType, vessels.vessel_type_id as vesselTypeId, vessels.classification_society as classificationSociety, vessels.call_sign as callSign FROM vessels LEFT JOIN vessel_types vt ON vessels.vessel_type_id = vt.id'
     let countQuery = 'SELECT COUNT(*) as total FROM vessels'
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (search) {
       conditions.push(
@@ -5710,12 +5983,12 @@ export class MySQLAdapter {
     // Count queries params are same as main query params minus limit/offset
     const countValues = values.slice(0, values.length - 2)
     const [countResult] = await this.pool.query(countQuery, countValues)
-    const total = (countResult as any[])[0].total
+    const total = (countResult as RowDataPacket[])[0].total
 
     // Execute Main
     const [rows] = await this.pool.query(query, values)
 
-    const data = (rows as any[]).map((r) => ({
+    const data = (rows as Row<Vessel>[]).map((r) => ({
       ...r,
       ofacMatchFound: Boolean(r.ofacMatchFound),
       isActive: Boolean(r.isActive),
@@ -5740,7 +6013,7 @@ export class MySQLAdapter {
     const [existing] = await this.pool.query('SELECT id FROM vessels WHERE imo_number = ?', [
       vessel.imoNumber
     ])
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       throw new Error(`Vessel with IMO number ${vessel.imoNumber} already exists`)
     }
 
@@ -5767,14 +6040,14 @@ export class MySQLAdapter {
     if (!this.pool) return
 
     // Fetch current vessel for audit logging
-    const [currentRows]: any[] = await this.pool.query(
+    const [currentRows] = await this.pool.query<RowDataPacket[]>(
       'SELECT name, imo_number, fleet_id, flag_state_id, built_year, rebuilt_year, gross_tonnage, vessel_type, vessel_type_id, classification_society, call_sign, is_active, customer_id, customer_type FROM vessels WHERE id = ?',
       [id]
     )
     const current = currentRows.length > 0 ? currentRows[0] : null
 
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     // Tracked fields for audit log
     const auditFields: { updateKey: keyof Vessel; dbCol: string; label: string }[] = [
@@ -5904,7 +6177,7 @@ export class MySQLAdapter {
                 `SELECT id, name FROM vessel_types WHERE id IN (${placeholders})`,
                 idsToResolve
               )
-              for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+              for (const r of nameRows as RowDataPacket[]) nameMap.set(r.id, r.name)
             }
             const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
             const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
@@ -5924,7 +6197,7 @@ export class MySQLAdapter {
                 `SELECT id, name FROM flag_states WHERE id IN (${placeholders})`,
                 idsToResolve
               )
-              for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+              for (const r of nameRows as RowDataPacket[]) nameMap.set(r.id, r.name)
             }
             const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
             const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
@@ -5944,7 +6217,7 @@ export class MySQLAdapter {
                 `SELECT id, name FROM fleets WHERE id IN (${placeholders})`,
                 idsToResolve
               )
-              for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+              for (const r of nameRows as RowDataPacket[]) nameMap.set(r.id, r.name)
             }
             const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
             const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
@@ -5964,7 +6237,7 @@ export class MySQLAdapter {
                 `SELECT id, name FROM entities WHERE id IN (${placeholders})`,
                 idsToResolve
               )
-              for (const r of nameRows as any[]) nameMap.set(r.id, r.name)
+              for (const r of nameRows as RowDataPacket[]) nameMap.set(r.id, r.name)
             }
             const oldName = oldVal ? (nameMap.get(oldVal) ?? oldVal) : null
             const newName = newVal ? (nameMap.get(newVal) ?? newVal) : null
@@ -6002,13 +6275,13 @@ export class MySQLAdapter {
     }
   }
 
-  async getVesselNameHistory(vesselId: string): Promise<any[]> {
+  async getVesselNameHistory(vesselId: string): Promise<VesselNameHistory[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, vessel_id as vesselId, previous_name as previousName, changed_at as changedAt, changed_by as changedBy FROM vessel_name_history WHERE vessel_id = ? ORDER BY changed_at DESC',
       [vesselId]
     )
-    return rows as any[]
+    return rows as Row<VesselNameHistory>[]
   }
 
   // Columns that make an entity "in use" beyond vessel_assureds. Discovered from the schema
@@ -6029,7 +6302,7 @@ export class MySQLAdapter {
       'activity_log.entity_id',
       'compliance_check_results.entity_id'
     ])
-    const cols = (rows as any[])
+    const cols = (rows as RowDataPacket[])
       .map((r) => ({ table: String(r.t), column: String(r.c) }))
       .filter(
         (r) =>
@@ -6049,7 +6322,7 @@ export class MySQLAdapter {
       'SELECT COUNT(*) AS n FROM policy_documents WHERE vessel_id = ?',
       [id]
     )
-    const policyCount = Number((polRows as any[])[0]?.n || 0)
+    const policyCount = Number((polRows as RowDataPacket[])[0]?.n || 0)
     if (policyCount > 0) {
       throw new Error(
         `This vessel has ${policyCount} polic${policyCount === 1 ? 'y' : 'ies'} and cannot be deleted. Deactivate it instead.`
@@ -6063,22 +6336,23 @@ export class MySQLAdapter {
     try {
       await conn.beginTransaction()
       // 1. Entities assured on this vessel (before the cascade removes the links)
-      const [assureds]: any[] = await conn.execute(
+      const [assureds] = await conn.execute<RowDataPacket[]>(
         'SELECT DISTINCT entity_id AS entityId FROM vessel_assureds WHERE vessel_id = ?',
         [id]
       )
-      const entityIds: string[] = assureds.map((a: any) => a.entityId).filter(Boolean)
+      const entityIds: string[] = assureds.map((a) => a.entityId).filter(Boolean)
 
       // 2. Delete the vessel's own data explicitly. These tables have NO foreign key to
       //    vessels in deployed databases, so nothing cascades: without this every delete
       //    left assureds, documents, surveys, defects, policies and notes behind (and the
       //    stale vessel_assureds rows kept "orphan" entities alive).
-      const run = async (sql: string, params: any[]) => {
+      const run = async (sql: string, params: SqlValue[]): Promise<void> => {
         try {
           await conn.query(sql, params)
-        } catch (e: any) {
+        } catch (e) {
           // Older schemas may lack a table/column — skip those, fail on anything else
-          if (e?.code !== 'ER_NO_SUCH_TABLE' && e?.code !== 'ER_BAD_FIELD_ERROR') throw e
+          const code = (e as { code?: string } | null)?.code
+          if (code !== 'ER_NO_SUCH_TABLE' && code !== 'ER_BAD_FIELD_ERROR') throw e
         }
       }
       // grandchildren first
@@ -6129,7 +6403,7 @@ export class MySQLAdapter {
       const [vTables] = await conn.query(`SELECT TABLE_NAME AS t FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'vessel_id' AND IS_NULLABLE = 'YES'`)
       const skip = new Set([...ownTables, 'policy_documents'])
-      for (const r of vTables as any[]) {
+      for (const r of vTables as RowDataPacket[]) {
         const t = String(r.t)
         if (skip.has(t) || !/^[a-z0-9_]+$/i.test(t)) continue
         await run(`UPDATE \`${t}\` SET vessel_id = NULL WHERE vessel_id = ?`, [id])
@@ -6147,7 +6421,7 @@ export class MySQLAdapter {
       //    (Previously any entity without another vessel was deleted, wiping brokers,
       //    customers and UBOs that were still referenced elsewhere.)
       for (const entityId of entityIds) {
-        const [others]: any[] = await conn.execute(
+        const [others] = await conn.execute<RowDataPacket[]>(
           'SELECT 1 FROM vessel_assureds WHERE entity_id = ? LIMIT 1',
           [entityId]
         )
@@ -6155,7 +6429,7 @@ export class MySQLAdapter {
         for (const rc of refCols) {
           if (inUse) break
           try {
-            const [hit]: any[] = await conn.query(
+            const [hit] = await conn.query<RowDataPacket[]>(
               `SELECT 1 FROM \`${rc.table}\` WHERE \`${rc.column}\` = ? LIMIT 1`,
               [entityId]
             )
@@ -6198,14 +6472,14 @@ export class MySQLAdapter {
       received_date as receivedDate, uploaded_date as uploadedDate, uploaded_by as uploadedBy
       FROM vessel_documents
     `
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (vesselId) {
       sql += ' WHERE vessel_id = ?'
       params.push(vesselId)
     }
 
     const [rows] = await this.pool.query(sql, params)
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<VesselDocument>[]).map((r) => ({
       ...r,
       sent: Boolean(r.sent),
       required: Boolean(r.required)
@@ -6223,7 +6497,7 @@ export class MySQLAdapter {
       }
     }
 
-    const [existing]: any[] = await this.pool.query(
+    const [existing] = await this.pool.query<RowDataPacket[]>(
       'SELECT id FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
       [doc.vesselId, doc.documentTypeId]
     )
@@ -6268,9 +6542,10 @@ export class MySQLAdapter {
 
   async duplicateVesselDocument(docId: string, uploadedBy: string): Promise<void> {
     if (!this.pool) return
-    const [rows]: any[] = await this.pool.query('SELECT * FROM vessel_documents WHERE id = ?', [
-      docId
-    ])
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT * FROM vessel_documents WHERE id = ?',
+      [docId]
+    )
     if (rows.length === 0) throw new Error('Document not found')
     const doc = rows[0]
     await this.pool.execute(
@@ -6303,7 +6578,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
 
-    const [existing]: any[] = await this.pool.query(
+    const [existing] = await this.pool.query<RowDataPacket[]>(
       'SELECT id FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
       [vesselId, docTypeId]
     )
@@ -6314,7 +6589,7 @@ export class MySQLAdapter {
         existing[0].id
       ])
     } else {
-      const [dt]: any[] = await this.pool.query(
+      const [dt] = await this.pool.query<RowDataPacket[]>(
         'SELECT required FROM document_types WHERE id = ?',
         [docTypeId]
       )
@@ -6336,7 +6611,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
 
-    const [existing]: any[] = await this.pool.query(
+    const [existing] = await this.pool.query<RowDataPacket[]>(
       'SELECT id FROM vessel_documents WHERE vessel_id = ? AND document_type_id = ?',
       [vesselId, docTypeId]
     )
@@ -6347,7 +6622,7 @@ export class MySQLAdapter {
         existing[0].id
       ])
     } else {
-      const [dt]: any[] = await this.pool.query(
+      const [dt] = await this.pool.query<RowDataPacket[]>(
         'SELECT required FROM document_types WHERE id = ?',
         [docTypeId]
       )
@@ -6363,7 +6638,7 @@ export class MySQLAdapter {
   }
 
   // --- Flag States ---
-  async getFlagStates(): Promise<any[]> {
+  async getFlagStates(): Promise<FlagState[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(`
             SELECT fs.id, fs.name, fs.display_name as displayName, fs.iso3_code as iso3Code, fs.address, fs.email,
@@ -6378,7 +6653,7 @@ export class MySQLAdapter {
                      fs.ratified_bunker, fs.ratified_wreck, fs.authority_name, fs.authority_address
             ORDER BY fs.name ASC
         `)
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<FlagState>[]).map((r) => ({
       ...r,
       vesselCount: Number(r.vesselCount),
       ratifiedBunker: Boolean(r.ratifiedBunker),
@@ -6396,9 +6671,9 @@ export class MySQLAdapter {
     ratifiedWreck?: boolean
     authorityName?: string
     authorityAddress?: string
-  }): Promise<any> {
+  }): Promise<FlagState> {
     if (!this.pool) throw new Error('No database connection')
-    const id = require('crypto').randomUUID()
+    const id = uuidv4()
     await this.pool.execute(
       'INSERT INTO flag_states (id, name, display_name, iso3_code, address, email, ratified_bunker, ratified_wreck, authority_name, authority_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -6440,7 +6715,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -6491,28 +6766,34 @@ export class MySQLAdapter {
     await this.pool.execute('DELETE FROM flag_states WHERE id = ?', [id])
   }
 
-  async getVesselsByFlagState(flagStateId: string): Promise<any[]> {
+  async getVesselsByFlagState(
+    flagStateId: string
+  ): Promise<{ id: string; name: string; imoNumber: string }[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, imo_number as imoNumber FROM vessels WHERE flag_state_id = ? ORDER BY name ASC',
       [flagStateId]
     )
-    return rows as any[]
+    return rows as Row<{ id: string; name: string; imoNumber: string }>[]
   }
 
   // --- Flag State Ports ---
-  async getFlagStatePorts(flagStateId: string): Promise<any[]> {
+  async getFlagStatePorts(flagStateId: string): Promise<FlagStatePort[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, flag_state_id as flagStateId, name, is_default as isDefault FROM flag_state_ports WHERE flag_state_id = ? ORDER BY name ASC',
       [flagStateId]
     )
-    return (rows as any[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
+    return (rows as Row<FlagStatePort>[]).map((r) => ({ ...r, isDefault: Boolean(r.isDefault) }))
   }
 
-  async addFlagStatePort(flagStateId: string, name: string, isDefault: boolean): Promise<any> {
+  async addFlagStatePort(
+    flagStateId: string,
+    name: string,
+    isDefault: boolean
+  ): Promise<FlagStatePort> {
     if (!this.pool) throw new Error('No database connection')
-    const id = require('crypto').randomUUID()
+    const id = uuidv4()
     if (isDefault) {
       await this.pool.execute(
         'UPDATE flag_state_ports SET is_default = FALSE WHERE flag_state_id = ?',
@@ -6533,7 +6814,7 @@ export class MySQLAdapter {
         'SELECT flag_state_id FROM flag_state_ports WHERE id = ?',
         [id]
       )
-      const port = (rows as any[])[0]
+      const port = (rows as RowDataPacket[])[0]
       if (port) {
         await this.pool.execute(
           'UPDATE flag_state_ports SET is_default = FALSE WHERE flag_state_id = ?',
@@ -6559,7 +6840,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities'
     )
-    return (rows as any[]).map((r) => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
+    return (rows as Row<Entity>[]).map((r) => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
   }
 
   async getEntitiesPaginated(params: EntityQueryParams): Promise<PaginatedResult<Entity>> {
@@ -6580,7 +6861,7 @@ export class MySQLAdapter {
       'SELECT id, name, type, identifier, email, phone, passport_file_path as passportFilePath, certificate_of_incorporation_path as certificateOfIncorporationPath, articles_of_association_path as articlesOfAssociationPath, kyc_file_path as kycFilePath, ofac_checked_at as ofacCheckedAt, ofac_match_found as ofacMatchFound, ofac_status as ofacStatus FROM entities'
     let countQuery = 'SELECT COUNT(*) as total FROM entities'
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (search) {
       conditions.push('(name LIKE ? OR identifier LIKE ?)')
@@ -6623,10 +6904,13 @@ export class MySQLAdapter {
 
     const countValues = values.slice(0, values.length - 2)
     const [countResult] = await this.pool.query(countQuery, countValues)
-    const total = (countResult as any[])[0].total
+    const total = (countResult as RowDataPacket[])[0].total
 
     const [rows] = await this.pool.query(query, values)
-    const data = (rows as any[]).map((r) => ({ ...r, ofacMatchFound: Boolean(r.ofacMatchFound) }))
+    const data = (rows as Row<Entity>[]).map((r) => ({
+      ...r,
+      ofacMatchFound: Boolean(r.ofacMatchFound)
+    }))
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
@@ -6688,7 +6972,7 @@ export class MySQLAdapter {
     }
 
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (updates.name !== undefined) {
       fields.push('name = ?')
@@ -6782,8 +7066,8 @@ export class MySQLAdapter {
       // Copy file paths from source to target if target doesn't have them
       const [sourceRows] = await conn.query('SELECT * FROM entities WHERE id = ?', [sourceId])
       const [targetRows] = await conn.query('SELECT * FROM entities WHERE id = ?', [targetId])
-      const source = (sourceRows as any[])[0]
-      const target = (targetRows as any[])[0]
+      const source = (sourceRows as RowDataPacket[])[0]
+      const target = (targetRows as RowDataPacket[])[0]
 
       if (!source || !target) throw new Error('One or both entities not found')
 
@@ -6808,7 +7092,7 @@ export class MySQLAdapter {
         [sourceId, targetId]
       )
       // Delete duplicates from source
-      for (const dupe of dupeAssureds as any[]) {
+      for (const dupe of dupeAssureds as RowDataPacket[]) {
         await conn.execute('DELETE FROM vessel_assureds WHERE id = ?', [dupe.id])
       }
       // Move remaining
@@ -6816,7 +7100,7 @@ export class MySQLAdapter {
         'UPDATE vessel_assureds SET entity_id = ? WHERE entity_id = ?',
         [targetId, sourceId]
       )
-      const mergedAssuredLinks = (assuredResult as any).affectedRows || 0
+      const mergedAssuredLinks = (assuredResult as ResultSetHeader).affectedRows || 0
 
       // 2. Update entity_ubos: reassign UBO relationships
       // As assured parent: move UBOs from source to target (skip duplicates)
@@ -6826,7 +7110,7 @@ export class MySQLAdapter {
                  WHERE eu1.assured_entity_id = ? AND eu2.assured_entity_id = ?`,
         [sourceId, targetId]
       )
-      for (const dupe of dupeUbosParent as any[]) {
+      for (const dupe of dupeUbosParent as RowDataPacket[]) {
         await conn.execute(
           'DELETE FROM entity_ubos WHERE assured_entity_id = ? AND ubo_entity_id = ?',
           [sourceId, dupe.ubo_entity_id]
@@ -6844,7 +7128,7 @@ export class MySQLAdapter {
                  WHERE eu1.ubo_entity_id = ? AND eu2.ubo_entity_id = ?`,
         [sourceId, targetId]
       )
-      for (const dupe of dupeUbosChild as any[]) {
+      for (const dupe of dupeUbosChild as RowDataPacket[]) {
         await conn.execute(
           'DELETE FROM entity_ubos WHERE assured_entity_id = ? AND ubo_entity_id = ?',
           [dupe.assured_entity_id, sourceId]
@@ -6854,7 +7138,7 @@ export class MySQLAdapter {
         'UPDATE entity_ubos SET ubo_entity_id = ? WHERE ubo_entity_id = ?',
         [targetId, sourceId]
       )
-      const mergedUBOLinks = (uboResult as any).affectedRows || 0
+      const mergedUBOLinks = (uboResult as ResultSetHeader).affectedRows || 0
 
       // Remove self-referencing UBOs (entity can't be its own UBO)
       await conn.execute('DELETE FROM entity_ubos WHERE assured_entity_id = ubo_entity_id')
@@ -6864,7 +7148,7 @@ export class MySQLAdapter {
         'UPDATE vessels SET customer_id = ? WHERE customer_id = ?',
         [targetId, sourceId]
       )
-      const mergedCustomerLinks = (custResult as any).affectedRows || 0
+      const mergedCustomerLinks = (custResult as ResultSetHeader).affectedRows || 0
 
       // 4. Update compliance_check_results
       await conn.execute(
@@ -6899,10 +7183,10 @@ export class MySQLAdapter {
             `UPDATE \`${rc.table}\` SET \`${rc.column}\` = ? WHERE \`${rc.column}\` = ?`,
             [targetId, sourceId]
           )
-        } catch (e: any) {
+        } catch (e) {
           // A unique index can reject the move when the target already has that link:
           // drop the source's duplicate row instead of failing the whole merge
-          if (e?.code === 'ER_DUP_ENTRY') {
+          if ((e as { code?: string } | null)?.code === 'ER_DUP_ENTRY') {
             await conn.query(`DELETE FROM \`${rc.table}\` WHERE \`${rc.column}\` = ?`, [sourceId])
           } else {
             throw e
@@ -6916,12 +7200,12 @@ export class MySQLAdapter {
           'SELECT document_type_id, file_path, expiry_date, received_date FROM entity_documents WHERE entity_id = ?',
           [sourceId]
         )
-        for (const sd of srcDocs as any[]) {
+        for (const sd of srcDocs as RowDataPacket[]) {
           const [existing] = await conn.query(
             'SELECT id FROM entity_documents WHERE entity_id = ? AND document_type_id = ?',
             [targetId, sd.document_type_id]
           )
-          if ((existing as any[]).length === 0 && sd.file_path) {
+          if ((existing as RowDataPacket[]).length === 0 && sd.file_path) {
             await conn.execute(
               'INSERT INTO entity_documents (id, entity_id, document_type_id, file_path, expiry_date, received_date) VALUES (?, ?, ?, ?, ?, ?)',
               [
@@ -6935,7 +7219,9 @@ export class MySQLAdapter {
             )
           }
         }
-      } catch {}
+      } catch {
+        /* entity_documents table may not exist yet: nothing to copy */
+      }
 
       // 5. Delete the source entity
       await conn.execute('DELETE FROM entities WHERE id = ?', [sourceId])
@@ -6956,7 +7242,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, description, entity_scope as entityScope, is_required as isRequired, order_index as orderIndex, is_active as isActive FROM entity_document_types ORDER BY order_index'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<EntityDocumentType>[]).map((r) => ({
       ...r,
       isRequired: Boolean(r.isRequired),
       isActive: Boolean(r.isActive)
@@ -6984,7 +7270,7 @@ export class MySQLAdapter {
   async updateEntityDocumentType(id: string, updates: Partial<EntityDocumentType>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -7027,7 +7313,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let q =
       'SELECT id, entity_id as entityId, document_type_id as documentTypeId, file_path as filePath, expiry_date as expiryDate, received_date as receivedDate, uploaded_at as uploadedAt FROM entity_documents'
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (entityId) {
       q += ' WHERE entity_id = ?'
       params.push(entityId)
@@ -7100,7 +7386,7 @@ export class MySQLAdapter {
             GROUP BY ar.id, ar.name, ar.order_index
             ORDER BY ar.order_index ASC, ar.name ASC
         `)
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<AssuredRole>[]).map((r) => ({
       ...r,
       vesselCount: Number(r.vesselCount)
     }))
@@ -7113,7 +7399,7 @@ export class MySQLAdapter {
       'SELECT id FROM assured_roles WHERE LOWER(name) = LOWER(?)',
       [role.name.trim()]
     )
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       throw new Error('This role already exists')
     }
     const id = uuidv4()
@@ -7121,7 +7407,7 @@ export class MySQLAdapter {
     const [maxRows] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) as maxOrder FROM assured_roles'
     )
-    const maxOrder = (maxRows as any[])[0].maxOrder
+    const maxOrder = (maxRows as RowDataPacket[])[0].maxOrder
     await this.pool.execute('INSERT INTO assured_roles (id, name, order_index) VALUES (?, ?, ?)', [
       id,
       role.name.trim(),
@@ -7135,10 +7421,10 @@ export class MySQLAdapter {
 
     // Fetch old role name for syncing with vessel_assureds
     const [oldRows] = await this.pool.execute('SELECT name FROM assured_roles WHERE id = ?', [id])
-    const oldRole = (oldRows as any[])[0]
+    const oldRole = (oldRows as RowDataPacket[])[0]
 
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (updates.name !== undefined) {
       fields.push('name = ?')
@@ -7194,7 +7480,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getVesselsByRole(roleName: string): Promise<any[]> {
+  async getVesselsByRole(roleName: string): Promise<VesselRef[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -7206,7 +7492,7 @@ export class MySQLAdapter {
         `,
       [roleName]
     )
-    return rows as any[]
+    return rows as Row<VesselRef>[]
   }
 
   async deleteAssuredRole(id: string): Promise<void> {
@@ -7219,7 +7505,7 @@ export class MySQLAdapter {
 
     // 1. Get all unique roles from vessel_assureds
     const [usedRows] = await this.pool.query('SELECT DISTINCT role FROM vessel_assureds')
-    const usedRoles = (usedRows as any[]).map((r) => r.role)
+    const usedRoles = (usedRows as RowDataPacket[]).map((r) => r.role)
 
     // 2. Get all existing roles from assured_roles
     const existingRoles = await this.getAssuredRoles()
@@ -7242,7 +7528,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let sql =
       'SELECT id, vessel_id as vesselId, entity_id as entityId, role, address_id as addressId FROM vessel_assureds'
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (vesselId) {
       sql += ' WHERE vessel_id = ?'
       params.push(vesselId)
@@ -7279,7 +7565,7 @@ export class MySQLAdapter {
       : 'SELECT * FROM entity_addresses ORDER BY created_at'
     const params = entityId ? [entityId] : []
     const [rows] = await this.pool.query(q, params)
-    return (rows as any[]).map((r) => ({
+    return (rows as RowDataPacket[]).map((r) => ({
       id: r.id,
       entityId: r.entity_id,
       label: r.label,
@@ -7322,7 +7608,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const vals: any[] = []
+    const vals: SqlValue[] = []
     if (updates.label !== undefined) {
       fields.push('label = ?')
       vals.push(updates.label)
@@ -7376,7 +7662,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, description, is_system as isSystem, created_at as createdAt FROM user_groups ORDER BY is_system DESC, name ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, isSystem: Boolean(r.isSystem) }))
+    return (rows as Row<UserGroup>[]).map((r) => ({ ...r, isSystem: Boolean(r.isSystem) }))
   }
 
   async addUserGroup(name: string, description?: string): Promise<UserGroup> {
@@ -7408,7 +7694,7 @@ export class MySQLAdapter {
       'SELECT permission_key FROM group_permissions WHERE group_id = ?',
       [groupId]
     )
-    return (rows as any[]).map((r) => r.permission_key)
+    return (rows as RowDataPacket[]).map((r) => r.permission_key)
   }
 
   async setGroupPermissions(groupId: string, permissionKeys: string[]): Promise<void> {
@@ -7433,7 +7719,7 @@ export class MySQLAdapter {
       'SELECT group_id FROM user_group_members WHERE user_id = ?',
       [userId]
     )
-    return (rows as any[]).map((r) => r.group_id)
+    return (rows as RowDataPacket[]).map((r) => r.group_id)
   }
 
   async setUserGroups(userId: string, groupIds: string[]): Promise<void> {
@@ -7460,7 +7746,10 @@ export class MySQLAdapter {
       'SELECT permission_key as permissionKey, granted FROM user_permission_overrides WHERE user_id = ?',
       [userId]
     )
-    return (rows as any[]).map((r) => ({ ...r, granted: Boolean(r.granted) }))
+    return (rows as Row<{ permissionKey: string; granted: boolean }>[]).map((r) => ({
+      ...r,
+      granted: Boolean(r.granted)
+    }))
   }
 
   async setUserPermissionOverrides(
@@ -7493,14 +7782,14 @@ export class MySQLAdapter {
              WHERE ugm.user_id = ?`,
       [userId]
     )
-    const perms = new Set((groupPerms as any[]).map((r) => r.permission_key))
+    const perms = new Set((groupPerms as RowDataPacket[]).map((r) => r.permission_key))
 
     // Apply per-user overrides
     const [overrides] = await this.pool.query(
       'SELECT permission_key, granted FROM user_permission_overrides WHERE user_id = ?',
       [userId]
     )
-    for (const o of overrides as any[]) {
+    for (const o of overrides as RowDataPacket[]) {
       if (o.granted) perms.add(o.permission_key)
       else perms.delete(o.permission_key)
     }
@@ -7512,7 +7801,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let sql =
       'SELECT assured_entity_id as assuredEntityId, ubo_entity_id as uboEntityId FROM entity_ubos'
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (assuredEntityId) {
       sql += ' WHERE assured_entity_id = ?'
       params.push(assuredEntityId)
@@ -7528,8 +7817,8 @@ export class MySQLAdapter {
         'INSERT INTO entity_ubos (assured_entity_id, ubo_entity_id) VALUES (?, ?)',
         [ubo.assuredEntityId, ubo.uboEntityId]
       )
-    } catch (e: any) {
-      if (e.code !== 'ER_DUP_ENTRY') throw e
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'ER_DUP_ENTRY') throw e
     }
   }
 
@@ -7544,7 +7833,7 @@ export class MySQLAdapter {
   // --- Users ---
   async getUser(username: string): Promise<User | null> {
     if (!this.pool) return null
-    const [rows]: any[] = await this.pool.query(
+    const [rows] = await this.pool.query<RowDataPacket[]>(
       'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt, last_login_at as lastLoginAt FROM users WHERE username = ?',
       [username]
     )
@@ -7561,8 +7850,8 @@ export class MySQLAdapter {
 
   async getUserCount(): Promise<number> {
     if (!this.pool) return 0
-    const [rows]: any[] = await this.pool.query('SELECT COUNT(*) as count FROM users')
-    return (rows[0] as any).count
+    const [rows] = await this.pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM users')
+    return rows[0].count
   }
 
   async getUsers(): Promise<User[]> {
@@ -7583,17 +7872,17 @@ export class MySQLAdapter {
     let oldUsername: string | null = null
     if (updates.username !== undefined) {
       const [cur] = await this.pool.query('SELECT username FROM users WHERE id = ?', [userId])
-      oldUsername = (cur as any[])[0]?.username ?? null
+      oldUsername = (cur as RowDataPacket[])[0]?.username ?? null
     }
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.username !== undefined) {
       // Check uniqueness
       const [existing] = await this.pool.query(
         'SELECT id FROM users WHERE username = ? AND id != ?',
         [updates.username, userId]
       )
-      if ((existing as any[]).length > 0) throw new Error('Username already taken')
+      if ((existing as RowDataPacket[]).length > 0) throw new Error('Username already taken')
       fields.push('username = ?')
       values.push(updates.username)
     }
@@ -7724,7 +8013,7 @@ export class MySQLAdapter {
 
   async getUserById(userId: string): Promise<User | null> {
     if (!this.pool) return null
-    const [rows]: any[] = await this.pool.query(
+    const [rows] = await this.pool.query<RowDataPacket[]>(
       'SELECT id, username, full_name as fullName, password_hash as passwordHash, role, theme_preference as themePreference, sanctions_threshold as sanctionsThreshold, last_app_version as lastAppVersion, window_width as windowWidth, window_height as windowHeight, window_x as windowX, window_y as windowY, sidebar_collapsed as sidebarCollapsed, collapsed_groups as collapsedGroups, dashboard_onboarded as dashboardOnboarded, created_at as createdAt FROM users WHERE id = ?',
       [userId]
     )
@@ -7747,7 +8036,7 @@ export class MySQLAdapter {
       'SELECT user_id FROM user_sessions WHERE session_hash = ? AND created_at >= (NOW() - INTERVAL 30 DAY)',
       [sessionHash]
     )
-    return (rows as any[])[0]?.user_id ?? null
+    return (rows as RowDataPacket[])[0]?.user_id ?? null
   }
 
   async deleteUserSession(sessionHash: string): Promise<void> {
@@ -7778,7 +8067,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT force_password_reset FROM users WHERE id = ?', [
       userId
     ])
-    return Boolean((rows as any[])[0]?.force_password_reset)
+    return Boolean((rows as RowDataPacket[])[0]?.force_password_reset)
   }
 
   async forcePasswordResetAll(): Promise<void> {
@@ -7807,7 +8096,7 @@ export class MySQLAdapter {
       'SELECT setting_value FROM app_settings WHERE setting_key = ?',
       [key]
     )
-    const result = rows as any[]
+    const result = rows as RowDataPacket[]
     return result.length > 0 ? result[0].setting_value : null
   }
 
@@ -7821,17 +8110,17 @@ export class MySQLAdapter {
     )
   }
 
-  async getPISectionTexts(): Promise<any> {
+  async getPISectionTexts(): Promise<PISectionTexts> {
     const val = await this.getSetting('pi_section_texts')
     if (!val) return {}
     try {
-      return JSON.parse(val)
+      return JSON.parse(val) as PISectionTexts
     } catch {
       return {}
     }
   }
 
-  async setPISectionTexts(texts: any, updatedBy?: string): Promise<void> {
+  async setPISectionTexts(texts: PISectionTexts, updatedBy?: string): Promise<void> {
     await this.setSetting('pi_section_texts', JSON.stringify(texts), updatedBy)
   }
 
@@ -7950,7 +8239,7 @@ export class MySQLAdapter {
              contact_details as contactDetails, notes, created_at as createdAt FROM surveyors`
     let countQuery = 'SELECT COUNT(*) as total FROM surveyors'
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (search) {
       conditions.push('(company_name LIKE ? OR country LIKE ? OR contact_person LIKE ?)')
@@ -7981,7 +8270,7 @@ export class MySQLAdapter {
 
     const countValues = values.slice(0, values.length - 2)
     const [countResult] = await this.pool.query(countQuery, countValues)
-    const total = (countResult as any[])[0].total
+    const total = (countResult as RowDataPacket[])[0].total
 
     const [rows] = await this.pool.query(query, values)
 
@@ -8009,7 +8298,7 @@ export class MySQLAdapter {
   async updateSurveyor(id: string, updates: Partial<Surveyor>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.companyName !== undefined) {
       fields.push('company_name = ?')
       values.push(updates.companyName)
@@ -8044,7 +8333,7 @@ export class MySQLAdapter {
   async getConditionSurveys(vesselId?: string): Promise<ConditionSurvey[]> {
     if (!this.pool) return []
     let sql: string
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (vesselId) {
       sql = `SELECT id, vessel_id as vesselId, survey_date as surveyDate,
                    surveyor_id as surveyorId, survey_type as surveyType, reference, location, notes,
@@ -8091,7 +8380,7 @@ export class MySQLAdapter {
   async updateConditionSurvey(id: string, updates: Partial<ConditionSurvey>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.surveyDate !== undefined) {
       fields.push('survey_date = ?')
       values.push(updates.surveyDate)
@@ -8161,7 +8450,7 @@ export class MySQLAdapter {
                    closed_at as closedAt, closed_by as closedBy, closure_notes as closureNotes,
                    reopen_reason as reopenReason, created_at as createdAt
                    FROM survey_defects`
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (surveyId) {
       sql += ' WHERE survey_id = ? ORDER BY defect_number ASC'
       params.push(surveyId)
@@ -8195,7 +8484,7 @@ export class MySQLAdapter {
   async updateSurveyDefect(id: string, updates: Partial<SurveyDefect>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.defectNumber !== undefined) {
       fields.push('defect_number = ?')
       values.push(updates.defectNumber)
@@ -8269,7 +8558,7 @@ export class MySQLAdapter {
                    file_name as fileName, file_type as fileType,
                    uploaded_at as uploadedAt, uploaded_by as uploadedBy
                    FROM survey_attachments`
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (surveyId) {
       sql += ' WHERE survey_id = ? ORDER BY uploaded_at DESC'
       params.push(surveyId)
@@ -8309,13 +8598,13 @@ export class MySQLAdapter {
   }
 
   // --- Defect Attachments ---
-  async getDefectAttachments(defectId: string): Promise<any[]> {
+  async getDefectAttachments(defectId: string): Promise<DefectAttachmentRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, defect_id as defectId, file_path as filePath, file_name as fileName, uploaded_at as uploadedAt, uploaded_by as uploadedBy FROM defect_attachments WHERE defect_id = ? ORDER BY uploaded_at DESC',
       [defectId]
     )
-    return rows as any[]
+    return rows as Row<DefectAttachmentRow>[]
   }
 
   async addDefectAttachment(data: {
@@ -8323,7 +8612,7 @@ export class MySQLAdapter {
     filePath: string
     fileName: string
     uploadedBy?: string
-  }): Promise<any> {
+  }): Promise<DefectAttachmentRecord> {
     if (!this.pool) throw new Error('DB not connected')
     if (data.filePath) {
       const validation = await this.validateFileExtension(data.filePath)
@@ -8343,7 +8632,7 @@ export class MySQLAdapter {
   }
 
   // --- Reports ---
-  async getOpenDefectsByVessel(): Promise<any[]> {
+  async getOpenDefectsByVessel(): Promise<OpenDefectRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(`
             SELECT
@@ -8359,10 +8648,10 @@ export class MySQLAdapter {
             WHERE sd.status = 'OPEN' AND v.is_active = TRUE
             ORDER BY v.name ASC, sd.severity DESC, sd.due_date ASC
         `)
-    return rows as any[]
+    return rows as Row<OpenDefectRow>[]
   }
 
-  async getSurveyHistory(vesselId: string): Promise<any[]> {
+  async getSurveyHistory(vesselId: string): Promise<SurveyHistoryRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -8382,16 +8671,11 @@ export class MySQLAdapter {
         `,
       [vesselId]
     )
-    return rows as any[]
+    return rows as Row<SurveyHistoryRow>[]
   }
 
   // --- Dashboard Activity ---
-  async getDashboardActivity(): Promise<{
-    recentVessels: any[]
-    recentEntities: any[]
-    recentAuditEntries: any[]
-    weekRenewals: any[]
-  }> {
+  async getDashboardActivity(): Promise<DashboardActivity> {
     if (!this.pool)
       return { recentVessels: [], recentEntities: [], recentAuditEntries: [], weekRenewals: [] }
     const [recentVessels] = await this.pool.query(`
@@ -8441,10 +8725,17 @@ export class MySQLAdapter {
             ORDER BY vpv.value_date ASC
         `)
     return {
-      recentVessels: (recentVessels as any[]).map((r) => ({ ...r, isActive: Boolean(r.isActive) })),
-      recentEntities: recentEntities as any[],
-      recentAuditEntries: recentAuditEntries as any[],
-      weekRenewals: weekRenewals as any[]
+      recentVessels: (recentVessels as Row<DashboardActivity['recentVessels'][number]>[]).map(
+        (r) => ({
+          ...r,
+          isActive: Boolean(r.isActive)
+        })
+      ),
+      recentEntities: recentEntities as Row<DashboardActivity['recentEntities'][number]>[],
+      recentAuditEntries: recentAuditEntries as Row<
+        DashboardActivity['recentAuditEntries'][number]
+      >[],
+      weekRenewals: weekRenewals as Row<DashboardActivity['weekRenewals'][number]>[]
     }
   }
 
@@ -8461,13 +8752,13 @@ export class MySQLAdapter {
       `SELECT COUNT(*) as cnt FROM vessels v WHERE v.is_active = TRUE AND NOT EXISTS (
                 SELECT 1 FROM vessel_dynamic_policies vdp WHERE vdp.vessel_id = v.id AND vdp.status = 'active' AND vdp.customer_entity_id IS NOT NULL
             )`
-    )) as any
+    )) as QueryRows
     const [[r2]] = (await this.pool.query(
       "SELECT COUNT(*) as cnt FROM entities WHERE email IS NULL OR email = ''"
-    )) as any
+    )) as QueryRows
     const [[r3]] = (await this.pool.query(
       "SELECT COUNT(*) as cnt FROM entities WHERE phone IS NULL OR phone = ''"
-    )) as any
+    )) as QueryRows
     const [[r4]] = (await this.pool.query(`
             SELECT COUNT(*) as cnt FROM vessel_dynamic_policies vdp
             WHERE vdp.status = 'active'
@@ -8479,7 +8770,7 @@ export class MySQLAdapter {
                   AND LOWER(ptc.name) LIKE '%end%'
                   AND vpv.value_date IS NOT NULL
               )
-        `)) as any
+        `)) as QueryRows
     return {
       vesselsNoCustomer: Number(r1?.cnt ?? 0),
       entitiesNoEmail: Number(r2?.cnt ?? 0),
@@ -8488,15 +8779,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getCalendarEvents(
-    year: number,
-    month: number
-  ): Promise<{
-    policies: any[]
-    documents: any[]
-    surveys: any[]
-    warranties: any[]
-  }> {
+  async getCalendarEvents(year: number, month: number): Promise<CalendarEvents> {
     if (!this.pool) return { policies: [], documents: [], surveys: [], warranties: [] }
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endDate =
@@ -8519,7 +8802,7 @@ export class MySQLAdapter {
               AND vpv.value_date >= ? AND vpv.value_date < ?
         `,
       [startDate, endDate]
-    )) as any
+    )) as QueryRows
 
     // Document expirations
     const [docRows] = (await this.pool.query(
@@ -8534,7 +8817,7 @@ export class MySQLAdapter {
               AND vd.expiry_date >= ? AND vd.expiry_date < ?
         `,
       [startDate, endDate]
-    )) as any
+    )) as QueryRows
 
     // Surveys
     const [surveyRows] = (await this.pool.query(
@@ -8547,7 +8830,7 @@ export class MySQLAdapter {
               AND cs.survey_date >= ? AND cs.survey_date < ?
         `,
       [startDate, endDate]
-    )) as any
+    )) as QueryRows
 
     // Warranty deadlines
     const [warrantyRows] = (await this.pool.query(
@@ -8561,80 +8844,79 @@ export class MySQLAdapter {
               AND sw.deadline_date >= ? AND sw.deadline_date < ?
         `,
       [startDate, endDate]
-    )) as any
+    )) as QueryRows
 
     return {
-      policies: Array.isArray(policyRows) ? policyRows : [],
-      documents: Array.isArray(docRows) ? docRows : [],
-      surveys: Array.isArray(surveyRows) ? surveyRows : [],
-      warranties: Array.isArray(warrantyRows) ? warrantyRows : []
+      policies: Array.isArray(policyRows)
+        ? (policyRows as Row<CalendarEvents['policies'][number]>[])
+        : [],
+      documents: Array.isArray(docRows)
+        ? (docRows as Row<CalendarEvents['documents'][number]>[])
+        : [],
+      surveys: Array.isArray(surveyRows)
+        ? (surveyRows as Row<CalendarEvents['surveys'][number]>[])
+        : [],
+      warranties: Array.isArray(warrantyRows)
+        ? (warrantyRows as Row<CalendarEvents['warranties'][number]>[])
+        : []
     }
   }
 
-  async getDataValidationResults(): Promise<{
-    rules: {
-      id: string
-      name: string
-      description: string
-      category: string
-      count: number
-      items: { id: string; name: string; type: string }[]
-    }[]
-  }> {
+  async getDataValidationResults(): Promise<{ rules: DataValidationRuleResult[] }> {
     if (!this.pool) return { rules: [] }
 
-    const rules: any[] = []
+    const rules: DataValidationRuleResult[] = []
 
     // 1. Vessels without customer
     const [r1] = (await this.pool.query(
       'SELECT id, name FROM vessels WHERE is_active = TRUE AND customer_id IS NULL'
-    )) as any
+    )) as QueryRows
     rules.push({
       id: 'vessels-no-customer',
       name: 'Vessels without customer assigned',
       description: 'Active vessels that have no customer entity linked',
       category: 'vessels',
       count: r1.length,
-      items: r1.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+      items: r1.map((r) => ({ id: r.id, name: r.name, type: 'vessel' }))
     })
 
     // 2. Vessels without fleet
     const [r2] = (await this.pool.query(
       'SELECT id, name FROM vessels WHERE is_active = TRUE AND fleet_id IS NULL'
-    )) as any
+    )) as QueryRows
     rules.push({
       id: 'vessels-no-fleet',
       name: 'Vessels without fleet assigned',
       description: 'Active vessels not assigned to any fleet',
       category: 'vessels',
       count: r2.length,
-      items: r2.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+      items: r2.map((r) => ({ id: r.id, name: r.name, type: 'vessel' }))
     })
 
     // 3. Entities without email
     const [r3] = (await this.pool.query(
       "SELECT id, name FROM entities WHERE email IS NULL OR email = ''"
-    )) as any
+    )) as QueryRows
     rules.push({
       id: 'entities-no-email',
       name: 'Entities without email',
       description: 'Entities missing email contact information',
       category: 'entities',
       count: r3.length,
-      items: r3.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+      items: r3.map((r) => ({ id: r.id, name: r.name, type: 'entity' }))
     })
 
     // 4. Entities without phone
     const [r4] = (await this.pool.query(
       "SELECT id, name FROM entities WHERE phone IS NULL OR phone = ''"
-    )) as any
+    )) as QueryRows
     rules.push({
       id: 'entities-no-phone',
       name: 'Entities without phone',
       description: 'Entities missing phone contact information',
       category: 'entities',
       count: r4.length,
-      items: r4.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+      items: r4.map((r) => ({ id: r.id, name: r.name, type: 'entity' }))
     })
 
     // 5. Active policies without premium amount
@@ -8652,14 +8934,14 @@ export class MySQLAdapter {
                   AND LOWER(ptc.name) LIKE '%premium%'
                   AND vpv.value_text IS NOT NULL AND vpv.value_text != ''
               )
-        `)) as any
+        `)) as QueryRows
     rules.push({
       id: 'policies-no-premium',
       name: 'Active policies without premium amount',
       description: 'Active policies that have no premium value recorded',
       category: 'policies',
       count: r5.length,
-      items: r5.map((r: any) => ({ id: r.id, name: r.name, type: 'policy' }))
+      items: r5.map((r) => ({ id: r.id, name: r.name, type: 'policy' }))
     })
 
     // 6. Active vessels without any policies
@@ -8670,14 +8952,14 @@ export class MySQLAdapter {
                 SELECT 1 FROM vessel_dynamic_policies vdp
                 WHERE vdp.vessel_id = v.id AND vdp.status = 'active'
               )
-        `)) as any
+        `)) as QueryRows
     rules.push({
       id: 'vessels-no-policies',
       name: 'Active vessels without any policies',
       description: 'Active vessels with no active insurance policies',
       category: 'vessels',
       count: r6.length,
-      items: r6.map((r: any) => ({ id: r.id, name: r.name, type: 'vessel' }))
+      items: r6.map((r) => ({ id: r.id, name: r.name, type: 'vessel' }))
     })
 
     // 7. Entities with no vessels (orphaned)
@@ -8689,14 +8971,14 @@ export class MySQLAdapter {
             AND NOT EXISTS (
                 SELECT 1 FROM vessels v WHERE v.customer_id = e.id
             )
-        `)) as any
+        `)) as QueryRows
     rules.push({
       id: 'entities-orphaned',
       name: 'Entities with no vessels (orphaned)',
       description: 'Entities not linked to any vessel as assured or customer',
       category: 'entities',
       count: r7.length,
-      items: r7.map((r: any) => ({ id: r.id, name: r.name, type: 'entity' }))
+      items: r7.map((r) => ({ id: r.id, name: r.name, type: 'entity' }))
     })
 
     // 8. Fleets with 0 vessels
@@ -8705,14 +8987,14 @@ export class MySQLAdapter {
             WHERE NOT EXISTS (
                 SELECT 1 FROM vessels v WHERE v.fleet_id = f.id
             )
-        `)) as any
+        `)) as QueryRows
     rules.push({
       id: 'fleets-empty',
       name: 'Fleets with 0 vessels',
       description: 'Fleet groups that contain no vessels',
       category: 'fleets',
       count: r8.length,
-      items: r8.map((r: any) => ({ id: r.id, name: r.name, type: 'fleet' }))
+      items: r8.map((r) => ({ id: r.id, name: r.name, type: 'fleet' }))
     })
 
     return { rules }
@@ -8764,15 +9046,20 @@ export class MySQLAdapter {
     return allowed.includes(fieldName) ? fieldName : null
   }
 
-  async getCustomValidationRules(): Promise<any[]> {
+  async getCustomValidationRules(): Promise<CustomValidationRule[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, description, entity_type AS entityType, field_name AS fieldName, operator, value, severity, is_enabled AS isEnabled, order_index AS `order` FROM custom_validation_rules ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, isEnabled: Boolean(r.isEnabled) }))
+    return (rows as Row<CustomValidationRule>[]).map((r) => ({
+      ...r,
+      isEnabled: Boolean(r.isEnabled)
+    }))
   }
 
-  async addCustomValidationRule(rule: any): Promise<any> {
+  async addCustomValidationRule(
+    rule: Omit<CustomValidationRule, 'id'>
+  ): Promise<CustomValidationRule> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -8793,10 +9080,13 @@ export class MySQLAdapter {
     return { ...rule, id }
   }
 
-  async updateCustomValidationRule(id: string, updates: any): Promise<void> {
+  async updateCustomValidationRule(
+    id: string,
+    updates: Partial<CustomValidationRule>
+  ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -8882,8 +9172,8 @@ export class MySQLAdapter {
       const fieldName = this.validateFieldName(rule.entityType, rule.fieldName)
       if (!fieldName) continue
 
-      let whereClause = ''
-      const params: any[] = []
+      let whereClause: string
+      const params: SqlValue[] = []
 
       switch (rule.operator) {
         case 'is_null':
@@ -8894,11 +9184,11 @@ export class MySQLAdapter {
           break
         case 'equals':
           whereClause = `${fieldName} = ?`
-          params.push(rule.value)
+          params.push(rule.value as string | null)
           break
         case 'not_equals':
           whereClause = `${fieldName} != ?`
-          params.push(rule.value)
+          params.push(rule.value as string | null)
           break
         case 'less_than':
           whereClause = `${fieldName} < ?`
@@ -8936,8 +9226,8 @@ export class MySQLAdapter {
           ruleId: rule.id,
           ruleName: rule.name,
           severity: rule.severity,
-          count: (rows as any[]).length,
-          items: (rows as any[]).map((r: any) => ({ id: r.id, name: r.name || r.id }))
+          count: (rows as RowDataPacket[]).length,
+          items: (rows as RowDataPacket[]).map((r) => ({ id: r.id, name: r.name || r.id }))
         })
       } catch (e) {
         console.error(`Custom validation rule "${rule.name}" failed:`, e)
@@ -8948,7 +9238,7 @@ export class MySQLAdapter {
   }
 
   // --- Survey Warranties ---
-  async getSurveyWarrantiesByVessel(vesselId: string): Promise<any[]> {
+  async getSurveyWarrantiesByVessel(vesselId: string): Promise<SurveyWarranty[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -8973,10 +9263,10 @@ export class MySQLAdapter {
         `,
       [vesselId]
     )
-    return rows as any[]
+    return rows as Row<SurveyWarranty>[]
   }
 
-  async getAllSurveyWarranties(): Promise<any[]> {
+  async getAllSurveyWarranties(): Promise<SurveyWarranty[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(`
             SELECT sw.id, sw.vessel_id as vesselId, sw.policy_id as policyId,
@@ -9014,10 +9304,15 @@ export class MySQLAdapter {
             LEFT JOIN surveyors vs ON vs.id = vcs.surveyor_id
             ORDER BY sw.inception_date ASC
         `)
-    return rows as any[]
+    return rows as Row<SurveyWarranty>[]
   }
 
-  async getSurveyWarrantiesDueToday(): Promise<any[]> {
+  async getSurveyWarrantiesDueToday(): Promise<
+    Pick<
+      SurveyWarranty,
+      'id' | 'description' | 'status' | 'vesselName' | 'imoNumber' | 'nextReminderDate'
+    >[]
+  > {
     if (!this.pool) return []
     const today = new Date().toISOString().split('T')[0]
     const [rows] = await this.pool.query(
@@ -9032,10 +9327,15 @@ export class MySQLAdapter {
         `,
       [today]
     )
-    return rows as any[]
+    return rows as Row<
+      Pick<
+        SurveyWarranty,
+        'id' | 'description' | 'status' | 'vesselName' | 'imoNumber' | 'nextReminderDate'
+      >
+    >[]
   }
 
-  async getEndorsementsDue(): Promise<any[]> {
+  async getEndorsementsDue(): Promise<EndorsementDueRow[]> {
     if (!this.pool) return []
     const today = new Date().toISOString().split('T')[0]
     const [rows] = await this.pool.query(
@@ -9053,12 +9353,12 @@ export class MySQLAdapter {
         `,
       [today]
     )
-    return rows as any[]
+    return rows as Row<EndorsementDueRow>[]
   }
 
   // All unsent (pending) reservations endorsements — includes ones not yet due (reminder date in the
   // future), so the Survey Follow-Up tab can track them before the 2-day reminder window elapses.
-  async getUnsentEndorsements(): Promise<any[]> {
+  async getUnsentEndorsements(): Promise<EndorsementDueRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(`
             SELECT cs.id as surveyId, cs.vessel_id as vesselId,
@@ -9073,12 +9373,15 @@ export class MySQLAdapter {
               AND cs.completed_at IS NULL
             ORDER BY cs.endorsement_reminder_date ASC
         `)
-    return rows as any[]
+    return rows as Row<EndorsementDueRow>[]
   }
 
-  async createSurveyWarranty(data: any): Promise<any> {
+  // Returns the raw inserted row (SELECT *: snake_case columns)
+  async createSurveyWarranty(
+    data: Omit<SurveyWarranty, 'id' | 'status' | 'createdAt'>
+  ): Promise<RowDataPacket> {
     if (!this.pool) throw new Error('No DB')
-    const id = require('crypto').randomUUID()
+    const id = uuidv4()
     await this.pool.query(
       `INSERT INTO survey_warranties (id, vessel_id, policy_id, description, deadline_type, deadline_days, deadline_event, inception_date, notes, reference, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
@@ -9096,14 +9399,14 @@ export class MySQLAdapter {
       ]
     )
     const [rows] = await this.pool.query('SELECT * FROM survey_warranties WHERE id = ?', [id])
-    return (rows as any[])[0]
+    return (rows as RowDataPacket[])[0]
   }
 
-  async updateSurveyWarranty(id: string, data: any): Promise<void> {
+  async updateSurveyWarranty(id: string, data: Partial<SurveyWarranty>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
-    const allowed = [
+    const values: SqlValue[] = []
+    const allowed: (keyof SurveyWarranty)[] = [
       'description',
       'deadlineType',
       'deadlineDays',
@@ -9146,9 +9449,12 @@ export class MySQLAdapter {
     await this.pool.query('DELETE FROM survey_warranties WHERE id = ?', [id])
   }
 
-  async logWarrantyReminder(data: any): Promise<any> {
+  // Returns the raw inserted row (SELECT *: snake_case columns)
+  async logWarrantyReminder(
+    data: Omit<SurveyWarrantyReminder, 'id' | 'createdAt'>
+  ): Promise<RowDataPacket> {
     if (!this.pool) throw new Error('No DB')
-    const id = require('crypto').randomUUID()
+    const id = uuidv4()
     await this.pool.query(
       `INSERT INTO survey_warranty_reminders (id, warranty_id, sent_at, channel, reference, notes, next_reminder_date, logged_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -9166,10 +9472,10 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT * FROM survey_warranty_reminders WHERE id = ?', [
       id
     ])
-    return (rows as any[])[0]
+    return (rows as RowDataPacket[])[0]
   }
 
-  async getWarrantyReminders(warrantyId: string): Promise<any[]> {
+  async getWarrantyReminders(warrantyId: string): Promise<SurveyWarrantyReminder[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -9183,7 +9489,7 @@ export class MySQLAdapter {
         `,
       [warrantyId]
     )
-    return rows as any[]
+    return rows as Row<SurveyWarrantyReminder>[]
   }
 
   async waiverSurveyWarranty(id: string, reason: string): Promise<void> {
@@ -9210,7 +9516,7 @@ export class MySQLAdapter {
       `SELECT condition_survey_id FROM survey_warranties WHERE id = ?`,
       [warrantyId]
     )
-    const warranty = (rows as any[])[0]
+    const warranty = (rows as RowDataPacket[])[0]
     if (warranty?.condition_survey_id) {
       const surveyId = warranty.condition_survey_id
       // 3. Close all open defects on that survey
@@ -9264,8 +9570,8 @@ export class MySQLAdapter {
   }
 
   // --- Compliance Schedule ---
-  async getComplianceScheduleSettings(): Promise<any> {
-    const defaultSettings = {
+  async getComplianceScheduleSettings(): Promise<StoredComplianceSchedule> {
+    const defaultSettings: StoredComplianceSchedule = {
       enabled: false,
       dayOfWeek: 1, // Monday
       timeOfDay: '09:00',
@@ -9282,13 +9588,19 @@ export class MySQLAdapter {
     }
 
     try {
-      return { ...defaultSettings, ...JSON.parse(settingValue) }
+      return {
+        ...defaultSettings,
+        ...(JSON.parse(settingValue) as Partial<StoredComplianceSchedule>)
+      }
     } catch {
       return defaultSettings
     }
   }
 
-  async setComplianceScheduleSettings(settings: any, updatedBy?: string): Promise<void> {
+  async setComplianceScheduleSettings(
+    settings: StoredComplianceSchedule,
+    updatedBy?: string
+  ): Promise<void> {
     await this.setSetting('complianceSchedule', JSON.stringify(settings), updatedBy)
   }
 
@@ -9311,7 +9623,7 @@ export class MySQLAdapter {
       `UPDATE compliance_check_logs SET status = 'failed' WHERE status = 'running' AND run_at < (NOW() - INTERVAL ? HOUR)`,
       [olderThanHours]
     )
-    return (r as any).affectedRows || 0
+    return (r as ResultSetHeader).affectedRows || 0
   }
 
   async updateComplianceCheckLog(
@@ -9320,7 +9632,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.matchesFound !== undefined) {
       fields.push('matches_found = ?')
       values.push(updates.matchesFound)
@@ -9341,7 +9653,7 @@ export class MySQLAdapter {
     )
   }
 
-  async getComplianceCheckLogs(limit: number = 20): Promise<any[]> {
+  async getComplianceCheckLogs(limit: number = 20): Promise<ComplianceCheckLog[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
@@ -9349,12 +9661,12 @@ export class MySQLAdapter {
              FROM compliance_check_logs ORDER BY run_at DESC LIMIT ?`,
       [limit]
     )
-    return rows as any[]
+    return rows as Row<ComplianceCheckLog>[]
   }
 
-  async getLatestComplianceCheckLog(): Promise<any | null> {
+  async getLatestComplianceCheckLog(): Promise<ComplianceCheckLog | null> {
     if (!this.pool) return null
-    const [rows]: any[] = await this.pool.query(
+    const [rows] = await this.pool.query<Row<ComplianceCheckLog>[]>(
       `SELECT id, run_at as runAt, total_checked as totalChecked, matches_found as matchesFound,
              status, error, created_at as createdAt
              FROM compliance_check_logs ORDER BY run_at DESC LIMIT 1`
@@ -9389,7 +9701,10 @@ export class MySQLAdapter {
     )
   }
 
-  async getComplianceCheckResults(logId?: string, status?: string): Promise<any[]> {
+  async getComplianceCheckResults(
+    logId?: string,
+    status?: string
+  ): Promise<ComplianceCheckResult[]> {
     if (!this.pool) return []
     let sql = `SELECT r.id, r.log_id as logId, r.entity_type as entityType, r.entity_id as entityId,
                    r.entity_name as entityName, r.match_score as matchScore, r.match_details as matchDetails,
@@ -9398,7 +9713,7 @@ export class MySQLAdapter {
                    LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
 
     const conditions: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
 
     // Filter out results for inactive vessels
     conditions.push("(r.entity_type != 'vessel' OR v.is_active = 1 OR v.id IS NULL)")
@@ -9417,12 +9732,12 @@ export class MySQLAdapter {
     }
     sql += ' ORDER BY r.match_score DESC, r.created_at DESC'
     const [rows] = await this.pool.query(sql, params)
-    return rows as any[]
+    return rows as Row<ComplianceCheckResult>[]
   }
 
   async getComplianceCheckResultsPaginated(
     params: ComplianceResultQueryParams
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<ComplianceCheckResult>> {
     if (!this.pool) return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }
 
     const {
@@ -9444,7 +9759,7 @@ export class MySQLAdapter {
     let countQuery = `SELECT COUNT(*) as total FROM compliance_check_results r
                    LEFT JOIN vessels v ON r.entity_type = 'vessel' AND r.entity_id = v.id`
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     // Filter out results for inactive vessels
     conditions.push("(r.entity_type != 'vessel' OR v.is_active = 1 OR v.id IS NULL)")
@@ -9482,14 +9797,20 @@ export class MySQLAdapter {
 
     const countValues = values.slice(0, values.length - 2)
     const [countResult] = await this.pool.query(countQuery, countValues)
-    const total = (countResult as any[])[0].total
+    const total = (countResult as RowDataPacket[])[0].total
 
     const [rows] = await this.pool.query(query, values)
 
-    return { data: rows as any[], total, page, limit, totalPages: Math.ceil(total / limit) }
+    return {
+      data: rows as Row<ComplianceCheckResult>[],
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
   }
 
-  async getPendingComplianceResults(): Promise<any[]> {
+  async getPendingComplianceResults(): Promise<ComplianceCheckResult[]> {
     return this.getComplianceCheckResults(undefined, 'pending_review')
   }
 
@@ -9509,7 +9830,7 @@ export class MySQLAdapter {
     if (!this.pool) return
 
     // 1. Get the result to know the entity/vessel
-    const [results]: any[] = await this.pool.query(
+    const [results] = await this.pool.query<RowDataPacket[]>(
       'SELECT entity_type as entityType, entity_id as entityId FROM compliance_check_results WHERE id = ?',
       [id]
     )
@@ -9532,7 +9853,7 @@ export class MySQLAdapter {
     } else {
       // Decision is 'cleared'
       // We only clear the record if there are no OTHER pending or sanctioned matches for this entity
-      const [otherMatches]: any[] = await this.pool.query(
+      const [otherMatches] = await this.pool.query<RowDataPacket[]>(
         `SELECT id FROM compliance_check_results 
                  WHERE entity_type = ? AND entity_id = ? AND id != ? 
                  AND (status = 'pending_review' OR (status = 'reviewed' AND decision = 'sanctioned'))`,
@@ -9561,7 +9882,7 @@ export class MySQLAdapter {
   async addPolicyType(name: string, code?: string): Promise<PolicyType> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types'
     )
     const order = maxRow[0].nextOrder
@@ -9575,7 +9896,7 @@ export class MySQLAdapter {
   async updatePolicyType(id: string, updates: { name?: string; code?: string }): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -9630,13 +9951,13 @@ export class MySQLAdapter {
   }
 
   // --- Dynamic Address Book Query ---
-  async queryDAB(criteria: DABQueryCriteria): Promise<any[]> {
+  async queryDAB(criteria: DABQueryCriteria): Promise<DABResult[]> {
     if (!this.pool) return []
 
     // Build a query that finds entities matching the criteria via their vessel associations
     // We need: entity name, type, email, phone, associated vessel names
     const conditions: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
 
     if (criteria.policyTypeIds && criteria.policyTypeIds.length > 0) {
       const placeholders = criteria.policyTypeIds.map(() => '?').join(',')
@@ -9732,28 +10053,28 @@ export class MySQLAdapter {
       const [custRows] = await this.pool.query(
         "SELECT DISTINCT customer_entity_id FROM vessel_dynamic_policies WHERE customer_entity_id IS NOT NULL AND status = 'active'"
       )
-      for (const r of custRows as any[]) customerEntityIds.add(r.customer_entity_id)
+      for (const r of custRows as RowDataPacket[]) customerEntityIds.add(r.customer_entity_id)
       const [brokerRows] = await this.pool.query(
         "SELECT DISTINCT customer_entity_id FROM vessel_dynamic_policies WHERE customer_entity_id IS NOT NULL AND customer_type = 'broker' AND status = 'active'"
       )
-      for (const r of brokerRows as any[]) brokerEntityIds.add(r.customer_entity_id)
+      for (const r of brokerRows as RowDataPacket[]) brokerEntityIds.add(r.customer_entity_id)
     } catch {
       /* tables may not exist yet */
     }
 
     // Merge results, deduplicating by entityId
-    const resultMap = new Map<string, any>()
-    for (const row of rows as any[]) {
+    const resultMap = new Map<string, Row<DABResult>>()
+    for (const row of rows as Row<DABResult>[]) {
       row.isCustomer = customerEntityIds.has(row.entityId)
       row.isBroker = brokerEntityIds.has(row.entityId)
       resultMap.set(row.entityId, row)
     }
-    for (const row of customerRows as any[]) {
+    for (const row of customerRows as Row<DABResult>[]) {
       row.isCustomer = customerEntityIds.has(row.entityId)
       row.isBroker = brokerEntityIds.has(row.entityId)
       if (resultMap.has(row.entityId)) {
         // Merge vessel names
-        const existing = resultMap.get(row.entityId)
+        const existing = resultMap.get(row.entityId)!
         const existingVessels = new Set(existing.vesselNames.split(', '))
         const newVessels = row.vesselNames.split(', ')
         for (const v of newVessels) existingVessels.add(v)
@@ -9773,13 +10094,16 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, clause_number as clauseNumber, name, description, is_cargo_related as isCargoRelated, order_index as `order` FROM pi_clauses ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, isCargoRelated: Boolean(r.isCargoRelated) }))
+    return (rows as Row<PIClause>[]).map((r) => ({
+      ...r,
+      isCargoRelated: Boolean(r.isCargoRelated)
+    }))
   }
 
   async addPIClause(clause: Omit<PIClause, 'id'>): Promise<PIClause> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_clauses'
     )
     const order = maxRow[0].nextOrder
@@ -9800,7 +10124,7 @@ export class MySQLAdapter {
   async updatePIClause(id: string, updates: Partial<PIClause>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.clauseNumber !== undefined) {
       fields.push('clause_number = ?')
       values.push(updates.clauseNumber)
@@ -9848,9 +10172,9 @@ export class MySQLAdapter {
         'SELECT clause_id, description_override FROM pi_clause_set_items WHERE set_id = ?',
         [set.id]
       )
-      set.clauseIds = (items as any[]).map((i) => i.clause_id)
+      set.clauseIds = (items as RowDataPacket[]).map((i) => i.clause_id)
       const overrides: Record<string, string> = {}
-      for (const item of items as any[]) {
+      for (const item of items as RowDataPacket[]) {
         if (item.description_override) overrides[item.clause_id] = item.description_override
       }
       if (Object.keys(overrides).length > 0) set.descriptionOverrides = overrides
@@ -9906,7 +10230,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       "SELECT id, text, is_cargo_related as isCargoRelated, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_warranties ORDER BY order_index ASC"
     )
-    const warranties = (rows as any[]).map((r) => ({
+    const warranties = (rows as Row<PIWarranty>[]).map((r) => ({
       ...r,
       isCargoRelated: Boolean(r.isCargoRelated),
       defaultSelected: Boolean(r.defaultSelected),
@@ -9918,7 +10242,7 @@ export class MySQLAdapter {
       const [tagRows] = await this.pool.query(
         'SELECT warranty_id, tag_id FROM pi_warranty_tag_assignments'
       )
-      for (const tr of tagRows as any[]) {
+      for (const tr of tagRows as RowDataPacket[]) {
         const w = warranties.find((w) => w.id === tr.warranty_id)
         if (w) w.tagIds.push(tr.tag_id)
       }
@@ -9929,7 +10253,7 @@ export class MySQLAdapter {
   async addPIWarranty(warranty: Omit<PIWarranty, 'id'>): Promise<PIWarranty> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_warranties'
     )
     const order = maxRow[0].nextOrder
@@ -9959,7 +10283,7 @@ export class MySQLAdapter {
   async updatePIWarranty(id: string, updates: Partial<PIWarranty>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -10009,12 +10333,12 @@ export class MySQLAdapter {
 
   // ==================== P&I Warranty Sets ====================
 
-  async getPIWarrantySets(): Promise<any[]> {
+  async getPIWarrantySets(): Promise<PIWarrantySet[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       "SELECT id, name, default_selected as defaultSelected, alternative_scope as alternativeScope, COALESCE(type_scope, 'all') as typeScope FROM pi_warranty_sets ORDER BY name ASC"
     )
-    const sets = rows as any[]
+    const sets = rows as Row<PIWarrantySet>[]
     for (const set of sets) {
       set.defaultSelected = !!set.defaultSelected
       set.alternativeScope = set.alternativeScope || null
@@ -10023,7 +10347,7 @@ export class MySQLAdapter {
         'SELECT warranty_id FROM pi_warranty_set_items WHERE set_id = ? ORDER BY order_index ASC',
         [set.id]
       )
-      set.warrantyIds = (items as any[]).map((i) => i.warranty_id)
+      set.warrantyIds = (items as RowDataPacket[]).map((i) => i.warranty_id)
     }
     return sets
   }
@@ -10032,15 +10356,15 @@ export class MySQLAdapter {
     name: string,
     warrantyIds: string[],
     defaultSelected?: boolean
-  ): Promise<any> {
+  ): Promise<PIWarrantySet> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
       'INSERT INTO pi_warranty_sets (id, name, default_selected) VALUES (?, ?, ?)',
       [id, name, defaultSelected ? 1 : 0]
     )
-    const [existing] = (await this.pool.query('SELECT id FROM pi_warranties')) as any[]
-    const validIds = new Set((existing as any[]).map((r: any) => r.id))
+    const [existing] = (await this.pool.query('SELECT id FROM pi_warranties')) as QueryRows
+    const validIds = new Set((existing as RowDataPacket[]).map((r) => r.id))
     const fk = await this.fkOff()
     try {
       let orderIdx = 0
@@ -10078,8 +10402,8 @@ export class MySQLAdapter {
       const fk = await this.fkOff()
       try {
         await fk.execute('DELETE FROM pi_warranty_set_items WHERE set_id = ?', [id])
-        const [existing] = (await fk.query('SELECT id FROM pi_warranties')) as any[]
-        const validIds = new Set((existing as any[]).map((r: any) => r.id))
+        const [existing] = (await fk.query('SELECT id FROM pi_warranties')) as QueryRows
+        const validIds = new Set((existing as RowDataPacket[]).map((r) => r.id))
         let updOrderIdx = 0
         for (const wid of warrantyIds) {
           if (validIds.has(wid)) {
@@ -10107,7 +10431,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, title, letter_code as letterCode, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PIDeductible>[]).map((r) => ({
       ...r,
       hasSecondary: Boolean(r.hasSecondary),
       defaultAmount: Number(r.defaultAmount),
@@ -10120,7 +10444,7 @@ export class MySQLAdapter {
   async addPIDeductible(ded: Omit<PIDeductible, 'id'>): Promise<PIDeductible> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_deductibles'
     )
     const order = maxRow[0].nextOrder
@@ -10145,7 +10469,7 @@ export class MySQLAdapter {
   async updatePIDeductible(id: string, updates: Partial<PIDeductible>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -10214,7 +10538,7 @@ export class MySQLAdapter {
       'SELECT id, set_id as setId, deductible_id as deductibleId, amount, currency, secondary_amount as secondaryAmount FROM pi_deductible_set_items WHERE set_id = ?',
       [setId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PIDeductibleSetItem>[]).map((r) => ({
       ...r,
       amount: Number(r.amount),
       secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined
@@ -10274,25 +10598,28 @@ export class MySQLAdapter {
 
   // ==================== P&I Text Deductibles (Master) ====================
 
-  async getPITextDeductibles(): Promise<any[]> {
+  async getPITextDeductibles(): Promise<PITextDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, title, text, default_included as defaultIncluded, order_index as `order` FROM pi_text_deductibles ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, defaultIncluded: Boolean(r.defaultIncluded) }))
+    return (rows as Row<PITextDeductible>[]).map((r) => ({
+      ...r,
+      defaultIncluded: Boolean(r.defaultIncluded)
+    }))
   }
 
   async addPITextDeductible(data: {
     title?: string
     text: string
     defaultIncluded?: boolean
-  }): Promise<any> {
+  }): Promise<PITextDeductible> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_text_deductibles'
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, data.title || '', data.text, data.defaultIncluded ? 1 : 0, order]
@@ -10312,7 +10639,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -10358,13 +10685,13 @@ export class MySQLAdapter {
     // Fetch vessel type mappings
     const [vtRows] = (await this.pool.query(
       'SELECT exclusion_id, vessel_type_id FROM pi_exclusion_vessel_type_map'
-    )) as any[]
+    )) as QueryRows
     const vtMap: Record<string, string[]> = {}
     for (const r of vtRows) {
       if (!vtMap[r.exclusion_id]) vtMap[r.exclusion_id] = []
       vtMap[r.exclusion_id].push(r.vessel_type_id)
     }
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PIExclusion>[]).map((r) => ({
       ...r,
       isCargoRelated: !!r.isCargoRelated,
       vesselTypeIds: vtMap[r.id] || []
@@ -10378,7 +10705,7 @@ export class MySQLAdapter {
   }): Promise<PIExclusion> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_exclusions'
     )
     const order = maxRow[0].nextOrder
@@ -10409,7 +10736,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -10457,13 +10784,16 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, text_template as textTemplate, default_amount as defaultAmount, default_currency as defaultCurrency, order_index as `order` FROM pi_sub_limit_templates ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, defaultAmount: Number(r.defaultAmount) }))
+    return (rows as Row<PISubLimitTemplate>[]).map((r) => ({
+      ...r,
+      defaultAmount: Number(r.defaultAmount)
+    }))
   }
 
   async addPISubLimitTemplate(tmpl: Omit<PISubLimitTemplate, 'id'>): Promise<PISubLimitTemplate> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_sub_limit_templates'
     )
     const order = maxRow[0].nextOrder
@@ -10477,7 +10807,7 @@ export class MySQLAdapter {
   async updatePISubLimitTemplate(id: string, updates: Partial<PISubLimitTemplate>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.textTemplate !== undefined) {
       fields.push('text_template = ?')
       values.push(updates.textTemplate)
@@ -10530,7 +10860,7 @@ export class MySQLAdapter {
   ): Promise<PIAdditionalClause> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_additional_clauses'
     )
     const order = maxRow[0].nextOrder
@@ -10590,7 +10920,7 @@ export class MySQLAdapter {
         'SELECT clause_id FROM pi_additional_clause_set_items WHERE set_id = ? ORDER BY order_index ASC',
         [s.id]
       )
-      s.clauseIds = (items as any[]).map((r) => r.clause_id)
+      s.clauseIds = (items as RowDataPacket[]).map((r) => r.clause_id)
     }
     return sets
   }
@@ -10668,7 +10998,7 @@ export class MySQLAdapter {
              ORDER BY qv.order_index ASC`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<Omit<QuotationVessel, 'ncbExcluded' | 'upccExcluded'>>[]).map((r) => ({
       ...r,
       builtYear: r.builtYear != null ? Number(r.builtYear) : undefined,
       rebuiltYear: r.rebuiltYear != null ? Number(r.rebuiltYear) : undefined,
@@ -10777,7 +11107,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     const colMap: Record<string, string> = {
       name: 'name',
       imoNumber: 'imo_number',
@@ -10807,7 +11137,7 @@ export class MySQLAdapter {
     for (const [key, col] of Object.entries(colMap)) {
       if (key in data) {
         fields.push(`${col} = ?`)
-        values.push((data as any)[key] ?? null)
+        values.push((data as Record<string, SqlValue | undefined>)[key] ?? null)
       }
     }
     if (fields.length === 0) return
@@ -10825,7 +11155,7 @@ export class MySQLAdapter {
       'SELECT quotation_id, vessel_label FROM quotation_vessels WHERE id = ?',
       [id]
     )
-    const vessel = (vRows as any[])[0]
+    const vessel = (vRows as RowDataPacket[])[0]
     await this.pool.execute('DELETE FROM quotation_vessels WHERE id = ?', [id])
     if (!vessel) return
     const qId = vessel.quotation_id
@@ -10867,7 +11197,7 @@ export class MySQLAdapter {
           `SELECT id, vessel_scope FROM ${table} WHERE quotation_id = ? AND vessel_scope IS NOT NULL`,
           [qId]
         )
-        for (const r of rows as any[]) {
+        for (const r of rows as RowDataPacket[]) {
           try {
             const scope = JSON.parse(r.vessel_scope)
             if (Array.isArray(scope) && scope.includes(id)) {
@@ -10877,9 +11207,13 @@ export class MySQLAdapter {
                 r.id
               ])
             }
-          } catch {}
+          } catch {
+            /* malformed vessel_scope JSON: leave the row as is */
+          }
         }
-      } catch {}
+      } catch {
+        /* table may not exist yet (older schema) */
+      }
     }
 
     // Relabel remaining vessels sequentially (V1, V2, V3...)
@@ -10887,9 +11221,9 @@ export class MySQLAdapter {
       'SELECT id, vessel_label FROM quotation_vessels WHERE quotation_id = ? ORDER BY order_index',
       [qId]
     )
-    for (let i = 0; i < (remaining as any[]).length; i++) {
+    for (let i = 0; i < (remaining as RowDataPacket[]).length; i++) {
       const newLabel = `V${i + 1}`
-      const row = (remaining as any[])[i]
+      const row = (remaining as RowDataPacket[])[i]
       if (row.vessel_label !== newLabel) {
         // Update assureds with old label to new label
         await this.pool.execute(
@@ -10947,7 +11281,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -10993,7 +11327,7 @@ export class MySQLAdapter {
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM trading_warranty_templates'
     )
-    const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+    const nextOrder = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO trading_warranty_templates (id, name, text, order_index) VALUES (?, ?, ?, ?)',
       [id, name, text, nextOrder]
@@ -11007,7 +11341,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -11055,7 +11389,7 @@ export class MySQLAdapter {
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM trading_custom_texts'
     )
-    const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+    const nextOrder = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO trading_custom_texts (id, name, text, order_index) VALUES (?, ?, ?, ?)',
       [id, name, text, nextOrder]
@@ -11069,7 +11403,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -11129,7 +11463,7 @@ export class MySQLAdapter {
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM premium_text_templates WHERE type = ?',
       [data.type]
     )
-    const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+    const nextOrder = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO premium_text_templates (id, name, text, type, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, data.name, data.text, data.type, nextOrder]
@@ -11149,7 +11483,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -11197,7 +11531,7 @@ export class MySQLAdapter {
     const id = uuidv4()
     const [maxRow] = (await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM policy_types'
-    )) as any[]
+    )) as QueryRows
     const orderIndex = maxRow[0].nextOrder
     await this.pool.execute(
       'INSERT INTO policy_types (id, name, code, order_index) VALUES (?, ?, ?, ?)',
@@ -11209,7 +11543,7 @@ export class MySQLAdapter {
   async updateQuotationType(id: string, updates: { name?: string; code?: string }): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -11237,7 +11571,7 @@ export class MySQLAdapter {
 
   // ==================== Quotations ====================
 
-  async getQuotations(): Promise<Quotation[]> {
+  async getQuotations(): Promise<QuotationListItem[]> {
     if (!this.pool) return []
     // First get the latest revision IDs efficiently
     const [latestIds] = await this.pool.query(`
@@ -11249,7 +11583,7 @@ export class MySQLAdapter {
                   AND q2.deleted_at IS NULL
             )
         `)
-    const idSet = new Set((latestIds as any[]).map((r) => r.id))
+    const idSet = new Set((latestIds as RowDataPacket[]).map((r) => r.id))
     if (idSet.size === 0) return []
 
     const [rows] = await this.pool.query(`
@@ -11271,7 +11605,7 @@ export class MySQLAdapter {
             ORDER BY q.created_at DESC
         `)
     // Filter to latest revisions in JS (faster than correlated subquery)
-    const filtered = (rows as any[]).filter((r) => idSet.has(r.id))
+    const filtered = (rows as Row<Quotation>[]).filter((r) => idSet.has(r.id))
 
     // Batch load vessel names and counts
     const qIds = filtered.map((r) => r.id)
@@ -11288,7 +11622,7 @@ export class MySQLAdapter {
     )
     const vesselMap = new Map<string, string>()
     const vesselCountMap = new Map<string, number>()
-    for (const v of vesselRows as any[]) {
+    for (const v of vesselRows as RowDataPacket[]) {
       if (!vesselMap.has(v.quotation_id)) vesselMap.set(v.quotation_id, v.vesselName)
       vesselCountMap.set(v.quotation_id, (vesselCountMap.get(v.quotation_id) || 0) + 1)
     }
@@ -11306,7 +11640,7 @@ export class MySQLAdapter {
     }))
   }
 
-  async getQuotationsForVessel(vesselId: string): Promise<any[]> {
+  async getQuotationsForVessel(vesselId: string): Promise<VesselQuotationRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -11329,8 +11663,8 @@ export class MySQLAdapter {
     )
 
     // Filter to latest revision per group (same as getQuotations)
-    const latestByGroup = new Map<string, any>()
-    for (const r of rows as any[]) {
+    const latestByGroup = new Map<string, Row<VesselQuotationRow>>()
+    for (const r of rows as Row<VesselQuotationRow>[]) {
       const gid = r.revisionGroupId || r.id
       const existing = latestByGroup.get(gid)
       if (!existing || (r.revisionNumber || 0) > (existing.revisionNumber || 0)) {
@@ -11338,7 +11672,7 @@ export class MySQLAdapter {
       }
     }
     const latestIds = new Set([...latestByGroup.values()].map((r) => r.id))
-    const filteredRows = (rows as any[]).filter((r) => latestIds.has(r.id))
+    const filteredRows = (rows as Row<VesselQuotationRow>[]).filter((r) => latestIds.has(r.id))
 
     const qIds = filteredRows.map((r) => r.id)
     if (qIds.length === 0) return []
@@ -11353,7 +11687,7 @@ export class MySQLAdapter {
       qIds
     )
     const vcMap = new Map<string, number>()
-    for (const v of vcRows as any[]) vcMap.set(v.quotation_id, v.cnt)
+    for (const v of vcRows as RowDataPacket[]) vcMap.set(v.quotation_id, v.cnt)
 
     // Batch load P&I clause names
     const [clauseRows] = await this.pool.query(
@@ -11365,7 +11699,7 @@ export class MySQLAdapter {
       qIds
     )
     const clauseMap = new Map<string, string[]>()
-    for (const c of clauseRows as any[]) {
+    for (const c of clauseRows as RowDataPacket[]) {
       if (!clauseMap.has(c.quotation_id)) clauseMap.set(c.quotation_id, [])
       clauseMap.get(c.quotation_id)!.push(c.name)
     }
@@ -11381,7 +11715,7 @@ export class MySQLAdapter {
       qIds
     )
     const hullMap = new Map<string, string[]>()
-    for (const h of hullRows as any[]) {
+    for (const h of hullRows as RowDataPacket[]) {
       if (!hullMap.has(h.quotation_id)) hullMap.set(h.quotation_id, [])
       hullMap.get(h.quotation_id)!.push(h.code || h.name)
     }
@@ -11418,7 +11752,7 @@ export class MySQLAdapter {
     favoriteIds?: string[]
     sortField?: string
     sortDir?: 'asc' | 'desc'
-  }): Promise<{ rows: any[]; total: number; stats: any }> {
+  }): Promise<QuotationListPage> {
     if (!this.pool) return { rows: [], total: 0, stats: {} }
 
     const pg = params.page || 0
@@ -11442,7 +11776,7 @@ export class MySQLAdapter {
 
     // Build WHERE conditions
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (params.search) {
       conditions.push(
@@ -11513,7 +11847,7 @@ export class MySQLAdapter {
             ) latest ON q.revision_group_id = latest.revision_group_id AND q.revision_number = latest.max_rev
             WHERE q.deleted_at IS NULL
         `)
-    const latestIds = new Set((latestRows as any[]).map((r: any) => r.id))
+    const latestIds = new Set((latestRows as RowDataPacket[]).map((r) => r.id))
     const latestIdList = [...latestIds].map((id) => `'${id}'`).join(',')
     if (latestIdList.length === 0) return { rows: [], total: 0, stats: {} }
 
@@ -11537,7 +11871,7 @@ export class MySQLAdapter {
 
     // Count total
     const [countRows] = await this.pool.query(`SELECT COUNT(*) as total ${baseQuery}`, values)
-    const total = (countRows as any[])[0].total
+    const total = (countRows as RowDataPacket[])[0].total
 
     // Stats (always from full filtered set)
     const [statsRows] = await this.pool.query(
@@ -11545,15 +11879,15 @@ export class MySQLAdapter {
       values
     )
     const statsByStatus: Record<string, number> = {}
-    for (const r of statsRows as any[]) statsByStatus[r.status] = r.cnt
+    for (const r of statsRows as RowDataPacket[]) statsByStatus[r.status] = r.cnt
 
     const [typeStatsRows] = await this.pool.query(
       `SELECT qt.code, qt.name, COUNT(*) as cnt ${baseQuery} GROUP BY qt.code, qt.name`,
       values
     )
     const statsByType: { code: string; name: string; count: number }[] = (
-      typeStatsRows as any[]
-    ).map((r: any) => ({ code: r.code, name: r.name, count: r.cnt }))
+      typeStatsRows as RowDataPacket[]
+    ).map((r) => ({ code: r.code, name: r.name, count: r.cnt }))
 
     // Paginated results
     const [rows] = await this.pool.query(
@@ -11578,7 +11912,7 @@ export class MySQLAdapter {
     )
 
     return {
-      rows: (rows as any[]).map((r: any) => ({
+      rows: (rows as Row<QuotationListRow>[]).map((r) => ({
         ...r,
         isRenewal: Boolean(r.isRenewal),
         isLocked: Boolean(r.isLocked),
@@ -11601,21 +11935,28 @@ export class MySQLAdapter {
              ORDER BY name`
     )
     const seen = new Set<string>()
-    return (rows as any[])
+    return (rows as RowDataPacket[])
       .filter((r) => !seen.has(r.id) && seen.add(r.id))
       .map((r) => ({ id: r.id, name: r.name }))
   }
 
-  async getQuotationSavedFilters(userId: string): Promise<any[]> {
+  async getQuotationSavedFilters(userId: string): Promise<QuotationSavedFilter[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, filters, order_index as `order` FROM quotation_saved_filters WHERE user_id = ? ORDER BY order_index',
       [userId]
     )
-    return (rows as any[]).map((r: any) => ({ ...r, filters: safeJson(r.filters, {}) }))
+    return (rows as Row<QuotationSavedFilter>[]).map((r) => ({
+      ...r,
+      filters: safeJson<QuotationSavedFilterValues>(r.filters, {})
+    }))
   }
 
-  async saveQuotationFilter(userId: string, name: string, filters: any): Promise<any> {
+  async saveQuotationFilter(
+    userId: string,
+    name: string,
+    filters: QuotationSavedFilterValues
+  ): Promise<Omit<QuotationSavedFilter, 'order'> | null> {
     if (!this.pool) return null
     const id = uuidv4()
     await this.pool.execute(
@@ -11640,7 +11981,7 @@ export class MySQLAdapter {
       'SELECT DISTINCT quotation_id AS id FROM policy_documents WHERE quotation_id IN (?)',
       [ids]
     )
-    const keep = new Set((withPol as any[]).map((r) => r.id))
+    const keep = new Set((withPol as RowDataPacket[]).map((r) => r.id))
     let deleted = 0
     for (const id of ids) {
       if (keep.has(id)) continue
@@ -11651,30 +11992,34 @@ export class MySQLAdapter {
   }
 
   // --- Quotation Groups ---
-  async getQuotationGroups(userId: string): Promise<any[]> {
+  async getQuotationGroups(userId: string): Promise<QuotationGroup[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, user_id as userId, color, order_index as `order` FROM quotation_groups WHERE user_id IS NULL OR user_id = ? ORDER BY user_id IS NOT NULL, order_index ASC',
       [userId]
     )
-    for (const g of rows as any[]) {
+    for (const g of rows as Row<QuotationGroup>[]) {
       const [cnt] = await this.pool.query(
         'SELECT COUNT(*) as cnt FROM quotation_group_members WHERE group_id = ?',
         [g.id]
       )
-      g.memberCount = (cnt as any[])[0].cnt
+      g.memberCount = (cnt as RowDataPacket[])[0].cnt
     }
-    return rows as any[]
+    return rows as Row<QuotationGroup>[]
   }
 
-  async addQuotationGroup(name: string, userId?: string | null, color?: string): Promise<any> {
+  async addQuotationGroup(
+    name: string,
+    userId?: string | null,
+    color?: string
+  ): Promise<QuotationGroup | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_groups WHERE user_id IS NULL OR user_id = ?',
       [userId || null]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO quotation_groups (id, name, user_id, color, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, name, userId || null, color || null, order]
@@ -11688,7 +12033,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -11730,7 +12075,7 @@ export class MySQLAdapter {
       'SELECT quotation_id FROM quotation_group_members WHERE group_id = ?',
       [groupId]
     )
-    return (rows as any[]).map((r) => r.quotation_id)
+    return (rows as RowDataPacket[]).map((r) => r.quotation_id)
   }
 
   async bulkAddQuotationsToGroup(groupId: string, quotationIds: string[]): Promise<void> {
@@ -11749,7 +12094,7 @@ export class MySQLAdapter {
       'SELECT quotation_id FROM quotation_favorites WHERE user_id = ?',
       [userId]
     )
-    return (rows as any[]).map((r: any) => r.quotation_id)
+    return (rows as RowDataPacket[]).map((r) => r.quotation_id)
   }
 
   async toggleQuotationFavorite(userId: string, quotationId: string): Promise<boolean> {
@@ -11758,7 +12103,7 @@ export class MySQLAdapter {
       'SELECT id FROM quotation_favorites WHERE user_id = ? AND quotation_id = ?',
       [userId, quotationId]
     )
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       await this.pool.execute(
         'DELETE FROM quotation_favorites WHERE user_id = ? AND quotation_id = ?',
         [userId, quotationId]
@@ -11842,7 +12187,7 @@ export class MySQLAdapter {
         `,
       [id]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<Quotation>[]
     if (arr.length === 0) return null
     const r = arr[0]
     return {
@@ -11956,7 +12301,7 @@ export class MySQLAdapter {
     )
     const regex = typeCode ? new RegExp(`^DRAFT-${typeCode}-(\\d+)$`) : /^DRAFT-(\d+)$/
     const usedNums = new Set(
-      (draftRows as any[]).map((r) => {
+      (draftRows as RowDataPacket[]).map((r) => {
         const m = String(r.reference_number).match(regex)
         return m ? parseInt(m[1], 10) : 0
       })
@@ -11977,7 +12322,7 @@ export class MySQLAdapter {
         const [tcRows] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [
           q.quotationTypeId
         ])
-        typeCode = (tcRows as any[])[0]?.code || undefined
+        typeCode = (tcRows as RowDataPacket[])[0]?.code || undefined
       }
       referenceNumber = await this.nextDraftRef(typeCode)
     }
@@ -11987,8 +12332,10 @@ export class MySQLAdapter {
       const [stepRows] = await this.pool.query(
         'SELECT id FROM quotation_workflow_steps WHERE is_initial = TRUE ORDER BY order_index LIMIT 1'
       )
-      initialStepId = (stepRows as any[])[0]?.id || null
-    } catch {}
+      initialStepId = (stepRows as RowDataPacket[])[0]?.id || null
+    } catch {
+      /* workflow table may not exist yet: no initial step */
+    }
     await this.pool.execute(
       `
             INSERT INTO quotations (id, reference_number, quotation_type_id, quotation_date, policy_type_id, vessel_id, is_renewal, status, period_text, validity_days, sanctions_clause_version, vdr_deductible_enabled, created_by, revision_group_id, revision_number, workflow_step_id, outstanding_premium_enabled, non_refundable_type)
@@ -12121,11 +12468,12 @@ export class MySQLAdapter {
       subjectivityDays: 'subjectivity_days'
     }
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     for (const [key, col] of Object.entries(fieldMap)) {
-      if ((updates as any)[key] !== undefined) {
+      const val = (updates as Record<string, SqlValue | undefined>)[key]
+      if (val !== undefined) {
         fields.push(`${col} = ?`)
-        values.push((updates as any)[key] ?? null)
+        values.push(val ?? null)
       }
     }
     // Handle JSON-serialized sectionTextsOverride
@@ -12164,7 +12512,7 @@ export class MySQLAdapter {
     const [srcRows] = await this.pool.query('SELECT * FROM quotations WHERE id = ?', [
       sourceQuotationId
     ])
-    const source = (srcRows as any[])[0]
+    const source = (srcRows as RowDataPacket[])[0]
     if (!source) throw new Error('Source quotation not found')
 
     for (const section of sections) {
@@ -12179,7 +12527,7 @@ export class MySQLAdapter {
             [sourceQuotationId]
           )
           const groupIdMap = new Map<string, string>()
-          for (const g of srcGroups as any[]) {
+          for (const g of srcGroups as RowDataPacket[]) {
             const newGroupId = uuidv4()
             groupIdMap.set(g.id, newGroupId)
             await this.pool.execute(
@@ -12195,7 +12543,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_assureds WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of rows as any[]) {
+          for (const r of rows as RowDataPacket[]) {
             const newGroupId = r.group_id ? groupIdMap.get(r.group_id) || null : null
             await this.pool.execute(
               'INSERT INTO quotation_assureds (id, quotation_id, entity_id, name, role, vessel_label, group_id, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -12225,7 +12573,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_vessels WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of rows as any[]) {
+          for (const r of rows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_vessels (id, quotation_id, vessel_id, vessel_label, order_index, name, imo_number, built_year, rebuilt_year, gross_tonnage, flag, vessel_type, classification, call_sign, ncb_excluded, upcc_excluded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [
@@ -12259,7 +12607,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_excluded_countries WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of rows as any[]) {
+          for (const r of rows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_excluded_countries (id, quotation_id, name, list_type) VALUES (?, ?, ?, ?)',
               [uuidv4(), targetQuotationId, r.name, r.list_type]
@@ -12293,7 +12641,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_warranties WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of wRows as any[]) {
+          for (const r of wRows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_warranties (id, quotation_id, pi_warranty_id, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
               [uuidv4(), targetQuotationId, r.pi_warranty_id, r.order_index, r.vessel_scope]
@@ -12303,7 +12651,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_custom_warranties WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of cwRows as any[]) {
+          for (const r of cwRows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_custom_warranties (id, quotation_id, text, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?)',
               [uuidv4(), targetQuotationId, r.text, r.order_index, r.vessel_scope]
@@ -12319,7 +12667,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_subjectivities WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of rows as any[]) {
+          for (const r of rows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_subjectivities (id, quotation_id, pi_subjectivity_id, text, is_custom, is_auto_populated, order_index, vessel_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
               [
@@ -12344,7 +12692,7 @@ export class MySQLAdapter {
             'SELECT * FROM quotation_instalments WHERE quotation_id = ?',
             [sourceQuotationId]
           )
-          for (const r of iRows as any[]) {
+          for (const r of iRows as RowDataPacket[]) {
             await this.pool.execute(
               'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception) VALUES (?, ?, ?, ?)',
               [uuidv4(), targetQuotationId, r.instalment_number, r.days_from_inception]
@@ -12436,13 +12784,13 @@ export class MySQLAdapter {
       } catch {
         /* table may not exist */
       }
-      for (const r of tables as any[]) {
+      for (const r of tables as RowDataPacket[]) {
         const t = String(r.t)
         if (!/^[a-z0-9_]+$/i.test(t)) continue
         try {
           await fk.execute(`DELETE FROM \`${t}\` WHERE quotation_id = ?`, [id])
         } catch (e) {
-          console.warn(`[purgeQuotation] ${t}:`, (e as any)?.message)
+          console.warn(`[purgeQuotation] ${t}:`, (e as Error | null)?.message)
         }
       }
       await fk.execute('DELETE FROM quotations WHERE id = ?', [id])
@@ -12460,7 +12808,7 @@ export class MySQLAdapter {
         `)
     const fk = await this.fkOff()
     try {
-      for (const r of tables as any[]) {
+      for (const r of tables as RowDataPacket[]) {
         const t = String(r.t)
         if (!/^[a-z0-9_]+$/i.test(t)) continue
         try {
@@ -12474,7 +12822,7 @@ export class MySQLAdapter {
             await fk.query(`DELETE FROM \`${t}\` WHERE policy_doc_id IN (?)`, [policyIds])
           }
         } catch (e) {
-          console.warn(`[purgePolicy] ${t}:`, (e as any)?.message)
+          console.warn(`[purgePolicy] ${t}:`, (e as Error | null)?.message)
         }
       }
       await fk.query('DELETE FROM policy_documents WHERE id IN (?)', [policyIds])
@@ -12490,7 +12838,7 @@ export class MySQLAdapter {
       'SELECT COUNT(*) AS n FROM policy_documents WHERE quotation_id = ?',
       [id]
     )
-    const n = Number((pol as any[])[0]?.n || 0)
+    const n = Number((pol as RowDataPacket[])[0]?.n || 0)
     if (n > 0)
       throw new Error(
         `This quotation has ${n} polic${n === 1 ? 'y' : 'ies'} and cannot be permanently deleted.`
@@ -12498,7 +12846,7 @@ export class MySQLAdapter {
     await this.purgeQuotationRows(id)
   }
 
-  async getDeletedQuotations(): Promise<any[]> {
+  async getDeletedQuotations(): Promise<DeletedQuotationRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(`
             SELECT q.id, q.reference_number as referenceNumber,
@@ -12514,7 +12862,7 @@ export class MySQLAdapter {
             WHERE q.deleted_at IS NOT NULL
             ORDER BY q.deleted_at DESC
         `)
-    return rows as any[]
+    return rows as Row<DeletedQuotationRow>[]
   }
 
   /** Assign a real quotation reference number (Q/{type}/{seq}) to a draft quotation */
@@ -12530,7 +12878,7 @@ export class MySQLAdapter {
       'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?',
       [quotationId]
     )
-    const row = (qRows as any[])[0]
+    const row = (qRows as RowDataPacket[])[0]
     if (!row) throw new Error('Quotation not found')
 
     // Only assign if currently a DRAFT number
@@ -12544,7 +12892,7 @@ export class MySQLAdapter {
       const [typeRow] = await this.pool.query('SELECT code FROM policy_types WHERE id = ?', [
         row.quotation_type_id
       ])
-      typeCode = (typeRow as any[])[0]?.code || '?'
+      typeCode = (typeRow as RowDataPacket[])[0]?.code || '?'
     }
 
     // Get next real sequential number from app_settings
@@ -12578,7 +12926,7 @@ export class MySQLAdapter {
       'SELECT reference_number, quotation_type_id FROM quotations WHERE id = ?',
       [quotationId]
     )
-    const row = (qRows as any[])[0]
+    const row = (qRows as RowDataPacket[])[0]
     if (!row || !row.reference_number) return
 
     const ref = String(row.reference_number)
@@ -12595,8 +12943,8 @@ export class MySQLAdapter {
       const [tcRow] = (await this.pool.query(
         'SELECT pt.code FROM quotations q JOIN policy_types pt ON q.quotation_type_id = pt.id WHERE q.id = ?',
         [quotationId]
-      )) as any[]
-      const newDraftRef = await this.nextDraftRef((tcRow as any[])[0]?.code)
+      )) as QueryRows
+      const newDraftRef = await this.nextDraftRef((tcRow as RowDataPacket[])[0]?.code)
       await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [
         newDraftRef,
         quotationId
@@ -12616,8 +12964,8 @@ export class MySQLAdapter {
     const [tcRow2] = (await this.pool.query(
       'SELECT pt.code FROM quotations q JOIN policy_types pt ON q.quotation_type_id = pt.id WHERE q.id = ?',
       [quotationId]
-    )) as any[]
-    const newDraftRef = await this.nextDraftRef((tcRow2 as any[])[0]?.code)
+    )) as QueryRows
+    const newDraftRef = await this.nextDraftRef((tcRow2 as RowDataPacket[])[0]?.code)
     await this.pool.execute('UPDATE quotations SET reference_number = ? WHERE id = ?', [
       newDraftRef,
       quotationId
@@ -12635,7 +12983,7 @@ export class MySQLAdapter {
       'SELECT pd.policy_number, pd.quotation_id FROM policy_documents pd WHERE pd.id = ?',
       [policyId]
     )
-    const row = (pRows as any[])[0]
+    const row = (pRows as RowDataPacket[])[0]
     if (!row) throw new Error('Policy not found')
 
     // Only assign if currently a POL-DRAFT number
@@ -12652,7 +13000,7 @@ export class MySQLAdapter {
                  WHERE q.id = ?`,
         [row.quotation_id]
       )
-      typeCode = (qRows as any[])[0]?.code || 'P'
+      typeCode = (qRows as RowDataPacket[])[0]?.code || 'P'
     }
 
     // Generate policy number: type + inverted year + 4-digit serial
@@ -12664,13 +13012,13 @@ export class MySQLAdapter {
       `SELECT COALESCE(MAX(CAST(SUBSTRING(policy_number, 6) AS UNSIGNED)), 0) as maxSerial
              FROM policy_documents WHERE LENGTH(policy_number) >= 9 AND policy_number REGEXP '^[A-Z][0-9]{4,}'`
     )
-    let nextSerial = ((serialRow as any[])[0]?.maxSerial || 0) + 1
+    let nextSerial = ((serialRow as RowDataPacket[])[0]?.maxSerial || 0) + 1
     if (nextSerial > 99999) {
       const [countRow] = await this.pool.query(
         'SELECT COUNT(*) as cnt FROM policy_documents WHERE policy_number NOT LIKE ?',
         ['POL-DRAFT-%']
       )
-      nextSerial = ((countRow as any[])[0]?.cnt || 0) + 1
+      nextSerial = ((countRow as RowDataPacket[])[0]?.cnt || 0) + 1
     }
 
     const policyNumber = typeCode + invertedYear + String(nextSerial).padStart(4, '0')
@@ -12686,7 +13034,7 @@ export class MySQLAdapter {
         'SELECT id, card_type, card_number FROM policy_blue_cards WHERE policy_doc_id = ?',
         [policyId]
       )
-      for (const bc of bcRows as any[]) {
+      for (const bc of bcRows as RowDataPacket[]) {
         // Keep reissue suffixes (e.g. "-2/BBC"): swap only the draft policy-number prefix
         const oldCard = String(bc.card_number || '')
         const newCardNumber = oldCard.startsWith(oldNumber)
@@ -12714,7 +13062,7 @@ export class MySQLAdapter {
       'SELECT * FROM quotation_vessels WHERE quotation_id = ?',
       [sourceId]
     )
-    for (const v of srcVessels as any[]) {
+    for (const v of srcVessels as RowDataPacket[]) {
       const newVId = uuidv4()
       vesselIdMap[v.id] = newVId
       await this.pool.execute(
@@ -12757,7 +13105,7 @@ export class MySQLAdapter {
       'SELECT * FROM quotation_hull_alternatives WHERE quotation_id = ?',
       [sourceId]
     )
-    for (const a of srcAlts as any[]) {
+    for (const a of srcAlts as RowDataPacket[]) {
       const newAId = uuidv4()
       altIdMap[a.id] = newAId
       const remappedVesselScopeId = a.vessel_scope_id
@@ -12787,7 +13135,7 @@ export class MySQLAdapter {
                  JOIN quotation_hull_alternatives a ON havp.alternative_id = a.id WHERE a.quotation_id = ?`,
         [sourceId]
       )
-      for (const r of srcAvp as any[]) {
+      for (const r of srcAvp as RowDataPacket[]) {
         const newAlt = altIdMap[r.alternative_id]
         const newVes = vesselIdMap[r.quotation_vessel_id]
         if (newAlt && newVes) {
@@ -12807,7 +13155,7 @@ export class MySQLAdapter {
         'SELECT * FROM quotation_discounts WHERE quotation_id = ?',
         [sourceId]
       )
-      for (const d of srcDiscounts as any[]) {
+      for (const d of srcDiscounts as RowDataPacket[]) {
         await this.pool.execute(
           'INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
@@ -12860,7 +13208,7 @@ export class MySQLAdapter {
         'SELECT limit_of_liability_vessel_amounts AS m FROM quotations WHERE id = ?',
         [newId]
       )
-      const lolRaw = (lolRows as any[])[0]?.m ?? null
+      const lolRaw = (lolRows as RowDataPacket[])[0]?.m ?? null
       if (lolRaw) {
         await this.pool.execute(
           'UPDATE quotations SET limit_of_liability_vessel_amounts = ? WHERE id = ?',
@@ -12877,7 +13225,7 @@ export class MySQLAdapter {
       'SELECT * FROM quotation_pi_alternatives WHERE quotation_id = ?',
       [sourceId]
     )
-    for (const a of srcPIAlts as any[]) {
+    for (const a of srcPIAlts as RowDataPacket[]) {
       const newAId = uuidv4()
       piAltIdMap[a.id] = newAId
       await this.pool.execute(
@@ -12915,7 +13263,7 @@ export class MySQLAdapter {
       const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [
         sourceId
       ])
-      for (const row of srcRows as any[]) {
+      for (const row of srcRows as RowDataPacket[]) {
         const newRowId = uuidv4()
         const values = colArr.map((c) => {
           if (c === 'quotation_id') return newId
@@ -12986,7 +13334,7 @@ export class MySQLAdapter {
       const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [
         sourceId
       ])
-      for (const row of srcRows as any[]) {
+      for (const row of srcRows as RowDataPacket[]) {
         const newRowId = uuidv4()
         const values = colArr.map((c) => {
           if (c === 'quotation_id') return newId
@@ -13008,7 +13356,7 @@ export class MySQLAdapter {
       'SELECT * FROM quotation_assured_groups WHERE quotation_id = ?',
       [sourceId]
     )
-    for (const g of srcAssuredGroups as any[]) {
+    for (const g of srcAssuredGroups as RowDataPacket[]) {
       const newGroupId = uuidv4()
       assuredGroupIdMap[g.id] = newGroupId
       await this.pool.execute(
@@ -13022,7 +13370,7 @@ export class MySQLAdapter {
       'SELECT * FROM quotation_assureds WHERE quotation_id = ?',
       [sourceId]
     )
-    for (const row of srcAssureds as any[]) {
+    for (const row of srcAssureds as RowDataPacket[]) {
       const newRowId = uuidv4()
       const newGroupId = row.group_id ? assuredGroupIdMap[row.group_id] || null : null
       await this.pool.execute(
@@ -13071,7 +13419,7 @@ export class MySQLAdapter {
       const [srcRows] = await this.pool.query(`SELECT * FROM ${table} WHERE quotation_id = ?`, [
         sourceId
       ])
-      for (const row of srcRows as any[]) {
+      for (const row of srcRows as RowDataPacket[]) {
         const newRowId = uuidv4()
         const values = colArr.map((c) => (c === 'quotation_id' ? newId : row[c]))
         await this.pool.execute(
@@ -13341,13 +13689,13 @@ export class MySQLAdapter {
         'SELECT id, vessel_id FROM quotation_vessels WHERE quotation_id = ?',
         [newId]
       )
-      for (const qv of qVessels as any[]) {
+      for (const qv of qVessels as RowDataPacket[]) {
         if (!qv.vessel_id) continue
         const [vRows] = await fk.query(
           'SELECT name, imo_number, built_year, rebuilt_year, gross_tonnage, flag_state_id, vessel_type, classification_society, call_sign FROM vessels WHERE id = ?',
           [qv.vessel_id]
         )
-        const v = (vRows as any[])[0]
+        const v = (vRows as RowDataPacket[])[0]
         if (!v) continue
         // Resolve flag name
         let flagName = v.flag_state_id || ''
@@ -13355,7 +13703,7 @@ export class MySQLAdapter {
           const [fRows] = await fk.query('SELECT name FROM flag_states WHERE id = ?', [
             v.flag_state_id
           ])
-          if ((fRows as any[]).length > 0) flagName = (fRows as any[])[0].name
+          if ((fRows as RowDataPacket[]).length > 0) flagName = (fRows as RowDataPacket[])[0].name
         }
         // Resolve classification name
         let className = v.classification_society || ''
@@ -13363,7 +13711,7 @@ export class MySQLAdapter {
           const [cRows] = await fk.query('SELECT name FROM classification_societies WHERE id = ?', [
             v.classification_society
           ])
-          if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
+          if ((cRows as RowDataPacket[]).length > 0) className = (cRows as RowDataPacket[])[0].name
         }
         await fk.execute(
           `UPDATE quotation_vessels SET name = ?, imo_number = ?, built_year = ?, rebuilt_year = ?, gross_tonnage = ?, flag = ?, vessel_type = ?, classification = ?, call_sign = ? WHERE id = ?`,
@@ -13419,12 +13767,12 @@ export class MySQLAdapter {
     } else {
       // No policies at all → create blank quotation
       const quotationTypes = await this.getQuotationTypes()
-      const qt = quotationTypes.find((t: any) => t.code === quotationTypeCode) || quotationTypes[0]
+      const qt = quotationTypes.find((t) => t.code === quotationTypeCode) || quotationTypes[0]
       const q = await this.addQuotation({
         quotationTypeId: qt?.id,
         isRenewal: true,
         createdBy
-      } as any)
+      })
       newQuotationId = q.id
     }
 
@@ -13438,12 +13786,12 @@ export class MySQLAdapter {
     for (const vid of vesselIds) {
       if (existingVesselDbIds.has(vid)) continue
       const [vRows] = await this.pool.query('SELECT * FROM vessels WHERE id = ?', [vid])
-      const v = (vRows as any[])[0]
+      const v = (vRows as RowDataPacket[])[0]
       if (!v) continue
       // Resolve flag name
       let flagName = ''
       if (v.flag_state_id) {
-        const fs = flagStates.find((f: any) => f.id === v.flag_state_id)
+        const fs = flagStates.find((f) => f.id === v.flag_state_id)
         flagName = fs?.name || ''
       }
       // Resolve classification name
@@ -13453,7 +13801,7 @@ export class MySQLAdapter {
           'SELECT name FROM classification_societies WHERE id = ?',
           [v.classification_society]
         )
-        if ((cRows as any[]).length > 0) className = (cRows as any[])[0].name
+        if ((cRows as RowDataPacket[]).length > 0) className = (cRows as RowDataPacket[])[0].name
       }
       await this.addQuotationVessel({
         quotationId: newQuotationId,
@@ -13472,7 +13820,7 @@ export class MySQLAdapter {
                 'SELECT name FROM vessel_types WHERE id = ?',
                 [v.vessel_type_id]
               )
-              return (vtRows as any[])[0]?.name || v.vessel_type
+              return (vtRows as RowDataPacket[])[0]?.name || v.vessel_type
             })()
           : v.vessel_type,
         classification: className,
@@ -13491,14 +13839,14 @@ export class MySQLAdapter {
     // Role order from settings — used to add assureds in Registered Owners → Managers → … order
     const fleetAssuredRoles = await this.getAssuredRoles()
     const fleetRoleOrder = new Map(
-      (Array.isArray(fleetAssuredRoles) ? fleetAssuredRoles : []).map((r: any, idx: number) => [
+      (Array.isArray(fleetAssuredRoles) ? fleetAssuredRoles : []).map((r, idx: number) => [
         r.name?.toLowerCase(),
         r.order ?? idx
       ])
     )
-    const sortByRole = (list: any[]) =>
+    const sortByRole = (list: VesselAssured[]): VesselAssured[] =>
       [...list].sort(
-        (a: any, b: any) =>
+        (a, b) =>
           (fleetRoleOrder.get(a.role?.toLowerCase()) ?? 999) -
           (fleetRoleOrder.get(b.role?.toLowerCase()) ?? 999)
       )
@@ -13557,7 +13905,7 @@ export class MySQLAdapter {
       // Merge warranties (add any not already in the quotation, with vessel scope)
       const sourceWarranties = await this.getQuotationWarranties(sourceQId)
       const existingWarranties = await this.getQuotationWarranties(newQuotationId)
-      const existingWarrantyIds = new Set(existingWarranties.map((w: any) => w.piWarrantyId))
+      const existingWarrantyIds = new Set(existingWarranties.map((w) => w.piWarrantyId))
       let warrantyOrder = existingWarranties.length
       for (const sw of sourceWarranties) {
         if (!existingWarrantyIds.has(sw.piWarrantyId)) {
@@ -13574,7 +13922,7 @@ export class MySQLAdapter {
       // Merge custom warranties (skip text already present — fleet renewals often share them)
       const sourceCustomWarranties = await this.getQuotationCustomWarranties(sourceQId)
       const existingCustom = await this.getQuotationCustomWarranties(newQuotationId)
-      const existingCustomTexts = new Set(existingCustom.map((w: any) => (w.text || '').trim()))
+      const existingCustomTexts = new Set(existingCustom.map((w) => (w.text || '').trim()))
       const fk = await this.fkOff()
       try {
         for (const cw of sourceCustomWarranties) {
@@ -13606,7 +13954,7 @@ export class MySQLAdapter {
     ])
     const fleetEntities = await this.getEntities()
     const fleetEntityById = new Map(
-      (Array.isArray(fleetEntities) ? fleetEntities : []).map((e: any) => [e.id, e])
+      (Array.isArray(fleetEntities) ? fleetEntities : []).map((e) => [e.id, e])
     )
     const isMultiVessel = allQVessels.length > 1
     let fleetAssuredOrder = 0
@@ -13621,7 +13969,7 @@ export class MySQLAdapter {
         if (va.role && va.role.toLowerCase().replace(/[^a-z]/g, '') === 'co') {
           if (!brokerCoName) {
             const ce = fleetEntityById.get(va.entityId)
-            if (ce) brokerCoName = (ce as any).name
+            if (ce) brokerCoName = ce.name
           }
           continue
         }
@@ -13634,7 +13982,7 @@ export class MySQLAdapter {
         await this.addQuotationAssured({
           quotationId: newQuotationId,
           entityId: va.entityId,
-          name: (entity as any).name,
+          name: entity.name,
           role: va.role || undefined,
           vesselLabel: isMultiVessel ? vLabel : undefined,
           order: fleetAssuredOrder++
@@ -13644,8 +13992,7 @@ export class MySQLAdapter {
     }
     if (brokerCoName) {
       const curQ = await this.getQuotation(newQuotationId)
-      if (curQ && !curQ.coName)
-        await this.updateQuotation(newQuotationId, { coName: brokerCoName } as any)
+      if (curQ && !curQ.coName) await this.updateQuotation(newQuotationId, { coName: brokerCoName })
     }
 
     return newQuotationId
@@ -13657,7 +14004,7 @@ export class MySQLAdapter {
       'SELECT COUNT(*) as cnt FROM quotations WHERE revision_group_id = ?',
       [revisionGroupId]
     )
-    return (rows as any[])[0]?.cnt || 0
+    return (rows as RowDataPacket[])[0]?.cnt || 0
   }
 
   async deleteQuotationGroup(revisionGroupId: string): Promise<void> {
@@ -13665,7 +14012,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query('SELECT id FROM quotations WHERE revision_group_id = ?', [
       revisionGroupId
     ])
-    for (const row of rows as any[]) {
+    for (const row of rows as RowDataPacket[]) {
       await this.deleteQuotation(row.id)
     }
   }
@@ -13686,7 +14033,7 @@ export class MySQLAdapter {
         `,
       [revisionGroupId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<Quotation>[]).map((r) => ({
       ...r,
       isLocked: Boolean(r.isLocked),
       revisionNumber: Number(r.revisionNumber || 0)
@@ -13711,14 +14058,14 @@ export class MySQLAdapter {
   // ==================== Quotation Sub-Tables ====================
 
   // -- Quotation Assureds --
-  async getQuotationAssureds(quotationId: string): Promise<any[]> {
+  async getQuotationAssureds(quotationId: string): Promise<QuotationAssured[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT qa.id, qa.quotation_id as quotationId, qa.entity_id as entityId, qa.name, qa.role, qa.vessel_label as vesselLabel, qa.group_id as groupId, qa.order_index as 'order'
              FROM quotation_assureds qa WHERE qa.quotation_id = ? ORDER BY qa.order_index`,
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationAssured>[]
   }
 
   async addQuotationAssured(data: {
@@ -13729,7 +14076,7 @@ export class MySQLAdapter {
     vesselLabel?: string
     groupId?: string
     order?: number
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -13760,7 +14107,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -13805,23 +14152,26 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Assured Groups --
-  async getQuotationAssuredGroups(quotationId: string): Promise<any[]> {
+  async getQuotationAssuredGroups(quotationId: string): Promise<QuotationAssuredGroup[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, name, order_index as `order` FROM quotation_assured_groups WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationAssuredGroup>[]
   }
 
-  async addQuotationAssuredGroup(quotationId: string, name: string): Promise<any> {
+  async addQuotationAssuredGroup(
+    quotationId: string,
+    name: string
+  ): Promise<QuotationAssuredGroup | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_assured_groups WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     const fk = await this.fkOff()
     try {
       await fk.execute(
@@ -13864,7 +14214,7 @@ export class MySQLAdapter {
   }
 
   // -- Quotation New Vessel --
-  async getQuotationNewVessel(quotationId: string): Promise<any | null> {
+  async getQuotationNewVessel(quotationId: string): Promise<QuotationNewVessel | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, name, imo_number as imoNumber, built_year as builtYear,
@@ -13872,7 +14222,7 @@ export class MySQLAdapter {
              FROM quotation_new_vessels WHERE quotation_id = ?`,
       [quotationId]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<QuotationNewVessel>[]
     return arr.length > 0
       ? {
           ...arr[0],
@@ -13882,7 +14232,10 @@ export class MySQLAdapter {
       : null
   }
 
-  async upsertQuotationNewVessel(quotationId: string, data: any): Promise<any> {
+  async upsertQuotationNewVessel(
+    quotationId: string,
+    data: Partial<QuotationNewVessel> & Pick<QuotationNewVessel, 'name'>
+  ): Promise<Partial<QuotationNewVessel> & { id: string; quotationId: string }> {
     if (!this.pool) throw new Error('DB not connected')
     const existing = await this.getQuotationNewVessel(quotationId)
     if (existing) {
@@ -13930,13 +14283,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Sub-Limits --
-  async getQuotationSubLimits(quotationId: string): Promise<any[]> {
+  async getQuotationSubLimits(quotationId: string): Promise<QuotationSubLimit[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, text, amount, currency FROM quotation_sub_limits WHERE quotation_id = ?`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({ ...r, amount: Number(r.amount) }))
+    return (rows as Row<QuotationSubLimit>[]).map((r) => ({ ...r, amount: Number(r.amount) }))
   }
 
   async addQuotationSubLimit(data: {
@@ -13944,7 +14297,7 @@ export class MySQLAdapter {
     text: string
     amount: number
     currency: string
-  }): Promise<any> {
+  }): Promise<QuotationSubLimit> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -13960,7 +14313,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -13987,13 +14340,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Clauses --
-  async getQuotationClauses(quotationId: string): Promise<any[]> {
+  async getQuotationClauses(quotationId: string): Promise<QuotationClauseRef[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, pi_clause_id as piClauseId, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_clauses WHERE quotation_id = ?',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationClauseRef>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14007,7 +14360,7 @@ export class MySQLAdapter {
       [quotationId]
     )
     const overrides: Record<string, string> = {}
-    for (const r of rows as any[]) {
+    for (const r of rows as RowDataPacket[]) {
       if (r.description_override) {
         // Key by clauseId::altId for alt-specific overrides
         const key = r.alternative_id ? `${r.pi_clause_id}::${r.alternative_id}` : r.pi_clause_id
@@ -14027,7 +14380,7 @@ export class MySQLAdapter {
     const [existing] = (await this.pool.query(
       'SELECT pi_clause_id, vessel_scope, alternative_id FROM quotation_clauses WHERE quotation_id = ?',
       [quotationId]
-    )) as any[]
+    )) as QueryRows
     const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
     for (const r of existing) {
       scopeMap[r.pi_clause_id] = { vs: r.vessel_scope, alt: r.alternative_id }
@@ -14047,7 +14400,7 @@ export class MySQLAdapter {
     quotationId: string,
     piClauseId: string,
     alternativeId?: string | null
-  ): Promise<any> {
+  ): Promise<AddedQuotationClause | null> {
     if (!this.pool) return null
     const id = uuidv4()
     await this.pool.execute(
@@ -14129,14 +14482,16 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Additional Clauses --
-  async getQuotationAdditionalClauses(quotationId: string): Promise<any[]> {
+  async getQuotationAdditionalClauses(
+    quotationId: string
+  ): Promise<QuotationAdditionalClauseRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, pi_additional_clause_id as piAdditionalClauseId, custom_text as customText, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId
              FROM quotation_additional_clauses WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationAdditionalClauseRow>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14149,7 +14504,7 @@ export class MySQLAdapter {
     customText?: string
     order?: number
     vesselScope?: string[]
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14172,13 +14527,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Warranties --
-  async getQuotationWarranties(quotationId: string): Promise<any[]> {
+  async getQuotationWarranties(quotationId: string): Promise<QuotationWarrantyRef[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, pi_warranty_id as piWarrantyId, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_warranties WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationWarrantyRef>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14215,7 +14570,7 @@ export class MySQLAdapter {
     const [existing] = (await this.pool.query(
       'SELECT pi_warranty_id, vessel_scope, alternative_id FROM quotation_warranties WHERE quotation_id = ?',
       [quotationId]
-    )) as any[]
+    )) as QueryRows
     const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
     for (const r of existing) {
       scopeMap[r.pi_warranty_id] = { vs: r.vessel_scope, alt: r.alternative_id }
@@ -14233,13 +14588,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Custom Warranties --
-  async getQuotationCustomWarranties(quotationId: string): Promise<any[]> {
+  async getQuotationCustomWarranties(quotationId: string): Promise<QuotationCustomWarranty[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_warranties WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationCustomWarranty>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14251,7 +14606,7 @@ export class MySQLAdapter {
     text: string
     order?: number
     vesselScope?: string[]
-  }): Promise<any> {
+  }): Promise<QuotationCustomWarranty> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const fk = await this.fkOff()
@@ -14284,7 +14639,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -14317,7 +14672,7 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Deductibles --
-  async getQuotationDeductibles(quotationId: string): Promise<any[]> {
+  async getQuotationDeductibles(quotationId: string): Promise<QuotationDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, pi_deductible_id as piDeductibleId, title, description, amount, currency,
@@ -14326,7 +14681,7 @@ export class MySQLAdapter {
              FROM quotation_deductibles WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationDeductible>[]).map((r) => ({
       ...r,
       amount: Number(r.amount),
       secondaryAmount: r.secondaryAmount ? Number(r.secondaryAmount) : undefined,
@@ -14354,7 +14709,7 @@ export class MySQLAdapter {
     order?: number
     vesselScope?: string[]
     vesselAmounts?: Record<string, number> | null
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14395,7 +14750,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -14466,13 +14821,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Text Deductibles --
-  async getQuotationTextDeductibles(quotationId: string): Promise<any[]> {
+  async getQuotationTextDeductibles(quotationId: string): Promise<QuotationTextDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, pi_text_deductible_id as piTextDeductibleId, title, text, order_index as 'order', vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_text_deductibles WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationTextDeductible>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14486,7 +14841,7 @@ export class MySQLAdapter {
     text: string
     order?: number
     vesselScope?: string[]
-  }): Promise<any> {
+  }): Promise<QuotationTextDeductible> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const fk = await this.fkOff()
@@ -14523,7 +14878,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -14560,14 +14915,14 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Exclusions --
-  async getQuotationExclusions(quotationId: string): Promise<any[]> {
+  async getQuotationExclusions(quotationId: string): Promise<QuotationExclusionRef[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, pi_exclusion_id as piExclusionId, custom_text as customText, vessel_scope as vesselScope, alternative_id as alternativeId, COALESCE(order_index, 0) as \`order\`
              FROM quotation_exclusions WHERE quotation_id = ? ORDER BY order_index ASC`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationExclusionRef>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14583,7 +14938,7 @@ export class MySQLAdapter {
     const [existing] = (await this.pool.query(
       'SELECT pi_exclusion_id, vessel_scope, alternative_id FROM quotation_exclusions WHERE quotation_id = ?',
       [quotationId]
-    )) as any[]
+    )) as QueryRows
     const scopeMap: Record<string, { vs: string | null; alt: string | null }> = {}
     for (const r of existing) {
       if (r.pi_exclusion_id)
@@ -14614,14 +14969,14 @@ export class MySQLAdapter {
     quotationId: string,
     piExclusionId: string,
     alternativeId?: string | null
-  ): Promise<any> {
+  ): Promise<AddedQuotationExclusion | null> {
     if (!this.pool) return null
     const id = uuidv4()
     // Get next order_index
     const [maxRow] = (await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_exclusions WHERE quotation_id = ?',
       [quotationId]
-    )) as any[]
+    )) as QueryRows
     const nextOrder = maxRow[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO quotation_exclusions (id, quotation_id, pi_exclusion_id, alternative_id, order_index) VALUES (?, ?, ?, ?, ?)',
@@ -14652,13 +15007,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Custom Exclusions --
-  async getQuotationCustomExclusions(quotationId: string): Promise<any[]> {
+  async getQuotationCustomExclusions(quotationId: string): Promise<QuotationCustomExclusion[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, text, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_custom_exclusions WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationCustomExclusion>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -14670,7 +15025,7 @@ export class MySQLAdapter {
     text: string
     order?: number
     vesselScope?: string[]
-  }): Promise<any> {
+  }): Promise<QuotationCustomExclusion> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14698,7 +15053,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -14731,13 +15086,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Custom Sections --
-  async getQuotationCustomSections(quotationId: string): Promise<any[]> {
+  async getQuotationCustomSections(quotationId: string): Promise<QuotationCustomSection[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, title, text, order_index as `order` FROM quotation_custom_sections WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationCustomSection>[]
   }
 
   async addQuotationCustomSection(data: {
@@ -14745,7 +15100,7 @@ export class MySQLAdapter {
     title: string
     text?: string
     order?: number
-  }): Promise<any> {
+  }): Promise<Omit<QuotationCustomSection, 'text'> & { text: string | null }> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14767,7 +15122,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -14829,13 +15184,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Excluded Countries --
-  async getQuotationExcludedCountries(quotationId: string): Promise<any[]> {
+  async getQuotationExcludedCountries(quotationId: string): Promise<QuotationExcludedCountry[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, name, list_type as listType FROM quotation_excluded_countries WHERE quotation_id = ?`,
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationExcludedCountry>[]
   }
 
   async setQuotationExcludedCountries(
@@ -14855,14 +15210,14 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Trading Intros (per-vessel) --
-  async getQuotationTradingIntros(quotationId: string): Promise<any[]> {
+  async getQuotationTradingIntros(quotationId: string): Promise<QuotationTradingIntro[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, text, vessel_scope as vesselScope, order_index as \`order\`
              FROM quotation_trading_intros WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationTradingIntro>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null
     }))
@@ -14873,7 +15228,7 @@ export class MySQLAdapter {
     text: string
     vesselScope?: string[] | null
     order?: number
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14895,7 +15250,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -14918,19 +15273,19 @@ export class MySQLAdapter {
   }
 
   // -- Master Subjectivities (PI) --
-  async getPISubjectivities(): Promise<any[]> {
+  async getPISubjectivities(): Promise<PISubjectivity[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       "SELECT id, text, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_subjectivities ORDER BY order_index ASC"
     )
-    const subjs = rows as any[]
+    const subjs = rows as Row<PISubjectivity>[]
     // Load doc type links
     for (const s of subjs) {
       const [links] = await this.pool.query(
         'SELECT doc_type_id as docTypeId FROM pi_subjectivity_doc_types WHERE subjectivity_id = ?',
         [s.id]
       )
-      s.docTypeIds = (links as any[]).map((l) => l.docTypeId)
+      s.docTypeIds = (links as RowDataPacket[]).map((l) => l.docTypeId)
     }
     return subjs
   }
@@ -14940,7 +15295,7 @@ export class MySQLAdapter {
     docTypeIds?: string[]
     typeScope?: string
     order?: number
-  }): Promise<any> {
+  }): Promise<PISubjectivity> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -14970,7 +15325,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields = ['text = ?']
-    const vals: any[] = [data.text]
+    const vals: SqlValue[] = [data.text]
     if (data.typeScope !== undefined) {
       fields.push('type_scope = ?')
       vals.push(data.typeScope)
@@ -15005,13 +15360,13 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Subjectivities --
-  async getQuotationSubjectivities(quotationId: string): Promise<any[]> {
+  async getQuotationSubjectivities(quotationId: string): Promise<QuotationSubjectivity[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, pi_subjectivity_id as piSubjectivityId, text, is_custom as isCustom, is_auto_populated as isAutoPopulated, order_index as 'order', vessel_scope as vesselScope FROM quotation_subjectivities WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationSubjectivity>[]).map((r) => ({
       ...r,
       isCustom: Boolean(r.isCustom),
       isAutoPopulated: Boolean(r.isAutoPopulated),
@@ -15027,7 +15382,7 @@ export class MySQLAdapter {
     isAutoPopulated?: boolean
     order?: number
     vesselScope?: string[]
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -15052,7 +15407,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const vals: any[] = []
+    const vals: SqlValue[] = []
     if (data.text !== undefined) {
       sets.push('text = ?')
       vals.push(data.text)
@@ -15110,14 +15465,14 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Instalments --
-  async getQuotationInstalments(quotationId: string): Promise<any[]> {
+  async getQuotationInstalments(quotationId: string): Promise<QuotationInstalment[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, instalment_number as instalmentNumber, days_from_inception as daysFromInception
              FROM quotation_instalments WHERE quotation_id = ? ORDER BY instalment_number`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationInstalment>[]).map((r) => ({
       ...r,
       instalmentNumber: Number(r.instalmentNumber),
       daysFromInception: Number(r.daysFromInception)
@@ -15141,20 +15496,20 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Information --
-  async getQuotationInformation(quotationId: string): Promise<any[]> {
+  async getQuotationInformation(quotationId: string): Promise<QuotationInformationItem[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, text, order_index as 'order' FROM quotation_information WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationInformationItem>[]
   }
 
   async addQuotationInformation(data: {
     quotationId: string
     text: string
     order?: number
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -15170,7 +15525,7 @@ export class MySQLAdapter {
   }
 
   // -- Quotation Notes --
-  async getQuotationNotes(quotationId: string): Promise<any[]> {
+  async getQuotationNotes(quotationId: string): Promise<QuotationNote[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, title, content, order_index as 'order',
@@ -15179,7 +15534,7 @@ export class MySQLAdapter {
              FROM quotation_notes WHERE quotation_id = ? ORDER BY created_at ASC, order_index ASC`,
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationNote>[]
   }
 
   async addQuotationNote(data: {
@@ -15190,7 +15545,7 @@ export class MySQLAdapter {
     parentNoteId?: string
     authorUserId?: string
     authorUsername?: string
-  }): Promise<any> {
+  }): Promise<WithId<typeof data>> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     await this.pool.execute(
@@ -15215,7 +15570,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -15241,7 +15596,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       "SELECT id, name, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_warranty_tags ORDER BY order_index ASC"
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as RowDataPacket[]).map((r) => ({
       ...r,
       typeScope: r.typeScope || 'all'
     })) as PIWarrantyTag[]
@@ -15250,7 +15605,7 @@ export class MySQLAdapter {
   async addPIWarrantyTag(name: string): Promise<PIWarrantyTag> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_warranty_tags'
     )
     const order = maxRow[0].nextOrder
@@ -15322,7 +15677,7 @@ export class MySQLAdapter {
   }): Promise<PISanctionsVersion> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
-    const [maxRow]: any[] = await this.pool.query(
+    const [maxRow] = await this.pool.query<RowDataPacket[]>(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM pi_sanctions_versions'
     )
     const order = maxRow[0].nextOrder
@@ -15339,7 +15694,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15377,7 +15732,7 @@ export class MySQLAdapter {
 
   // --- Vessel Insurance Policies (imported) ---
 
-  async getVesselInsurancePolicies(vesselId: string): Promise<any[]> {
+  async getVesselInsurancePolicies(vesselId: string): Promise<VesselInsurancePolicy[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, vessel_id as vesselId, policy_category as policyCategory, policy_number as policyNumber,
@@ -15392,7 +15747,7 @@ export class MySQLAdapter {
              FROM vessel_insurance_policies WHERE vessel_id = ? ORDER BY policy_category, inception_date DESC`,
       [vesselId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<VesselInsurancePolicy>[]).map((r) => ({
       ...r,
       hmValue: r.hmValue ? Number(r.hmValue) : undefined,
       ivValue: r.ivValue ? Number(r.ivValue) : undefined,
@@ -15407,7 +15762,7 @@ export class MySQLAdapter {
   }
 
   async importVesselInsurancePolicies(
-    policies: { vesselId: string; records: any[] }[]
+    policies: { vesselId: string; records: Omit<VesselInsurancePolicy, 'id' | 'vesselId'>[] }[]
   ): Promise<number> {
     if (!this.pool) return 0
     let count = 0
@@ -15469,7 +15824,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, abbreviation, is_iacs as isIacs, order_index as `order` FROM classification_societies ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, isIacs: Boolean(r.isIacs) }))
+    return (rows as Row<ClassificationSociety>[]).map((r) => ({ ...r, isIacs: Boolean(r.isIacs) }))
   }
 
   async addClassificationSociety(
@@ -15490,7 +15845,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15541,7 +15896,7 @@ export class MySQLAdapter {
              ORDER BY cs.order_index ASC`,
       [vesselId]
     )
-    return (rows as any[]).map((r) => ({ ...r, isIacs: Boolean(r.isIacs) }))
+    return (rows as Row<VesselClassification>[]).map((r) => ({ ...r, isIacs: Boolean(r.isIacs) }))
   }
 
   async setVesselClassifications(
@@ -15580,7 +15935,7 @@ export class MySQLAdapter {
   async updateVesselType(id: string, updates: Partial<VesselType>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15642,17 +15997,19 @@ export class MySQLAdapter {
     let sql = `SELECT id, policy_type_id as policyTypeId, name, field_type as fieldType, select_options as selectOptions,
                    is_required as isRequired, order_index as \`order\`
                    FROM policy_type_characteristics`
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (policyTypeId) {
       sql += ' WHERE policy_type_id = ?'
       params.push(policyTypeId)
     }
     sql += ' ORDER BY order_index ASC'
     const [rows] = await this.pool.query(sql, params)
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PolicyTypeCharacteristic>[]).map((r) => ({
       ...r,
       isRequired: Boolean(r.isRequired),
-      selectOptions: r.selectOptions ? safeJson(r.selectOptions, null) : undefined
+      selectOptions: r.selectOptions
+        ? safeJson<string[]>(r.selectOptions, null as unknown as string[])
+        : undefined
     }))
   }
 
@@ -15682,7 +16039,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15731,7 +16088,7 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let sql =
       'SELECT id, policy_type_id as policyTypeId, name, order_index as `order` FROM policy_type_conditions'
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (policyTypeId) {
       sql += ' WHERE policy_type_id = ?'
       params.push(policyTypeId)
@@ -15757,7 +16114,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15816,8 +16173,8 @@ export class MySQLAdapter {
              ORDER BY ptch.order_index ASC`,
       [policies.map((p) => p.id)]
     )
-    const byPolicy = new Map<string, any[]>()
-    for (const v of vals as any[]) {
+    const byPolicy = new Map<string, VesselPolicyValue[]>()
+    for (const v of vals as Row<VesselPolicyValue>[]) {
       const list = byPolicy.get(v.policyId) || []
       list.push({
         ...v,
@@ -15863,8 +16220,8 @@ export class MySQLAdapter {
              ORDER BY vpv.policy_id, ptch.order_index ASC`
     )
 
-    const valuesByPolicy = new Map<string, any[]>()
-    for (const v of vals as any[]) {
+    const valuesByPolicy = new Map<string, VesselPolicyValue[]>()
+    for (const v of vals as Row<VesselPolicyValue>[]) {
       if (!valuesByPolicy.has(v.policyId)) valuesByPolicy.set(v.policyId, [])
       valuesByPolicy.get(v.policyId)!.push({
         ...v,
@@ -15882,21 +16239,21 @@ export class MySQLAdapter {
 
   // ==================== Banks ====================
 
-  async getBanks(): Promise<any[]> {
+  async getBanks(): Promise<BankRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, details, order_index AS `order` FROM banks ORDER BY order_index ASC'
     )
-    return rows as any[]
+    return rows as Row<BankRow>[]
   }
 
-  async addBank(name: string, details: string): Promise<any> {
+  async addBank(name: string, details: string): Promise<BankRow> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM banks'
     )
-    const nextOrder = (maxRow as any[])[0]?.nextOrder || 0
+    const nextOrder = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO banks (id, name, details, order_index) VALUES (?, ?, ?, ?)',
       [id, name, details, nextOrder]
@@ -15907,7 +16264,7 @@ export class MySQLAdapter {
   async updateBank(id: string, updates: Partial<{ name: string; details: string }>): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -15940,7 +16297,10 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT policy_type_id as policyTypeId, commission_percent as commissionPercent FROM policy_type_commissions'
     )
-    return (rows as any[]).map((r) => ({ ...r, commissionPercent: Number(r.commissionPercent) }))
+    return (rows as Row<{ policyTypeId: string; commissionPercent: number }>[]).map((r) => ({
+      ...r,
+      commissionPercent: Number(r.commissionPercent)
+    }))
   }
 
   async setCommissionDefault(policyTypeId: string, commissionPercent: number): Promise<void> {
@@ -15949,7 +16309,7 @@ export class MySQLAdapter {
       'SELECT id FROM policy_type_commissions WHERE policy_type_id = ?',
       [policyTypeId]
     )
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       await this.pool.execute(
         'UPDATE policy_type_commissions SET commission_percent = ? WHERE policy_type_id = ?',
         [commissionPercent, policyTypeId]
@@ -15962,9 +16322,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getEntityCommissionOverrides(
-    entityId?: string
-  ): Promise<
+  async getEntityCommissionOverrides(entityId?: string): Promise<
     {
       id: string
       entityId: string
@@ -15976,14 +16334,22 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let query = `SELECT eco.id, eco.entity_id as entityId, eco.policy_type_id as policyTypeId, eco.commission_percent as commissionPercent, e.name as entityName
             FROM entity_commission_overrides eco LEFT JOIN entities e ON eco.entity_id = e.id`
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (entityId) {
       query += ' WHERE eco.entity_id = ?'
       params.push(entityId)
     }
     query += ' ORDER BY e.name, eco.policy_type_id'
     const [rows] = await this.pool.query(query, params)
-    return (rows as any[]).map((r) => ({ ...r, commissionPercent: Number(r.commissionPercent) }))
+    return (
+      rows as Row<{
+        id: string
+        entityId: string
+        policyTypeId: string
+        commissionPercent: number
+        entityName?: string
+      }>[]
+    ).map((r) => ({ ...r, commissionPercent: Number(r.commissionPercent) }))
   }
 
   async setEntityCommissionOverride(
@@ -15996,7 +16362,7 @@ export class MySQLAdapter {
       'SELECT id FROM entity_commission_overrides WHERE entity_id = ? AND policy_type_id = ?',
       [entityId, policyTypeId]
     )
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       await this.pool.execute(
         'UPDATE entity_commission_overrides SET commission_percent = ? WHERE entity_id = ? AND policy_type_id = ?',
         [commissionPercent, entityId, policyTypeId]
@@ -16025,20 +16391,22 @@ export class MySQLAdapter {
         'SELECT commission_percent FROM entity_commission_overrides WHERE entity_id = ? AND policy_type_id = ?',
         [entityId, policyTypeId]
       )
-      if ((overrides as any[]).length > 0) return Number((overrides as any[])[0].commission_percent)
+      if ((overrides as RowDataPacket[]).length > 0)
+        return Number((overrides as RowDataPacket[])[0].commission_percent)
     }
     // 2. Fall back to policy type default
     const [defaults] = await this.pool.query(
       'SELECT commission_percent FROM policy_type_commissions WHERE policy_type_id = ?',
       [policyTypeId]
     )
-    if ((defaults as any[]).length > 0) return Number((defaults as any[])[0].commission_percent)
+    if ((defaults as RowDataPacket[]).length > 0)
+      return Number((defaults as RowDataPacket[])[0].commission_percent)
     return null
   }
 
   // ==================== Policy Documents ====================
 
-  async getPoliciesList(): Promise<any[]> {
+  async getPoliciesList(): Promise<PolicyListRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT pd.id, pd.quotation_id as quotationId, pd.vessel_id as vesselId,
@@ -16067,7 +16435,7 @@ export class MySQLAdapter {
              )
              ORDER BY pd.created_at DESC`
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PolicyListRow>[]).map((r) => ({
       ...r,
       revisionNumber: Number(r.revisionNumber || 0),
       premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : undefined,
@@ -16076,7 +16444,7 @@ export class MySQLAdapter {
   }
 
   // ── Receipts ──────────────────────────────────────────────────────────
-  private mapReceiptRow(r: any): any {
+  private mapReceiptRow(r: RowDataPacket): Receipt {
     return {
       id: r.id,
       receiptNumber: r.receiptNumber,
@@ -16105,7 +16473,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getReceipts(): Promise<any[]> {
+  async getReceipts(): Promise<Receipt[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
@@ -16122,10 +16490,10 @@ export class MySQLAdapter {
              LEFT JOIN users u ON r.created_by = u.id
              ORDER BY r.receipt_year DESC, r.receipt_serial DESC`
     )
-    return (rows as any[]).map((r) => this.mapReceiptRow(r))
+    return (rows as RowDataPacket[]).map((r) => this.mapReceiptRow(r))
   }
 
-  async getReceiptsByVessel(vesselId: string): Promise<any[]> {
+  async getReceiptsByVessel(vesselId: string): Promise<Receipt[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
@@ -16144,10 +16512,10 @@ export class MySQLAdapter {
              ORDER BY r.receipt_year DESC, r.receipt_serial DESC`,
       [vesselId]
     )
-    return (rows as any[]).map((r) => this.mapReceiptRow(r))
+    return (rows as RowDataPacket[]).map((r) => this.mapReceiptRow(r))
   }
 
-  async getReceipt(id: string): Promise<any | null> {
+  async getReceipt(id: string): Promise<Receipt | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT r.id, r.receipt_number AS receiptNumber, r.receipt_serial AS receiptSerial,
@@ -16165,7 +16533,7 @@ export class MySQLAdapter {
              WHERE r.id = ?`,
       [id]
     )
-    const list = rows as any[]
+    const list = rows as RowDataPacket[]
     if (list.length === 0) return null
     const receipt = this.mapReceiptRow(list[0])
     const [pols] = await this.pool.query(
@@ -16174,7 +16542,7 @@ export class MySQLAdapter {
              FROM receipt_policies WHERE receipt_id = ? ORDER BY order_index`,
       [id]
     )
-    receipt.policies = pols as any[]
+    receipt.policies = pols as Row<ReceiptPolicy>[]
     return receipt
   }
 
@@ -16208,12 +16576,12 @@ export class MySQLAdapter {
     return { serial: nextSerial, year: y, number: `H${nextSerial}/${y}` }
   }
 
-  async createReceipt(data: any, userId?: string): Promise<any> {
+  async createReceipt(data: ReceiptInput, userId?: string): Promise<Receipt | null> {
     // Serial read + insert + advance must be atomic across users (no duplicate receipt numbers)
     return this.withNamedLock('vc_receipt_number', () => this.createReceiptLocked(data, userId))
   }
 
-  private async createReceiptLocked(data: any, userId?: string): Promise<any> {
+  private async createReceiptLocked(data: ReceiptInput, userId?: string): Promise<Receipt | null> {
     if (!this.pool) throw new Error('Database not connected')
     const conn = await this.pool.getConnection()
     try {
@@ -16283,13 +16651,13 @@ export class MySQLAdapter {
     }
   }
 
-  async updateReceipt(id: string, data: any): Promise<any> {
+  async updateReceipt(id: string, data: Partial<ReceiptInput>): Promise<Receipt | null> {
     if (!this.pool) throw new Error('Database not connected')
     const conn = await this.pool.getConnection()
     try {
       await conn.beginTransaction()
       const fields: string[] = []
-      const values: any[] = []
+      const values: SqlValue[] = []
       const map: Record<string, string> = {
         receiptNumber: 'receipt_number',
         vesselId: 'vessel_id',
@@ -16307,8 +16675,9 @@ export class MySQLAdapter {
       }
       for (const [key, col] of Object.entries(map)) {
         if (key in data) {
+          const v = (data as Record<string, SqlValue | undefined>)[key]
           fields.push(`${col} = ?`)
-          values.push(data[key] === undefined ? null : data[key])
+          values.push(v === undefined ? null : v)
         }
       }
       if (fields.length > 0) {
@@ -16358,10 +16727,11 @@ export class MySQLAdapter {
         `,
       [vesselId, quotationTypeCode]
     )
-    return (rows as any[])[0]?.id || null
+    return (rows as RowDataPacket[])[0]?.id || null
   }
 
-  async getPolicyDocumentById(id: string): Promise<any> {
+  // Raw columns (pd.*) come back alongside the camelCase aliases
+  async getPolicyDocumentById(id: string): Promise<Row<PolicyDocument> | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `
@@ -16390,7 +16760,7 @@ export class MySQLAdapter {
         `,
       [id]
     )
-    const r = (rows as any[])[0]
+    const r = (rows as Row<PolicyDocument>[])[0]
     if (!r) return null
     return {
       ...r,
@@ -16464,7 +16834,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getPolicyInstalments(policyId: string): Promise<any[]> {
+  async getPolicyInstalments(policyId: string): Promise<PolicyDocInstalment[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -16477,7 +16847,7 @@ export class MySQLAdapter {
         `,
       [policyId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PolicyDocInstalment>[]).map((r) => ({
       ...r,
       premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : 0,
       commissionAmount: r.commissionAmount ? Number(r.commissionAmount) : 0,
@@ -16485,7 +16855,7 @@ export class MySQLAdapter {
     }))
   }
 
-  async getPolicyAddresses(policyId: string): Promise<any[]> {
+  async getPolicyAddresses(policyId: string): Promise<PolicyDocAddress[]> {
     if (!this.pool) return []
     try {
       const [rows] = await this.pool.query(
@@ -16500,7 +16870,7 @@ export class MySQLAdapter {
             `,
         [policyId]
       )
-      return rows as any[]
+      return rows as Row<PolicyDocAddress>[]
     } catch {
       // Fallback if order column doesn't exist yet
       const [rows] = await this.pool.query(
@@ -16515,11 +16885,11 @@ export class MySQLAdapter {
             `,
         [policyId]
       )
-      return rows as any[]
+      return rows as Row<PolicyDocAddress>[]
     }
   }
 
-  async getPolicyRevisions(policyNumber: string): Promise<any[]> {
+  async getPolicyRevisions(policyNumber: string): Promise<PolicyRevisionRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -16533,10 +16903,13 @@ export class MySQLAdapter {
         `,
       [policyNumber]
     )
-    return (rows as any[]).map((r) => ({ ...r, revisionNumber: Number(r.revisionNumber || 0) }))
+    return (rows as Row<PolicyRevisionRow>[]).map((r) => ({
+      ...r,
+      revisionNumber: Number(r.revisionNumber || 0)
+    }))
   }
 
-  async getPolicyBlueCards(policyId: string): Promise<any[]> {
+  async getPolicyBlueCards(policyId: string): Promise<PolicyBlueCard[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `
@@ -16556,7 +16929,7 @@ export class MySQLAdapter {
         `,
       [policyId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PolicyBlueCard>[]).map((r) => ({
       ...r,
       revisionNumber: Number(r.revisionNumber || 0),
       status: r.status || 'active'
@@ -16580,7 +16953,7 @@ export class MySQLAdapter {
     addressedToName?: string
     addressedToAddress?: string
     cancelReplaceText?: string
-  }): Promise<any> {
+  }): Promise<WithId<typeof data> | null> {
     if (!this.pool) return null
     const id = uuidv4()
     await this.pool.execute(
@@ -16615,10 +16988,10 @@ export class MySQLAdapter {
     return { id, ...data, status: data.status || 'active' }
   }
 
-  async updatePolicyBlueCard(id: string, data: Record<string, any>): Promise<void> {
+  async updatePolicyBlueCard(id: string, data: PolicyBlueCardUpdate): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const vals: any[] = []
+    const vals: SqlValue[] = []
     const fieldMap: Record<string, string> = {
       cardNumber: 'card_number',
       inceptionDate: 'inception_date',
@@ -16636,7 +17009,7 @@ export class MySQLAdapter {
     for (const [key, col] of Object.entries(fieldMap)) {
       if (key in data) {
         sets.push(`${col} = ?`)
-        vals.push(data[key] ?? null)
+        vals.push((data as Record<string, SqlValue | undefined>)[key] ?? null)
       }
     }
     if (sets.length === 0) return
@@ -16649,7 +17022,10 @@ export class MySQLAdapter {
     await this.pool.execute(`UPDATE policy_blue_cards SET status = 'superseded' WHERE id = ?`, [id])
   }
 
-  async updatePolicyDocument(id: string, fields: Record<string, any>): Promise<void> {
+  async updatePolicyDocument(
+    id: string,
+    fields: Record<string, SqlValue | undefined>
+  ): Promise<void> {
     if (!this.pool) return
     const fieldMap: Record<string, string> = {
       inceptionDate: 'inception_date',
@@ -16684,10 +17060,10 @@ export class MySQLAdapter {
       selectedSubjectivityIds: 'selected_subjectivity_ids'
     }
     const sets: string[] = []
-    const vals: any[] = []
+    const vals: SqlValue[] = []
     for (const [key, col] of Object.entries(fieldMap)) {
       if (key in fields) {
-        let val = fields[key] ?? null
+        let val: SqlValue = fields[key] ?? null
         if (key === 'sectionOrder') val = val ? JSON.stringify(val) : null
         if (key === 'selectedSubjectivityIds') val = val != null ? JSON.stringify(val) : null
         sets.push(`${col} = ?`)
@@ -16713,7 +17089,7 @@ export class MySQLAdapter {
       'SELECT file_name AS fileName, data FROM policy_export_files WHERE policy_doc_id = ? AND doc_key = ?',
       [policyId, docKey]
     )
-    const r = (rows as any[])[0]
+    const r = (rows as RowDataPacket[])[0]
     return r ? { fileName: r.fileName, data: r.data } : null
   }
 
@@ -16735,7 +17111,7 @@ export class MySQLAdapter {
           [endMatch[1], policyId]
         )
       : await this.pool.query('SELECT signed_at FROM policy_documents WHERE id = ?', [policyId])
-    if (!(signedRows as any[])[0]?.signed_at) return false
+    if (!(signedRows as RowDataPacket[])[0]?.signed_at) return false
     await this.pool.execute(
       `INSERT INTO policy_export_files (id, policy_doc_id, doc_key, file_name, data) VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE id = id`,
@@ -16832,7 +17208,7 @@ export class MySQLAdapter {
         'SELECT id FROM policy_documents WHERE policy_number = (SELECT policy_number FROM policy_documents WHERE id = ?)',
         [policyId]
       )
-      const existing = new Set((before as any[]).map((r) => r.id))
+      const existing = new Set((before as RowDataPacket[]).map((r) => r.id))
       try {
         return await this.createPolicyRevisionLocked(policyId, createdBy)
       } catch (e) {
@@ -16841,7 +17217,9 @@ export class MySQLAdapter {
             'SELECT id FROM policy_documents WHERE policy_number = (SELECT policy_number FROM policy_documents WHERE id = ?)',
             [policyId]
           )
-          const created = (after as any[]).map((r) => r.id).filter((pid) => !existing.has(pid))
+          const created = (after as RowDataPacket[])
+            .map((r) => r.id)
+            .filter((pid) => !existing.has(pid))
           await this.purgePolicyRows(created)
         } catch (cleanupErr) {
           console.error('[revision] cleanup after failure failed:', cleanupErr)
@@ -16862,7 +17240,7 @@ export class MySQLAdapter {
       'SELECT COALESCE(MAX(revision_number), 0) as maxRev FROM policy_documents WHERE policy_number = ?',
       [existing.policyNumber]
     )
-    const newRevision = ((maxRevRows as any[])[0]?.maxRev || 0) + 1
+    const newRevision = ((maxRevRows as RowDataPacket[])[0]?.maxRev || 0) + 1
 
     // Auto-generate cancel and replace text
     const today = new Date().toISOString().split('T')[0]
@@ -16941,7 +17319,7 @@ export class MySQLAdapter {
 
     // Copy active blue cards
     const blueCards = await this.getPolicyBlueCards(policyId)
-    for (const bc of blueCards.filter((b: any) => b.status === 'active')) {
+    for (const bc of blueCards.filter((b) => b.status === 'active')) {
       await this.pool.execute(
         `
                 INSERT INTO policy_blue_cards (id, policy_doc_id, card_type, card_number,
@@ -16986,7 +17364,7 @@ export class MySQLAdapter {
       'SELECT quotation_id FROM policy_documents WHERE id = ?',
       [id]
     )
-    const quotationId = (polRows as any[])[0]?.quotation_id || null
+    const quotationId = (polRows as RowDataPacket[])[0]?.quotation_id || null
 
     // Delete the policy and all its own rows (instalments, addresses, blue cards, endorsements,
     // ...); receipt lines keep their text but lose the link
@@ -17015,7 +17393,7 @@ export class MySQLAdapter {
              WHERE q.id = ?`,
       [quotationId]
     )
-    const stepName = String((qRows as any[])[0]?.step_name || '').toLowerCase()
+    const stepName = String((qRows as RowDataPacket[])[0]?.step_name || '').toLowerCase()
     if (stepName !== 'converted') return
 
     const vessels = await this.getQuotationVessels(quotationId)
@@ -17023,15 +17401,14 @@ export class MySQLAdapter {
       'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?',
       [quotationId]
     )
-    const covered = new Set((covRows as any[]).map((r) => r.vessel_id))
-    const allCovered =
-      vessels.length > 0 && vessels.every((v: any) => covered.has(v.vesselId || v.id))
+    const covered = new Set((covRows as RowDataPacket[]).map((r) => r.vessel_id))
+    const allCovered = vessels.length > 0 && vessels.every((v) => covered.has(v.vesselId || v.id))
     if (allCovered) return
 
     const [stepRows] = await this.pool.query(
       'SELECT id, name, is_initial, order_index FROM quotation_workflow_steps'
     )
-    const steps = stepRows as any[]
+    const steps = stepRows as RowDataPacket[]
     const target =
       steps.find((s) => String(s.name).toLowerCase() === 'approved') ||
       steps
@@ -17049,14 +17426,14 @@ export class MySQLAdapter {
   async convertQuotationToPolicy(
     quotationId: string,
     options: Parameters<MySQLAdapter['convertQuotationToPolicyLocked']>[1]
-  ): Promise<any[]> {
+  ): Promise<ConvertedPolicy[]> {
     // draft_policy_seq is read, used for N policies, then written back: serialise conversions
     return this.withNamedLock('vc_policy_draft_number', async () => {
       const [before] = await this.pool!.query(
         'SELECT id FROM policy_documents WHERE quotation_id = ?',
         [quotationId]
       )
-      const existing = new Set((before as any[]).map((r) => r.id))
+      const existing = new Set((before as RowDataPacket[]).map((r) => r.id))
       try {
         return await this.convertQuotationToPolicyLocked(quotationId, options)
       } catch (e) {
@@ -17067,7 +17444,9 @@ export class MySQLAdapter {
             'SELECT id FROM policy_documents WHERE quotation_id = ?',
             [quotationId]
           )
-          const created = (after as any[]).map((r) => r.id).filter((pid) => !existing.has(pid))
+          const created = (after as RowDataPacket[])
+            .map((r) => r.id)
+            .filter((pid) => !existing.has(pid))
           await this.purgePolicyRows(created)
         } catch (cleanupErr) {
           console.error('[convert] cleanup after failure failed:', cleanupErr)
@@ -17130,8 +17509,12 @@ export class MySQLAdapter {
       // Per-vessel payable premium + instalment amounts (same dates as `instalments`).
       // Each vessel becomes its own policy, so each needs its own figures.
       perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
+      // Explicit payable premium and selected LOL / agreed-value options from the wizard
+      premiumAmount?: number
+      selectedLolOptionId?: string | null
+      selectedAgreedValueOptionId?: string | null
     }
-  ): Promise<any[]> {
+  ): Promise<ConvertedPolicy[]> {
     if (!this.pool) throw new Error('DB not connected')
 
     const quotation = await this.getQuotation(quotationId)
@@ -17149,7 +17532,7 @@ export class MySQLAdapter {
       ? (await this.getSetting(`policy_text_${typeCode}_openingClause`)) || null
       : null
 
-    const createdPolicies: any[] = []
+    const createdPolicies: ConvertedPolicy[] = []
     const vessels = await this.getQuotationVessels(quotationId)
 
     for (const vid of options.vesselIds) {
@@ -17187,7 +17570,7 @@ export class MySQLAdapter {
       )
       const premiumAmount = pv
         ? pv.premiumAmount
-        : (options as any).premiumAmount ||
+        : options.premiumAmount ||
           (instalmentSum > 0
             ? instalmentSum
             : vessel?.premiumAmount || quotation.premiumAmount || 0)
@@ -17224,8 +17607,8 @@ export class MySQLAdapter {
           options.sectionOrder && options.sectionOrder.length > 0
             ? JSON.stringify(options.sectionOrder)
             : null,
-          (options as any).selectedLolOptionId || null,
-          (options as any).selectedAgreedValueOptionId || null,
+          options.selectedLolOptionId || null,
+          options.selectedAgreedValueOptionId || null,
           options.outstandingPremiumEnabled == null
             ? null
             : options.outstandingPremiumEnabled
@@ -17278,12 +17661,12 @@ export class MySQLAdapter {
                 'SELECT id FROM entity_addresses WHERE entity_id = ? AND TRIM(address_line1) = TRIM(?) LIMIT 1',
                 [r.entityId, r.addressText]
               )
-              if ((exist as any[]).length === 0) {
+              if ((exist as RowDataPacket[]).length === 0) {
                 await this.addEntityAddress({
                   entityId: r.entityId,
                   label: (r.addressLabel || '').trim() || r.role || 'Policy Address',
                   addressLine1: r.addressText.trim()
-                } as any)
+                })
               }
             } catch {
               /* non-critical */
@@ -17315,14 +17698,14 @@ export class MySQLAdapter {
         const vesselQV = vessels.find(
           (v) => v.vesselId === actualVesselId || v.id === actualVesselId
         )
-        const relevantAssureds = safeQAssureds.filter((a: any) => {
+        const relevantAssureds = safeQAssureds.filter((a) => {
           if (!a.vesselLabel && !a.groupId) return true // global assured
           if (vesselQV && a.vesselLabel === vesselQV.vesselLabel) return true
           return true // include all for safety
         })
         if (relevantAssureds.length > 0) {
           for (let ai = 0; ai < relevantAssureds.length; ai++) {
-            const a = relevantAssureds[ai] as any
+            const a = relevantAssureds[ai]
             // Look up address from entity_addresses if available
             let addrText = ''
             if (a.entityId) {
@@ -17330,8 +17713,8 @@ export class MySQLAdapter {
                 'SELECT address_line1 FROM entity_addresses WHERE entity_id = ? LIMIT 1',
                 [a.entityId]
               )
-              if ((addrRows as any[]).length > 0)
-                addrText = (addrRows as any[])[0].address_line1 || ''
+              if ((addrRows as RowDataPacket[]).length > 0)
+                addrText = (addrRows as RowDataPacket[])[0].address_line1 || ''
             }
             await this.pool.execute(
               `
@@ -17355,7 +17738,7 @@ export class MySQLAdapter {
                 `,
             [actualVesselId]
           )
-          for (const assured of assureds as any[]) {
+          for (const assured of assureds as RowDataPacket[]) {
             await this.pool.execute(
               `
                         INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, role, address_text)
@@ -17382,13 +17765,13 @@ export class MySQLAdapter {
             'SELECT flag_state_id FROM vessels WHERE id = ?',
             [actualVesselId]
           )
-          const flagStateId = (vFlagRows as any[])[0]?.flag_state_id
+          const flagStateId = (vFlagRows as RowDataPacket[])[0]?.flag_state_id
           if (flagStateId) {
             const [portRows] = await this.pool.query(
               'SELECT name, is_default FROM flag_state_ports WHERE flag_state_id = ? ORDER BY name ASC',
               [flagStateId]
             )
-            const ports = portRows as any[]
+            const ports = portRows as RowDataPacket[]
             defaultPort =
               ports.length === 1 ? ports[0].name : ports.find((p) => p.is_default)?.name || null
 
@@ -17396,7 +17779,7 @@ export class MySQLAdapter {
               'SELECT authority_name, authority_address, ratified_bunker, ratified_wreck FROM flag_states WHERE id = ?',
               [flagStateId]
             )
-            const fs = (fsRows as any[])[0]
+            const fs = (fsRows as RowDataPacket[])[0]
             if (fs) {
               flagAuthorityId = flagStateId
               flagAuthorityName = fs.authority_name || null
@@ -17421,7 +17804,7 @@ export class MySQLAdapter {
                          WHERE va.vessel_id = ?`,
             [actualVesselId]
           )
-          const assureds = (assuredRows as any[]).slice().sort((a, b) => {
+          const assureds = (assuredRows as RowDataPacket[]).slice().sort((a, b) => {
             const ao = (a.role || '').toLowerCase().includes('registered owner') ? 0 : 1
             const bo = (b.role || '').toLowerCase().includes('registered owner') ? 0 : 1
             return ao - bo
@@ -17430,19 +17813,19 @@ export class MySQLAdapter {
           if (owner) {
             ownerEntityId = owner.entityId
             ownerName = owner.name
-            let addrRow: any = null
+            let addrRow: RowDataPacket | null = null
             if (owner.addressId) {
               const [r] = await this.pool.query('SELECT * FROM entity_addresses WHERE id = ?', [
                 owner.addressId
               ])
-              addrRow = (r as any[])[0]
+              addrRow = (r as RowDataPacket[])[0]
             }
             if (!addrRow) {
               const [r2] = await this.pool.query(
                 'SELECT * FROM entity_addresses WHERE entity_id = ? ORDER BY created_at LIMIT 1',
                 [owner.entityId]
               )
-              addrRow = (r2 as any[])[0]
+              addrRow = (r2 as RowDataPacket[])[0]
             }
             if (addrRow) {
               const parts = [
@@ -17451,7 +17834,7 @@ export class MySQLAdapter {
                 [addrRow.city, addrRow.postal_code].filter(Boolean).join(' '),
                 addrRow.country
               ]
-                .map((s: any) => (s || '').trim())
+                .map((s) => (s || '').trim())
                 .filter(Boolean)
               ownerAddress = parts.length ? parts.join('\n') : null
             }
@@ -17470,25 +17853,25 @@ export class MySQLAdapter {
             const [eRows] = await this.pool!.query('SELECT name FROM entities WHERE id = ?', [
               entId
             ])
-            const nm = (eRows as any[])[0]?.name || null
-            let addrRow: any = null
+            const nm = (eRows as RowDataPacket[])[0]?.name || null
+            let addrRow: RowDataPacket | null = null
             const [vaRows] = await this.pool!.query(
               'SELECT address_id FROM vessel_assureds WHERE vessel_id = ? AND entity_id = ? LIMIT 1',
               [actualVesselId, entId]
             )
-            const addrId = (vaRows as any[])[0]?.address_id
+            const addrId = (vaRows as RowDataPacket[])[0]?.address_id
             if (addrId) {
               const [r] = await this.pool!.query('SELECT * FROM entity_addresses WHERE id = ?', [
                 addrId
               ])
-              addrRow = (r as any[])[0]
+              addrRow = (r as RowDataPacket[])[0]
             }
             if (!addrRow) {
               const [r2] = await this.pool!.query(
                 'SELECT * FROM entity_addresses WHERE entity_id = ? ORDER BY created_at LIMIT 1',
                 [entId]
               )
-              addrRow = (r2 as any[])[0]
+              addrRow = (r2 as RowDataPacket[])[0]
             }
             let addr: string | null = null
             if (addrRow) {
@@ -17498,7 +17881,7 @@ export class MySQLAdapter {
                 [addrRow.city, addrRow.postal_code].filter(Boolean).join(' '),
                 addrRow.country
               ]
-                .map((s: any) => (s || '').trim())
+                .map((s) => (s || '').trim())
                 .filter(Boolean)
               addr = parts.length ? parts.join('\n') : null
             }
@@ -17557,14 +17940,14 @@ export class MySQLAdapter {
             "SELECT id FROM vessel_dynamic_policies WHERE vessel_id = ? AND policy_type_id = ? AND status = 'active' LIMIT 1",
             [actualVesselId, typeId]
           )
-          if ((dynPols as any[]).length > 0) {
+          if ((dynPols as RowDataPacket[]).length > 0) {
             await this.pool.execute(
               'UPDATE vessel_dynamic_policies SET customer_entity_id = ?, customer_type = ?, broker_entity_id = COALESCE(broker_entity_id, ?) WHERE id = ?',
               [
                 quotation.customerEntityId,
                 quotation.customerType || 'broker',
                 quotation.customerType === 'broker' ? quotation.customerEntityId : null,
-                (dynPols as any[])[0].id
+                (dynPols as RowDataPacket[])[0].id
               ]
             )
           }
@@ -17584,14 +17967,14 @@ export class MySQLAdapter {
         'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?',
         [quotationId]
       )
-      const convertedIds = new Set((convertedRows as any[]).map((r) => r.vessel_id))
+      const convertedIds = new Set((convertedRows as RowDataPacket[]).map((r) => r.vessel_id))
       const allConverted =
         vessels.length > 0 && vessels.every((v) => convertedIds.has(v.vesselId || v.id))
       if (allConverted) {
         const [convertedSteps] = await this.pool.query(
           "SELECT id FROM quotation_workflow_steps WHERE LOWER(name) = 'converted' LIMIT 1"
         )
-        const convertedStep = (convertedSteps as any[])[0]
+        const convertedStep = (convertedSteps as RowDataPacket[])[0]
         if (convertedStep) {
           await this.pool.execute('UPDATE quotations SET workflow_step_id = ? WHERE id = ?', [
             convertedStep.id,
@@ -17614,7 +17997,7 @@ export class MySQLAdapter {
         'SELECT DISTINCT vessel_id FROM policy_documents WHERE quotation_id = ?',
         [quotationId]
       )
-      return (rows as any[]).map((r) => r.vessel_id).filter(Boolean)
+      return (rows as RowDataPacket[]).map((r) => r.vessel_id).filter(Boolean)
     } catch {
       return []
     }
@@ -17661,7 +18044,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.policyNumber !== undefined) {
       fields.push('policy_number = ?')
       values.push(updates.policyNumber || null)
@@ -17748,7 +18131,7 @@ export class MySQLAdapter {
   }
 
   // --- Policy Expiry Alerts ---
-  async getExpiredActivePolicies(): Promise<any[]> {
+  async getExpiredActivePolicies(): Promise<PolicyExpiryRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
@@ -17766,9 +18149,9 @@ export class MySQLAdapter {
                AND vpv.value_date < CURDATE()
              ORDER BY vpv.value_date ASC`
     )
-    return rows as any[]
+    return rows as Row<PolicyExpiryRow>[]
   }
-  async getExpiringSoonPolicies(daysAhead = 90): Promise<any[]> {
+  async getExpiringSoonPolicies(daysAhead = 90): Promise<PolicyExpiryRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
@@ -17789,11 +18172,11 @@ export class MySQLAdapter {
              ORDER BY vpv.value_date ASC`,
       [daysAhead]
     )
-    return rows as any[]
+    return rows as Row<PolicyExpiryRow>[]
   }
 
   // --- Policy Renewals by Month ---
-  async getPolicyRenewalsByMonth(year: number, month: number): Promise<any[]> {
+  async getPolicyRenewalsByMonth(year: number, month: number): Promise<PolicyRenewalRow[]> {
     if (!this.pool) return []
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
     const endMonth = month === 12 ? 1 : month + 1
@@ -17837,11 +18220,11 @@ export class MySQLAdapter {
              ORDER BY vpv.value_date ASC, v.name ASC`,
       [startDate, endDate]
     )
-    return rows as any[]
+    return rows as Row<PolicyRenewalRow>[]
   }
 
   // --- Renewal Pipeline ---
-  async getRenewalPipeline(dateFrom: string, dateTo: string): Promise<any[]> {
+  async getRenewalPipeline(dateFrom: string, dateTo: string): Promise<PolicyRenewalRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT vdp.id, vdp.vessel_id as vesselId, v.name as vesselName, v.imo_number as imoNumber,
@@ -17876,20 +18259,20 @@ export class MySQLAdapter {
       [dateFrom, dateTo]
     )
     // DECIMAL comes back as a string; the report sums it
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<PolicyRenewalRow>[]).map((r) => ({
       ...r,
       premium: r.premium == null ? null : Number(r.premium)
     }))
   }
 
   // --- Policy Renewal Notes ---
-  async getPolicyRenewalNotes(policyId: string, _policyNumber?: string): Promise<any[]> {
+  async getPolicyRenewalNotes(policyId: string): Promise<PolicyRenewalNote[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, policy_id as policyId, policy_number as policyNumber, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt FROM policy_renewal_notes WHERE policy_id = ? ORDER BY created_at ASC',
       [policyId]
     )
-    return rows as any[]
+    return rows as Row<PolicyRenewalNote>[]
   }
 
   async addPolicyRenewalNote(
@@ -17898,7 +18281,7 @@ export class MySQLAdapter {
     note: string,
     userId: string,
     username: string
-  ): Promise<any> {
+  ): Promise<PolicyRenewalNote> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     const now = new Date()
@@ -17926,13 +18309,13 @@ export class MySQLAdapter {
   }
 
   // --- Vessel Notes ---
-  async getVesselNotes(vesselId: string): Promise<any[]> {
+  async getVesselNotes(vesselId: string): Promise<VesselNote[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, vessel_id as vesselId, note, created_by_user_id as createdByUserId, created_by_username as createdByUsername, created_at as createdAt, parent_note_id as parentNoteId FROM vessel_notes WHERE vessel_id = ? ORDER BY created_at ASC',
       [vesselId]
     )
-    return rows as any[]
+    return rows as Row<VesselNote>[]
   }
 
   async addVesselNote(
@@ -17941,7 +18324,7 @@ export class MySQLAdapter {
     userId: string,
     username: string,
     parentNoteId?: string
-  ): Promise<any> {
+  ): Promise<VesselNote> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     const now = new Date()
@@ -17969,19 +18352,19 @@ export class MySQLAdapter {
   }
 
   // --- Renewal Status Types ---
-  async getRenewalStatusTypes(): Promise<any[]> {
+  async getRenewalStatusTypes(): Promise<RenewalStatusType[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, color, order_index as `order` FROM renewal_status_types ORDER BY order_index ASC, name ASC'
     )
-    return rows as any[]
+    return rows as Row<RenewalStatusType>[]
   }
 
-  async addRenewalStatusType(name: string, color: string): Promise<any> {
+  async addRenewalStatusType(name: string, color: string): Promise<RenewalStatusType> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     const [countRows] = await this.pool.query('SELECT COUNT(*) as cnt FROM renewal_status_types')
-    const order = (countRows as any[])[0]?.cnt ?? 0
+    const order = (countRows as RowDataPacket[])[0]?.cnt ?? 0
     await this.pool.execute(
       'INSERT INTO renewal_status_types (id, name, color, order_index) VALUES (?, ?, ?, ?)',
       [id, name.trim(), color, order]
@@ -18018,7 +18401,7 @@ export class MySQLAdapter {
 
   // --- File Path Remap ---
 
-  async getVesselFilePaths(vesselId: string): Promise<any[]> {
+  async getVesselFilePaths(vesselId: string): Promise<StoredFilePath[]> {
     if (!this.pool) return []
     const [docRows] = await this.pool.query(
       `SELECT vd.id, 'document' as source, vd.file_path as filePath,
@@ -18039,7 +18422,7 @@ export class MySQLAdapter {
              ORDER BY cs.survey_date DESC, sa.file_name`,
       [vesselId]
     )
-    return [...(docRows as any[]), ...(attRows as any[])]
+    return [...(docRows as Row<StoredFilePath>[]), ...(attRows as Row<StoredFilePath>[])]
   }
 
   async remapVesselFilePaths(
@@ -18061,7 +18444,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getEntityFilePaths(entityId: string): Promise<any[]> {
+  async getEntityFilePaths(entityId: string): Promise<StoredFilePath[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT ed.entity_id as id, ed.document_type_id as source, ed.file_path as filePath, edt.name as label
@@ -18070,7 +18453,7 @@ export class MySQLAdapter {
              WHERE ed.entity_id = ? AND ed.file_path IS NOT NULL`,
       [entityId]
     )
-    return rows as any[]
+    return rows as Row<StoredFilePath>[]
   }
 
   async remapEntityFilePaths(
@@ -18115,7 +18498,7 @@ export class MySQLAdapter {
     return { id }
   }
 
-  async getWarBreachRecords(): Promise<any[]> {
+  async getWarBreachRecords(): Promise<WarBreachRecord[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, cover_note_no AS coverNoteNo, currency, breach_details AS breachDetails,
@@ -18123,7 +18506,7 @@ export class MySQLAdapter {
                     total_net_due AS totalNetDue, created_at AS createdAt
              FROM war_breach_records ORDER BY created_at DESC`
     )
-    return rows as any[]
+    return rows as Row<WarBreachRecord>[]
   }
 
   async deleteWarBreachRecord(id: string): Promise<void> {
@@ -18139,7 +18522,7 @@ export class MySQLAdapter {
     entityType?: string | null
     threshold: number
     decision: string
-    results?: any[]
+    results?: SanctionsReportCheckInput['results']
     checkedBy?: string | null
   }): Promise<{ id: string }> {
     if (!this.pool) throw new Error('DB not connected')
@@ -18161,7 +18544,7 @@ export class MySQLAdapter {
     return { id }
   }
 
-  async getSanctionsReportChecks(limit = 200): Promise<any[]> {
+  async getSanctionsReportChecks(limit = 200): Promise<SanctionsReportCheck[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, subject_name AS subjectName, entity_id AS entityId, entity_type AS entityType,
@@ -18169,7 +18552,7 @@ export class MySQLAdapter {
              FROM sanctions_report_checks ORDER BY checked_at DESC LIMIT ?`,
       [limit]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<SanctionsReportCheck>[]).map((r) => ({
       ...r,
       results: (() => {
         try {
@@ -18183,12 +18566,12 @@ export class MySQLAdapter {
 
   // ==================== Hull Agreed Value Texts ====================
 
-  async getHullAgreedValueTexts(): Promise<any[]> {
+  async getHullAgreedValueTexts(): Promise<HullAgreedValueText[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, text, default_selected as defaultSelected, section, order_index as `order` FROM hull_agreed_value_texts ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<HullAgreedValueText>[]).map((r) => ({
       ...r,
       defaultSelected: Boolean(r.defaultSelected),
       section: r.section || 'hm'
@@ -18199,14 +18582,14 @@ export class MySQLAdapter {
     text: string,
     defaultSelected: boolean,
     section?: string
-  ): Promise<any> {
+  ): Promise<HullAgreedValueText> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const sec = section || 'hm'
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_agreed_value_texts'
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO hull_agreed_value_texts (id, text, default_selected, section, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, text, defaultSelected, sec, order]
@@ -18220,7 +18603,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -18258,12 +18641,15 @@ export class MySQLAdapter {
 
   // ==================== Hull Clauses ====================
 
-  async getHullClauses(): Promise<any[]> {
+  async getHullClauses(): Promise<HullClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, code, description, condition_section as conditionSection, order_index as `order` FROM hull_clauses ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, conditionSection: r.conditionSection || 'hm' }))
+    return (rows as Row<HullClause>[]).map((r) => ({
+      ...r,
+      conditionSection: r.conditionSection || 'hm'
+    }))
   }
 
   async addHullClause(
@@ -18271,19 +18657,26 @@ export class MySQLAdapter {
     code: string,
     description?: string,
     conditionSection?: string
-  ): Promise<any> {
+  ): Promise<HullClause> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const sec = conditionSection || 'hm'
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_clauses'
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO hull_clauses (id, name, code, description, condition_section, order_index) VALUES (?, ?, ?, ?, ?, ?)',
       [id, name, code, description || null, sec, order]
     )
-    return { id, name, code, description, conditionSection: sec, order }
+    return {
+      id,
+      name,
+      code,
+      description,
+      conditionSection: sec as HullConditionSection,
+      order
+    }
   }
 
   async updateHullClause(
@@ -18292,7 +18685,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -18331,14 +18724,14 @@ export class MySQLAdapter {
 
   // ==================== Hull Clause Conditions ====================
 
-  async getHullClauseConditions(hullClauseId?: string): Promise<any[]> {
+  async getHullClauseConditions(hullClauseId?: string): Promise<HullClauseCondition[]> {
     if (!this.pool) return []
     if (hullClauseId) {
       const [rows] = await this.pool.query(
         'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions WHERE hull_clause_id = ? ORDER BY order_index ASC',
         [hullClauseId]
       )
-      return (rows as any[]).map((r) => ({
+      return (rows as Row<HullClauseCondition>[]).map((r) => ({
         ...r,
         defaultSelected: Boolean(r.defaultSelected),
         hasAmount: Boolean(r.hasAmount),
@@ -18348,7 +18741,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, hull_clause_id as hullClauseId, condition_number as conditionNumber, text, default_selected as defaultSelected, condition_section as conditionSection, has_amount as hasAmount, amount_placeholder as amountPlaceholder, order_index as `order` FROM hull_clause_conditions ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<HullClauseCondition>[]).map((r) => ({
       ...r,
       defaultSelected: Boolean(r.defaultSelected),
       hasAmount: Boolean(r.hasAmount),
@@ -18364,14 +18757,14 @@ export class MySQLAdapter {
     conditionSection: string = 'both',
     hasAmount: boolean = false,
     amountPlaceholder?: string
-  ): Promise<any> {
+  ): Promise<HullClauseCondition> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_clause_conditions WHERE hull_clause_id = ?',
       [hullClauseId]
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO hull_clause_conditions (id, hull_clause_id, condition_number, text, default_selected, condition_section, has_amount, amount_placeholder, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -18392,7 +18785,7 @@ export class MySQLAdapter {
       conditionNumber,
       text,
       defaultSelected,
-      conditionSection,
+      conditionSection: conditionSection as HullConditionSection,
       hasAmount,
       amountPlaceholder,
       order
@@ -18412,7 +18805,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.conditionNumber !== undefined) {
       fields.push('condition_number = ?')
       values.push(updates.conditionNumber)
@@ -18462,7 +18855,7 @@ export class MySQLAdapter {
 
   // ==================== Hull Additional Conditions ====================
 
-  async getHullAdditionalConditions(): Promise<any[]> {
+  async getHullAdditionalConditions(): Promise<HullAdditionalCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, title, text, default_selected as defaultSelected, order_index as `order`, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM hull_additional_conditions ORDER BY order_index ASC'
@@ -18471,11 +18864,11 @@ export class MySQLAdapter {
       'SELECT additional_condition_id, hull_clause_id FROM hull_additional_condition_clauses'
     )
     const linkMap: Record<string, string[]> = {}
-    for (const l of links as any[]) {
+    for (const l of links as RowDataPacket[]) {
       if (!linkMap[l.additional_condition_id]) linkMap[l.additional_condition_id] = []
       linkMap[l.additional_condition_id].push(l.hull_clause_id)
     }
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<HullAdditionalCondition>[]).map((r) => ({
       ...r,
       defaultSelected: Boolean(r.defaultSelected),
       hasAmount: Boolean(r.hasAmount),
@@ -18490,13 +18883,13 @@ export class MySQLAdapter {
     hullClauseIds?: string[],
     hasAmount?: boolean,
     amountPlaceholder?: string
-  ): Promise<any> {
+  ): Promise<HullAdditionalCondition> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM hull_additional_conditions'
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO hull_additional_conditions (id, title, text, default_selected, order_index, has_amount, amount_placeholder) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
@@ -18542,7 +18935,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title || null)
@@ -18605,13 +18998,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation Agreed Value Items ====================
 
-  async getQuotationAgreedValueItems(quotationId: string): Promise<any[]> {
+  async getQuotationAgreedValueItems(quotationId: string): Promise<QuotationAgreedValueItem[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, hull_text_id as hullTextId, text, section, order_index as `order`, vessel_scope as vesselScope FROM quotation_agreed_value_items WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationAgreedValueItem>[]).map((r) => ({
       ...r,
       section: r.section || 'hm',
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null
@@ -18650,13 +19043,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation Agreed Value Options ====================
 
-  async getQuotationAgreedValueOptions(quotationId: string): Promise<any[]> {
+  async getQuotationAgreedValueOptions(quotationId: string): Promise<QuotationAgreedValueOption[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, label, amount, currency, premium_amount as premiumAmount, order_index as `order` FROM quotation_agreed_value_options WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationAgreedValueOption>[]).map((r) => ({
       ...r,
       amount: Number(r.amount),
       premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null
@@ -18668,14 +19061,14 @@ export class MySQLAdapter {
     amount: number,
     currency?: string,
     label?: string
-  ): Promise<any> {
+  ): Promise<(Omit<QuotationAgreedValueOption, 'label'> & { label: string | null }) | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_agreed_value_options WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     const fk = await this.fkOff()
     try {
       await fk.execute(
@@ -18698,11 +19091,11 @@ export class MySQLAdapter {
 
   async updateQuotationAgreedValueOption(
     id: string,
-    updates: { label?: string; amount?: number; currency?: string }
+    updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.label !== undefined) {
       fields.push('label = ?')
       values.push(updates.label || null)
@@ -18715,9 +19108,9 @@ export class MySQLAdapter {
       fields.push('currency = ?')
       values.push(updates.currency)
     }
-    if ((updates as any).premiumAmount !== undefined) {
+    if (updates.premiumAmount !== undefined) {
       fields.push('premium_amount = ?')
-      values.push((updates as any).premiumAmount ?? null)
+      values.push(updates.premiumAmount ?? null)
     }
     if (fields.length === 0) return
     values.push(id)
@@ -18744,13 +19137,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation LOL Options ====================
 
-  async getQuotationLolOptions(quotationId: string): Promise<any[]> {
+  async getQuotationLolOptions(quotationId: string): Promise<QuotationLolOption[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, label, amount, currency, premium_amount as premiumAmount, order_index as `order` FROM quotation_lol_options WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationLolOption>[]).map((r) => ({
       ...r,
       amount: Number(r.amount),
       premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null
@@ -18762,14 +19155,14 @@ export class MySQLAdapter {
     amount: number,
     currency?: string,
     label?: string
-  ): Promise<any> {
+  ): Promise<QuotationLolOption | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_lol_options WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO quotation_lol_options (id, quotation_id, label, amount, currency, premium_amount, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, quotationId, label || null, amount, currency || 'USD', null, order]
@@ -18791,7 +19184,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.label !== undefined) {
       fields.push('label = ?')
       values.push(updates.label || null)
@@ -18823,13 +19216,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation Hull Alternatives ====================
 
-  async getQuotationHullAlternatives(quotationId: string): Promise<any[]> {
+  async getQuotationHullAlternatives(quotationId: string): Promise<QuotationHullAlternative[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, hull_clause_id as hullClauseId, label, premium_amount as premiumAmount, agreed_value as agreedValue, agreed_value_currency as agreedValueCurrency, order_index as `order`, vessel_scope_id as vesselScopeId, include_in_shared as includeInShared FROM quotation_hull_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<Omit<QuotationHullAlternative, 'includeInShared'>>[]).map((r) => ({
       ...r,
       premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
       agreedValue: r.agreedValue != null ? Number(r.agreedValue) : undefined,
@@ -18844,14 +19237,16 @@ export class MySQLAdapter {
     vesselScopeId?: string | null,
     agreedValue?: number | null,
     agreedValueCurrency?: string
-  ): Promise<any> {
+  ): Promise<
+    (Omit<QuotationHullAlternative, 'hullClauseId'> & { hullClauseId: string | null }) | null
+  > {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_hull_alternatives WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     const fk = await this.fkOff()
     try {
       await fk.execute(
@@ -18898,7 +19293,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.hullClauseId !== undefined) {
       fields.push('hull_clause_id = ?')
       values.push(updates.hullClauseId)
@@ -18936,7 +19331,7 @@ export class MySQLAdapter {
   }
 
   // Per-vessel premium under a hull alternative (matrix for fleet quotes with alternatives)
-  async getHullAltVesselPremiums(quotationId: string): Promise<any[]> {
+  async getHullAltVesselPremiums(quotationId: string): Promise<HullAltVesselPremium[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT havp.id, havp.alternative_id AS alternativeId, havp.quotation_vessel_id AS quotationVesselId,
@@ -18946,7 +19341,7 @@ export class MySQLAdapter {
              WHERE a.quotation_id = ?`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<HullAltVesselPremium>[]).map((r) => ({
       ...r,
       premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null
     }))
@@ -18975,7 +19370,7 @@ export class MySQLAdapter {
       'SELECT COALESCE(SUM(premium_amount), 0) AS total FROM quotation_hull_alt_vessel_premiums WHERE alternative_id = ?',
       [alternativeId]
     )
-    const total = Number((sumRows as any[])[0]?.total || 0)
+    const total = Number((sumRows as RowDataPacket[])[0]?.total || 0)
     await this.pool.execute(
       'UPDATE quotation_hull_alternatives SET premium_amount = ? WHERE id = ?',
       [total || null, alternativeId]
@@ -18984,7 +19379,7 @@ export class MySQLAdapter {
   }
 
   // Generic per-quotation discounts (beyond NCB/UPCC)
-  async getQuotationDiscounts(quotationId: string): Promise<any[]> {
+  async getQuotationDiscounts(quotationId: string): Promise<QuotationDiscount[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id AS quotationId, label, discount_type AS discountType,
@@ -18992,7 +19387,7 @@ export class MySQLAdapter {
              FROM quotation_discounts WHERE quotation_id = ? ORDER BY order_index`,
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationDiscount>[]).map((r) => ({
       ...r,
       percent: r.percent != null ? Number(r.percent) : null,
       amount: r.amount != null ? Number(r.amount) : null
@@ -19009,14 +19404,14 @@ export class MySQLAdapter {
       text?: string | null
       targetSection?: string | null
     }
-  ): Promise<any> {
+  ): Promise<QuotationDiscount> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_discounts WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       `INSERT INTO quotation_discounts (id, quotation_id, label, discount_type, percent, amount, text, target_section, order_index)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -19036,7 +19431,7 @@ export class MySQLAdapter {
       id,
       quotationId,
       label: data.label || '',
-      discountType: data.discountType || 'percentage',
+      discountType: (data.discountType || 'percentage') as QuotationDiscount['discountType'],
       percent: data.percent ?? null,
       amount: data.amount ?? null,
       text: data.text ?? null,
@@ -19058,7 +19453,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.label !== undefined) {
       fields.push('label = ?')
       values.push(updates.label || null)
@@ -19129,13 +19524,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation P&I Alternatives ====================
 
-  async getQuotationPIAlternatives(quotationId: string): Promise<any[]> {
+  async getQuotationPIAlternatives(quotationId: string): Promise<QuotationPIAlternative[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, label, premium_amount as premiumAmount, lol_amount as lolAmount, lol_currency as lolCurrency, order_index as `order` FROM quotation_pi_alternatives WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationPIAlternative>[]).map((r) => ({
       ...r,
       premiumAmount: r.premiumAmount ? Number(r.premiumAmount) : undefined,
       lolAmount: r.lolAmount != null ? Number(r.lolAmount) : undefined,
@@ -19148,14 +19543,14 @@ export class MySQLAdapter {
     label?: string,
     lolAmount?: number | null,
     lolCurrency?: string
-  ): Promise<any> {
+  ): Promise<QuotationPIAlternative | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_pi_alternatives WHERE quotation_id = ?',
       [quotationId]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     const fk = await this.fkOff()
     try {
       await fk.execute(
@@ -19187,7 +19582,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.label !== undefined) {
       fields.push('label = ?')
       values.push(updates.label || null)
@@ -19267,13 +19662,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation Hull Conditions ====================
 
-  async getQuotationHullConditions(quotationId: string): Promise<any[]> {
+  async getQuotationHullConditions(quotationId: string): Promise<QuotationHullCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, hull_condition_id as hullConditionId, text_override as textOverride, condition_section as conditionSection, amount, vessel_amounts as vesselAmounts, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationHullCondition>[]).map((r) => ({
       ...r,
       amount: r.amount != null ? Number(r.amount) : undefined,
       vesselAmounts: r.vesselAmounts ? safeJson(r.vesselAmounts, null) : null,
@@ -19341,13 +19736,15 @@ export class MySQLAdapter {
 
   // ==================== Quotation Hull Additional Conditions ====================
 
-  async getQuotationHullAdditionalConditions(quotationId: string): Promise<any[]> {
+  async getQuotationHullAdditionalConditions(
+    quotationId: string
+  ): Promise<QuotationHullAdditionalCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, hull_additional_condition_id as hullAdditionalConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId, amount FROM quotation_hull_additional_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationHullAdditionalCondition>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null,
@@ -19397,13 +19794,15 @@ export class MySQLAdapter {
 
   // -- Custom Hull Additional Conditions (per quotation) --
 
-  async getQuotationHullCustomConditions(quotationId: string): Promise<any[]> {
+  async getQuotationHullCustomConditions(
+    quotationId: string
+  ): Promise<QuotationHullCustomCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, text, title, order_index as `order`, vessel_scope as vesselScope, alternative_id as alternativeId FROM quotation_hull_custom_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationHullCustomCondition>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null,
       alternativeId: r.alternativeId || null
@@ -19416,14 +19815,14 @@ export class MySQLAdapter {
     title?: string
     vesselScope?: string[] | null
     alternativeId?: string | null
-  }): Promise<any> {
+  }): Promise<QuotationHullCustomCondition> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [countRows] = await this.pool.query(
       'SELECT COUNT(*) as cnt FROM quotation_hull_custom_conditions WHERE quotation_id = ?',
       [data.quotationId]
     )
-    const order = (countRows as any[])[0]?.cnt || 0
+    const order = (countRows as RowDataPacket[])[0]?.cnt || 0
     await this.pool.execute(
       'INSERT INTO quotation_hull_custom_conditions (id, quotation_id, text, title, order_index, vessel_scope, alternative_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
@@ -19450,7 +19849,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -19499,21 +19898,24 @@ export class MySQLAdapter {
 
   // ==================== War Risk Conditions ====================
 
-  async getWarConditions(): Promise<any[]> {
+  async getWarConditions(): Promise<WarCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, text, default_selected as defaultSelected, order_index as `order` FROM war_conditions ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({ ...r, defaultSelected: Boolean(r.defaultSelected) }))
+    return (rows as Row<WarCondition>[]).map((r) => ({
+      ...r,
+      defaultSelected: Boolean(r.defaultSelected)
+    }))
   }
 
-  async addWarCondition(text: string, defaultSelected: boolean): Promise<any> {
+  async addWarCondition(text: string, defaultSelected: boolean): Promise<WarCondition> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM war_conditions'
     )
-    const order = (maxRow as any[])[0]?.nextOrder || 0
+    const order = (maxRow as RowDataPacket[])[0]?.nextOrder || 0
     await this.pool.execute(
       'INSERT INTO war_conditions (id, text, default_selected, order_index) VALUES (?, ?, ?, ?)',
       [id, text, defaultSelected, order]
@@ -19527,7 +19929,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.text !== undefined) {
       fields.push('text = ?')
       values.push(updates.text)
@@ -19558,13 +19960,13 @@ export class MySQLAdapter {
 
   // ==================== Quotation War Conditions ====================
 
-  async getQuotationWarConditions(quotationId: string): Promise<any[]> {
+  async getQuotationWarConditions(quotationId: string): Promise<QuotationWarCondition[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, quotation_id as quotationId, war_condition_id as warConditionId, text_override as textOverride, order_index as `order`, vessel_scope as vesselScope FROM quotation_war_conditions WHERE quotation_id = ? ORDER BY order_index ASC',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<QuotationWarCondition>[]).map((r) => ({
       ...r,
       vesselScope: r.vesselScope ? safeJson(r.vesselScope, null) : null
     }))
@@ -19599,7 +20001,7 @@ export class MySQLAdapter {
 
   // ==================== War Risk Settings ====================
 
-  async getWarSettings(): Promise<any> {
+  async getWarSettings(): Promise<WarSettings> {
     if (!this.pool)
       return {
         jwlaCode: 'JWLA032',
@@ -19611,9 +20013,9 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       "SELECT setting_value FROM app_settings WHERE setting_key = 'war_settings'"
     )
-    const arr = rows as any[]
+    const arr = rows as RowDataPacket[]
     if (arr.length > 0) {
-      const parsed = safeJson<any>(arr[0].setting_value, null)
+      const parsed = safeJson<WarSettings | null>(arr[0].setting_value, null)
       if (parsed) return parsed
     }
     return {
@@ -19625,7 +20027,7 @@ export class MySQLAdapter {
     }
   }
 
-  async setWarSettings(settings: any): Promise<void> {
+  async setWarSettings(settings: WarSettings): Promise<void> {
     if (!this.pool) return
     const json = JSON.stringify(settings)
     await this.pool.execute(
@@ -19642,9 +20044,9 @@ export class MySQLAdapter {
       'SELECT id, user_id AS userId, name, filters, created_at AS createdAt FROM analytics_presets WHERE user_id = ? ORDER BY name',
       [userId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<AnalyticsPreset>[]).map((r) => ({
       ...r,
-      filters: safeJson(r.filters, {})
+      filters: safeJson<AnalyticsFilters>(r.filters, {} as AnalyticsFilters)
     }))
   }
 
@@ -19683,21 +20085,29 @@ export class MySQLAdapter {
 
   // ==================== Analytics Query ====================
 
-  async getAnalyticsData(filters: AnalyticsFilters): Promise<any> {
+  async getAnalyticsData(filters: AnalyticsFilters): Promise<AnalyticsData> {
     if (!this.pool) return {}
     // Build WHERE conditions
     const conditions: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
 
     if (filters.activeOnly) conditions.push('v.is_active = TRUE')
-    if (filters.ageMin != null)
-      (conditions.push(`v.built_year <= ?`), params.push(new Date().getFullYear() - filters.ageMin))
-    if (filters.ageMax != null)
-      (conditions.push(`v.built_year >= ?`), params.push(new Date().getFullYear() - filters.ageMax))
-    if (filters.tonnageMin != null)
-      (conditions.push('v.gross_tonnage >= ?'), params.push(filters.tonnageMin))
-    if (filters.tonnageMax != null)
-      (conditions.push('v.gross_tonnage <= ?'), params.push(filters.tonnageMax))
+    if (filters.ageMin != null) {
+      conditions.push(`v.built_year <= ?`)
+      params.push(new Date().getFullYear() - filters.ageMin)
+    }
+    if (filters.ageMax != null) {
+      conditions.push(`v.built_year >= ?`)
+      params.push(new Date().getFullYear() - filters.ageMax)
+    }
+    if (filters.tonnageMin != null) {
+      conditions.push('v.gross_tonnage >= ?')
+      params.push(filters.tonnageMin)
+    }
+    if (filters.tonnageMax != null) {
+      conditions.push('v.gross_tonnage <= ?')
+      params.push(filters.tonnageMax)
+    }
     if (filters.fleetIds?.length) {
       conditions.push(`v.fleet_id IN (${filters.fleetIds.map(() => '?').join(',')})`)
       params.push(...filters.fleetIds)
@@ -19736,11 +20146,11 @@ export class MySQLAdapter {
       params
     )
 
-    const vList = vessels as any[]
+    const vList = vessels as Row<AnalyticsVesselRow>[]
     const vesselIds = vList.map((v) => v.id)
 
     // Policy coverage for filtered vessels
-    let policyCoverage: any[] = []
+    let policyCoverage: AnalyticsPolicyCoverage[] = []
     if (vesselIds.length > 0) {
       const [pRows] = await this.pool.execute(
         `SELECT pt.name, COUNT(DISTINCT vdp.vessel_id) AS vesselCount
@@ -19750,29 +20160,29 @@ export class MySQLAdapter {
                  GROUP BY pt.id, pt.name ORDER BY vesselCount DESC`,
         vesselIds
       )
-      policyCoverage = pRows as any[]
+      policyCoverage = pRows as Row<AnalyticsPolicyCoverage>[]
     }
 
     return { vessels: vList, policyCoverage }
   }
 
   async backupDatabase(): Promise<{
-    tables: Record<string, any[]>
+    tables: Record<string, RowDataPacket[]>
     exportedAt: string
     version: string
   }> {
     if (!this.pool) throw new Error('Not connected')
 
-    const [tableRows] = (await this.pool.query('SHOW TABLES')) as any[]
+    const [tableRows] = (await this.pool.query('SHOW TABLES')) as QueryRows
     const dbKey = Object.keys(tableRows[0])[0]
-    const tableNames: string[] = tableRows.map((r: any) => r[dbKey])
+    const tableNames: string[] = tableRows.map((r) => r[dbKey])
 
-    const tables: Record<string, any[]> = {}
+    const tables: Record<string, RowDataPacket[]> = {}
     for (const table of tableNames) {
       // Skip users table to avoid locking out on restore
       if (table === 'users') continue
       const [rows] = await this.pool.query(`SELECT * FROM \`${table}\``)
-      tables[table] = rows as any[]
+      tables[table] = rows as RowDataPacket[]
     }
 
     return {
@@ -19782,18 +20192,22 @@ export class MySQLAdapter {
     }
   }
 
-  async restoreDatabase(data: { tables: Record<string, any[]> }): Promise<void> {
+  async restoreDatabase(data: {
+    tables: Record<string, Record<string, SqlValue>[]>
+  }): Promise<void> {
     if (!this.pool) throw new Error('Not connected')
 
     // Validate table names against actual schema to prevent SQL injection via crafted backups
     const [dbTables] = await this.pool.query('SHOW TABLES')
-    const validTables = new Set((dbTables as any[]).map((r) => Object.values(r)[0] as string))
+    const validTables = new Set(
+      (dbTables as RowDataPacket[]).map((r) => Object.values(r)[0] as string)
+    )
 
     // Live columns per table: backup columns the schema no longer has are dropped instead of
     // failing the INSERT halfway through the restore
     const liveColumns = async (table: string): Promise<Set<string>> => {
       const [cols] = await this.pool!.query(`SHOW COLUMNS FROM \`${table}\``)
-      return new Set((cols as any[]).map((c) => c.Field as string))
+      return new Set((cols as RowDataPacket[]).map((c) => c.Field as string))
     }
 
     // One transaction on one connection: DELETE (transactional) instead of TRUNCATE (which
@@ -19867,7 +20281,7 @@ export class MySQLAdapter {
     dateFrom?: string
     dateTo?: string
     search?: string
-  }): Promise<PaginatedResult<any>> {
+  }): Promise<PaginatedResult<ActivityLogEntry>> {
     if (!this.pool) return { data: [], total: 0, page: 1, limit: 25, totalPages: 0 }
 
     const { page = 1, limit = 25, module, action, userId, dateFrom, dateTo, search } = filters
@@ -19877,7 +20291,7 @@ export class MySQLAdapter {
       'SELECT id, user_id AS userId, username, action, module, entity_type AS entityType, entity_id AS entityId, entity_name AS entityName, details, created_at AS createdAt FROM activity_log'
     let countQuery = 'SELECT COUNT(*) as total FROM activity_log'
     const conditions: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
 
     if (module) {
       conditions.push('module = ?')
@@ -19916,12 +20330,12 @@ export class MySQLAdapter {
     values.push(limit, offset)
 
     const [countResult] = await this.pool.query(countQuery, countValues)
-    const total = (countResult as any[])[0].total
+    const total = (countResult as RowDataPacket[])[0].total
     const totalPages = Math.ceil(total / limit)
 
     const [rows] = await this.pool.query(query, values)
 
-    return { data: rows as any[], total, page, limit, totalPages }
+    return { data: rows as Row<ActivityLogEntry>[], total, page, limit, totalPages }
   }
 
   async logActivity(entry: {
@@ -19959,14 +20373,14 @@ export class MySQLAdapter {
     if (!this.pool) return []
     let sql =
       'SELECT id, name, subject, body, category, is_system AS isSystem, created_by AS createdBy, order_index AS `order` FROM email_templates'
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (category) {
       sql += ' WHERE category = ?'
       params.push(category)
     }
     sql += ' ORDER BY order_index ASC, created_at ASC'
     const [rows] = await this.pool.query(sql, params)
-    return (rows as any[]).map((r) => ({ ...r, isSystem: !!r.isSystem }))
+    return (rows as Row<EmailTemplate>[]).map((r) => ({ ...r, isSystem: !!r.isSystem }))
   }
 
   async addEmailTemplate(template: {
@@ -19980,7 +20394,7 @@ export class MySQLAdapter {
     if (!this.pool) throw new Error('Not connected')
     const id = uuidv4()
     const [countRows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM email_templates')
-    const orderIndex = (countRows as any[])[0].cnt
+    const orderIndex = (countRows as RowDataPacket[])[0].cnt
     await this.pool.execute(
       'INSERT INTO email_templates (id, name, subject, body, category, is_system, created_by, order_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -20012,7 +20426,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -20037,7 +20451,7 @@ export class MySQLAdapter {
   async deleteEmailTemplate(id: string): Promise<void> {
     if (!this.pool) return
     const [rows] = await this.pool.query('SELECT is_system FROM email_templates WHERE id = ?', [id])
-    if ((rows as any[])[0]?.is_system) throw new Error('Cannot delete system templates')
+    if ((rows as RowDataPacket[])[0]?.is_system) throw new Error('Cannot delete system templates')
     await this.pool.execute('DELETE FROM email_templates WHERE id = ?', [id])
   }
 
@@ -20056,7 +20470,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT DISTINCT module FROM activity_log ORDER BY module ASC'
     )
-    return (rows as any[]).map((r) => r.module)
+    return (rows as RowDataPacket[]).map((r) => r.module)
   }
 
   async getActivityLogDistinctActions(): Promise<string[]> {
@@ -20064,7 +20478,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT DISTINCT action FROM activity_log ORDER BY action ASC'
     )
-    return (rows as any[]).map((r) => r.action)
+    return (rows as RowDataPacket[]).map((r) => r.action)
   }
 
   async getActivityLogDistinctUsers(): Promise<{ id: string; username: string }[]> {
@@ -20072,7 +20486,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT DISTINCT al.user_id AS id, al.username FROM activity_log al ORDER BY al.username ASC'
     )
-    return rows as any[]
+    return rows as Row<{ id: string; username: string }>[]
   }
   async getActivityLogRetention(): Promise<number> {
     const val = await this.getSetting('activity_log_retention_days')
@@ -20089,13 +20503,13 @@ export class MySQLAdapter {
       'DELETE FROM activity_log WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
       [retentionDays]
     )
-    return (result as any).affectedRows || 0
+    return (result as ResultSetHeader).affectedRows || 0
   }
 
   async getActivityLogCount(): Promise<number> {
     if (!this.pool) return 0
     const [rows] = await this.pool.query('SELECT COUNT(*) AS cnt FROM activity_log')
-    return (rows as any[])[0]?.cnt || 0
+    return (rows as RowDataPacket[])[0]?.cnt || 0
   }
 
   // --- Workflow Steps ---
@@ -20104,7 +20518,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, color, order_index AS `order`, can_edit AS canEdit, can_export AS canExport, is_lock_point AS isLockPoint, is_initial AS isInitial, created_at AS createdAt FROM quotation_workflow_steps ORDER BY order_index ASC'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<WorkflowStep>[]).map((r) => ({
       ...r,
       canEdit: Boolean(r.canEdit),
       canExport: Boolean(r.canExport),
@@ -20126,7 +20540,7 @@ export class MySQLAdapter {
     const [maxRows] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM quotation_workflow_steps'
     )
-    const order = (maxRows as any[])[0].nextOrder
+    const order = (maxRows as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO quotation_workflow_steps (id, name, color, order_index, can_edit, can_export, is_lock_point, is_initial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -20156,7 +20570,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (updates.name !== undefined) {
       sets.push('name = ?')
       params.push(updates.name)
@@ -20203,7 +20617,7 @@ export class MySQLAdapter {
       'SELECT COUNT(*) as cnt FROM quotations WHERE workflow_step_id = ?',
       [id]
     )
-    const count = (countRows as any[])[0]?.cnt || 0
+    const count = (countRows as RowDataPacket[])[0]?.cnt || 0
     if (count > 0) {
       return {
         success: false,
@@ -20240,7 +20654,10 @@ export class MySQLAdapter {
              LEFT JOIN quotation_workflow_steps ts ON t.to_step_id = ts.id
              ORDER BY fs.order_index, ts.order_index`
     )
-    return (rows as any[]).map((r) => ({ ...r, autoCreateRevision: Boolean(r.autoCreateRevision) }))
+    return (rows as Row<WorkflowTransition>[]).map((r) => ({
+      ...r,
+      autoCreateRevision: Boolean(r.autoCreateRevision)
+    }))
   }
 
   async addWorkflowTransition(t: {
@@ -20264,7 +20681,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (updates.permissionKey !== undefined) {
       sets.push('permission_key = ?')
       params.push(updates.permissionKey)
@@ -20300,8 +20717,9 @@ export class MySQLAdapter {
       'SELECT id, is_lock_point FROM quotation_workflow_steps WHERE id = ?',
       [toStepId]
     )
-    if ((stepRows as any[]).length === 0) throw new Error('Target workflow step no longer exists')
-    const isLockPoint = Boolean((stepRows as any[])[0]?.is_lock_point)
+    if ((stepRows as RowDataPacket[]).length === 0)
+      throw new Error('Target workflow step no longer exists')
+    const isLockPoint = Boolean((stepRows as RowDataPacket[])[0]?.is_lock_point)
 
     const conn = await this.pool.getConnection()
     try {
@@ -20309,18 +20727,18 @@ export class MySQLAdapter {
       const [qRows] = await conn.query('SELECT workflow_step_id FROM quotations WHERE id = ?', [
         quotationId
       ])
-      const fromStepId = (qRows as any[])[0]?.workflow_step_id || null
+      const fromStepId = (qRows as RowDataPacket[])[0]?.workflow_step_id || null
       // Validate a transition exists from current step to target step
       if (fromStepId) {
         const [transRows] = await conn.query(
           'SELECT id FROM quotation_workflow_transitions WHERE from_step_id = ? AND to_step_id = ?',
           [fromStepId, toStepId]
         )
-        if ((transRows as any[]).length === 0)
+        if ((transRows as RowDataPacket[]).length === 0)
           throw new Error('No valid transition from current step to target step')
       }
       const updates: string[] = ['workflow_step_id = ?']
-      const params: any[] = [toStepId]
+      const params: SqlValue[] = [toStepId]
       if (isLockPoint) {
         updates.push('is_locked = TRUE')
       }
@@ -20354,7 +20772,7 @@ export class MySQLAdapter {
              ORDER BY l.created_at DESC`,
       [quotationId]
     )
-    return rows as any[]
+    return rows as Row<QuotationWorkflowLog>[]
   }
 
   async getReachableSteps(
@@ -20397,12 +20815,12 @@ export class MySQLAdapter {
 
   // ==================== Survey Warranty Templates (Quotations) ====================
 
-  async getSurveyWarrantyTemplates(): Promise<any[]> {
+  async getSurveyWarrantyTemplates(): Promise<SurveyWarrantyTemplateRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT * FROM survey_warranty_templates ORDER BY order_index, created_at'
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as RowDataPacket[]).map((r) => ({
       id: r.id,
       title: r.title || null,
       text: r.text,
@@ -20416,13 +20834,16 @@ export class MySQLAdapter {
     return matches ? [...new Set(matches)] : []
   }
 
-  async addSurveyWarrantyTemplate(text: string, title?: string): Promise<any> {
+  async addSurveyWarrantyTemplate(
+    text: string,
+    title?: string
+  ): Promise<SurveyWarrantyTemplateRow> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM survey_warranty_templates'
     )
-    const order = (maxRow as any[])[0].next_order
+    const order = (maxRow as RowDataPacket[])[0].next_order
     await this.pool.execute(
       'INSERT INTO survey_warranty_templates (id, title, text, order_index) VALUES (?, ?, ?, ?)',
       [id, title || null, text, order]
@@ -20453,13 +20874,13 @@ export class MySQLAdapter {
     }
   }
 
-  async getSurveyWarrantyTemplateSets(): Promise<any[]> {
+  async getSurveyWarrantyTemplateSets(): Promise<SurveyWarrantyTemplateSet[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT * FROM survey_warranty_template_sets ORDER BY order_index'
     )
-    const sets: any[] = []
-    for (const r of rows as any[]) {
+    const sets: SurveyWarrantyTemplateSet[] = []
+    for (const r of rows as RowDataPacket[]) {
       const [items] = await this.pool.query(
         'SELECT template_id FROM survey_warranty_template_set_items WHERE set_id = ?',
         [r.id]
@@ -20467,20 +20888,23 @@ export class MySQLAdapter {
       sets.push({
         id: r.id,
         name: r.name,
-        templateIds: (items as any[]).map((i) => i.template_id),
+        templateIds: (items as RowDataPacket[]).map((i) => i.template_id),
         order: r.order_index
       })
     }
     return sets
   }
 
-  async addSurveyWarrantyTemplateSet(name: string, templateIds: string[]): Promise<any> {
+  async addSurveyWarrantyTemplateSet(
+    name: string,
+    templateIds: string[]
+  ): Promise<SurveyWarrantyTemplateSet> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM survey_warranty_template_sets'
     )
-    const order = (maxRow as any[])[0].next_order
+    const order = (maxRow as RowDataPacket[])[0].next_order
     await this.pool.execute(
       'INSERT INTO survey_warranty_template_sets (id, name, order_index) VALUES (?, ?, ?)',
       [id, name, order]
@@ -20519,13 +20943,13 @@ export class MySQLAdapter {
     await this.pool.execute('DELETE FROM survey_warranty_template_sets WHERE id = ?', [id])
   }
 
-  async getQuotationSurveyWarranties(quotationId: string): Promise<any[]> {
+  async getQuotationSurveyWarranties(quotationId: string): Promise<QuotationSurveyWarranty[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT * FROM quotation_survey_warranties WHERE quotation_id = ? ORDER BY order_index',
       [quotationId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as RowDataPacket[]).map((r) => ({
       id: r.id,
       quotationId: r.quotation_id,
       templateId: r.template_id,
@@ -20542,7 +20966,10 @@ export class MySQLAdapter {
     }))
   }
 
-  async setQuotationSurveyWarranties(quotationId: string, items: any[]): Promise<void> {
+  async setQuotationSurveyWarranties(
+    quotationId: string,
+    items: QuotationSurveyWarranty[]
+  ): Promise<void> {
     if (!this.pool) return
     const conn = await this.pool.getConnection()
     try {
@@ -20583,14 +21010,16 @@ export class MySQLAdapter {
     }
   }
 
-  async addQuotationSurveyWarranty(data: any): Promise<any> {
+  async addQuotationSurveyWarranty(
+    data: Partial<QuotationSurveyWarranty> & Pick<QuotationSurveyWarranty, 'quotationId' | 'text'>
+  ): Promise<WithId<typeof data> & { order: number }> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM quotation_survey_warranties WHERE quotation_id = ?',
       [data.quotationId]
     )
-    const order = (maxRow as any[])[0].next_order
+    const order = (maxRow as RowDataPacket[])[0].next_order
     const conn = await this.pool.getConnection()
     try {
       await conn.execute('SET FOREIGN_KEY_CHECKS=0')
@@ -20625,10 +21054,13 @@ export class MySQLAdapter {
     return { id, ...data, order }
   }
 
-  async updateQuotationSurveyWarranty(id: string, data: any): Promise<void> {
+  async updateQuotationSurveyWarranty(
+    id: string,
+    data: Partial<QuotationSurveyWarranty>
+  ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (data.text !== undefined) {
       fields.push('text = ?')
       values.push(data.text)
@@ -20687,25 +21119,25 @@ export class MySQLAdapter {
   async getNotifications(
     userId: string,
     opts?: { unreadOnly?: boolean; limit?: number; offset?: number }
-  ): Promise<{ data: any[]; unreadCount: number }> {
+  ): Promise<{ data: Notification[]; unreadCount: number }> {
     if (!this.pool) return { data: [], unreadCount: 0 }
     const limit = opts?.limit || 50
     const offset = opts?.offset || 0
     let query =
       'SELECT id, user_id AS userId, type, title, message, link_type AS linkType, link_id AS linkId, is_read AS isRead, created_at AS createdAt FROM notifications WHERE user_id = ?'
-    const values: any[] = [userId]
+    const values: SqlValue[] = [userId]
     if (opts?.unreadOnly) {
       query += ' AND is_read = FALSE'
     }
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
     values.push(limit, offset)
     const [rows] = await this.pool.query(query, values)
-    const data = (rows as any[]).map((r) => ({ ...r, isRead: Boolean(r.isRead) }))
+    const data = (rows as Row<Notification>[]).map((r) => ({ ...r, isRead: Boolean(r.isRead) }))
     const [countRows] = await this.pool.query(
       'SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = FALSE',
       [userId]
     )
-    const unreadCount = (countRows as any[])[0].cnt
+    const unreadCount = (countRows as RowDataPacket[])[0].cnt
     return { data, unreadCount }
   }
 
@@ -20715,7 +21147,7 @@ export class MySQLAdapter {
       'SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = FALSE',
       [userId]
     )
-    return (rows as any[])[0].cnt
+    return (rows as RowDataPacket[])[0].cnt
   }
 
   async createNotification(notification: {
@@ -20799,7 +21231,7 @@ export class MySQLAdapter {
                AND NOT (upo.permission_key IS NOT NULL AND upo.granted = FALSE)`,
       [permissionKey, permissionKey]
     )
-    for (const row of rows as any[]) {
+    for (const row of rows as RowDataPacket[]) {
       if (excludeUserId && row.id === excludeUserId) continue
       await this.createNotification({ userId: row.id, type, title, message, linkType, linkId })
     }
@@ -20817,7 +21249,7 @@ export class MySQLAdapter {
 
   // ==================== Notification Groups ====================
 
-  async getNotificationGroups(): Promise<any[]> {
+  async getNotificationGroups(): Promise<NotificationGroup[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT ng.id, ng.name, ng.description, ng.order_index AS \`order\`,
@@ -20825,19 +21257,19 @@ export class MySQLAdapter {
                     (SELECT COUNT(*) FROM notification_group_subscriptions ngs WHERE ngs.group_id = ng.id) AS subscriptionCount
              FROM notification_groups ng ORDER BY ng.order_index ASC`
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<NotificationGroup>[]).map((r) => ({
       ...r,
       memberCount: Number(r.memberCount),
       subscriptionCount: Number(r.subscriptionCount)
     }))
   }
 
-  async addNotificationGroup(name: string, description?: string): Promise<any> {
+  async addNotificationGroup(name: string, description?: string): Promise<NotificationGroup> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = (await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM notification_groups'
-    )) as any[]
+    )) as QueryRows
     const order = maxRow[0]?.nextOrder ?? 0
     await this.pool.execute(
       'INSERT INTO notification_groups (id, name, description, order_index) VALUES (?, ?, ?, ?)',
@@ -20907,7 +21339,7 @@ export class MySQLAdapter {
       'SELECT event_type FROM notification_group_subscriptions WHERE group_id = ?',
       [groupId]
     )
-    return (rows as any[]).map((r) => r.event_type)
+    return (rows as RowDataPacket[]).map((r) => r.event_type)
   }
 
   async setNotificationGroupSubscriptions(groupId: string, eventTypes: string[]): Promise<void> {
@@ -20934,15 +21366,15 @@ export class MySQLAdapter {
              WHERE ngs.event_type = ?`,
       [eventType]
     )
-    const groups = groupRows as { groupId: string; groupName: string }[]
+    const groups = groupRows as Row<{ groupId: string; groupName: string; userIds: string[] }>[]
     for (const g of groups) {
       const [memberRows] = await this.pool.query(
         'SELECT user_id FROM notification_group_members WHERE group_id = ?',
         [g.groupId]
       )
-      ;(g as any).userIds = (memberRows as any[]).map((r) => r.user_id)
+      g.userIds = (memberRows as RowDataPacket[]).map((r) => r.user_id)
     }
-    return groups as any[]
+    return groups
   }
 
   async notifyGroupsForEvent(
@@ -20968,15 +21400,7 @@ export class MySQLAdapter {
     }
   }
 
-  async globalSearch(
-    query: string,
-    limit: number = 20
-  ): Promise<{
-    vessels: any[]
-    entities: any[]
-    quotations: any[]
-    policies: any[]
-  }> {
+  async globalSearch(query: string, limit: number = 20): Promise<GlobalSearchResults> {
     if (!this.pool) return { vessels: [], entities: [], quotations: [], policies: [] }
     const like = `%${query}%`
     const perCategory = Math.min(Math.floor(limit / 4), 5) || 5
@@ -20991,7 +21415,7 @@ export class MySQLAdapter {
                  LIMIT ?`,
           [like, like, perCategory]
         )
-        .then(([rows]) => rows as any[]),
+        .then(([rows]) => rows as Row<GlobalSearchResults['vessels'][number]>[]),
 
       this.pool
         .query(
@@ -21002,7 +21426,7 @@ export class MySQLAdapter {
                  LIMIT ?`,
           [like, perCategory]
         )
-        .then(([rows]) => rows as any[]),
+        .then(([rows]) => rows as Row<GlobalSearchResults['entities'][number]>[]),
 
       this.pool
         .query(
@@ -21020,7 +21444,7 @@ export class MySQLAdapter {
                  LIMIT ?`,
           [like, perCategory]
         )
-        .then(([rows]) => rows as any[]),
+        .then(([rows]) => rows as Row<GlobalSearchResults['quotations'][number]>[]),
 
       this.pool
         .query(
@@ -21043,7 +21467,7 @@ export class MySQLAdapter {
                  LIMIT ?)`,
           [like, perCategory, like, like, perCategory]
         )
-        .then(([rows]) => rows as any[])
+        .then(([rows]) => rows as Row<GlobalSearchResults['policies'][number]>[])
     ])
 
     return { vessels, entities, quotations, policies }
@@ -21053,7 +21477,7 @@ export class MySQLAdapter {
     if (!this.pool) return
     const [existing] = (await this.pool.query(
       'SELECT COUNT(*) AS cnt FROM notification_groups'
-    )) as any[]
+    )) as QueryRows
     if (existing[0]?.cnt > 0) return
 
     const complianceId = uuidv4()
@@ -21103,7 +21527,7 @@ export class MySQLAdapter {
   }
 
   // --- Recent Items ---
-  async getRecentItems(userId: string, limit = 8): Promise<any[]> {
+  async getRecentItems(userId: string, limit = 8): Promise<RecentItem[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, user_id AS userId, item_type AS itemType, item_id AS itemId,
@@ -21115,7 +21539,7 @@ export class MySQLAdapter {
              LIMIT ?`,
       [userId, limit]
     )
-    return rows as any[]
+    return rows as Row<RecentItem>[]
   }
 
   async getDatabaseHealth(): Promise<{
@@ -21137,7 +21561,7 @@ export class MySQLAdapter {
       }
     }
     try {
-      const [[versionRow]] = (await this.pool.query('SELECT VERSION() as version')) as any
+      const [[versionRow]] = (await this.pool.query('SELECT VERSION() as version')) as QueryRows
       const version = versionRow?.version || 'Unknown'
 
       const [tableRows] = (await this.pool.query(
@@ -21147,18 +21571,15 @@ export class MySQLAdapter {
                  FROM information_schema.tables
                  WHERE table_schema = DATABASE()
                  ORDER BY data_length DESC`
-      )) as any
+      )) as QueryRows
 
       const tables = Array.isArray(tableRows) ? tableRows : []
       const tableCount = tables.length
-      const totalSizeMB = tables.reduce(
-        (sum: number, t: any) => sum + (parseFloat(t.sizeMB) || 0),
-        0
-      )
+      const totalSizeMB = tables.reduce((sum: number, t) => sum + (parseFloat(t.sizeMB) || 0), 0)
       const databaseSize =
         totalSizeMB < 1 ? `${(totalSizeMB * 1024).toFixed(0)} KB` : `${totalSizeMB.toFixed(2)} MB`
 
-      const largestTables = tables.slice(0, 10).map((t: any) => ({
+      const largestTables = tables.slice(0, 10).map((t) => ({
         name: t.name,
         rows: parseInt(t.rows) || 0,
         sizeMB: parseFloat(t.sizeMB) || 0
@@ -21219,7 +21640,7 @@ export class MySQLAdapter {
       'SELECT visible_columns FROM user_column_prefs WHERE user_id = ? AND page_key = ?',
       [userId, pageKey]
     )
-    const arr = rows as any[]
+    const arr = rows as RowDataPacket[]
     if (arr.length === 0) return null
     try {
       return JSON.parse(arr[0].visible_columns)
@@ -21288,29 +21709,31 @@ export class MySQLAdapter {
       `DELETE FROM entities WHERE id IN (${placeholders})`,
       entityIds
     )
-    return (result as any).affectedRows || 0
+    return (result as ResultSetHeader).affectedRows || 0
   }
 
   // --- Document Templates ---
-  async getDocumentTemplates(category?: string): Promise<any[]> {
+  async getDocumentTemplates(category?: string): Promise<DocumentTemplate[]> {
     if (!this.pool) return []
     let query = `SELECT id, name, description, category, file_name AS fileName,
             placeholders, body, created_by AS createdBy, order_index AS \`order\`, created_at AS createdAt
             FROM document_templates`
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (category) {
       query += ' WHERE category = ?'
       params.push(category)
     }
     query += ' ORDER BY order_index ASC'
     const [rows] = await this.pool.query(query, params)
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<DocumentTemplate>[]).map((r) => ({
       ...r,
       placeholders: r.placeholders ? safeJson(r.placeholders, null) : null
     }))
   }
 
-  async getDocumentTemplateById(id: string): Promise<any | null> {
+  async getDocumentTemplateById(
+    id: string
+  ): Promise<(DocumentTemplate & { fileData: Buffer | null }) | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT id, name, description, category, file_name AS fileName,
@@ -21319,7 +21742,7 @@ export class MySQLAdapter {
             FROM document_templates WHERE id = ?`,
       [id]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<DocumentTemplate & { fileData: Buffer | null }>[]
     if (arr.length === 0) return null
     const r = arr[0]
     return {
@@ -21337,12 +21760,12 @@ export class MySQLAdapter {
     placeholders?: string[] | null
     body?: string | null
     createdBy?: string | null
-  }): Promise<any> {
+  }): Promise<DocumentTemplate> {
     if (!this.pool) throw new Error('DB Not connected')
     const id = uuidv4()
     const [maxRow] = (await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 AS nextOrder FROM document_templates'
-    )) as any[]
+    )) as QueryRows
     const nextOrder = maxRow[0]?.nextOrder ?? 0
     await this.pool.execute(
       `INSERT INTO document_templates (id, name, description, category, file_name, file_data, placeholders, body, created_by, order_index)
@@ -21384,7 +21807,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (data.name !== undefined) {
       sets.push('name = ?')
       params.push(data.name)
@@ -21446,10 +21869,10 @@ export class MySQLAdapter {
              ORDER BY created_at DESC`,
       [userId]
     )
-    return (rows as any[]).map((r) => ({
+    return (rows as Row<SavedReport>[]).map((r) => ({
       ...r,
       isShared: Boolean(r.isShared),
-      config: safeJson(r.config, {})
+      config: safeJson<ReportConfig>(r.config, {} as ReportConfig)
     }))
   }
 
@@ -21498,7 +21921,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const sets: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (data.name !== undefined) {
       sets.push('name = ?')
       params.push(data.name)
@@ -21525,7 +21948,7 @@ export class MySQLAdapter {
     if (!this.pool) return
     if (ownerId == null) await this.pool.execute('DELETE FROM saved_reports WHERE id = ?', [id])
     else {
-      const [r]: any = await this.pool.execute(
+      const [r] = await this.pool.execute<ResultSetHeader>(
         'DELETE FROM saved_reports WHERE id = ? AND created_by = ?',
         [id, ownerId]
       )
@@ -21533,7 +21956,7 @@ export class MySQLAdapter {
     }
   }
 
-  async runReport(dataSource: string, config: ReportConfig): Promise<any[]> {
+  async runReport(dataSource: string, config: ReportConfig): Promise<ReportResultRow[]> {
     if (!this.pool) return []
 
     // Vessel classification can live in the legacy single column (v.classification_society)
@@ -21547,7 +21970,7 @@ export class MySQLAdapter {
       {
         baseQuery: string
         columnMap: Record<string, string>
-        filterMap: Record<string, (params: any[], val: any) => string>
+        filterMap: Record<string, (params: SqlValue[], val: string) => string>
         groupMap?: Record<string, string>
       }
     > = {
@@ -22022,7 +22445,7 @@ export class MySQLAdapter {
 
     // Build WHERE
     const conditions: string[] = []
-    const params: any[] = []
+    const params: SqlValue[] = []
     if (config.filters) {
       for (const [key, val] of Object.entries(config.filters)) {
         if (val === undefined || val === null || val === '' || val === 'all') continue
@@ -22050,18 +22473,18 @@ export class MySQLAdapter {
 
     const query = `SELECT ${selectCols} ${def.baseQuery} ${whereClause} ${orderClause} LIMIT 5000`
     const [rows] = await this.pool.query(query, params)
-    return rows as any[]
+    return rows as Row<ReportResultRow>[]
   }
 
   // ── User Signatures ─────────────────────────────────────────────
 
-  async getUserSignature(userId: string): Promise<any | null> {
+  async getUserSignature(userId: string): Promise<UserSignatureRow | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       'SELECT id, user_id AS userId, image_data AS imageData, file_name AS fileName, uploaded_at AS uploadedAt FROM user_signatures WHERE user_id = ?',
       [userId]
     )
-    const r = (rows as any[])[0]
+    const r = (rows as Row<UserSignatureRow>[])[0]
     return r || null
   }
 
@@ -22104,11 +22527,13 @@ export class MySQLAdapter {
              WHERE pd.id = ? AND pd.signed_by IS NOT NULL`,
       [policyId]
     )
-    const r = (rows as any[])[0]
+    const r = (
+      rows as Row<{ imageData: Buffer; signedBy: string; signedAt: string; signerName: string }>[]
+    )[0]
     return r || null
   }
 
-  async getAllUserSignatures(): Promise<any[]> {
+  async getAllUserSignatures(): Promise<UserSignatureListRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT us.id, us.user_id AS userId, us.file_name AS fileName, us.uploaded_at AS uploadedAt,
@@ -22117,26 +22542,26 @@ export class MySQLAdapter {
              JOIN users u ON u.id = us.user_id
              ORDER BY u.username`
     )
-    return rows as any[]
+    return rows as Row<UserSignatureListRow>[]
   }
 
   // ==================== Cargo Clauses ====================
 
-  async getCargoClausesBySection(section: string): Promise<any[]> {
+  async getCargoClausesBySection(section: string): Promise<CargoClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
       [section]
     )
-    return rows as any[]
+    return rows as Row<CargoClause>[]
   }
 
-  async getAllCargoClauses(): Promise<any[]> {
+  async getAllCargoClauses(): Promise<CargoClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
     )
-    return rows as any[]
+    return rows as Row<CargoClause>[]
   }
 
   async addCargoClause(
@@ -22146,14 +22571,14 @@ export class MySQLAdapter {
     code?: string,
     hasAmount?: boolean,
     amountPlaceholder?: string
-  ): Promise<any> {
+  ): Promise<NullableFields<CargoClause, 'text' | 'code' | 'amountPlaceholder'> | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_clauses WHERE section = ?',
       [section]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO cargo_clauses (id, section, title, text, code, order_index, has_amount, amount_placeholder) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -22169,7 +22594,7 @@ export class MySQLAdapter {
     )
     return {
       id,
-      section,
+      section: section as CargoClause['section'],
       title,
       text: text || null,
       code: code || null,
@@ -22193,7 +22618,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.title !== undefined) {
       fields.push('title = ?')
       values.push(updates.title)
@@ -22236,7 +22661,7 @@ export class MySQLAdapter {
   }
 
   // Cargo clause sets (named bundles of clauses, per section)
-  async getCargoClauseSets(section?: string): Promise<any[]> {
+  async getCargoClauseSets(section?: string): Promise<CargoClauseSet[]> {
     if (!this.pool) return []
     const [rows] = section
       ? await this.pool.query(
@@ -22246,25 +22671,29 @@ export class MySQLAdapter {
       : await this.pool.query(
           'SELECT id, section, name, order_index as `order` FROM cargo_clause_sets ORDER BY section, order_index ASC, name ASC'
         )
-    const sets = rows as any[]
+    const sets = rows as Row<CargoClauseSet>[]
     for (const set of sets) {
       const [items] = await this.pool.query(
         'SELECT cargo_clause_id FROM cargo_clause_set_items WHERE set_id = ? ORDER BY order_index ASC',
         [set.id]
       )
-      set.clauseIds = (items as any[]).map((i) => i.cargo_clause_id)
+      set.clauseIds = (items as RowDataPacket[]).map((i) => i.cargo_clause_id)
     }
     return sets
   }
 
-  async addCargoClauseSet(section: string, name: string, clauseIds: string[]): Promise<any> {
+  async addCargoClauseSet(
+    section: string,
+    name: string,
+    clauseIds: string[]
+  ): Promise<CargoClauseSet> {
     if (!this.pool) throw new Error('DB not connected')
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_clause_sets WHERE section = ?',
       [section]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO cargo_clause_sets (id, section, name, order_index) VALUES (?, ?, ?, ?)',
       [id, section, name, order]
@@ -22275,7 +22704,7 @@ export class MySQLAdapter {
         [uuidv4(), id, clauseIds[i], i]
       )
     }
-    return { id, section, name, order, clauseIds }
+    return { id, section: section as CargoClauseSet['section'], name, order, clauseIds }
   }
 
   async updateCargoClauseSet(id: string, name: string, clauseIds: string[]): Promise<void> {
@@ -22297,7 +22726,10 @@ export class MySQLAdapter {
   }
 
   // Per-quotation cargo clauses
-  async getQuotationCargoClauses(quotationId: string, section: string): Promise<any[]> {
+  async getQuotationCargoClauses(
+    quotationId: string,
+    section: string
+  ): Promise<QuotationCargoClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT qcc.id, qcc.quotation_id as quotationId, qcc.cargo_clause_id as cargoClauseId,
@@ -22310,7 +22742,7 @@ export class MySQLAdapter {
              ORDER BY qcc.order_index ASC`,
       [quotationId, section]
     )
-    return rows as any[]
+    return rows as Row<QuotationCargoClause>[]
   }
 
   async setQuotationCargoClauses(
@@ -22340,7 +22772,10 @@ export class MySQLAdapter {
     }
   }
 
-  async getQuotationCargoCustomClauses(quotationId: string, section: string): Promise<any[]> {
+  async getQuotationCargoCustomClauses(
+    quotationId: string,
+    section: string
+  ): Promise<QuotationCargoCustomClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, quotation_id as quotationId, text, section, order_index as \`order\`
@@ -22349,26 +22784,32 @@ export class MySQLAdapter {
              ORDER BY order_index ASC`,
       [quotationId, section]
     )
-    return rows as any[]
+    return rows as Row<QuotationCargoCustomClause>[]
   }
 
   async addQuotationCargoCustomClause(
     quotationId: string,
     section: string,
     text: string
-  ): Promise<any> {
+  ): Promise<QuotationCargoCustomClause | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM quotation_cargo_custom_clauses WHERE quotation_id = ? AND section = ?',
       [quotationId, section]
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO quotation_cargo_custom_clauses (id, quotation_id, text, section, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, quotationId, text, section, order]
     )
-    return { id, quotationId, text, section, order }
+    return {
+      id,
+      quotationId,
+      text,
+      section: section as QuotationCargoCustomClause['section'],
+      order
+    }
   }
 
   async updateQuotationCargoCustomClause(id: string, updates: { text?: string }): Promise<void> {
@@ -22397,21 +22838,25 @@ export class MySQLAdapter {
   }
 
   // Cargo Institute Clauses (ICC A/B/C)
-  async getCargoInstituteClauses(): Promise<any[]> {
+  async getCargoInstituteClauses(): Promise<CargoInstituteClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       'SELECT id, name, code, description, order_index as `order`, active FROM cargo_institute_clauses ORDER BY order_index ASC'
     )
-    return rows as any[]
+    return rows as Row<CargoInstituteClause>[]
   }
 
-  async addCargoInstituteClause(name: string, code?: string, description?: string): Promise<any> {
+  async addCargoInstituteClause(
+    name: string,
+    code?: string,
+    description?: string
+  ): Promise<NullableFields<CargoInstituteClause, 'code' | 'description'> | null> {
     if (!this.pool) return null
     const id = uuidv4()
     const [maxRow] = await this.pool.query(
       'SELECT COALESCE(MAX(order_index), -1) + 1 as nextOrder FROM cargo_institute_clauses'
     )
-    const order = (maxRow as any[])[0].nextOrder
+    const order = (maxRow as RowDataPacket[])[0].nextOrder
     await this.pool.execute(
       'INSERT INTO cargo_institute_clauses (id, name, code, description, order_index) VALUES (?, ?, ?, ?, ?)',
       [id, name, code || null, description || null, order]
@@ -22425,7 +22870,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -22496,7 +22941,7 @@ export class MySQLAdapter {
           `UPDATE ${table} SET ${column} = CONCAT(?, SUBSTRING(${column}, ? + 1)) WHERE LOWER(LEFT(${column}, ?)) = ?`,
           [newNorm, oldNorm.length, oldNorm.length, oldLower]
         )
-        const affected = (r as any).affectedRows || 0
+        const affected = (r as ResultSetHeader).affectedRows || 0
         if (affected > 0)
           console.log(`[remapAllFilePaths] ${table}.${column}: ${affected} rows updated`)
         total += affected
@@ -22523,7 +22968,7 @@ export class MySQLAdapter {
              LEFT JOIN document_types dt ON vd.document_type_id = dt.id
              WHERE vd.file_path IS NOT NULL AND vd.file_path != ''`
     )
-    for (const r of vdRows as any[]) {
+    for (const r of vdRows as RowDataPacket[]) {
       results.push({
         table: 'vessel_documents',
         id: r.id,
@@ -22541,7 +22986,7 @@ export class MySQLAdapter {
              LEFT JOIN vessels v ON cs.vessel_id = v.id
              WHERE sa.file_path IS NOT NULL AND sa.file_path != ''`
     )
-    for (const r of saRows as any[]) {
+    for (const r of saRows as RowDataPacket[]) {
       results.push({
         table: 'survey_attachments',
         id: r.id,
@@ -22562,7 +23007,7 @@ export class MySQLAdapter {
       const [rows] = await this.pool.query(
         `SELECT id, name, ${ec.col} as filePath FROM entities WHERE ${ec.col} IS NOT NULL AND ${ec.col} != ''`
       )
-      for (const r of rows as any[]) {
+      for (const r of rows as RowDataPacket[]) {
         results.push({
           table: 'entities',
           id: r.id,
@@ -22577,7 +23022,7 @@ export class MySQLAdapter {
   }
   // ---- Policy Endorsements ----
 
-  async getEndorsements(policyDocId: string): Promise<any[]> {
+  async getEndorsements(policyDocId: string): Promise<PolicyEndorsement[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
@@ -22590,10 +23035,10 @@ export class MySQLAdapter {
              FROM policy_endorsements WHERE policy_doc_id = ? ORDER BY endorsement_number ASC`,
       [policyDocId]
     )
-    return rows as any[]
+    return rows as Row<PolicyEndorsement>[]
   }
 
-  async getEndorsement(id: string): Promise<any | null> {
+  async getEndorsement(id: string): Promise<PolicyEndorsement | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.query(
       `SELECT id, policy_doc_id AS policyDocId, endorsement_number AS endorsementNumber,
@@ -22606,7 +23051,7 @@ export class MySQLAdapter {
              FROM policy_endorsements WHERE id = ?`,
       [id]
     )
-    const arr = rows as any[]
+    const arr = rows as Row<PolicyEndorsement>[]
     return arr.length > 0 ? arr[0] : null
   }
 
@@ -22616,7 +23061,7 @@ export class MySQLAdapter {
       'SELECT COALESCE(MAX(endorsement_number), 0) + 1 AS nextNum FROM policy_endorsements WHERE policy_doc_id = ?',
       [policyDocId]
     )
-    return (rows as any[])[0].nextNum
+    return (rows as RowDataPacket[])[0].nextNum
   }
 
   async createEndorsement(data: {
@@ -22674,7 +23119,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.effectiveDate !== undefined) {
       fields.push('effective_date = ?')
       values.push(updates.effectiveDate)
@@ -22709,11 +23154,11 @@ export class MySQLAdapter {
     }
     // DATETIME columns: an ISO string (2026-10-04T07:20:54.890Z) is rejected by MariaDB strict mode
     // (stored as local time, like the CURRENT_TIMESTAMP columns)
-    const toDbDateTime = (v: string | null) => {
+    const toDbDateTime = (v: string | null): string | null => {
       if (!v) return null
       const d = new Date(v)
       if (isNaN(d.getTime())) return String(v).slice(0, 19)
-      const p = (n: number) => String(n).padStart(2, '0')
+      const p = (n: number): string => String(n).padStart(2, '0')
       return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
     }
     if (updates.exportedAt !== undefined) {
@@ -22737,7 +23182,10 @@ export class MySQLAdapter {
     // Any real change (content, signing) drops the stored files; marking it exported does not
     if (
       Object.keys(updates).some(
-        (k) => k !== 'status' && k !== 'exportedAt' && (updates as any)[k] !== undefined
+        (k) =>
+          k !== 'status' &&
+          k !== 'exportedAt' &&
+          (updates as Record<string, unknown>)[k] !== undefined
       )
     ) {
       await this.clearEndorsementExportFiles(id)
@@ -22752,7 +23200,7 @@ export class MySQLAdapter {
     await this.clearEndorsementExportFiles(id)
   }
 
-  async getEndorsementSections(endorsementId: string): Promise<any[]> {
+  async getEndorsementSections(endorsementId: string): Promise<EndorsementSection[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, endorsement_id AS endorsementId, section_key AS sectionKey,
@@ -22761,7 +23209,7 @@ export class MySQLAdapter {
              FROM endorsement_sections WHERE endorsement_id = ? ORDER BY order_index ASC`,
       [endorsementId]
     )
-    return rows as any[]
+    return rows as Row<EndorsementSection>[]
   }
 
   async setEndorsementSections(
@@ -22799,7 +23247,7 @@ export class MySQLAdapter {
     }
   }
 
-  async getEndorsementInstalments(endorsementId: string): Promise<any[]> {
+  async getEndorsementInstalments(endorsementId: string): Promise<EndorsementInstalment[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, endorsement_id AS endorsementId, instalment_number AS instalmentNumber,
@@ -22807,7 +23255,7 @@ export class MySQLAdapter {
              FROM endorsement_instalments WHERE endorsement_id = ? ORDER BY instalment_number ASC`,
       [endorsementId]
     )
-    return rows as any[]
+    return rows as Row<EndorsementInstalment>[]
   }
 
   async setEndorsementInstalments(
@@ -22846,18 +23294,18 @@ export class MySQLAdapter {
       'SELECT COUNT(*) AS cnt FROM policy_endorsements WHERE policy_doc_id = ?',
       [policyDocId]
     )
-    return (rows as any[])[0].cnt
+    return (rows as RowDataPacket[])[0].cnt
   }
 
   // ---- Endorsement Trigger Fields ----
 
-  async getEndorsementTriggerFields(): Promise<any[]> {
+  async getEndorsementTriggerFields(): Promise<EndorsementTriggerField[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, field_key AS fieldKey, field_label AS fieldLabel, is_active AS isActive
              FROM endorsement_trigger_fields ORDER BY field_label ASC`
     )
-    return rows as any[]
+    return rows as Row<EndorsementTriggerField>[]
   }
 
   async setEndorsementTriggerFields(
@@ -22874,13 +23322,13 @@ export class MySQLAdapter {
 
   // ---- Endorsement Templates ----
 
-  async getEndorsementTemplates(): Promise<any[]> {
+  async getEndorsementTemplates(): Promise<EndorsementTemplate[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
       `SELECT id, name, section_key AS sectionKey, content, order_index AS orderIndex
              FROM endorsement_templates ORDER BY order_index ASC`
     )
-    return rows as any[]
+    return rows as Row<EndorsementTemplate>[]
   }
 
   async addEndorsementTemplate(data: {
@@ -22905,7 +23353,7 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     const fields: string[] = []
-    const values: any[] = []
+    const values: SqlValue[] = []
     if (updates.name !== undefined) {
       fields.push('name = ?')
       values.push(updates.name)
@@ -22976,7 +23424,7 @@ export class MySQLAdapter {
         'SELECT vessel_id, quotation_id FROM policy_documents WHERE id = ?',
         [policyDocId]
       )
-      const policy = (policyRows as any[])[0]
+      const policy = (policyRows as RowDataPacket[])[0]
       if (!policy) throw new Error('Policy not found')
 
       // Check if P&I (for blue card supersession)
@@ -22986,7 +23434,7 @@ export class MySQLAdapter {
           `SELECT qt.code FROM policy_documents pd JOIN quotations q ON pd.quotation_id = q.id JOIN policy_types qt ON q.quotation_type_id = qt.id WHERE pd.id = ?`,
           [policyDocId]
         )
-        isPnI = (qtRows as any[])[0]?.code === 'P'
+        isPnI = (qtRows as RowDataPacket[])[0]?.code === 'P'
       } catch {
         /* ignore */
       }
@@ -23047,7 +23495,7 @@ export class MySQLAdapter {
         const [qRows] = await conn.query('SELECT quotation_type_id FROM quotations WHERE id = ?', [
           policy.quotation_id
         ])
-        const qtId = (qRows as any[])[0]?.quotation_type_id
+        const qtId = (qRows as RowDataPacket[])[0]?.quotation_type_id
         if (qtId) {
           await conn.execute(
             "UPDATE vessel_dynamic_policies SET status = 'cancelled' WHERE vessel_id = ? AND policy_type_id = ? AND status = 'active'",
@@ -23071,7 +23519,7 @@ export class MySQLAdapter {
         "SELECT COUNT(*) as cnt FROM vessel_dynamic_policies WHERE vessel_id = ? AND status = 'active'",
         [policy.vessel_id]
       )
-      if ((remaining as any[])[0].cnt === 0) {
+      if ((remaining as RowDataPacket[])[0].cnt === 0) {
         await conn.execute('UPDATE vessels SET is_active = FALSE WHERE id = ?', [policy.vessel_id])
       }
 

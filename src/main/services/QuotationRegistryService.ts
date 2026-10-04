@@ -1,5 +1,6 @@
 import XLSX from 'xlsx-js-style'
-import { existsSync, writeFileSync } from 'fs'
+import { existsSync, writeFileSync, unlinkSync } from 'fs'
+import { tmpdir } from 'os'
 import { execSync, execFileSync } from 'child_process'
 import { join } from 'path'
 
@@ -75,7 +76,6 @@ function getLastSerial(ws: XLSX.WorkSheet): number {
 // '...' strings is unsafe — PowerShell also treats the curly quotes ‘ ’ ‚ ‛ as string
 // delimiters, so a name like O’BRIEN could break out of the string.
 function runPowerShellScript(body: string, data: Record<string, unknown>): string {
-  const { tmpdir } = require('os')
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const tempFile = join(tmpdir(), `vc-registry-${stamp}.ps1`)
   const dataFile = join(tmpdir(), `vc-registry-${stamp}.json`)
@@ -93,16 +93,17 @@ function runPowerShellScript(body: string, data: Record<string, unknown>): strin
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tempFile, '-DataPath', dataFile],
       { encoding: 'utf-8', timeout: 30000, windowsHide: true }
     ).trim()
-  } catch (err: any) {
-    throw new Error(`Excel COM failed: ${err.stderr || err.message}`)
+  } catch (err) {
+    const e = err as { stderr?: string; message?: string }
+    throw new Error(`Excel COM failed: ${e.stderr || e.message}`, { cause: err })
   } finally {
     try {
-      require('fs').unlinkSync(tempFile)
+      unlinkSync(tempFile)
     } catch {
       /* ignore */
     }
     try {
-      require('fs').unlinkSync(dataFile)
+      unlinkSync(dataFile)
     } catch {
       /* ignore */
     }
@@ -219,7 +220,7 @@ function appendRowViaXlsx(
   const newRow = range.e.r + 1
 
   const dateSerial = (Date.now() - new Date(1899, 11, 30).getTime()) / (24 * 60 * 60 * 1000)
-  const cells: [number, any][] = [
+  const cells: [number, XLSX.CellObject][] = [
     [0, { v: dateSerial, t: 'n', z: 'dd/mm/yyyy' }],
     [1, { v: values.quotationType, t: 's' }],
     [2, { v: values.branch, t: 's' }],

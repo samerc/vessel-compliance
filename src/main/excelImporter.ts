@@ -1,25 +1,36 @@
 import XLSX from 'xlsx-js-style'
 import { db } from './mysql/adapter'
+import type { Entity } from '../shared/types'
+
+type ExcelCell = string | number | boolean | Date | null | undefined
+
+interface ImportStats {
+  vesselsCreated: number
+  vesselsUpdated: number
+  entitiesCreated: number
+  assuredsLinked: number
+  customersAssigned: number
+}
 
 export class ExcelImporter {
   async importFromExcel(
     filePath: string
-  ): Promise<{ success: boolean; message: string; stats?: any }> {
+  ): Promise<{ success: boolean; message: string; stats?: ImportStats }> {
     try {
       const workbook = XLSX.readFile(filePath)
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
-      const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
+      const rawData: ExcelCell[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
 
       if (rawData.length < 2) {
         return { success: false, message: 'Excel file is empty or has no data rows' }
       }
 
-      const headers = rawData[0].map((h: any) => h?.toString().trim() || '')
+      const headers = rawData[0].map((h) => h?.toString().trim() || '')
       const dataRows = rawData.slice(1)
 
       // Find column indices (case-insensitive, trimmed)
-      const findCol = (name: string) =>
+      const findCol = (name: string): number =>
         headers.findIndex(
           (h: string) => h.toLowerCase().replace(/[#]/g, '').trim() === name.toLowerCase()
         )
@@ -40,7 +51,7 @@ export class ExcelImporter {
         }
       }
 
-      const stats = {
+      const stats: ImportStats = {
         vesselsCreated: 0,
         vesselsUpdated: 0,
         entitiesCreated: 0,
@@ -133,15 +144,19 @@ export class ExcelImporter {
         message: 'Import completed successfully!',
         stats
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        message: `Import failed: ${error.message}`
+        message: `Import failed: ${error instanceof Error ? error.message : String(error)}`
       }
     }
   }
 
-  private async findOrCreateEntity(name: string, type: 'company' | 'person', stats: any) {
+  private async findOrCreateEntity(
+    name: string,
+    type: 'company' | 'person',
+    stats: ImportStats
+  ): Promise<Entity> {
     const entities = await db.getEntities()
     let entity = entities.find((e) => e.name.toLowerCase() === name.toLowerCase())
 
@@ -158,8 +173,8 @@ export class ExcelImporter {
     name: string,
     role: string,
     type: 'company' | 'person',
-    stats: any
-  ) {
+    stats: ImportStats
+  ): Promise<void> {
     const entity = await this.findOrCreateEntity(name, type, stats)
 
     const vesselAssureds = await db.getVesselAssureds(vesselId)

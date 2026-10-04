@@ -9,8 +9,13 @@
  * version can always bootstrap newer hot-update code.
  */
 import { app } from 'electron'
-import { existsSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, readFileSync, writeFileSync, rmSync, renameSync } from 'fs'
+import { createRequire } from 'module'
+import { delimiter, join } from 'path'
+
+// The app code is loaded from a path computed at runtime (bundled ASAR or the hot-update cache),
+// so it cannot be a static import: use a CommonJS require bound to this file.
+const nodeRequire = createRequire(__filename)
 
 const HOT_UPDATE_DIR = join(app.getPath('userData'), 'hot-update')
 
@@ -45,9 +50,9 @@ if (app.isPackaged) {
       const asarNodeModules = join(app.getAppPath(), 'node_modules')
       process.env.NODE_PATH = [process.env.NODE_PATH, asarNodeModules]
         .filter(Boolean)
-        .join(require('path').delimiter)
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require('module').Module._initPaths()
+        .join(delimiter)
+      // Node only reads NODE_PATH at startup: re-run its private path initialisation
+      nodeRequire('module').Module._initPaths()
 
       appEntry = hotApp
     }
@@ -58,8 +63,7 @@ if (app.isPackaged) {
 
 const bundledEntry = join(__dirname, 'index.js')
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require(appEntry)
+  nodeRequire(appEntry)
 } catch (err) {
   if (appEntry === bundledEntry) throw err
   // A broken hot-update must not crash the app on every launch: disable the cache and start the
@@ -68,15 +72,14 @@ try {
   // Only the latest broken copy is kept, for diagnosis.
   console.error('[bootstrap] Hot-update failed to load, falling back to bundled code:', err)
   try {
-    const fs = require('fs')
     const userData = app.getPath('userData')
-    let info: any = {}
+    let info: { buildNumber?: unknown; version?: unknown } = {}
     try {
-      info = JSON.parse(fs.readFileSync(join(HOT_UPDATE_DIR, 'version.json'), 'utf-8'))
+      info = JSON.parse(readFileSync(join(HOT_UPDATE_DIR, 'version.json'), 'utf-8'))
     } catch {
       /* unknown build */
     }
-    fs.writeFileSync(
+    writeFileSync(
       join(userData, 'hot-update-blocked.json'),
       JSON.stringify({
         buildNumber: info.buildNumber ?? null,
@@ -86,11 +89,10 @@ try {
       })
     )
     const brokenDir = `${HOT_UPDATE_DIR}-broken`
-    fs.rmSync(brokenDir, { recursive: true, force: true })
-    fs.renameSync(HOT_UPDATE_DIR, brokenDir)
+    rmSync(brokenDir, { recursive: true, force: true })
+    renameSync(HOT_UPDATE_DIR, brokenDir)
   } catch {
     /* ignore — fallback still proceeds */
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require(bundledEntry)
+  nodeRequire(bundledEntry)
 }

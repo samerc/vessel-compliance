@@ -6,6 +6,13 @@ import Store from 'electron-store'
 
 const store = new Store()
 
+/** Copy of a user row without its password hash (never cached, persisted or sent to the renderer). */
+const withoutPasswordHash = (user: User): Omit<User, 'passwordHash'> => {
+  const copy: Omit<User, 'passwordHash'> & { passwordHash?: string } = { ...user }
+  delete copy.passwordHash
+  return copy
+}
+
 const hashSessionId = (sessionId: string): string =>
   createHash('sha256').update(sessionId).digest('hex')
 
@@ -199,7 +206,7 @@ export class AuthService {
     db.updateUserLastLogin(user.id).catch(() => {})
 
     // Return user without hash and create session
-    const { passwordHash, ...safeUser } = user
+    const safeUser = withoutPasswordHash(user)
     const sessionId = this.createSession(safeUser)
     return { success: true, user: safeUser, sessionId }
   }
@@ -338,7 +345,7 @@ export class AuthService {
           this.clearSessionFromDisk()
           continue
         }
-        const { passwordHash: _ph, ...safeUser } = fresh
+        const safeUser = withoutPasswordHash(fresh)
         session.user = safeUser
         session.verified = true
         this.saveSessionToDisk(sessionId, safeUser)
@@ -357,7 +364,7 @@ export class AuthService {
         this.sessions.delete(sessionId)
         continue
       }
-      const { passwordHash: _ph, ...safeUser } = fresh
+      const safeUser = withoutPasswordHash(fresh)
       session.user = { ...session.user, ...safeUser }
     }
   }

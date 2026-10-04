@@ -8,7 +8,7 @@ export function parseIsfSanctions(buffer: Buffer): {
 } {
   const wb = XLSX.read(buffer, { type: 'buffer' })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
 
   const entries: SanctionsEntity[] = []
   if (data.length < 3) return { entities: entries, releaseDate: null }
@@ -28,7 +28,7 @@ export function parseIsfSanctions(buffer: Buffer): {
   return { entities: entries, releaseDate: null }
 }
 
-function parseIsfRow(row: any[]): SanctionsEntity | null {
+function parseIsfRow(row: unknown[]): SanctionsEntity | null {
   const name = cleanText(row[1])
   if (!name) return null
 
@@ -117,7 +117,7 @@ function excelDateToString(serial: number): string {
   return `${year}-${month}-${day}`
 }
 
-function cleanText(val: any): string {
+function cleanText(val: unknown): string {
   if (val == null) return ''
   if (typeof val === 'number') return String(val)
   return String(val).trim().replace(/\s+/g, ' ')

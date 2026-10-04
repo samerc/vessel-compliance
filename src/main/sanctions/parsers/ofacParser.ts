@@ -1,5 +1,12 @@
 import xml2js from 'xml2js'
-import { normalizeText, extractText, parseDate, normalizeEntityType } from '../normalize'
+import {
+  normalizeText,
+  extractText,
+  parseDate,
+  normalizeEntityType,
+  asList,
+  type XmlNode
+} from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
 export async function parseOfacSdn(
@@ -33,11 +40,11 @@ export async function parseOfacSdn(
   return { entities: entries, releaseDate }
 }
 
-function parseSDNEntry(entry: any): SanctionsEntity | null {
+function parseSDNEntry(entry: XmlNode): SanctionsEntity | null {
   const sdnType = extractText(entry.sdnType || entry.SdnType || entry.type)
   const entityType = normalizeEntityType(sdnType)
 
-  let name = ''
+  let name: string
   if (entry.firstName || entry.lastName) {
     const firstName = extractText(entry.firstName || '')
     const lastName = extractText(entry.lastName || '')
@@ -49,8 +56,7 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
 
   const aliases: string[] = []
   if (entry.akaList) {
-    let akaEntries = entry.akaList.aka
-    if (!Array.isArray(akaEntries)) akaEntries = [akaEntries]
+    const akaEntries = asList(entry.akaList.aka)
     for (const aka of akaEntries) {
       if (!aka) continue
       const akaName = getAkaName(aka)
@@ -60,8 +66,7 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
 
   const addresses: string[] = []
   if (entry.addressList) {
-    let addrEntries = entry.addressList.address
-    if (!Array.isArray(addrEntries)) addrEntries = [addrEntries]
+    const addrEntries = asList(entry.addressList.address)
     for (const addr of addrEntries) {
       if (!addr) continue
       const address = parseAddress(addr)
@@ -71,15 +76,13 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
 
   const programs: string[] = []
   if (entry.programList) {
-    let progEntries = entry.programList.program
-    if (!Array.isArray(progEntries)) progEntries = [progEntries]
-    programs.push(...progEntries.map((p: any) => extractText(p)).filter(Boolean))
+    const progEntries = asList(entry.programList.program)
+    programs.push(...progEntries.map((p) => extractText(p)).filter(Boolean))
   }
 
   const identifications: { type: string; number: string; country: string }[] = []
   if (entry.idList) {
-    let idEntries = entry.idList.id
-    if (!Array.isArray(idEntries)) idEntries = [idEntries]
+    const idEntries = asList(entry.idList.id)
     for (const id of idEntries) {
       if (!id) continue
       identifications.push({
@@ -92,15 +95,13 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
 
   let dateOfBirth: string | null = null
   if (entry.dateOfBirthList) {
-    let dobEntries = entry.dateOfBirthList.dateOfBirthItem
-    if (!Array.isArray(dobEntries)) dobEntries = [dobEntries]
+    const dobEntries = asList(entry.dateOfBirthList.dateOfBirthItem)
     if (dobEntries[0]) dateOfBirth = parseDate(dobEntries[0].dateOfBirth)
   }
 
   let nationality: string | null = null
   if (entry.nationalityList) {
-    let natEntries = entry.nationalityList.nationality
-    if (!Array.isArray(natEntries)) natEntries = [natEntries]
+    const natEntries = asList(entry.nationalityList.nationality)
     if (natEntries[0]) nationality = extractText(natEntries[0].country || natEntries[0])
   }
 
@@ -138,7 +139,7 @@ function parseSDNEntry(entry: any): SanctionsEntity | null {
   }
 }
 
-function getAkaName(aka: any): string {
+function getAkaName(aka: XmlNode): string {
   if (!aka) return ''
   if (aka.firstName || aka.lastName) {
     const firstName = extractText(aka.firstName || '')
@@ -148,7 +149,7 @@ function getAkaName(aka: any): string {
   return extractText(aka.lastName || aka.name || aka)
 }
 
-function parseAddress(addr: any): string | null {
+function parseAddress(addr: XmlNode): string | null {
   if (!addr) return null
   const parts = [
     extractText(addr.address1),

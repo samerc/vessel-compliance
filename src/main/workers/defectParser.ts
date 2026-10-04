@@ -140,7 +140,7 @@ function normRef(ref: string): string {
 
 function cleanText(s: string): string {
   return s
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n */g, '\n')
     .replace(/\n{2,}/g, '\n')
     .trim()
@@ -210,7 +210,7 @@ export function parseDefectText(raw: string): ParsedDefect[] {
   const lines = raw
     .replace(/\r/g, '')
     .split('\n')
-    .map((l) => l.replace(/[ \t ]+/g, ' ').trim())
+    .map((l) => l.replace(/[ \t\u00a0]+/g, ' ').trim())
   const out: ParsedDefect[] = []
   let section: Section = 'none'
   let surveyDate: Date | null = null

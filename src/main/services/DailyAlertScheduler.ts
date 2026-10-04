@@ -1,4 +1,5 @@
 import { MySQLAdapter } from '../mysql/adapter'
+import type { RowDataPacket } from 'mysql2/promise'
 
 export class DailyAlertScheduler {
   private db: MySQLAdapter
@@ -113,7 +114,7 @@ export class DailyAlertScheduler {
       [todayStr, futureDateStr]
     )
 
-    const items = rows as any[]
+    const items = rows as RowDataPacket[]
     if (items.length > 0) {
       const summary =
         items.length === 1
@@ -139,7 +140,7 @@ export class DailyAlertScheduler {
        LEFT JOIN vessel_documents vd ON vd.vessel_id = v.id AND vd.document_type_id = dt.id AND vd.file_path IS NOT NULL
        WHERE v.is_active = TRUE AND dt.required = TRUE AND vd.id IS NULL`
     )
-    const count = (rows as any[])[0]?.cnt || 0
+    const count = (rows as RowDataPacket[])[0]?.cnt || 0
     if (count > 0) {
       await this.db.notifyGroupsForEvent(
         'document_missing',
@@ -171,7 +172,7 @@ export class DailyAlertScheduler {
       [todayStr, futureDateStr]
     )
 
-    const items = rows as any[]
+    const items = rows as RowDataPacket[]
     if (items.length > 0) {
       const summary =
         items.length === 1
@@ -206,7 +207,7 @@ export class DailyAlertScheduler {
       [todayStr, futureDateStr]
     )
 
-    const items = rows as any[]
+    const items = rows as RowDataPacket[]
     if (items.length > 0) {
       const summary =
         items.length === 1
@@ -244,7 +245,7 @@ export class DailyAlertScheduler {
       [todayStr, futureDateStr]
     )
 
-    const items = rows as any[]
+    const items = rows as RowDataPacket[]
     if (items.length > 0) {
       const summary =
         items.length === 1

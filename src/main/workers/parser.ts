@@ -12,7 +12,7 @@ import { parseDefectTables, parseDefectText, type ParsedDefect } from './defectP
 // pdf.js only takes its Node.js code path (polyfills, in-process worker) when it believes it runs in
 // Node; it treats any Electron process whose process.type is not 'browser' as a web page. This is an
 // isolated utility process with no DOM, so hide the Electron process type BEFORE pdf-parse loads.
-if ((process as any).type && (process as any).type !== 'browser') {
+if (process.type && process.type !== 'browser') {
   try {
     Object.defineProperty(process, 'type', { value: undefined, configurable: true, writable: true })
   } catch {
@@ -22,15 +22,18 @@ if ((process as any).type && (process as any).type !== 'browser') {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PDFParse } = require('pdf-parse') as { PDFParse: typeof PDFParseType }
 
-const utilityPort = (process as any).parentPort as
-  | {
-      on: (ev: 'message', cb: (e: { data: any }) => void) => void
-      postMessage: (m: unknown) => void
-    }
-  | undefined
+interface ParseRequest {
+  filePath: string
+}
+interface UtilityPort {
+  on: (ev: 'message', cb: (e: { data: unknown }) => void) => void
+  postMessage: (m: unknown) => void
+}
+// Only set in an Electron utility process (undefined when run standalone with worker_threads)
+const utilityPort = process.parentPort as UtilityPort | undefined
 const port = {
-  on: (cb: (msg: any) => void): void => {
-    if (utilityPort) utilityPort.on('message', (e) => cb(e.data))
+  on: (cb: (msg: ParseRequest) => void): void => {
+    if (utilityPort) utilityPort.on('message', (e) => cb(e.data as ParseRequest))
     else parentPort?.on('message', cb)
   },
   post: (m: unknown): void => {
@@ -68,8 +71,8 @@ port.on(async ({ filePath }) => {
       )
     }
     port.post({ success: true, defects })
-  } catch (error: any) {
-    port.post({ success: false, error: error.message })
+  } catch (error) {
+    port.post({ success: false, error: error instanceof Error ? error.message : undefined })
   }
   // One file per process: exit once pdf.js has finished cleaning up (the parent kills it if it lingers)
   port.close()

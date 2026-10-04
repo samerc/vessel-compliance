@@ -1,4 +1,5 @@
 import Fuse, { type FuseResult } from 'fuse.js'
+import { readFileSync } from 'fs'
 import { SanctionsDatabase, SanctionsEntity, DataUpdate } from './SanctionsDatabase'
 import { parseOfacSdn } from './parsers/ofacParser'
 import { parseEuSanctions } from './parsers/euParser'
@@ -89,11 +90,14 @@ export interface SearchResult {
   entity: Omit<SanctionsEntity, 'id'>
 }
 
+/** Entity as indexed by Fuse: aliases also flattened (and Arabic-folded) into one string. */
+type SearchableEntity = SanctionsEntity & { aliasesFlat: string }
+
 export class SanctionsService {
   private db = new SanctionsDatabase()
-  private fuseIndex: Fuse<any> | null = null
+  private fuseIndex: Fuse<SearchableEntity> | null = null
   private entityCache: SanctionsEntity[] = []
-  private searchable: any[] = []
+  private searchable: SearchableEntity[] = []
   private gramIndex: Map<string, number[]> = new Map()
   private gramCounts: Uint16Array = new Uint16Array(0)
   // Slots of `searchable` replaced/removed by a SIC edit since the last full build (tombstones)
@@ -113,13 +117,13 @@ export class SanctionsService {
     this.initialized = false
   }
 
-  private static toSearchable(e: SanctionsEntity): any {
+  private static toSearchable(e: SanctionsEntity): SearchableEntity {
     // Aliases hold the Arabic spelling of SIC names: folded so spelling variants match
     return { ...e, aliasesFlat: Array.isArray(e.aliases) ? foldArabic(e.aliases.join(' ')) : '' }
   }
 
   // Inverted trigram index over every searched field (see prefilterOverlap)
-  private indexGrams(e: any, idx: number): void {
+  private indexGrams(e: SearchableEntity, idx: number): void {
     const text = [
       e.name,
       e.name_normalized,
@@ -179,9 +183,9 @@ export class SanctionsService {
 
   // Fuse over the trigram candidates only; falls back to the full index when the query has no
   // usable trigrams or the candidates are most of the list anyway
-  private fuzzyCandidatesSearch(query: string, minScore: number): FuseResult<any>[] {
+  private fuzzyCandidatesSearch(query: string, minScore: number): FuseResult<SearchableEntity>[] {
     if (!this.fuseIndex) return []
-    const full = () => {
+    const full = (): FuseResult<SearchableEntity>[] => {
       const r = this.fuseIndex!.search(query)
       return this.dead.size ? r.filter((x) => !this.dead.has(x.refIndex)) : r
     }
@@ -338,8 +342,8 @@ export class SanctionsService {
 
       console.log(`[Sanctions] ${src} refresh complete: ${entities.length} entities`)
       return { source: src, count: entities.length, status: 'success', releaseDate }
-    } catch (err: any) {
-      const msg = err.message || 'Unknown error'
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : '') || 'Unknown error'
       console.error(`[Sanctions] ${src} refresh failed:`, msg)
       this.db.upsertDataUpdate(src, 0, `error: ${msg}`, null)
       return { source: src, count: 0, status: 'error', releaseDate: null, error: msg }
@@ -408,8 +412,7 @@ export class SanctionsService {
   }
 
   importSicFromFile(filePath: string): { count: number } {
-    const fs = require('fs')
-    const buffer = fs.readFileSync(filePath)
+    const buffer = readFileSync(filePath)
     const parsed = parseSicExcel(buffer)
     this.db.clearEntitiesBySource('SIC')
     this.db.insertEntitiesBatch(parsed.entities)
@@ -479,7 +482,8 @@ export class SanctionsService {
 }
 
 function stripId(entity: SanctionsEntity): Omit<SanctionsEntity, 'id'> {
-  const { id: _, ...rest } = entity
+  const rest: SanctionsEntity = { ...entity }
+  delete rest.id
   return rest
 }
 

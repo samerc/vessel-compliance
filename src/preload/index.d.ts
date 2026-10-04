@@ -21,8 +21,6 @@ import {
   EntityQueryParams,
   SurveyorQueryParams,
   ComplianceResultQueryParams,
-  ReminderSettings,
-  VesselReminder,
   VesselNameHistory,
   FlagState,
   VesselCustomDocType,
@@ -112,7 +110,6 @@ import {
   SavedReport,
   ReportConfig,
   CustomValidationRule,
-  PolicyTcTemplate,
   FileNode,
   EntityDocumentType,
   EntityDocument,
@@ -122,7 +119,47 @@ import {
   EndorsementTriggerField,
   EndorsementTemplate,
   SicLetterPage,
-  SicEntityInput
+  SicEntityInput,
+  VesselQueryParams,
+  DbConnectionConfig,
+  HotUpdateVersion,
+  Changelog,
+  ExcelImportStats,
+  SicListEntity,
+  SanctionsRefreshResult,
+  DABResult,
+  DefectAttachmentRecord,
+  OpenDefectRow,
+  SurveyHistoryRow,
+  EndorsementDueRow,
+  PolicyListRow,
+  PolicyExpiryRow,
+  PolicyRenewalRow,
+  RenewalStatusType,
+  PolicyRenewalNote,
+  VesselNote,
+  QuotationListRow,
+  QuotationSavedFilter,
+  QuotationSavedFilterValues,
+  VesselQuotationRow,
+  DeletedQuotationRow,
+  WarBreachRecordInput,
+  WarBreachRecord,
+  AnalyticsFilters,
+  AnalyticsVesselRow,
+  AnalyticsPolicyCoverage,
+  PolicyDocument,
+  PolicyDocInstalment,
+  PolicyDocAddress,
+  PolicyBlueCard,
+  PolicyBlueCardInput,
+  PolicyBlueCardUpdate,
+  ConvertedPolicy,
+  PolicyCancelOptions,
+  ReportResultRow,
+  TcTemplateMeta,
+  TcTemplateDetail,
+  TcTemplateSummary
 } from '../shared/types'
 
 export interface Api {
@@ -136,11 +173,13 @@ export interface Api {
     currentPassword: string,
     newPassword: string
   ) => Promise<{ success: boolean; message?: string }>
-  authLogin: (credentials: {
+  /** Legacy fallback: not exposed by the preload (AuthProvider calls login when present) */
+  authLogin?: (credentials: {
     username: string
     password: string
   }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
-  authGetSession: () => Promise<Omit<User, 'passwordHash'> | null>
+  /** Legacy fallback: not exposed by the preload */
+  authGetSession?: () => Promise<Omit<User, 'passwordHash'> | null>
   authResetPassword: (
     username: string
   ) => Promise<{ success: boolean; message?: string; newPassword?: string }>
@@ -148,7 +187,8 @@ export interface Api {
   authForceResetPassword: (newPassword: string) => Promise<{ success: boolean }>
   adminForcePasswordResetAll: () => Promise<{ success: boolean }>
   adminForcePasswordResetUsers: (userIds: string[]) => Promise<{ success: boolean }>
-  authLogout: () => Promise<void>
+  /** Legacy fallback: not exposed by the preload */
+  authLogout?: () => Promise<void>
   authCreateUser: (userData: {
     username: string
     password: string
@@ -164,7 +204,7 @@ export interface Api {
   setupSelectDirectory: () => Promise<string | null>
   setupSelectConfigFile: () => Promise<string | null>
   setupSaveConfig: (
-    config: any,
+    config: DbConnectionConfig,
     directory: string
   ) => Promise<{ success: boolean; message?: string }>
   setupCheckConnection: () => Promise<boolean>
@@ -172,7 +212,7 @@ export interface Api {
   setupLoadConfigFromDir: (directory: string) => Promise<{ success: boolean; message?: string }>
   setupLoadConfigFromFile: (filePath: string) => Promise<{ success: boolean; message?: string }>
   onDbStatus: (callback: (status: { connected: boolean }) => void) => () => void
-  onHotUpdateAvailable: (callback: (version: any) => void) => () => void
+  onHotUpdateAvailable: (callback: (version: HotUpdateVersion) => void) => () => void
   getDocumentTypes: () => Promise<DocumentType[]>
   addDocumentType: (docType: Omit<DocumentType, 'id'>) => Promise<DocumentType>
   updateDocumentType: (id: string, updates: Partial<DocumentType>) => Promise<void>
@@ -187,6 +227,7 @@ export interface Api {
   deleteFleet: (id: string) => Promise<void>
 
   getVessels: () => Promise<Vessel[]>
+  getVesselsPaginated: (params: VesselQueryParams) => Promise<PaginatedResult<Vessel>>
   addVessel: (
     vessel: Omit<Vessel, 'id'>
   ) => Promise<{ success: boolean; data?: Vessel; message?: string }>
@@ -263,7 +304,7 @@ export interface Api {
     availableBuild: number | null
     updateReady: boolean
   }>
-  hotUpdateCheck: () => Promise<{ updated: boolean; version?: any; error?: string }>
+  hotUpdateCheck: () => Promise<{ updated: boolean; version?: HotUpdateVersion; error?: string }>
   hotUpdateClearCache: () => Promise<{ success: boolean }>
   hotUpdateRestart: () => Promise<void>
 
@@ -329,7 +370,9 @@ export interface Api {
   dialogOpenFile: () => Promise<string | null>
   dialogOpenImageFile: () => Promise<{ filePath: string; fileName: string } | null>
   dialogOpenFileAny: () => Promise<string | null>
-  excelImport: (filePath: string) => Promise<{ success: boolean; message: string; stats?: any }>
+  excelImport: (
+    filePath: string
+  ) => Promise<{ success: boolean; message: string; stats?: ExcelImportStats }>
   dialogOpenFileWord: () => Promise<string | null>
   importDefectsFromWord: (
     surveyId: string,
@@ -375,22 +418,15 @@ export interface Api {
     }[]
     totalEntities: number
   }>
-  sanctionsRefresh: (source?: string) => Promise<any>
-  sanctionsRefreshSource: (
-    source: string
-  ) => Promise<{
-    source: string
-    count: number
-    status: string
-    releaseDate: string | null
-    error?: string
-  }>
+  /** One source: its result; no source: one result per list */
+  sanctionsRefresh: (source?: string) => Promise<SanctionsRefreshResult | SanctionsRefreshResult[]>
+  sanctionsRefreshSource: (source: string) => Promise<SanctionsRefreshResult>
 
   // SIC List
-  sicGetEntities: () => Promise<any[]>
-  sicGetEntity: (id: number) => Promise<any>
-  sicAddEntity: (entity: any) => Promise<{ id: number }>
-  sicUpdateEntity: (id: number, entity: any) => Promise<{ success: boolean }>
+  sicGetEntities: () => Promise<SicListEntity[]>
+  sicGetEntity: (id: number) => Promise<SicListEntity | null>
+  sicAddEntity: (entity: SicEntityInput) => Promise<{ id: number }>
+  sicUpdateEntity: (id: number, entity: Partial<SicEntityInput>) => Promise<{ success: boolean }>
   sicDeleteEntity: (id: number) => Promise<{ success: boolean }>
   sicImport: (filePath: string) => Promise<{ count: number }>
   sicGetRemarkTemplates: () => Promise<{ label: string; text: string }[]>
@@ -456,7 +492,7 @@ export interface Api {
   deleteVesselPolicy: (id: string) => Promise<void>
 
   // Dynamic Address Book
-  queryDAB: (criteria: DABQueryCriteria) => Promise<any[]>
+  queryDAB: (criteria: DABQueryCriteria) => Promise<DABResult[]>
 
   // Surveyors
   getSurveyors: () => Promise<Surveyor[]>
@@ -482,9 +518,7 @@ export interface Api {
   getSurveyAttachments: (surveyId?: string) => Promise<SurveyAttachment[]>
   addSurveyAttachment: (attachment: Omit<SurveyAttachment, 'id'>) => Promise<SurveyAttachment>
   deleteSurveyAttachment: (id: string) => Promise<void>
-  defectGetAttachments: (
-    defectId: string
-  ) => Promise<
+  defectGetAttachments: (defectId: string) => Promise<
     {
       id: string
       defectId: string
@@ -499,10 +533,10 @@ export interface Api {
     filePath: string
     fileName: string
     uploadedBy?: string
-  }) => Promise<any>
+  }) => Promise<DefectAttachmentRecord>
   defectDeleteAttachment: (id: string) => Promise<void>
-  getOpenDefectsByVessel: () => Promise<any[]>
-  getSurveyHistory: (vesselId: string) => Promise<any[]>
+  getOpenDefectsByVessel: () => Promise<OpenDefectRow[]>
+  getSurveyHistory: (vesselId: string) => Promise<SurveyHistoryRow[]>
   closeSurvey: (surveyId: string, userId: string) => Promise<void>
   updateConditionSurveyEndorsement: (surveyId: string, issued: boolean) => Promise<void>
 
@@ -584,8 +618,8 @@ export interface Api {
   surveyWarrantyGetByVessel: (vesselId: string) => Promise<SurveyWarranty[]>
   surveyWarrantyGetAll: () => Promise<SurveyWarranty[]>
   surveyWarrantyGetDueToday: () => Promise<SurveyWarranty[]>
-  surveyWarrantyGetEndorsementsDue: () => Promise<any[]>
-  surveyWarrantyGetUnsentEndorsements: () => Promise<any[]>
+  surveyWarrantyGetEndorsementsDue: () => Promise<EndorsementDueRow[]>
+  surveyWarrantyGetUnsentEndorsements: () => Promise<EndorsementDueRow[]>
   surveyWarrantyCreate: (
     data: Omit<SurveyWarranty, 'id' | 'status' | 'createdAt'>
   ) => Promise<SurveyWarranty>
@@ -722,9 +756,7 @@ export interface Api {
   hullDeleteAgreedValueOption: (id: string) => Promise<void>
   hullReorderAgreedValueOptions: (ids: string[]) => Promise<void>
   // LOL Options
-  lolGetOptions: (
-    qId: string
-  ) => Promise<
+  lolGetOptions: (qId: string) => Promise<
     {
       id: string
       quotationId: string
@@ -735,7 +767,20 @@ export interface Api {
       order: number
     }[]
   >
-  lolAddOption: (qId: string, amount: number, currency?: string, label?: string) => Promise<any>
+  lolAddOption: (
+    qId: string,
+    amount: number,
+    currency?: string,
+    label?: string
+  ) => Promise<{
+    id: string
+    quotationId: string
+    label: string | null
+    amount: number
+    currency: string
+    premiumAmount: number | null
+    order: number
+  }>
   lolUpdateOption: (
     id: string,
     updates: { label?: string; amount?: number; currency?: string; premiumAmount?: number | null }
@@ -810,9 +855,7 @@ export interface Api {
   ) => Promise<void>
 
   // Custom hull additional conditions (per quotation)
-  hullGetQuotationCustomConditions: (
-    qId: string
-  ) => Promise<
+  hullGetQuotationCustomConditions: (qId: string) => Promise<
     {
       id: string
       quotationId: string
@@ -829,7 +872,15 @@ export interface Api {
     title?: string
     vesselScope?: string[] | null
     alternativeId?: string | null
-  }) => Promise<any>
+  }) => Promise<{
+    id: string
+    quotationId: string
+    text: string
+    title?: string
+    vesselScope?: string[] | null
+    alternativeId?: string | null
+    order: number
+  }>
   hullUpdateQuotationCustomCondition: (
     id: string,
     updates: {
@@ -1165,30 +1216,34 @@ export interface Api {
   ) => Promise<void>
 
   // Policy List
-  getPoliciesList: () => Promise<any[]>
+  getPoliciesList: () => Promise<PolicyListRow[]>
 
   // Policy Expiry Alerts
-  getExpiredActivePolicies: () => Promise<any[]>
-  getExpiringSoonPolicies: (days?: number) => Promise<any[]>
-  getPolicyRenewalsByMonth: (year: number, month: number) => Promise<any[]>
+  getExpiredActivePolicies: () => Promise<PolicyExpiryRow[]>
+  getExpiringSoonPolicies: (days?: number) => Promise<PolicyExpiryRow[]>
+  getPolicyRenewalsByMonth: (year: number, month: number) => Promise<PolicyRenewalRow[]>
   setQuotationSentDate: (policyId: string, date: string | null) => Promise<void>
-  getRenewalPipeline: (dateFrom: string, dateTo: string) => Promise<any[]>
+  getRenewalPipeline: (dateFrom: string, dateTo: string) => Promise<PolicyRenewalRow[]>
 
   // Renewal Status Types
-  getRenewalStatusTypes: () => Promise<any[]>
-  addRenewalStatusType: (name: string, color: string) => Promise<any>
+  getRenewalStatusTypes: () => Promise<RenewalStatusType[]>
+  addRenewalStatusType: (name: string, color: string) => Promise<RenewalStatusType>
   updateRenewalStatusType: (id: string, name: string, color: string) => Promise<void>
   deleteRenewalStatusType: (id: string) => Promise<void>
   setRenewalStatusForPolicy: (policyId: string, statusId: string | null) => Promise<void>
 
   // Policy Renewal Notes
-  getPolicyRenewalNotes: (policyId: string, policyNumber: string) => Promise<any[]>
-  addPolicyRenewalNote: (policyId: string, policyNumber: string, note: string) => Promise<any>
+  getPolicyRenewalNotes: (policyId: string, policyNumber: string) => Promise<PolicyRenewalNote[]>
+  addPolicyRenewalNote: (
+    policyId: string,
+    policyNumber: string,
+    note: string
+  ) => Promise<PolicyRenewalNote>
   deletePolicyRenewalNote: (noteId: string) => Promise<void>
 
   // Vessel Notes
-  getVesselNotes: (vesselId: string) => Promise<any[]>
-  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) => Promise<any>
+  getVesselNotes: (vesselId: string) => Promise<VesselNote[]>
+  addVesselNote: (vesselId: string, note: string, parentNoteId?: string) => Promise<VesselNote>
   deleteVesselNote: (noteId: string) => Promise<void>
 
   // Quotation Types
@@ -1217,7 +1272,7 @@ export interface Api {
     sortField?: string
     sortDir?: 'asc' | 'desc'
   }) => Promise<{
-    rows: any[]
+    rows: QuotationListRow[]
     total: number
     stats: {
       byStatus: Record<string, number>
@@ -1226,13 +1281,11 @@ export interface Api {
     }
   }>
   quotationGetCreators: () => Promise<{ id: string; name: string }[]>
-  quotationGetSavedFilters: () => Promise<
-    { id: string; name: string; filters: any; order: number }[]
-  >
+  quotationGetSavedFilters: () => Promise<QuotationSavedFilter[]>
   quotationSaveFilter: (
     name: string,
-    filters: any
-  ) => Promise<{ id: string; name: string; filters: any }>
+    filters: QuotationSavedFilterValues
+  ) => Promise<Omit<QuotationSavedFilter, 'order'>>
   quotationDeleteFilter: (id: string) => Promise<void>
   quotationGetFavorites: () => Promise<string[]>
   quotationToggleFavorite: (quotationId: string) => Promise<boolean>
@@ -1268,7 +1321,7 @@ export interface Api {
   quotationGroupRemoveMember: (groupId: string, quotationId: string) => Promise<void>
   quotationGroupBulkAdd: (groupId: string, quotationIds: string[]) => Promise<void>
 
-  vesselGetQuotations: (vesselId: string) => Promise<any[]>
+  vesselGetQuotations: (vesselId: string) => Promise<VesselQuotationRow[]>
   getQuotation: (id: string) => Promise<Quotation | null>
   quotationLock: (
     id: string
@@ -1284,7 +1337,7 @@ export interface Api {
   deleteQuotation: (id: string) => Promise<void>
   restoreQuotation: (id: string) => Promise<void>
   permanentlyDeleteQuotation: (id: string) => Promise<void>
-  getDeletedQuotations: () => Promise<any[]>
+  getDeletedQuotations: () => Promise<DeletedQuotationRow[]>
   getQuotationRevisionCount: (revisionGroupId: string) => Promise<number>
   deleteQuotationGroup: (revisionGroupId: string) => Promise<void>
   createQuotationRevision: (sourceId: string) => Promise<Quotation>
@@ -1368,9 +1421,7 @@ export interface Api {
   ) => Promise<void>
   deleteQuotationSubLimit: (id: string) => Promise<void>
 
-  getQuotationClauses: (
-    qId: string
-  ) => Promise<
+  getQuotationClauses: (qId: string) => Promise<
     {
       id: string
       piClauseId: string
@@ -1387,7 +1438,12 @@ export interface Api {
     qId: string,
     piClauseId: string,
     alternativeId?: string | null
-  ) => Promise<any>
+  ) => Promise<{
+    id: string
+    quotationId: string
+    piClauseId: string
+    alternativeId: string | null
+  }>
   deleteQuotationClause: (
     qId: string,
     piClauseId: string,
@@ -1401,9 +1457,7 @@ export interface Api {
     alternativeId?: string | null
   ) => Promise<void>
 
-  getQuotationAdditionalClauses: (
-    qId: string
-  ) => Promise<
+  getQuotationAdditionalClauses: (qId: string) => Promise<
     {
       id: string
       quotationId: string
@@ -1419,12 +1473,17 @@ export interface Api {
     customText?: string
     order?: number
     vesselScope?: string[]
-  }) => Promise<any>
+  }) => Promise<{
+    id: string
+    quotationId: string
+    piAdditionalClauseId?: string
+    customText?: string
+    order?: number
+    vesselScope?: string[]
+  }>
   deleteQuotationAdditionalClause: (id: string) => Promise<void>
 
-  getQuotationWarranties: (
-    qId: string
-  ) => Promise<
+  getQuotationWarranties: (qId: string) => Promise<
     {
       id: string
       piWarrantyId: string
@@ -1504,9 +1563,7 @@ export interface Api {
   deleteQuotationTextDeductible: (id: string) => Promise<void>
   reorderQuotationTextDeductibles: (orderedIds: string[]) => Promise<void>
 
-  getQuotationExclusions: (
-    qId: string
-  ) => Promise<
+  getQuotationExclusions: (qId: string) => Promise<
     {
       id: string
       quotationId: string
@@ -1519,7 +1576,17 @@ export interface Api {
     qId: string,
     items: { piExclusionId?: string; customText?: string }[]
   ) => Promise<void>
-  addQuotationExclusion: (qId: string, piExclusionId: string, altId?: string | null) => Promise<any>
+  addQuotationExclusion: (
+    qId: string,
+    piExclusionId: string,
+    altId?: string | null
+  ) => Promise<{
+    id: string
+    quotationId: string
+    piExclusionId: string
+    alternativeId: string | null
+    order: number
+  }>
   deleteQuotationExclusion: (id: string) => Promise<void>
   reorderQuotationExclusions: (ids: string[]) => Promise<void>
   getQuotationCustomExclusions: (qId: string) => Promise<QuotationCustomExclusion[]>
@@ -1572,7 +1639,13 @@ export interface Api {
     text: string
     vesselScope?: string[] | null
     order?: number
-  }) => Promise<any>
+  }) => Promise<{
+    id: string
+    quotationId: string
+    text: string
+    vesselScope?: string[] | null
+    order?: number
+  }>
   tradingUpdateIntro: (
     id: string,
     updates: { text?: string; vesselScope?: string[] | null }
@@ -1602,7 +1675,16 @@ export interface Api {
     isAutoPopulated?: boolean
     order?: number
     vesselScope?: string[]
-  }) => Promise<any>
+  }) => Promise<{
+    id: string
+    quotationId: string
+    piSubjectivityId?: string
+    text: string
+    isCustom?: boolean
+    isAutoPopulated?: boolean
+    order?: number
+    vesselScope?: string[]
+  }>
   updateQuotationSubjectivity: (
     id: string,
     data: { text?: string; order?: number; vesselScope?: string[] | null }
@@ -1622,7 +1704,7 @@ export interface Api {
     quotationId: string
     text: string
     order?: number
-  }) => Promise<any>
+  }) => Promise<{ id: string; quotationId: string; text: string; order?: number }>
   deleteQuotationInformation: (id: string) => Promise<void>
 
   getQuotationNotes: (qId: string) => Promise<QuotationNote[]>
@@ -1690,7 +1772,8 @@ export interface Api {
   updateCheckForUpdates: () => Promise<void>
   updateQuitAndInstall: () => Promise<void>
   updateGetCurrentVersion: () => Promise<string>
-  updateGetChangelogs: () => Promise<any>
+  /** A failed GitHub fetch resolves with the error value (read channel) */
+  updateGetChangelogs: () => Promise<Changelog[] | { error: true; message: string }>
 
   vesselGetFilePaths: (
     vesselId: string
@@ -1703,8 +1786,8 @@ export interface Api {
   dialogOpenFolder: () => Promise<string | null>
   dialogLocateFile: () => Promise<string | null>
   shellShowItemInFolder: (filePath: string) => Promise<void>
-  warBreachSave: (record: any) => Promise<{ id: string }>
-  warBreachGetAll: () => Promise<any[]>
+  warBreachSave: (record: WarBreachRecordInput) => Promise<{ id: string }>
+  warBreachGetAll: () => Promise<WarBreachRecord[]>
   warBreachDelete: (id: string) => Promise<void>
   sanctionsReportSave: (
     data: import('../shared/types').SanctionsReportCheckInput
@@ -1729,11 +1812,13 @@ export interface Api {
   analyticsGetPresets: () => Promise<import('../shared/types').AnalyticsPreset[]>
   analyticsAddPreset: (
     name: string,
-    filters: any
+    filters: AnalyticsFilters
   ) => Promise<import('../shared/types').AnalyticsPreset>
-  analyticsUpdatePreset: (id: string, name: string, filters: any) => Promise<void>
+  analyticsUpdatePreset: (id: string, name: string, filters: AnalyticsFilters) => Promise<void>
   analyticsDeletePreset: (id: string) => Promise<void>
-  analyticsGetData: (filters: any) => Promise<{ vessels: any[]; policyCoverage: any[] }>
+  analyticsGetData: (
+    filters: AnalyticsFilters
+  ) => Promise<{ vessels: AnalyticsVesselRow[]; policyCoverage: AnalyticsPolicyCoverage[] }>
   activityGetLog: (
     filters: import('../shared/types').ActivityLogFilters
   ) => Promise<
@@ -1754,6 +1839,7 @@ export interface Api {
   activitySetRetention: (days: number) => Promise<{ deleted: number }>
   activityCleanup: () => Promise<{ deleted: number }>
   activityGetCount: () => Promise<number>
+  updateSanctionsThreshold: (threshold: number) => Promise<void>
   updateUserAppVersion: (version: string) => Promise<void>
   updateUserSidebarState: (sidebarCollapsed: boolean, collapsedGroups: string) => Promise<void>
   onUpdateChecking: (callback: () => void) => () => void
@@ -1851,9 +1937,7 @@ export interface Api {
   // Commission defaults & overrides
   commissionGetDefaults: () => Promise<{ policyTypeId: string; commissionPercent: number }[]>
   commissionSetDefault: (policyTypeId: string, commissionPercent: number) => Promise<void>
-  commissionGetOverrides: (
-    entityId?: string
-  ) => Promise<
+  commissionGetOverrides: (entityId?: string) => Promise<
     {
       id: string
       entityId: string
@@ -1871,14 +1955,12 @@ export interface Api {
   commissionResolve: (entityId: string | null, policyTypeId: string) => Promise<number | null>
 
   // Policy document methods
-  policyGetById: (id: string) => Promise<any>
-  policyGetInstalments: (policyId: string) => Promise<any[]>
-  policyGetAddresses: (policyId: string) => Promise<any[]>
+  policyGetById: (id: string) => Promise<PolicyDocument | null>
+  policyGetInstalments: (policyId: string) => Promise<PolicyDocInstalment[]>
+  policyGetAddresses: (policyId: string) => Promise<PolicyDocAddress[]>
   policyGetConvertedVesselIds: (quotationId: string) => Promise<string[]>
-  policyGetBlueCards: (policyId: string) => Promise<any[]>
-  policyGetRevisions: (
-    policyNumber: string
-  ) => Promise<
+  policyGetBlueCards: (policyId: string) => Promise<PolicyBlueCard[]>
+  policyGetRevisions: (policyNumber: string) => Promise<
     {
       id: string
       policyNumber: string
@@ -1889,10 +1971,11 @@ export interface Api {
       createdByName: string
     }[]
   >
-  policyAddBlueCard: (data: any) => Promise<any>
-  policyUpdateBlueCard: (id: string, data: any) => Promise<void>
+  policyAddBlueCard: (data: PolicyBlueCardInput) => Promise<PolicyBlueCardInput & { id: string }>
+  policyUpdateBlueCard: (id: string, data: PolicyBlueCardUpdate) => Promise<void>
   policySupersedeBlueCard: (id: string) => Promise<void>
-  policyUpdate: (id: string, fields: Record<string, any>) => Promise<void>
+  /** camelCase policy fields to write (the adapter maps each known key to its column) */
+  policyUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
   policySetInstalments: (
     policyId: string,
     instalments: {
@@ -1954,7 +2037,7 @@ export interface Api {
       selectedSubjectivityIds?: string[] | null
       perVessel?: Record<string, { premiumAmount: number; instalmentAmounts: number[] }> | null
     }
-  ) => Promise<any[]>
+  ) => Promise<ConvertedPolicy[]>
   policyFindActiveForVessel: (vesselId: string, quotationTypeCode: string) => Promise<string | null>
   policyRenew: (policyId: string) => Promise<{ quotationId: string }>
   policyRenewFleet: (
@@ -1962,9 +2045,7 @@ export interface Api {
     quotationTypeCode: string
   ) => Promise<{ quotationId: string }>
   policySign: (policyId: string) => Promise<{ success: boolean }>
-  policyGetSignature: (
-    policyId: string
-  ) => Promise<{
+  policyGetSignature: (policyId: string) => Promise<{
     imageData: number[]
     signedBy: string
     signedAt: string
@@ -2036,7 +2117,7 @@ export interface Api {
   endorsementUpdateTemplate: (id: string, updates: Partial<EndorsementTemplate>) => Promise<void>
   endorsementDeleteTemplate: (id: string) => Promise<void>
   endorsementReorderTemplates: (ids: string[]) => Promise<void>
-  endorsementCancelPolicy: (policyDocId: string, options: any) => Promise<string>
+  endorsementCancelPolicy: (policyDocId: string, options: PolicyCancelOptions) => Promise<string>
 
   // Signatures
   signatureGet: () => Promise<{
@@ -2046,9 +2127,7 @@ export interface Api {
     fileName: string
     uploadedAt: string
   } | null>
-  signatureGetForUser: (
-    userId: string
-  ) => Promise<{
+  signatureGetForUser: (userId: string) => Promise<{
     id: string
     userId: string
     imageData: number[]
@@ -2120,7 +2199,7 @@ export interface Api {
     isShared?: boolean
   }) => Promise<SavedReport | { id: string }>
   reportBuilderDelete: (id: string) => Promise<void>
-  reportBuilderRun: (dataSource: string, config: ReportConfig) => Promise<any[]>
+  reportBuilderRun: (dataSource: string, config: ReportConfig) => Promise<ReportResultRow[]>
 
   // Document Templates
   fileSaveDocx: (
@@ -2213,11 +2292,11 @@ export interface Api {
   ) => Promise<void>
 
   // T&C Templates
-  tcGetTemplate: (typeCode: string) => Promise<any | null>
+  tcGetTemplate: (typeCode: string) => Promise<TcTemplateSummary | null>
   tcGetTemplateFile: (typeCode: string) => Promise<number[] | null>
-  tcGetAllTemplates: () => Promise<any[]>
-  tcListByType: (typeCode: string) => Promise<any[]>
-  tcGetById: (id: string) => Promise<any | null>
+  tcGetAllTemplates: () => Promise<TcTemplateMeta[]>
+  tcListByType: (typeCode: string) => Promise<TcTemplateMeta[]>
+  tcGetById: (id: string) => Promise<TcTemplateDetail | null>
   tcGetFileById: (id: string) => Promise<number[] | null>
   tcCreate: (data: {
     typeCode: string
@@ -2227,7 +2306,7 @@ export interface Api {
     fileData?: number[] | null
     fileName?: string | null
     makeDefault?: boolean
-  }) => Promise<any>
+  }) => Promise<TcTemplateDetail | null>
   tcUpdate: (
     id: string,
     updates: {
@@ -2236,7 +2315,7 @@ export interface Api {
       fileData?: number[] | null
       fileName?: string | null
     }
-  ) => Promise<any>
+  ) => Promise<TcTemplateDetail | null>
   tcSetDefault: (id: string) => Promise<void>
   tcDeleteById: (id: string) => Promise<void>
   convertDocxBufferToPdf: (data: {

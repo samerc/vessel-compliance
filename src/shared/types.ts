@@ -1603,7 +1603,8 @@ export interface SavedReport {
 
 export interface ReportConfig {
   columns: string[]
-  filters: Record<string, any>
+  /** filter key to the chosen value (select id/value, text or date) */
+  filters: Record<string, string>
   groupBy?: string | null
   sortBy?: string | null
   sortDir?: 'asc' | 'desc'
@@ -1866,3 +1867,605 @@ export interface SicEntityInput {
   motherName?: string | null
   fatherName?: string | null
 }
+
+/** A SIC list row as stored in the local sanctions database (sic:getEntities / sic:getEntity) */
+export interface SicListEntity {
+  id: number
+  source: string
+  source_id: string | null
+  entity_type: string
+  name: string
+  name_normalized: string
+  aliases: string[]
+  date_of_birth: string | null
+  nationality: string | null
+  addresses: string[]
+  identifications: { type: string; number: string; country: string }[]
+  programs: string[]
+  vessel_imo: string | null
+  remarks: string | null
+  listed_date: string | null
+  mother_name: string | null
+  father_name: string | null
+}
+
+/** Outcome of refreshing one sanctions list (sanctions:refresh / sanctions:refreshSource) */
+export interface SanctionsRefreshResult {
+  source: string
+  count: number
+  status: string
+  releaseDate: string | null
+  error?: string
+}
+
+// ==================== App setup & updates ====================
+
+/** MySQL connection settings saved to db-config.json (setup:saveConfig) */
+export interface DbConnectionConfig {
+  host: string
+  port: number
+  user: string
+  password: string
+  database: string
+}
+
+/** A code-only (hot-update) build published on GitHub */
+export interface HotUpdateVersion {
+  buildNumber: number
+  version: string
+  timestamp: string
+  notes?: string
+}
+
+/** One GitHub release note (update:getChangelogs) */
+export interface Changelog {
+  version: string
+  name: string | null
+  date: string | null
+  notes: string | null
+  url: string
+}
+
+/** Counters returned by the legacy Excel importer (excel:import) */
+export interface ExcelImportStats {
+  vesselsCreated: number
+  vesselsUpdated: number
+  entitiesCreated: number
+  assuredsLinked: number
+  customersAssigned: number
+}
+
+// ==================== Surveys (report rows) ====================
+
+/** A saved photo/evidence file on a defect (defect:addAttachment) */
+export interface DefectAttachmentRecord {
+  id: string
+  defectId: string
+  filePath: string
+  fileName: string
+  uploadedBy?: string
+}
+
+/** One open defect with its vessel and survey (db:getOpenDefectsByVessel) */
+export interface OpenDefectRow {
+  vesselId: string
+  vesselName: string
+  imoNumber: string
+  surveyId: string
+  surveyDate: string
+  surveyorName: string | null
+  defectId: string
+  defectNumber: string | null
+  description: string
+  severity: string | null
+  dueDate: string | null
+  dueEvent: string | null
+  createdAt: string
+}
+
+/** One condition survey with its defect counts (db:getSurveyHistory) */
+export interface SurveyHistoryRow {
+  surveyId: string
+  surveyDate: string
+  surveyorName: string | null
+  surveyorCompany: string | null
+  surveyType: string | null
+  reference: string | null
+  location: string | null
+  openDefects: number
+  closedDefects: number
+  totalDefects: number
+}
+
+/** A survey whose reservations endorsement is not issued yet (survey_warranty:getEndorsementsDue) */
+export interface EndorsementDueRow {
+  surveyId: string
+  vesselId: string
+  surveyDate: string
+  surveyType: string | null
+  endorsementReminderDate: string
+  vesselName: string
+  imoNumber: string
+  /** only in survey_warranty:getUnsentEndorsements */
+  reference?: string | null
+}
+
+// ==================== Dynamic Address Book ====================
+
+/** One contact found by a DAB query (db:queryDAB) */
+export interface DABResult {
+  entityId: string
+  entityName: string
+  entityType: string
+  email: string | null
+  phone: string | null
+  /** comma-separated vessel names */
+  vesselNames: string
+  isCustomer: boolean
+  isBroker: boolean
+}
+
+// ==================== Policy renewals & notes ====================
+
+/** An active vessel policy with its end date (policies:getExpiredActive / getExpiringSoon) */
+export interface PolicyExpiryRow {
+  id: string
+  vesselId: string
+  vesselName: string
+  imoNumber: string
+  policyTypeName: string
+  policyNumber: string | null
+  status: string
+  endDate: string
+}
+
+/** A vessel policy ending in the requested period (policies:getRenewalsByMonth / renewals:getPipeline) */
+export interface PolicyRenewalRow {
+  id: string
+  vesselId: string
+  vesselName: string
+  imoNumber: string
+  policyTypeName: string
+  policyTypeId: string
+  policyNumber: string | null
+  endDate: string
+  customerName: string | null
+  customerType: string | null
+  fleetName: string | null
+  currency: string | null
+  renewalStatusId: string | null
+  renewalStatusName: string | null
+  renewalStatusColor: string | null
+  /** policies:getRenewalsByMonth: raw DECIMAL string; renewals:getPipeline: number */
+  premium: string | number | null
+  /** policies:getRenewalsByMonth only */
+  quotationSentDate?: string | null
+  /** policies:getRenewalsByMonth only */
+  noteCount?: number
+  /** renewals:getPipeline only */
+  status?: string
+}
+
+/** A renewal state label (renewalStates:getAll) */
+export interface RenewalStatusType {
+  id: string
+  name: string
+  color: string
+  order: number
+}
+
+/** A note on a policy renewal (renewalNotes:get) */
+export interface PolicyRenewalNote {
+  id: string
+  policyId: string
+  policyNumber: string
+  note: string
+  createdByUserId: string
+  createdByUsername: string
+  createdAt: string
+}
+
+/** A note on a vessel (vesselNotes:get) */
+export interface VesselNote {
+  id: string
+  vesselId: string
+  note: string
+  createdByUserId: string
+  createdByUsername: string
+  createdAt: string
+  parentNoteId: string | null
+}
+
+// ==================== Quotation lists ====================
+
+/** One row of the paginated quotation list (quotation:getPaginated) */
+export interface QuotationListRow {
+  id: string
+  referenceNumber: string
+  quotationTypeId: string | null
+  quotationTypeName: string | null
+  quotationTypeCode: string | null
+  quotationDate: string | null
+  policyTypeId: string | null
+  policyTypeName: string | null
+  isRenewal: boolean
+  status: QuotationStatus
+  premiumAmount: number | null
+  premiumCurrency: string | null
+  coName: string | null
+  customerEntityId: string | null
+  customerType: string | null
+  title: string | null
+  revisionNumber: number
+  revisionGroupId: string | null
+  isLocked: boolean
+  createdAt: string
+  updatedAt: string
+  createdBy: string | null
+  workflowStepId: string | null
+  workflowStepName: string | null
+  workflowStepColor: string | null
+  vesselName: string | null
+  vesselCount: number
+  lockedBy: string | null
+  lockedByName: string | null
+}
+
+/** The quotation list filters stored in a saved view (quotation:saveFilter) */
+export interface QuotationSavedFilterValues {
+  statusFilter?: string
+  typeFilter?: string
+  renewalFilter?: string
+  viewFilter?: string
+  createdByFilter?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+/** A saved quotation list view (quotation:getSavedFilters) */
+export interface QuotationSavedFilter {
+  id: string
+  name: string
+  filters: QuotationSavedFilterValues
+  order: number
+}
+
+/** A quotation that covers a given vessel, latest revision only (vessel:getQuotations) */
+export interface VesselQuotationRow {
+  id: string
+  referenceNumber: string
+  quotationTypeName: string | null
+  quotationTypeCode: string | null
+  quotationDate: string | null
+  status: QuotationStatus
+  isRenewal: boolean
+  premiumAmount: number | null
+  premiumCurrency: string | null
+  createdAt: string
+  updatedAt: string
+  coName: string | null
+  title: string | null
+  revisionNumber: number
+  revisionGroupId: string | null
+  workflowStepName: string | null
+  workflowStepColor: string | null
+  vesselCount: number
+  conditionsSummary: string
+}
+
+/** A soft-deleted quotation in the recycle bin (db:getDeletedQuotations) */
+export interface DeletedQuotationRow {
+  id: string
+  referenceNumber: string
+  quotationTypeName: string | null
+  quotationTypeCode: string | null
+  /** TINYINT 0/1 */
+  isRenewal: number
+  status: QuotationStatus
+  coName: string | null
+  title: string | null
+  revisionNumber: number
+  deletedAt: string
+  deletedByName: string | null
+  createdAt: string
+}
+
+// ==================== War Breach Calculator ====================
+
+/** A War Breach calculation to save (warBreach:save) */
+export interface WarBreachRecordInput {
+  coverNoteNo: string
+  currency: string
+  breachDetails: string
+  baseDays: number
+  /** JSON of the calculator settings */
+  settingsJson: string
+  /** JSON of the per-vessel rows */
+  vesselsJson: string
+  totalNetDue: number
+}
+
+/** A saved War Breach calculation (warBreach:getAll) */
+export interface WarBreachRecord {
+  id: string
+  coverNoteNo: string | null
+  currency: string | null
+  breachDetails: string | null
+  baseDays: number
+  settingsJson: string
+  vesselsJson: string
+  /** DECIMAL column: comes back as a string */
+  totalNetDue: string
+  createdAt: string
+}
+
+// ==================== Fleet Analytics data ====================
+
+/** One vessel in the analytics data set (analytics:getData) */
+export interface AnalyticsVesselRow {
+  id: string
+  name: string
+  imoNumber: string
+  fleetId: string | null
+  flagStateId: string | null
+  builtYear: number | null
+  rebuiltYear: number | null
+  /** DECIMAL column: comes back as a string */
+  grossTonnage: string | null
+  vesselType: string | null
+  vesselTypeId: string | null
+  /** TINYINT 0/1 */
+  isActive: number
+  customerId: string | null
+  customerType: string | null
+  ofacStatus: string | null
+  classificationSociety: string | null
+}
+
+/** Count of filtered vessels holding an active policy of one type (analytics:getData) */
+export interface AnalyticsPolicyCoverage {
+  name: string
+  vesselCount: number
+}
+
+// ==================== Policy documents ====================
+
+/** A latest-revision policy in the policy list (policies:getList) */
+export interface PolicyListRow {
+  id: string
+  quotationId: string
+  vesselId: string
+  policyNumber: string
+  status: string
+  revisionNumber: number
+  inceptionDate: string | null
+  inceptionTime: string | null
+  expiryDate: string | null
+  expiryTime: string | null
+  timezone: string | null
+  premiumAmount?: number
+  commissionPercent?: number
+  createdAt: string
+  exportedAt: string | null
+  vesselName: string | null
+  imoNumber: string | null
+  customerName: string | null
+  quotationTypeCode: string | null
+  quotationTypeName: string | null
+  policyTypeId: string | null
+  policyTypeName: string | null
+  brokerName: string | null
+}
+
+/** A full policy document with its vessel, quotation and bank details (policy:getById) */
+export interface PolicyDocument {
+  id: string
+  quotationId: string
+  vesselId: string
+  policyNumber: string
+  status: string
+  revisionNumber: number
+  inceptionDate: string | null
+  inceptionTime: string | null
+  expiryDate: string | null
+  expiryTime: string | null
+  timezone: string | null
+  commissionPercent: number | null
+  showAddresses: boolean
+  bankId: string | null
+  proRata: boolean
+  perAnnumPremium: number | null
+  premiumAmount: number
+  selectedAlternativeId: string | null
+  openingClause: string | null
+  importantNotice: string | null
+  closingCity: string | null
+  cancelReplaceText: string | null
+  previousPolicyNumber: string | null
+  previousPolicyDate: string | null
+  selectedSubjectivityIds: string[] | null
+  outstandingPremiumEnabled: boolean | null
+  outstandingPremiumText: string | null
+  nonRefundableType: string | null
+  nonRefundablePercent: number | null
+  qrEnabled: boolean | null
+  hideBroker: boolean
+  exchangeRate: number
+  createdBy: string | null
+  createdAt: string
+  exportedAt: string | null
+  signedBy: string | null
+  signedAt: string | null
+  exportSnapshot: string | null
+  sectionOrder: string[] | null
+  selectedLolOptionId: string | null
+  selectedAgreedValueOptionId: string | null
+  ourShare: number | null
+  subjectivityDays: number
+  quotationTypeCode: string | null
+  quotationTypeName: string | null
+  quotationReference: string | null
+  vesselName: string | null
+  imoNumber: string | null
+  vesselType: string | null
+  flagStateId: string | null
+  builtYear: number | null
+  rebuiltYear: number | null
+  /** DECIMAL column: comes back as a string */
+  grossTonnage: string | null
+  classificationSociety: string | null
+  fleetId: string | null
+  fleetName: string | null
+  callSign: string | null
+  flagStateName: string | null
+  flagIso3Code: string | null
+  customerName: string | null
+  /** not selected by the query: always null */
+  customerType: string | null
+  bankName: string | null
+  bankDetails: string | null
+  createdByName: string | null
+  signedByName: string | null
+}
+
+/** One instalment of a policy (policy:getInstalments) */
+export interface PolicyDocInstalment {
+  id: string
+  policyDocId: string
+  instalmentNumber: number
+  dueDate: string
+  premiumAmount: number
+  commissionAmount: number
+  isNonRefundable: boolean
+}
+
+/** An insured address printed on a policy (policy:getAddresses) */
+export interface PolicyDocAddress {
+  id: string
+  policyDocId: string
+  entityId: string | null
+  role: string
+  addressText: string | null
+  entityName: string | null
+  order?: number
+}
+
+/** A blue card certificate (policy:getBlueCards) */
+export interface PolicyBlueCard {
+  id: string
+  policyDocId: string
+  cardType: string
+  cardNumber: string
+  inceptionDate: string
+  expiryDate: string
+  revisionNumber: number
+  issuedDate: string
+  status: string
+  ownerEntityId: string | null
+  ownerName: string | null
+  ownerAddress: string | null
+  portOfRegistry: string | null
+  addressedToFlagId: string | null
+  addressedToName: string | null
+  addressedToAddress: string | null
+  cancelReplaceText: string | null
+}
+
+/** A new blue card (policy:addBlueCard); the result echoes it with its id */
+export interface PolicyBlueCardInput {
+  policyId: string
+  cardType: string
+  cardNumber: string
+  inceptionDate: string
+  expiryDate: string
+  revisionNumber: number
+  issuedDate: string
+  status?: string
+  ownerEntityId?: string
+  ownerName?: string
+  ownerAddress?: string
+  portOfRegistry?: string
+  addressedToFlagId?: string
+  addressedToName?: string
+  addressedToAddress?: string
+  cancelReplaceText?: string
+}
+
+/** Editable blue card fields (policy:updateBlueCard); a key that is present is written, null clears it */
+export interface PolicyBlueCardUpdate {
+  cardNumber?: string | null
+  inceptionDate?: string | null
+  expiryDate?: string | null
+  issuedDate?: string | null
+  ownerEntityId?: string | null
+  ownerName?: string | null
+  ownerAddress?: string | null
+  portOfRegistry?: string | null
+  addressedToFlagId?: string | null
+  addressedToName?: string | null
+  addressedToAddress?: string | null
+  cancelReplaceText?: string | null
+}
+
+/** A policy created by a quotation conversion (policy:convertFromQuotation) */
+export interface ConvertedPolicy {
+  id: string
+  policyNumber: string
+  vesselId: string
+}
+
+/** Options for cancelling a policy with a return-premium endorsement (endorsement:cancelPolicy) */
+export interface PolicyCancelOptions {
+  effectiveDate: string
+  endorsementContent: string
+  returnPremium: number
+  premiumCurrency: string
+  commissionPercent: number
+  instalments: {
+    instalmentNumber: number
+    dueDate: string
+    premiumAmount: number
+    commissionAmount: number
+  }[]
+  isProRata: boolean
+  annualPremium?: number | null
+  /** only used to name the policy in the activity log */
+  policyNumber?: string
+}
+
+/** One Report Builder result row: column key to raw SQL value */
+export type ReportResultRow = Record<string, string | number | null>
+
+/** T&C template metadata, no content (tc:getAllTemplates / tc:listByType) */
+export interface TcTemplateMeta {
+  id: string
+  typeCode: string
+  name: string
+  kind: 'html' | 'docx'
+  isDefault: boolean
+  orderIndex: number
+  fileName: string | null
+  pageCount: number
+  updatedAt: string | null
+  uploadedAt: string | null
+}
+
+/** A T&C template with its content (tc:getById / tc:create / tc:update) */
+export interface TcTemplateDetail extends TcTemplateMeta {
+  contentHtml: string | null
+  hasFile: boolean
+}
+
+/** The default T&C template of a policy type (tc:getTemplate) */
+export type TcTemplateSummary = Pick<
+  TcTemplateDetail,
+  | 'id'
+  | 'typeCode'
+  | 'fileName'
+  | 'pageCount'
+  | 'uploadedAt'
+  | 'kind'
+  | 'hasFile'
+  | 'contentHtml'
+  | 'name'
+>

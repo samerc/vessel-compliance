@@ -120,7 +120,7 @@ export function vesselTechnical(
   const { quotation: q, vessels } = ctx
   const n = vessels.length || 1
   const sumVesselPrem = vessels.reduce((s, v) => s + (v.premiumAmount || 0), 0)
-  const share = (fleetAmount: number) =>
+  const share = (fleetAmount: number): number =>
     n <= 1
       ? fleetAmount
       : sumVesselPrem > 0

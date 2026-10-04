@@ -1,5 +1,5 @@
 import xml2js from 'xml2js'
-import { normalizeText, extractText, parseDate } from '../normalize'
+import { normalizeText, extractText, parseDate, asList, type XmlNode } from '../normalize'
 import { SanctionsEntity } from '../SanctionsDatabase'
 
 export async function parseUnSanctions(
@@ -45,7 +45,7 @@ export async function parseUnSanctions(
   return { entities: entries, releaseDate }
 }
 
-function parseUnIndividual(ind: any): SanctionsEntity | null {
+function parseUnIndividual(ind: XmlNode): SanctionsEntity | null {
   const nameParts = [
     extractText(ind.FIRST_NAME),
     extractText(ind.SECOND_NAME),
@@ -57,9 +57,7 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
 
   const aliases: string[] = []
   if (ind.INDIVIDUAL_ALIAS) {
-    let aliasList = Array.isArray(ind.INDIVIDUAL_ALIAS)
-      ? ind.INDIVIDUAL_ALIAS
-      : [ind.INDIVIDUAL_ALIAS]
+    const aliasList = asList(ind.INDIVIDUAL_ALIAS)
     for (const alias of aliasList) {
       const aliasName = extractText(alias.ALIAS_NAME || alias)
       if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName))
@@ -69,23 +67,19 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
 
   let dateOfBirth: string | null = null
   if (ind.INDIVIDUAL_DATE_OF_BIRTH) {
-    let dobList = Array.isArray(ind.INDIVIDUAL_DATE_OF_BIRTH)
-      ? ind.INDIVIDUAL_DATE_OF_BIRTH
-      : [ind.INDIVIDUAL_DATE_OF_BIRTH]
+    const dobList = asList(ind.INDIVIDUAL_DATE_OF_BIRTH)
     if (dobList[0]) dateOfBirth = parseDate(dobList[0].DATE || dobList[0].YEAR || dobList[0])
   }
 
   let nationality: string | null = null
   if (ind.NATIONALITY) {
-    let natList = Array.isArray(ind.NATIONALITY) ? ind.NATIONALITY : [ind.NATIONALITY]
+    const natList = asList(ind.NATIONALITY)
     if (natList[0]) nationality = extractText(natList[0].VALUE || natList[0])
   }
 
   const addresses: string[] = []
   if (ind.INDIVIDUAL_ADDRESS) {
-    let addrList = Array.isArray(ind.INDIVIDUAL_ADDRESS)
-      ? ind.INDIVIDUAL_ADDRESS
-      : [ind.INDIVIDUAL_ADDRESS]
+    const addrList = asList(ind.INDIVIDUAL_ADDRESS)
     for (const addr of addrList) {
       const address = parseUnAddress(addr)
       if (address) addresses.push(address)
@@ -94,9 +88,7 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
 
   const identifications: { type: string; number: string; country: string }[] = []
   if (ind.INDIVIDUAL_DOCUMENT) {
-    let docList = Array.isArray(ind.INDIVIDUAL_DOCUMENT)
-      ? ind.INDIVIDUAL_DOCUMENT
-      : [ind.INDIVIDUAL_DOCUMENT]
+    const docList = asList(ind.INDIVIDUAL_DOCUMENT)
     for (const doc of docList) {
       identifications.push({
         type: extractText(doc.TYPE_OF_DOCUMENT || doc.TYPE_OF_DOCUMENT2),
@@ -130,13 +122,13 @@ function parseUnIndividual(ind: any): SanctionsEntity | null {
   }
 }
 
-function parseUnEntity(ent: any): SanctionsEntity | null {
+function parseUnEntity(ent: XmlNode): SanctionsEntity | null {
   const primaryName = extractText(ent.FIRST_NAME || ent.NAME)
   if (!primaryName) return null
 
   const aliases: string[] = []
   if (ent.ENTITY_ALIAS) {
-    let aliasList = Array.isArray(ent.ENTITY_ALIAS) ? ent.ENTITY_ALIAS : [ent.ENTITY_ALIAS]
+    const aliasList = asList(ent.ENTITY_ALIAS)
     for (const alias of aliasList) {
       const aliasName = extractText(alias.ALIAS_NAME || alias)
       if (aliasName && aliasName !== primaryName && !aliases.includes(aliasName))
@@ -146,7 +138,7 @@ function parseUnEntity(ent: any): SanctionsEntity | null {
 
   const addresses: string[] = []
   if (ent.ENTITY_ADDRESS) {
-    let addrList = Array.isArray(ent.ENTITY_ADDRESS) ? ent.ENTITY_ADDRESS : [ent.ENTITY_ADDRESS]
+    const addrList = asList(ent.ENTITY_ADDRESS)
     for (const addr of addrList) {
       const address = parseUnAddress(addr)
       if (address) addresses.push(address)
@@ -185,7 +177,7 @@ function extractImoFromText(text: string | null): string | null {
   return match ? match[1] || match[0] : null
 }
 
-function parseUnAddress(addr: any): string | null {
+function parseUnAddress(addr: XmlNode): string | null {
   if (!addr) return null
   const parts = [
     extractText(addr.STREET),
