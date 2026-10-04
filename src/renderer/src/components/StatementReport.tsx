@@ -38,6 +38,7 @@ import {
 // date and columns, export on the company letterhead (Word or PDF).
 
 const COLS_PREF_KEY = 'statement_columns'
+const ORIENTATION_KEY = 'statement_orientation'
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
@@ -377,7 +378,14 @@ export default function StatementReport(): React.JSX.Element {
   const [visible, setVisible] = useState<string[]>([])
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [totalKey, setTotalKey] = useState<string | null>(null)
-  const [orientation, setOrientation] = useState<StatementExportInput['orientation']>('auto')
+  const [orientation, setOrientation] = useState<StatementExportInput['orientation']>(() => {
+    try {
+      const v = localStorage.getItem(ORIENTATION_KEY)
+      return v === 'landscape' || v === 'auto' ? v : 'portrait'
+    } catch {
+      return 'portrait'
+    }
+  })
   const [showGroups, setShowGroups] = useState(true)
 
   useEffect(() => {
@@ -801,14 +809,20 @@ export default function StatementReport(): React.JSX.Element {
                   <label style={labelStyle}>Page</label>
                   <select
                     value={orientation}
-                    onChange={(e) =>
-                      setOrientation(e.target.value as StatementExportInput['orientation'])
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value as StatementExportInput['orientation']
+                      setOrientation(v)
+                      try {
+                        localStorage.setItem(ORIENTATION_KEY, v)
+                      } catch {
+                        /* per-viewer convenience only */
+                      }
+                    }}
                     style={{ width: '100%' }}
                   >
-                    <option value="auto">Automatic</option>
                     <option value="portrait">Portrait</option>
                     <option value="landscape">Landscape</option>
+                    <option value="auto">Automatic (portrait if it fits)</option>
                   </select>
                 </div>
               </div>

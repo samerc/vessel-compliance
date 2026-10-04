@@ -171,34 +171,129 @@ function fillPlaceholders(text: string, input: StatementExportInput, totalText: 
     .replace(/\{total\}/g, totalText)
 }
 
-/** Relative column widths from the longest word of the label and the longest value. */
-function columnWeights(input: StatementExportInput): number[] {
+const CELL_PAD = 50 // left/right cell inset, twips
+/** Longer text than this may wrap onto a second line (names, addresses); shorter never wraps */
+const WRAP_CHARS = 14
+const MIN_FONT = 7
+
+interface ColumnNeed {
+  /** Width that shows the longest value on one line */
+  natural: number
+  /** Narrowest acceptable width (wrapping columns only; else = natural) */
+  min: number
+  wraps: boolean
+}
+
+/** Estimated widths (twips) of each visible column at a font size, from Arial character widths. */
+let measureCtx: CanvasRenderingContext2D | null = null
+
+/** Width in twips of text in Arial at a font size (canvas: a font of N px measures in N-twip ems). */
+function textTwips(text: string, fontPt: number, bold = false): number {
+  if (!measureCtx) measureCtx = window.document.createElement('canvas').getContext('2d')
+  const em = fontPt * 20
+  if (!measureCtx) return text.length * em * 0.6
+  measureCtx.font = `${bold ? 'bold ' : ''}${em}px Arial`
+  return measureCtx.measureText(text).width
+}
+
+/** Widths (twips) each visible column needs at a font size, from the real Arial text widths. */
+function columnNeeds(input: StatementExportInput, fontPt: number): ColumnNeed[] {
+  // Word lays text out slightly wider than the canvas; keep a margin so nothing breaks
+  const pad = (w: number): number => Math.ceil(w * 1.08 + 2 * CELL_PAD + 40)
   return input.visible.map((key) => {
-    const col = input.columns.find((c) => c.key === key)
+    const kind = input.columns.find((c) => c.key === key)?.kind || 'text'
     const label = input.labels[key] || key
-    const longestWord = Math.max(...label.split(/\s+/).map((w) => w.length))
-    const longestValue = Math.max(0, ...input.rows.map((r) => (r.cells[key] || '').length))
-    const min = col?.kind === 'money' || col?.kind === 'date' ? 10 : 4
-    return Math.min(32, Math.max(min, longestWord + 1, longestValue + 1))
+    // The header may wrap between words, never inside one
+    const headerWord = Math.max(...label.split(/\s+/).map((w) => textTwips(w, fontPt, true)))
+    const values = input.rows.map((r) => r.cells[key] || '')
+    const longest = Math.max(0, ...values.map((v) => textTwips(v, fontPt)))
+    const natural = pad(Math.max(headerWord, longest))
+    // Only multi-word text (names, addresses) may wrap; codes, numbers and dates never do
+    const wraps =
+      kind === 'text' && values.some((v) => v.length > WRAP_CHARS && /\s/.test(v.trim()))
+    if (!wraps) return { natural, min: natural, wraps }
+    const longestWord = Math.max(
+      0,
+      ...values.flatMap((v) => v.split(/\s+/).map((w) => textTwips(w, fontPt)))
+    )
+    const min = pad(Math.max(headerWord, longestWord, textTwips('M'.repeat(8), fontPt)))
+    return { natural, min: Math.min(min, natural), wraps }
   })
+}
+
+/** Column widths that add up exactly to `contentW`, or null when they cannot fit at this size. */
+function fitColumns(needs: ColumnNeed[], contentW: number): number[] | null {
+  const naturalSum = needs.reduce((s, n) => s + n.natural, 0)
+  let widths: number[]
+  if (naturalSum <= contentW) {
+    // Everything on one line: share the spare width out in proportion
+    widths = needs.map((n) => (n.natural / naturalSum) * contentW)
+  } else {
+    // Short columns keep their width; long text columns share the rest and wrap
+    const fixed = needs.reduce((s, n) => s + (n.wraps ? 0 : n.natural), 0)
+    const wrapNatural = needs.reduce((s, n) => s + (n.wraps ? n.natural : 0), 0)
+    const wrapMin = needs.reduce((s, n) => s + (n.wraps ? n.min : 0), 0)
+    const rest = contentW - fixed
+    if (wrapNatural === 0 || rest < wrapMin) return null
+    widths = needs.map((n) =>
+      n.wraps ? Math.max(n.min, (n.natural / wrapNatural) * rest) : n.natural
+    )
+    // max(min, share) can overshoot: take it back from the wrapping columns above their minimum
+    let over = widths.reduce((s, w) => s + w, 0) - contentW
+    for (let i = 0; i < widths.length && over > 0; i++) {
+      if (!needs[i].wraps) continue
+      const give = Math.min(over, widths[i] - needs[i].min)
+      widths[i] -= give
+      over -= give
+    }
+  }
+  const out = widths.map((w) => Math.floor(w))
+  out[out.length - 1] += contentW - out.reduce((s, w) => s + w, 0)
+  return out
+}
+
+/** Picks orientation, font size and widths so the table fits the page width. */
+function layoutTable(input: StatementExportInput): {
+  landscape: boolean
+  fontPt: number
+  widths: number[]
+} {
+  const maxFont = input.fontSize || 9
+  const tryFit = (landscape: boolean): { fontPt: number; widths: number[] } | null => {
+    const contentW = (landscape ? PAGE_H : PAGE_W) - 2 * MARGIN_LR
+    for (let f = maxFont; f >= MIN_FONT; f -= 0.5) {
+      const widths = fitColumns(columnNeeds(input, f), contentW)
+      if (widths) return { fontPt: f, widths }
+    }
+    return null
+  }
+  const proportional = (landscape: boolean): { fontPt: number; widths: number[] } => {
+    // Last resort: smallest font, widths in proportion to what each column needs (all wrap)
+    const contentW = (landscape ? PAGE_H : PAGE_W) - 2 * MARGIN_LR
+    const needs = columnNeeds(input, MIN_FONT)
+    const sum = needs.reduce((s, n) => s + n.natural, 0)
+    const widths = needs.map((n) => Math.floor((n.natural / sum) * contentW))
+    widths[widths.length - 1] += contentW - widths.reduce((s, w) => s + w, 0)
+    return { fontPt: MIN_FONT, widths }
+  }
+  if (input.orientation === 'landscape') {
+    return { landscape: true, ...(tryFit(true) || proportional(true)) }
+  }
+  const portrait = tryFit(false)
+  if (portrait || input.orientation === 'portrait') {
+    return { landscape: false, ...(portrait || proportional(false)) }
+  }
+  // Automatic: portrait when it fits, else landscape
+  return { landscape: true, ...(tryFit(true) || proportional(true)) }
 }
 
 export async function buildStatementDocx(
   input: StatementExportInput
 ): Promise<{ blob: Blob; fileName: string }> {
-  const fontHalf = Math.round((input.fontSize || 9) * 2)
-  const weights = columnWeights(input)
-  // Average Arial character ~0.5em; cell insets 2 x 60 twips
-  const needed = weights.reduce((s, w) => s + w * fontHalf * 5 + 120, 0)
-  const portraitW = PAGE_W - 2 * MARGIN_LR
-  const landscape =
-    input.orientation === 'landscape' || (input.orientation === 'auto' && needed > portraitW)
-  const contentW = (landscape ? PAGE_H : PAGE_W) - 2 * MARGIN_LR
-
   // Widths always add up to the content width, so the table never runs off the page
-  const sumW = weights.reduce((s, w) => s + w, 0)
-  const widths = weights.map((w) => Math.floor((w / sumW) * contentW))
-  widths[widths.length - 1] += contentW - widths.reduce((s, w) => s + w, 0)
+  const { landscape, fontPt, widths } = layoutTable(input)
+  const fontHalf = Math.round(fontPt * 2)
+  const contentW = (landscape ? PAGE_H : PAGE_W) - 2 * MARGIN_LR
 
   const kindOf = (key: string): StatementColumn['kind'] =>
     input.columns.find((c) => c.key === key)?.kind || 'text'
@@ -219,7 +314,7 @@ export async function buildStatementDocx(
       width: { size: width, type: WidthType.DXA },
       columnSpan: o.span,
       verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 40, bottom: 40, left: 60, right: 60 },
+      margins: { top: 40, bottom: 40, left: CELL_PAD, right: CELL_PAD },
       borders: { top: thin, bottom: thin, left: thin, right: thin },
       shading: o.shade ? { type: ShadingType.CLEAR, color: 'auto', fill: o.shade } : undefined,
       children: [
