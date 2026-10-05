@@ -111,7 +111,13 @@ export default function ConditionsTab({
 
     // Auto-select all active clauses on first load if none are selected
     const safeClauses = scopedClauses
-    if (!clauseDefaultsApplied.current && safeSelected.length === 0 && safeClauses.length > 0) {
+    // FD&D starts with no conditions selected (custom ones are picked by hand)
+    if (
+      !clauseDefaultsApplied.current &&
+      typeCode !== 'F' &&
+      safeSelected.length === 0 &&
+      safeClauses.length > 0
+    ) {
       clauseDefaultsApplied.current = true
       const allClauseIds = safeClauses.map((c: PIClause) => c.id)
       try {
@@ -434,10 +440,15 @@ export default function ConditionsTab({
     loadData()
   }
 
-  // FD&D has no Section B clauses: only the additional clauses (FD&D terms, JH/JL clauses)
-  const hasClauseList =
-    quotation.quotationTypeCode !== 'F' || allClauses.length > 0 || selectedIds.size > 0
-  const activeSub = hasClauseList ? subTab : 'additional'
+  // FD&D: only the conditions tagged FD&D in settings (none by default), never P&I Section B
+  const isFdd = quotation.quotationTypeCode === 'F'
+  const activeSub = subTab
+  // Presets made of P&I clauses do not apply to FD&D
+  const visibleSets = isFdd
+    ? clauseSets.filter((cs) =>
+        (cs.clauseIds || []).every((id) => allClauses.some((c) => c.id === id))
+      )
+    : clauseSets
 
   return (
     <div>
@@ -451,40 +462,36 @@ export default function ConditionsTab({
           paddingBottom: '0'
         }}
       >
-        {hasClauseList && (
-          <button
-            onClick={() => setSubTab('clauses')}
+        <button
+          onClick={() => setSubTab('clauses')}
+          style={{
+            padding: '8px 18px',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            border: 'none',
+            borderBottom:
+              activeSub === 'clauses' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            background: 'transparent',
+            color: activeSub === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            marginBottom: '-2px',
+            transition: 'color 0.15s'
+          }}
+        >
+          Clauses{' '}
+          <span
             style={{
-              padding: '8px 18px',
-              fontSize: '0.88rem',
-              fontWeight: 600,
-              border: 'none',
-              borderBottom:
-                activeSub === 'clauses'
-                  ? '2px solid var(--accent-primary)'
-                  : '2px solid transparent',
-              background: 'transparent',
-              color: activeSub === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              marginBottom: '-2px',
-              transition: 'color 0.15s'
+              fontSize: '0.72rem',
+              padding: '1px 6px',
+              borderRadius: '10px',
+              background: 'rgba(var(--accent-primary-rgb), 0.1)',
+              color: 'var(--accent-primary)',
+              marginLeft: '6px'
             }}
           >
-            Clauses{' '}
-            <span
-              style={{
-                fontSize: '0.72rem',
-                padding: '1px 6px',
-                borderRadius: '10px',
-                background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                color: 'var(--accent-primary)',
-                marginLeft: '6px'
-              }}
-            >
-              {selectedIds.size}
-            </span>
-          </button>
-        )}
+            {selectedIds.size}
+          </span>
+        </button>
         <button
           onClick={() => setSubTab('additional')}
           style={{
@@ -523,10 +530,11 @@ export default function ConditionsTab({
       {activeSub === 'clauses' && (
         <div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-            Select the P&I conditions and clauses. Use clause set presets for quick selection.
-            Override descriptions as needed.
+            {isFdd
+              ? 'FD&D conditions tagged FD&D in Quotation Settings (P&I / FD&D, Conditions) appear here. None are selected by default.'
+              : 'Select the P&I conditions and clauses. Use clause set presets for quick selection. Override descriptions as needed.'}
           </p>
-          {clauseSets.length > 0 && (
+          {visibleSets.length > 0 && (
             <div
               style={{
                 marginBottom: '16px',
@@ -537,7 +545,7 @@ export default function ConditionsTab({
               }}
             >
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Presets:</span>
-              {clauseSets.map((cs) => (
+              {visibleSets.map((cs) => (
                 <button
                   key={cs.id}
                   onClick={() => applySet(cs.id)}

@@ -1974,7 +1974,14 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           const clauseDesc = desc ? ` \u2013 ${desc}` : ''
           const displayName = stripClauseRef(c.name || '')
           const cScope = vesselScopeSuffix(data.clauseVesselScopes[c.id], data.quotationVessels)
-          const rightText = (displayName ? `${displayName}${clauseDesc}` : desc || '') + cScope
+          // FD&D conditions are custom (no Section B numbering): their name on the left
+          const isFddClause = data.quotation.quotationTypeCode === 'F'
+          const leftText = isFddClause
+            ? c.name || `Cl.${c.clauseNumber}`
+            : `Section B Cl.${c.clauseNumber}`
+          const rightText =
+            (isFddClause ? desc || '' : displayName ? `${displayName}${clauseDesc}` : desc || '') +
+            cScope
           const isNewClause = origData && !origClauseIds.has(c.id)
           const clauseColor = isNewClause ? RED : '000000'
           return new TableRow({
@@ -1986,7 +1993,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
                   new Paragraph({
                     children: [
                       new TextRun({
-                        text: `Section B Cl.${c.clauseNumber}`,
+                        text: leftText,
                         size: 22,
                         font: 'Arial',
                         color: clauseColor
@@ -3813,7 +3820,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined
         dedContent.push(emptyP())
         dedContent.push(
-          np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
+          ...mp(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
         )
       }
       for (const alt of data.piAlternatives) {
@@ -3828,7 +3835,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           for (const td of altTds) {
             const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined
             dedContent.push(
-              np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
+              ...mp(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
             )
           }
         }
@@ -3837,7 +3844,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       for (const td of data.textDeductibles) {
         const tdColor = origData && !origTextDeductibleTexts.has(td.text) ? RED : undefined
         dedContent.push(
-          np(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
+          ...mp(td.text + vesselScopeSuffix(td.vesselScope, data.quotationVessels), tdColor)
         )
       }
     }
