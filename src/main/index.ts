@@ -3437,6 +3437,13 @@ app.whenReady().then(() => {
     await requirePermission(event, 'quotations:settings')
     return db.addPIClause(clause)
   })
+  safeHandle(
+    'pi:setItemTypeScope',
+    async (event, kind: Parameters<typeof db.setPIItemTypeScope>[0], id: string, scope: string) => {
+      await requirePermission(event, 'quotations:settings')
+      return db.setPIItemTypeScope(kind, id, scope)
+    }
+  )
   safeHandle('pi:updateClause', async (event, id: string, updates: Partial<PIClause>) => {
     await requirePermission(event, 'quotations:settings')
     return db.updatePIClause(id, updates)

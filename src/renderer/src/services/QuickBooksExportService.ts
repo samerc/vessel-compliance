@@ -11,6 +11,7 @@ import type {
   QuotationSubjectivity,
   QuotationVessel
 } from '../../../shared/types'
+import { isPiLike } from '../../../shared/quotationTypes'
 
 type QuotationWarrantyRow = Awaited<ReturnType<typeof window.api.getQuotationWarranties>>[number]
 
@@ -263,13 +264,13 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
         const isHull = q.quotationTypeCode === 'H'
         const [qvs, piAlts, hullAlts, lols, avp, disc, warSet] = await Promise.all([
           window.api.getQuotationVessels(policy.quotationId),
-          q.quotationTypeCode === 'P'
+          isPiLike(q.quotationTypeCode)
             ? window.api.piGetQuotationAlternatives(policy.quotationId)
             : Promise.resolve([]),
           isHull
             ? window.api.hullGetQuotationAlternatives(policy.quotationId)
             : Promise.resolve([]),
-          q.quotationTypeCode === 'P'
+          isPiLike(q.quotationTypeCode)
             ? window.api.lolGetOptions(policy.quotationId)
             : Promise.resolve([]),
           isHull ? window.api.hullGetAltVesselPremiums(policy.quotationId) : Promise.resolve([]),

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import TypeScopeToggle from './TypeScopeToggle'
+import { TYPE_SCOPE_LABELS } from '../../../shared/quotationTypes'
 import {
   Plus,
   Trash2,
@@ -114,9 +116,17 @@ interface IpcResultLike {
 
 type SettingsCategory = 'general' | 'pi' | 'hull' | 'war' | 'cargo'
 
+const SCOPE_BADGE_COLORS: Record<string, string> = {
+  pi: '#6464ff',
+  fdd: '#a855f7',
+  hull: '#ff64c8',
+  war: '#ffb020',
+  cargo: '#32b886'
+}
+
 const CATEGORIES: { id: SettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
-  { id: 'pi', label: 'P&I', color: '#6464ff' },
+  { id: 'pi', label: 'P&I / FD&D', color: '#6464ff' },
   { id: 'hull', label: 'H&M', color: '#ff64c8' },
   { id: 'war', label: 'War', color: '#ff8c32' },
   { id: 'cargo', label: 'Cargo', color: '#32b886' }
@@ -524,7 +534,7 @@ function CollapsibleStandardTexts({
     if (!open || loaded) return
     ;(async () => {
       const saved = await window.api.piGetSectionTexts()
-      if (saved && Object.keys(saved).length > 0) setTexts(saved)
+      if (saved && Object.keys(saved).length > 0) setTexts({ ...DEFAULT_SECTION_TEXTS, ...saved })
       else setTexts(DEFAULT_SECTION_TEXTS)
       setLoaded(true)
     })()
@@ -1384,6 +1394,13 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
                             alignItems: 'center'
                           }}
                         >
+                          <TypeScopeToggle
+                            scope={c.typeScope}
+                            onChange={async (sc) => {
+                              await window.api.piSetItemTypeScope('clause', c.id, sc)
+                              loadData()
+                            }}
+                          />
                           <button
                             title="Move up"
                             aria-label="Move up"
@@ -1689,7 +1706,10 @@ function ClausesTab({ showSuccess, showError, isLight }: TabProps): React.JSX.El
       </section>
 
       <CollapsibleStandardTexts
-        fields={[{ key: 'conditionsIntro', label: 'Conditions Intro', rows: 2 }]}
+        fields={[
+          { key: 'conditionsIntro', label: 'Conditions Intro', rows: 2 },
+          { key: 'conditionsIntroFDD', label: 'Conditions Intro (FD&D quotations)', rows: 2 }
+        ]}
         showSuccess={showSuccess}
       />
     </div>
@@ -1707,9 +1727,9 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
   const [newCargoRelated, setNewCargoRelated] = useState(false)
   const [newTagIds, setNewTagIds] = useState<string[]>([])
   const [newTypeScope, setNewTypeScope] = useState<string>('all')
-  const [warrantyTypeFilter, setWarrantyTypeFilter] = useState<'show_all' | 'pi' | 'hull' | 'war'>(
-    'show_all'
-  )
+  const [warrantyTypeFilter, setWarrantyTypeFilter] = useState<
+    'show_all' | 'pi' | 'fdd' | 'hull' | 'war'
+  >('show_all')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [editDefaultSelected, setEditDefaultSelected] = useState(false)
@@ -2343,7 +2363,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h3 style={{ fontSize: '1rem', margin: 0 }}>Warranties</h3>
             <div style={{ display: 'flex', gap: '4px' }}>
-              {(['show_all', 'pi', 'hull', 'war'] as const).map((f) => (
+              {(['show_all', 'pi', 'fdd', 'hull', 'war'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setWarrantyTypeFilter(f)}
@@ -2365,7 +2385,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                       warrantyTypeFilter === f ? 'var(--accent-primary)' : 'var(--text-secondary)'
                   }}
                 >
-                  {f === 'show_all' ? 'All' : f === 'pi' ? 'P&I' : f === 'hull' ? 'Hull' : 'War'}
+                  {f === 'show_all' ? 'All' : TYPE_SCOPE_LABELS[f]}
                 </button>
               ))}
             </div>
@@ -2585,6 +2605,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
               {[
                 { v: 'all', l: 'All' },
                 { v: 'pi', l: 'P&I' },
+                { v: 'fdd', l: 'FD&D' },
                 { v: 'hull', l: 'Hull' },
                 { v: 'war', l: 'War' },
                 { v: 'cargo', l: 'Cargo' }
@@ -2729,6 +2750,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                   {[
                     { v: 'all', l: 'All' },
                     { v: 'pi', l: 'P&I' },
+                    { v: 'fdd', l: 'FD&D' },
                     { v: 'hull', l: 'Hull' },
                     { v: 'war', l: 'War' },
                     { v: 'cargo', l: 'Cargo' }
@@ -2831,6 +2853,7 @@ function WarrantiesTab({ showSuccess, showError, isLight }: TabProps): React.JSX
                       w.typeScope.split(',').map((s) => {
                         const colors: Record<string, { bg: string; fg: string; label: string }> = {
                           pi: { bg: 'rgba(100,100,255,0.15)', fg: '#6464ff', label: 'P&I' },
+                          fdd: { bg: 'rgba(168,85,247,0.15)', fg: '#a855f7', label: 'FD&D' },
                           hull: { bg: 'rgba(255,100,200,0.15)', fg: '#ff64c8', label: 'Hull' },
                           war: { bg: 'rgba(255,176,32,0.15)', fg: '#ffb020', label: 'War' },
                           cargo: { bg: 'rgba(50,184,134,0.15)', fg: '#32b886', label: 'Cargo' }
@@ -3388,6 +3411,13 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                  <TypeScopeToggle
+                    scope={d.typeScope}
+                    onChange={async (sc) => {
+                      await window.api.piSetItemTypeScope('deductible', d.id, sc)
+                      loadData()
+                    }}
+                  />
                   <button
                     title="Move up"
                     aria-label="Move up"
@@ -3620,6 +3650,13 @@ function DeductiblesTab({ showSuccess }: TabProps): React.JSX.Element {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                  <TypeScopeToggle
+                    scope={td.typeScope}
+                    onChange={async (sc) => {
+                      await window.api.piSetItemTypeScope('textDeductible', td.id, sc)
+                      loadData()
+                    }}
+                  />
                   <button
                     title="Move up"
                     aria-label="Move up"
@@ -4174,6 +4211,13 @@ function ExclusionsTab({ showSuccess, isLight }: TabProps): React.JSX.Element {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexShrink: 0 }}>
+                <TypeScopeToggle
+                  scope={ex.typeScope}
+                  onChange={async (sc) => {
+                    await window.api.piSetItemTypeScope('exclusion', ex.id, sc)
+                    loadData()
+                  }}
+                />
                 <button
                   title="Move up"
                   aria-label="Move up"
@@ -4555,6 +4599,11 @@ function SubLimitsTab({ showSuccess }: TabProps): React.JSX.Element {
             key: 'limitOfLiabilityDefaultText',
             label: 'Default Liability Text ({amount}, {currency} placeholders)',
             rows: 3
+          },
+          {
+            key: 'limitOfLiabilityDefaultTextFDD',
+            label: 'Default Liability Text for FD&D quotations ({amount}, {currency} placeholders)',
+            rows: 3
           }
         ]}
         showSuccess={showSuccess}
@@ -4798,6 +4847,13 @@ function AdditionalClausesTab({ showSuccess, showError }: TabProps): React.JSX.E
                   <span style={{ whiteSpace: 'pre-wrap' }}>{c.text}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                  <TypeScopeToggle
+                    scope={c.typeScope}
+                    onChange={async (sc) => {
+                      await window.api.piSetItemTypeScope('additionalClause', c.id, sc)
+                      loadData()
+                    }}
+                  />
                   <label
                     style={{
                       display: 'flex',
@@ -5955,7 +6011,7 @@ function TradingWarrantyTab({ showSuccess }: TabProps): React.JSX.Element {
   const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionTexts()
     if (saved && Object.keys(saved).length > 0) {
-      setTexts(saved)
+      setTexts({ ...DEFAULT_SECTION_TEXTS, ...saved })
     } else {
       setTexts(DEFAULT_SECTION_TEXTS)
     }
@@ -7290,6 +7346,8 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
             >
               <option value="both">Both</option>
               <option value="pi">P&I only</option>
+              <option value="fdd">FD&D only</option>
+              <option value="pi,fdd">P&I and FD&D</option>
               <option value="hull">Hull only</option>
               <option value="war">War only</option>
             </select>
@@ -7363,6 +7421,7 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
                     {[
                       { v: 'all', l: 'All' },
                       { v: 'pi', l: 'P&I' },
+                      { v: 'fdd', l: 'FD&D' },
                       { v: 'hull', l: 'Hull' },
                       { v: 'war', l: 'War' },
                       { v: 'cargo', l: 'Cargo' }
@@ -7476,29 +7535,27 @@ function MasterSubjectivitiesTab({ showSuccess, showError }: TabProps): React.JS
                     </div>
                   </div>
                   <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                    {s.typeScope && s.typeScope !== 'all' && (
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background:
-                            s.typeScope === 'pi'
-                              ? 'rgba(100, 100, 255, 0.15)'
-                              : s.typeScope === 'hull'
-                                ? 'rgba(255, 100, 200, 0.15)'
-                                : 'rgba(255, 176, 32, 0.15)',
-                          color:
-                            s.typeScope === 'pi'
-                              ? '#6464ff'
-                              : s.typeScope === 'hull'
-                                ? '#ff64c8'
-                                : '#ffb020'
-                        }}
-                      >
-                        {s.typeScope === 'pi' ? 'P&I' : s.typeScope === 'hull' ? 'Hull' : 'War'}
-                      </span>
-                    )}
+                    {s.typeScope &&
+                      s.typeScope !== 'all' &&
+                      s.typeScope !== 'both' &&
+                      s.typeScope.split(',').map((tok) => {
+                        const t = tok.trim()
+                        const color = SCOPE_BADGE_COLORS[t] || '#999'
+                        return (
+                          <span
+                            key={t}
+                            style={{
+                              fontSize: '0.7rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: `${color}26`,
+                              color
+                            }}
+                          >
+                            {TYPE_SCOPE_LABELS[t] || t}
+                          </span>
+                        )
+                      })}
                     {(s.docTypeIds || []).map((dtId) => {
                       const dt = docTypes.find((d) => d.id === dtId)
                       return dt ? (
@@ -7951,6 +8008,12 @@ const SECTION_TEXT_FIELDS: {
     label: 'Important Notice (War)',
     section: 'Important Notice',
     rows: 5
+  },
+  {
+    key: 'importantNoticeFDD',
+    label: 'Important Notice (FD&D)',
+    section: 'Important Notice',
+    rows: 5
   }
 ]
 
@@ -7969,7 +8032,7 @@ function StandardTextsTab({ showSuccess }: TabProps): React.JSX.Element {
   const loadData = useCallback(async (): Promise<void> => {
     const saved = await window.api.piGetSectionTexts()
     if (saved && Object.keys(saved).length > 0) {
-      setTexts(saved)
+      setTexts({ ...DEFAULT_SECTION_TEXTS, ...saved })
     } else {
       setTexts(DEFAULT_SECTION_TEXTS)
     }
@@ -8375,6 +8438,7 @@ function SectionOrderTab({ showSuccess }: TabProps): React.JSX.Element {
           <div style={{ display: 'flex', gap: '4px' }}>
             {[
               { code: 'P', label: 'P&I' },
+              { code: 'F', label: 'FD&D' },
               { code: 'H', label: 'Hull' },
               { code: 'W', label: 'War' }
             ].map((t) => (

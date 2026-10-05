@@ -435,6 +435,8 @@ const api: Api = {
   piGetClauses: () => ipcRenderer.invoke('pi:getClauses'),
   piAddClause: (clause) => ipcRenderer.invoke('pi:addClause', clause),
   piUpdateClause: (id: string, updates) => ipcRenderer.invoke('pi:updateClause', id, updates),
+  piSetItemTypeScope: (kind, id: string, scope: string) =>
+    ipcRenderer.invoke('pi:setItemTypeScope', kind, id, scope),
   piDeleteClause: (id: string) => ipcRenderer.invoke('pi:deleteClause', id),
   piReorderClauses: (orderedIds: string[]) => ipcRenderer.invoke('pi:reorderClauses', orderedIds),
 

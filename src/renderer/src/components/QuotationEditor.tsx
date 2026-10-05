@@ -75,6 +75,7 @@ import VoyageTab from './quotation-tabs/VoyageTab'
 import SubjectMatterTab from './quotation-tabs/SubjectMatterTab'
 import CargoClausesTab from './quotation-tabs/CargoClausesTab'
 import { ok } from '../utils/ipc'
+import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
 // A safeHandle IPC call resolved with { error, message } instead of the value
 const hasIpcError = (r: unknown): boolean =>
@@ -132,15 +133,15 @@ const allTabs: TabDef[] = [
   { key: 'agreedValue', label: 'Agreed Value', icon: Shield, types: ['H'] },
   { key: 'sumInsured', label: 'Sum Insured', icon: Shield, types: ['W'] },
   { key: 'insuredValue', label: 'Insured Value', icon: Shield, types: ['C'] },
-  { key: 'liability', label: 'Limit of Liability', icon: Shield, types: ['P'] },
+  { key: 'liability', label: 'Limit of Liability', icon: Shield, types: ['P', 'F'] },
   { key: 'hullConditions', label: 'Conditions', icon: FileText, types: ['H'] },
   { key: 'warConditions', label: 'Conditions', icon: FileText, types: ['W'] },
-  { key: 'conditions', label: 'Conditions', icon: FileText, types: ['P'] },
+  { key: 'conditions', label: 'Conditions', icon: FileText, types: ['P', 'F'] },
   { key: 'cargoConditions', label: 'Conditions', icon: FileText, types: ['C'] },
   { key: 'subjectMatter', label: 'Subject Matter', icon: FileText, types: ['C'] },
   { key: 'voyage', label: 'Voyage', icon: Globe, types: ['C'] },
   { key: 'period', label: 'Period', icon: Clock, types: ['P', 'H', 'W', 'F', 'L'] },
-  { key: 'trading', label: 'Trading', icon: Globe, types: ['P', 'H'] },
+  { key: 'trading', label: 'Trading', icon: Globe, types: ['P', 'F', 'H'] },
   { key: 'warTrading', label: 'Trading Warranty', icon: Globe, types: ['W'] },
   { key: 'warranties', label: 'Warranties', icon: CheckSquare, types: ['P', 'H', 'W', 'F', 'L'] },
   {
@@ -149,8 +150,8 @@ const allTabs: TabDef[] = [
     icon: ClipboardCheck,
     types: ['P', 'H', 'F', 'L']
   },
-  { key: 'deductibles', label: 'Deductibles', icon: Scale, types: ['P'] },
-  { key: 'exclusions', label: 'Exclusions', icon: Ban, types: ['P'] },
+  { key: 'deductibles', label: 'Deductibles', icon: Scale, types: ['P', 'F'] },
+  { key: 'exclusions', label: 'Exclusions', icon: Ban, types: ['P', 'F'] },
   { key: 'cargoSpecial', label: 'Special Conditions', icon: FileText, types: ['C'] },
   { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle, types: ['P', 'H', 'W', 'F', 'L'] },
   { key: 'subjectivities', label: 'Subjectivities', icon: Anchor },
@@ -387,7 +388,7 @@ export default function QuotationEditor({
         setWorkflowLog([])
       }
       // Load PI alternatives
-      if (fullQ.quotationTypeCode === 'P') {
+      if (isPiLike(fullQ.quotationTypeCode)) {
         const piAlts = await window.api.piGetQuotationAlternatives(fullQ.id)
         const safeAlts = Array.isArray(piAlts) ? piAlts : []
         setPiAlternatives(safeAlts)
@@ -412,7 +413,9 @@ export default function QuotationEditor({
 
   const getEffectiveText = (key: keyof PISectionTexts): string => {
     return String(
-      q.sectionTextsOverride?.[key] ?? globalTexts[key] ?? DEFAULT_SECTION_TEXTS[key] ?? ''
+      q.sectionTextsOverride?.[key] ??
+        textsForType({ ...DEFAULT_SECTION_TEXTS, ...globalTexts }, q.quotationTypeCode)[key] ??
+        ''
     )
   }
 
@@ -543,7 +546,7 @@ export default function QuotationEditor({
     ) {
       // Check if premium is set on quotation level OR on alternatives/vessels/value options
       let hasPremium = quotation.premiumAmount != null && quotation.premiumAmount !== 0
-      if (!hasPremium && typeCode === 'P') {
+      if (!hasPremium && isPiLike(typeCode)) {
         // P&I alternatives may have per-alternative premiums
         try {
           const piAlts = await window.api.piGetQuotationAlternatives(quotation.id)
@@ -577,7 +580,7 @@ export default function QuotationEditor({
           /* best-effort check */
         }
       }
-      if (!hasPremium && typeCode === 'P') {
+      if (!hasPremium && isPiLike(typeCode)) {
         // Check LOL alternative premiums
         try {
           const lolOpts = await window.api.lolGetOptions(quotation.id)
@@ -593,7 +596,7 @@ export default function QuotationEditor({
 
     // P&I: Limit of Liability (skip if LOL alternatives are set)
     if (
-      typeCode === 'P' &&
+      isPiLike(typeCode) &&
       (quotation.limitOfLiabilityAmount == null || quotation.limitOfLiabilityAmount === 0)
     ) {
       try {
@@ -793,7 +796,7 @@ export default function QuotationEditor({
 
   // P&I Alternatives management
   const piAltColors = ['#00aac8', '#6464ff', '#ff64c8', '#ffb020', '#44cc88']
-  const isPIType = q.quotationTypeCode === 'P'
+  const isPIType = isPiLike(q.quotationTypeCode)
   const piAltTabs: EditorTab[] = ['conditions', 'warranties', 'deductibles', 'exclusions']
   const showPIAltBar = isPIType && piAltTabs.includes(activeTab)
 

@@ -15,6 +15,7 @@ import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, PickerDropdown, MoneyInput } from './shared'
 import { ALT_COLORS } from './sharedUtils'
 import { ok } from '../../utils/ipc'
+import { inTypeScope } from '../../../../shared/quotationTypes'
 
 export default function DeductiblesTab({
   quotation,
@@ -75,9 +76,13 @@ export default function DeductiblesTab({
         window.api.getQuotationVessels(quotation.id)
       ])
       const safeQd = Array.isArray(qd) ? qd : []
-      const safeMd = Array.isArray(md) ? md : []
+      // Only the items offered for this quotation type (P&I or FD&D)
+      const typeCode = quotation.quotationTypeCode
+      const safeMd = (Array.isArray(md) ? md : []).filter((m) => inTypeScope(m.typeScope, typeCode))
       const safeTd = Array.isArray(td) ? td : []
-      const safeMtd = Array.isArray(mtd) ? mtd : []
+      const safeMtd = (Array.isArray(mtd) ? mtd : []).filter((m) =>
+        inTypeScope(m.typeScope, typeCode)
+      )
       setDeductibles(safeQd)
       setMasterDeductibles(safeMd)
       setTextDeds(safeTd)
@@ -112,7 +117,7 @@ export default function DeductiblesTab({
       }
     }
     loadData()
-  }, [quotation.id, reloadKey])
+  }, [quotation.id, quotation.quotationTypeCode, reloadKey])
   const reload = (): void => setReloadKey((k) => k + 1)
 
   const handleAddFromMaster = async (masterId: string): Promise<void> => {

@@ -21,6 +21,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { asArray, ok, isIpcError } from '../../utils/ipc'
 import { MoneyInput } from './shared'
 import { DEFAULT_UPCC_TITLE } from '../../utils/surveyWarrantyText'
+import { isPiLike } from '../../../../shared/quotationTypes'
 
 /** Sections an additional discount's wording can be placed in (besides its own section) */
 const DISCOUNT_PLACEMENTS = ['premium', 'ncb', 'upcc']
@@ -265,7 +266,7 @@ export default function PremiumTab({
         })
         .catch(() => {})
     }
-    if (quotation.quotationTypeCode === 'P') {
+    if (isPiLike(quotation.quotationTypeCode)) {
       window.api
         .piGetQuotationAlternatives(quotation.id)
         .then((a) => setPiAlternatives(Array.isArray(a) ? a : []))
@@ -430,7 +431,7 @@ export default function PremiumTab({
   const numInst = quotation.numInstalments || 1
   const instFor = (tech: number, v: (typeof qVessels)[0]): number =>
     (hasDiscount ? payableFor(tech, v) : tech) / numInst
-  const piMultiAlt = quotation.quotationTypeCode === 'P' && piAlternatives.length > 1
+  const piMultiAlt = isPiLike(quotation.quotationTypeCode) && piAlternatives.length > 1
   // Payable (after NCB/UPCC + extra discounts) for a plain technical amount, no per-vessel exclusions.
   // Used for single-vessel alternative rows (P&I alternatives) where premium lives on each alternative.
   const payablePlain = (tech: number): number => {
@@ -711,7 +712,7 @@ export default function PremiumTab({
       {!isMultiVessel && (
         <div style={{ marginBottom: '16px' }}>
           {/* P&I with multiple alternatives: per-alternative premium */}
-          {quotation.quotationTypeCode === 'P' && piAlternatives.length > 1 ? (
+          {isPiLike(quotation.quotationTypeCode) && piAlternatives.length > 1 ? (
             <div
               style={{
                 display: 'flex',
@@ -789,7 +790,7 @@ export default function PremiumTab({
               })}
             </div>
           ) : /* P&I with LOL alternatives (no full PI alternatives): per-LOL-option premium */
-          quotation.quotationTypeCode === 'P' && lolOptions.length > 0 ? (
+          isPiLike(quotation.quotationTypeCode) && lolOptions.length > 0 ? (
             <div
               style={{
                 display: 'flex',

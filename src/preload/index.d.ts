@@ -640,6 +640,12 @@ export interface Api {
   piGetClauses: () => Promise<PIClause[]>
   piAddClause: (clause: Omit<PIClause, 'id'>) => Promise<PIClause>
   piUpdateClause: (id: string, updates: Partial<PIClause>) => Promise<void>
+  /** Which quotation types (pi / fdd, comma-separated) a P&I settings item is offered for */
+  piSetItemTypeScope: (
+    kind: 'clause' | 'deductible' | 'textDeductible' | 'exclusion' | 'additionalClause',
+    id: string,
+    scope: string
+  ) => Promise<void>
   piDeleteClause: (id: string) => Promise<void>
   piReorderClauses: (orderedIds: string[]) => Promise<void>
 

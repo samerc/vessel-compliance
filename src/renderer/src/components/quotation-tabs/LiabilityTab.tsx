@@ -12,6 +12,7 @@ import { MoneyInput, StrMoneyInput } from './shared'
 import { ALT_COLORS } from './sharedUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { asArray, ok } from '../../utils/ipc'
+import { isPiLike } from '../../../../shared/quotationTypes'
 
 export default function LiabilityTab({
   quotation,
@@ -65,7 +66,7 @@ export default function LiabilityTab({
       setSubLimits(asArray(sl))
       setTemplates(Array.isArray(tmpl) ? tmpl : [])
       setQVessels(Array.isArray(qv) ? qv : [])
-      if (typeCode === 'P') {
+      if (isPiLike(typeCode)) {
         const [alts, lolOpts] = await Promise.all([
           window.api.piGetQuotationAlternatives(quotationId),
           window.api.lolGetOptions(quotationId)
@@ -277,7 +278,7 @@ export default function LiabilityTab({
       )}
 
       {/* LOL Alternatives */}
-      {quotation.quotationTypeCode === 'P' && piAlts.length < 2 && (
+      {isPiLike(quotation.quotationTypeCode) && piAlts.length < 2 && (
         <div style={{ marginBottom: '20px' }}>
           {lolOptions.length > 0 ? (
             <>

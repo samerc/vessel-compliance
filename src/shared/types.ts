@@ -574,6 +574,8 @@ export interface PIClause {
   description?: string
   isCargoRelated: boolean
   order: number
+  /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
+  typeScope?: string
 }
 
 export interface PIClauseSet {
@@ -631,6 +633,8 @@ export interface PIDeductible {
   secondaryDescription?: string
   secondaryDefaultAmount?: number
   order: number
+  /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
+  typeScope?: string
 }
 
 export interface PIDeductibleSet {
@@ -653,6 +657,8 @@ export interface PIExclusion {
   isCargoRelated: boolean
   vesselTypeIds?: string[]
   order: number
+  /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
+  typeScope?: string
 }
 
 export interface QuotationCustomExclusion {
@@ -706,6 +712,8 @@ export interface PIAdditionalClause {
   text: string
   order: number
   defaultSelected?: boolean
+  /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
+  typeScope?: string
 }
 
 export interface PIAdditionalClauseSet {
@@ -1243,6 +1251,8 @@ export interface PITextDeductible {
   text: string
   defaultIncluded: boolean
   order: number
+  /** Quotation types the item is offered for: pi, fdd or both (comma-separated); all = every type */
+  typeScope?: string
 }
 
 export interface QuotationTextDeductible {
@@ -1341,7 +1351,10 @@ export interface PISectionTexts {
   docFooterSpacing?: number
   insuredFooter?: string
   conditionsIntro?: string
+  /** FD&D wording of conditionsIntro (FD&D quotations) */
+  conditionsIntroFDD?: string
   limitOfLiabilityDefaultText?: string
+  limitOfLiabilityDefaultTextFDD?: string
   tradingIntro?: string
   tradingConditionA?: string
   tradingConditionB?: string
@@ -1376,6 +1389,7 @@ export interface PISectionTexts {
   importantNoticePI?: string
   importantNoticeHull?: string
   importantNoticeWar?: string
+  importantNoticeFDD?: string
 }
 
 export interface PISanctionsVersion {

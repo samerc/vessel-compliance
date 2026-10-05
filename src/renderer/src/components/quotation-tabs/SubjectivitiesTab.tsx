@@ -25,6 +25,7 @@ import {
 import { resolveEffectivePolicyExpiry } from '../../utils/policyUtils'
 import VesselScopeChips from '../VesselScopeChips'
 import { ok } from '../../utils/ipc'
+import { inTypeScope } from '../../../../shared/quotationTypes'
 
 /** Where the subjectivity loaders put what they load */
 interface SubjectivitySink {
@@ -54,16 +55,8 @@ async function loadSubjectivities(
   const safeMasters = Array.isArray(masters) ? masters : []
   const safeDts = Array.isArray(dts) ? dts : []
   // Filter masters by quotation type scope
-  const typeCode =
-    quotationTypeCode?.toLowerCase() === 'h'
-      ? 'hull'
-      : quotationTypeCode?.toLowerCase() === 'w'
-        ? 'war'
-        : quotationTypeCode?.toLowerCase() === 'c'
-          ? 'cargo'
-          : 'pi'
-  const filteredMasters = safeMasters.filter(
-    (m) => !m.typeScope || m.typeScope === 'all' || m.typeScope.split(',').includes(typeCode)
+  const filteredMasters = safeMasters.filter((m) =>
+    inTypeScope(m.typeScope, quotationTypeCode?.toUpperCase())
   )
   sink.setItems(safeSubjs)
   sink.setMasterList(filteredMasters)

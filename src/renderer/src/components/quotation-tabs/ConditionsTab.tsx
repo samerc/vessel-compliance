@@ -14,6 +14,7 @@ import {
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 import { ok } from '../../utils/ipc'
+import { inTypeScope } from '../../../../shared/quotationTypes'
 
 type QuotationAdditionalClauseRow = Awaited<
   ReturnType<typeof window.api.getQuotationAdditionalClauses>
@@ -70,7 +71,12 @@ export default function ConditionsTab({
         window.api.getQuotationVessels(quotation.id)
       ]
     )
-    setAllClauses(Array.isArray(clauses) ? clauses : [])
+    // Only the items offered for this quotation type (P&I or FD&D)
+    const typeCode = quotation.quotationTypeCode
+    const scopedClauses = (Array.isArray(clauses) ? clauses : []).filter((c) =>
+      inTypeScope(c.typeScope, typeCode)
+    )
+    setAllClauses(scopedClauses)
     setClauseSets(Array.isArray(sets) ? sets : [])
     const safeSelected = Array.isArray(selected) ? selected : []
     setSelectedIds(new Set(safeSelected.map((r) => r.piClauseId)))
@@ -96,13 +102,15 @@ export default function ConditionsTab({
     setDescOverrides(overrides && !(overrides as IpcResultLike).error ? overrides : {})
     const safeAddCl = Array.isArray(addClauses) ? addClauses : []
     setAdditionalClauses(safeAddCl)
-    const safeAllAdd = Array.isArray(allAdd) ? allAdd : []
+    const safeAllAdd = (Array.isArray(allAdd) ? allAdd : []).filter((c) =>
+      inTypeScope(c.typeScope, typeCode)
+    )
     setAllAdditional(safeAllAdd)
     setAdditionalClauseSets(Array.isArray(addSets) ? addSets : [])
     setQVessels(Array.isArray(qv) ? qv : [])
 
     // Auto-select all active clauses on first load if none are selected
-    const safeClauses = Array.isArray(clauses) ? clauses : []
+    const safeClauses = scopedClauses
     if (!clauseDefaultsApplied.current && safeSelected.length === 0 && safeClauses.length > 0) {
       clauseDefaultsApplied.current = true
       const allClauseIds = safeClauses.map((c: PIClause) => c.id)
@@ -173,7 +181,7 @@ export default function ConditionsTab({
     } else {
       additionalDefaultsApplied.current = true
     }
-  }, [quotation.id])
+  }, [quotation.id, quotation.quotationTypeCode])
   useEffect(() => {
     const run = async (): Promise<void> => {
       await loadData()
@@ -426,6 +434,11 @@ export default function ConditionsTab({
     loadData()
   }
 
+  // FD&D has no Section B clauses: only the additional clauses (FD&D terms, JH/JL clauses)
+  const hasClauseList =
+    quotation.quotationTypeCode !== 'F' || allClauses.length > 0 || selectedIds.size > 0
+  const activeSub = hasClauseList ? subTab : 'additional'
+
   return (
     <div>
       {/* Sub-tab bar */}
@@ -438,36 +451,40 @@ export default function ConditionsTab({
           paddingBottom: '0'
         }}
       >
-        <button
-          onClick={() => setSubTab('clauses')}
-          style={{
-            padding: '8px 18px',
-            fontSize: '0.88rem',
-            fontWeight: 600,
-            border: 'none',
-            borderBottom:
-              subTab === 'clauses' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            background: 'transparent',
-            color: subTab === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            cursor: 'pointer',
-            marginBottom: '-2px',
-            transition: 'color 0.15s'
-          }}
-        >
-          Clauses{' '}
-          <span
+        {hasClauseList && (
+          <button
+            onClick={() => setSubTab('clauses')}
             style={{
-              fontSize: '0.72rem',
-              padding: '1px 6px',
-              borderRadius: '10px',
-              background: 'rgba(var(--accent-primary-rgb), 0.1)',
-              color: 'var(--accent-primary)',
-              marginLeft: '6px'
+              padding: '8px 18px',
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              border: 'none',
+              borderBottom:
+                activeSub === 'clauses'
+                  ? '2px solid var(--accent-primary)'
+                  : '2px solid transparent',
+              background: 'transparent',
+              color: activeSub === 'clauses' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              marginBottom: '-2px',
+              transition: 'color 0.15s'
             }}
           >
-            {selectedIds.size}
-          </span>
-        </button>
+            Clauses{' '}
+            <span
+              style={{
+                fontSize: '0.72rem',
+                padding: '1px 6px',
+                borderRadius: '10px',
+                background: 'rgba(var(--accent-primary-rgb), 0.1)',
+                color: 'var(--accent-primary)',
+                marginLeft: '6px'
+              }}
+            >
+              {selectedIds.size}
+            </span>
+          </button>
+        )}
         <button
           onClick={() => setSubTab('additional')}
           style={{
@@ -476,9 +493,11 @@ export default function ConditionsTab({
             fontWeight: 600,
             border: 'none',
             borderBottom:
-              subTab === 'additional' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              activeSub === 'additional'
+                ? '2px solid var(--accent-primary)'
+                : '2px solid transparent',
             background: 'transparent',
-            color: subTab === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            color: activeSub === 'additional' ? 'var(--accent-primary)' : 'var(--text-secondary)',
             cursor: 'pointer',
             marginBottom: '-2px',
             transition: 'color 0.15s'
@@ -501,7 +520,7 @@ export default function ConditionsTab({
       </div>
 
       {/* Clauses sub-tab */}
-      {subTab === 'clauses' && (
+      {activeSub === 'clauses' && (
         <div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
             Select the P&I conditions and clauses. Use clause set presets for quick selection.
@@ -626,7 +645,7 @@ export default function ConditionsTab({
       )}
 
       {/* Additional Clauses sub-tab */}
-      {subTab === 'additional' && (
+      {activeSub === 'additional' && (
         <div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
             Additional clauses appended after the main conditions in exports. Use presets or add

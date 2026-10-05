@@ -95,6 +95,7 @@ import { stripHtml } from '../utils/htmlToPdfText'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
 import { warSectionTexts } from '../utils/warTexts'
 import { formatDateLong } from '../utils/dateUtils'
+import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 
 // ==================== Export Snapshot ====================
 
@@ -367,16 +368,14 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   }
 
   // Fetch PI alternatives
-  const piAlternativesRaw =
-    quotation.quotationTypeCode === 'P'
-      ? await window.api.piGetQuotationAlternatives(quotation.id)
-      : []
+  const piAlternativesRaw = isPiLike(quotation.quotationTypeCode)
+    ? await window.api.piGetQuotationAlternatives(quotation.id)
+    : []
 
   // Fetch LOL options
-  const lolOptionsRaw =
-    quotation.quotationTypeCode === 'P'
-      ? await window.api.lolGetOptions(quotation.id).catch(() => [])
-      : []
+  const lolOptionsRaw = isPiLike(quotation.quotationTypeCode)
+    ? await window.api.lolGetOptions(quotation.id).catch(() => [])
+    : []
 
   // Fetch agreed value options
   const agreedValueOptionsRaw = await window.api.hullGetAgreedValueOptions(quotation.id)
@@ -419,8 +418,11 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   const mergedTexts: PISectionTexts = snapshot
     ? snapshot.sectionTexts
     : {
-        ...DEFAULT_SECTION_TEXTS,
-        ...(sectionTexts || {}),
+        // FD&D quotations use the FD&D wording of the texts that have one
+        ...textsForType(
+          { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}) },
+          quotation.quotationTypeCode
+        ),
         ...(quotation.sectionTextsOverride || {})
       }
   if (mergedTexts.warrantiesAdditionalText)
@@ -986,6 +988,14 @@ async function resolveSectionOrder(data: QuotationData): Promise<string[]> {
     }
     return typeKeys.has(k)
   })
+}
+
+/** Document title wording per quotation type ("... QUOTATION FOR {vessel}") */
+function quotationTitlePrefix(code?: string | null): string {
+  if (code === 'H') return 'HULL'
+  if (code === 'W') return 'WAR / PIRACY'
+  if (code === 'F') return 'FREIGHT DEMURRAGE & DEFENCE'
+  return 'PROTECTION AND INDEMNITY'
 }
 
 function st(data: QuotationData, key: keyof PISectionTexts): string {
@@ -1878,8 +1888,15 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         ? cleanText.match(/(Under\s+no\s+circumstances.*)/is)
         : null
       if (underNoMatch) {
-        const beforeUnderNo = cleanText.substring(0, underNoMatch.index!).trim()
-        const underNoPart = underNoMatch[1].trim()
+        // Splitting HTML here leaves an unclosed tag on each side (<p> before, </p> after):
+        // drop those orphans so they are not printed as text
+        const beforeUnderNo = cleanText
+          .substring(0, underNoMatch.index!)
+          .replace(/(<(p|span|div)(\s[^>]*)?>\s*)+$/i, '')
+          .trim()
+        let underNoPart = underNoMatch[1].trim()
+        if (!/<(p|span|div)[\s>]/i.test(underNoPart))
+          underNoPart = underNoPart.replace(/(\s*<\/(p|span|div)>)+$/i, '').trim()
         if (beforeUnderNo) liabContent.push(...lolTextParas(beforeUnderNo))
         if (dLolAmountParas.length > 0) liabContent.push(emptyP(), ...dLolAmountParas)
         if (wordSubLimitParas.length > 0) liabContent.push(emptyP(), ...wordSubLimitParas)
@@ -5202,7 +5219,9 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
         ? 'importantNoticeHull'
         : data.quotation.quotationTypeCode === 'W'
           ? 'importantNoticeWar'
-          : ''
+          : data.quotation.quotationTypeCode === 'F'
+            ? 'importantNoticeFDD'
+            : ''
   const _inText =
     (_inTypeKey && st(data, _inTypeKey as keyof PISectionTexts)) || st(data, 'importantNotice')
   if (_inText) {
@@ -5286,7 +5305,7 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           text:
             data.quotation.quotationTypeCode === 'C'
               ? `Marine Cargo Quotation for ${data.quotation.title || vName}`
-              : `${data.quotation.quotationTypeCode === 'H' ? 'HULL' : data.quotation.quotationTypeCode === 'W' ? 'WAR / PIRACY' : 'PROTECTION AND INDEMNITY'} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`,
+              : `${quotationTitlePrefix(data.quotation.quotationTypeCode)} QUOTATION FOR ${(data.quotation.title || vName).toUpperCase()}`,
           bold: true,
           size: 26,
           font: 'Arial',

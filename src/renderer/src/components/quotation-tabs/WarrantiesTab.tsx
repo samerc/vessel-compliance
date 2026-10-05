@@ -27,6 +27,7 @@ import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips } from './shared'
 import { ALT_COLORS } from './sharedUtils'
 import { ok, isIpcError } from '../../utils/ipc'
+import { inTypeScope } from '../../../../shared/quotationTypes'
 
 export default function WarrantiesTab({
   quotation,
@@ -126,17 +127,9 @@ export default function WarrantiesTab({
       ) {
         defaultsApplied.current = true
         // Filter by quotation type scope so P&I warranties don't auto-apply to hull quotations
-        const tc =
-          quotation.quotationTypeCode?.toLowerCase() === 'h'
-            ? 'hull'
-            : quotation.quotationTypeCode?.toLowerCase() === 'w'
-              ? 'war'
-              : 'pi'
         const scopeValid = new Set(
           safeAll
-            .filter(
-              (w) => !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(tc)
-            )
+            .filter((w) => inTypeScope(w.typeScope, quotation.quotationTypeCode))
             .map((w) => w.id)
         )
         const defaultIds: string[] = []
@@ -314,8 +307,6 @@ export default function WarrantiesTab({
 
   // Filter warranties by quotation type scope
   const qTypeCode = quotation.quotationTypeCode?.toLowerCase() || 'p'
-  const typeCode =
-    qTypeCode === 'h' ? 'hull' : qTypeCode === 'w' ? 'war' : qTypeCode === 'c' ? 'cargo' : 'pi'
   const isCargo = qTypeCode === 'c'
   const [hasCargoClauseSelected, setHasCargoClauseSelected] = useState(false)
   useEffect(() => {
@@ -340,11 +331,12 @@ export default function WarrantiesTab({
     })()
   }, [quotation.id, isCargo])
 
-  const showCargoWarranties = isCargo || hasCargoClauseSelected
+  // FD&D has no cargo clause to select, so its cargo warranties are always offered
+  const showCargoWarranties = isCargo || qTypeCode === 'f' || hasCargoClauseSelected
   const visibleWarranties = allWarranties.filter((w) => {
     // Exclude cargo-related warranties unless cargo type or cargo clause selected
     if (!showCargoWarranties && w.isCargoRelated) return false
-    return !w.typeScope || w.typeScope === 'all' || w.typeScope.split(',').includes(typeCode)
+    return inTypeScope(w.typeScope, quotation.quotationTypeCode)
   })
 
   const getTabWarranties = (): PIWarranty[] => {

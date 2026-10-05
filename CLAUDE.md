@@ -1362,6 +1362,16 @@ Two checkbox-based notices in PremiumTab (non-cargo):
 - **IACS first**: When a vessel has dual classification societies, IACS member is always displayed first
 - **Applied to**: VesselDetail display, quotation exports, policy exports
 
+### FD&D Quotations (code F)
+
+FD&D (Freight, Demurrage & Defence) quotations are built on P&I:
+- **Same tabs and features**: Limit of Liability (incl. LOL alternatives), Conditions, Trading, Deductibles, Exclusions, P&I alternatives, section order (P&I default order, own `section_order_defaults_F`). `isPiLike(code)` in `src/shared/quotationTypes.ts` is the switch (P or F); keep blue cards and other P&I-only policy items on `=== 'P'`
+- **Type scope**: the P&I settings lists carry `type_scope` (`pi`, `fdd`, `pi,fdd`/`all`): `pi_clauses`, `pi_deductibles`, `pi_text_deductibles` (default `pi`), `pi_exclusions`, `pi_additional_clauses` (default `all`). Edited with the P&I / FD&D chips on each row (`TypeScopeToggle`, IPC `pi:setItemTypeScope`); the editor tabs show only items in scope (`inTypeScope`). Warranties/subjectivities use the same `fdd` token (a one-time migration added it wherever `pi` was, since FD&D used to see the P&I items)
+- **FD&D has no Section B clauses**: the Conditions tab shows only Additional Clauses; cargo exclusions and warranties are always offered (no cargo clause to select)
+- **Wording**: title "FREIGHT DEMURRAGE & DEFENCE QUOTATION FOR", standard texts `conditionsIntroFDD`, `limitOfLiabilityDefaultTextFDD` (applied over the P&I key by `textsForType`), `importantNoticeFDD`
+- **One type**: a startup migration merges duplicate code-F types into one named "FD&D" (moves quotations, vessel policies, characteristics, commissions, document tags)
+- **Policy side not done yet**: converter / policy export / DA for FD&D are the next phase
+
 ### Cargo Quotation Specifics
 
 - **Rate-based premium**: Rate % input → calculated premium amount (no "p.a." suffix, no previous premium display)

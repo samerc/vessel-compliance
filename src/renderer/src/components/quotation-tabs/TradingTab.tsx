@@ -11,6 +11,7 @@ import {
 import RichTextEditor from '../RichTextEditor'
 import { stripHtml } from '../../utils/htmlToPdfText'
 import { asArray } from '../../utils/ipc'
+import { isPiLike } from '../../../../shared/quotationTypes'
 interface TradingIntro {
   id: string
   quotationId: string
@@ -561,7 +562,7 @@ export default function TradingTab({
           </div>
 
           {/* Section E: Additional Trading Text (not for P&I) */}
-          {quotation.quotationTypeCode !== 'P' && (
+          {!isPiLike(quotation.quotationTypeCode) && (
             <div style={sectionStyle}>
               <label
                 style={{

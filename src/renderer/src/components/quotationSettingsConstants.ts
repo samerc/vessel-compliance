@@ -108,7 +108,7 @@ export function addMissingSections(order: string[], defaults: string[]): string[
 
 export function getDefaultSectionOrder(typeCode?: string): string[] {
   if (typeCode === 'H') return [...HULL_SECTION_ORDER]
-  if (typeCode === 'P') return [...PI_SECTION_ORDER]
+  if (typeCode === 'P' || typeCode === 'F') return [...PI_SECTION_ORDER]
   if (typeCode === 'W') return [...WAR_SECTION_ORDER]
   if (typeCode === 'C') return [...CARGO_SECTION_ORDER]
   return [...DEFAULT_SECTION_ORDER]
@@ -157,6 +157,12 @@ export const DEFAULT_SECTION_TEXTS: PISectionTexts = {
     'The limit of liability of the Insurer under this Policy shall not exceed {currency} {amount} any one vessel any one accident or occurrence and in the aggregate during the policy period, except where otherwise specifically provided.',
   conditionsIntro:
     'Al-Bahriah Protection & Indemnity Wording 01.01.2025 covering the following Risks Insured:',
+  conditionsIntroFDD:
+    'Al-Bahriah Freight, Demurrage and Defense Terms & Conditions dated 01.01.2025.',
+  limitOfLiabilityDefaultTextFDD:
+    '<p>{currency} {amount} on all claims in the aggregate inclusive costs, fees and expenses either approved and/or incurred by the Insurer, each dispute.</p><p>Under no circumstances is the Combined Single Limit detailed above to be exceeded.</p>',
+  importantNoticeFDD:
+    '<p>IMPORTANT NOTICE</p><p>Attention is drawn to Clause A.4 of the Al-Bahriah FD&amp;D Terms and Conditions applicable to this Policy which contains terms contracting out of certain provisions of the English Insurance Act 2015 as respects the fair presentation of the risk, the effect of warranties and other terms, the making of fraudulent claims, the duty of good faith and damages for late payment of claims.</p>',
   tradingIntro:
     'Subject to Paragraph 2 below, any trade of whatsoever nature with the following countries is excluded.',
   tradingConditionA:

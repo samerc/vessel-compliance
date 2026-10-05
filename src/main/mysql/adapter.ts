@@ -2735,7 +2735,11 @@ export class MySQLAdapter {
           'h&m': 'H',
           'hull and machinery': 'H',
           war: 'W',
-          'war risk': 'W'
+          'war risk': 'W',
+          'fd&d': 'F',
+          fdd: 'F',
+          'freight demurrage & defence': 'F',
+          'freight, demurrage and defence': 'F'
         }
         const [ptRows] = (await this.pool.query(
           'SELECT id, name, code FROM policy_types'
@@ -2787,6 +2791,13 @@ export class MySQLAdapter {
             )
           }
         }
+      }
+
+      // Migration: FD&D quotations (code F) - one FD&D type, type scope on the P&I lists, FD&D items
+      try {
+        await this.migrateFddQuotations()
+      } catch (e) {
+        console.error('FD&D migration:', e)
       }
 
       // Final collation normalization pass — catches any tables created or altered
@@ -8118,6 +8129,128 @@ export class MySQLAdapter {
   }
 
   // Settings Management
+  private async migrateFddQuotations(): Promise<void> {
+    if (!this.pool) return
+    // a) type_scope on the P&I settings lists. Section B clauses and amount deductibles are
+    //    P&I cover; exclusions and additional clauses (JH/JL clauses) are shared by default.
+    const scopeCols: [string, string][] = [
+      ['pi_clauses', 'pi'],
+      ['pi_deductibles', 'pi'],
+      ['pi_text_deductibles', 'pi'],
+      ['pi_exclusions', 'all'],
+      ['pi_additional_clauses', 'all']
+    ]
+    for (const [table, def] of scopeCols) {
+      const [cols] = (await this.pool.query(
+        `SHOW COLUMNS FROM ${table} LIKE 'type_scope'`
+      )) as QueryRows
+      if (cols.length === 0) {
+        await this.pool.query(
+          `ALTER TABLE ${table} ADD COLUMN type_scope VARCHAR(50) DEFAULT '${def}'`
+        )
+      }
+    }
+
+    // b) Merge duplicate FD&D types (e.g. "FDD" seeded next to a user-made "FD&D") into one
+    const [fTypes] = (await this.pool.query(
+      "SELECT pt.id, pt.name, pt.created_at, (SELECT COUNT(*) FROM policy_type_characteristics c WHERE c.policy_type_id = pt.id) + (SELECT COUNT(*) FROM vessel_dynamic_policies d WHERE d.policy_type_id = pt.id) + (SELECT COUNT(*) FROM quotations q WHERE q.quotation_type_id = pt.id) AS refs FROM policy_types pt WHERE pt.code = 'F' ORDER BY refs DESC, pt.created_at ASC"
+    )) as QueryRows
+    if (fTypes.length > 1) {
+      const keep = fTypes[0].id as string
+      const conn = await this.pool.getConnection()
+      try {
+        await conn.beginTransaction()
+        for (const dup of fTypes.slice(1)) {
+          const dupId = dup.id as string
+          // Junction / unique-per-type tables: move what does not clash, drop the rest
+          await conn.execute(
+            'INSERT IGNORE INTO document_type_policy_types (document_type_id, policy_type_id) SELECT document_type_id, ? FROM document_type_policy_types WHERE policy_type_id = ?',
+            [keep, dupId]
+          )
+          await conn.execute('DELETE FROM document_type_policy_types WHERE policy_type_id = ?', [
+            dupId
+          ])
+          for (const table of [
+            'policy_type_commissions',
+            'entity_commission_overrides',
+            'vessel_policies'
+          ]) {
+            await conn.execute(
+              `UPDATE IGNORE ${table} SET policy_type_id = ? WHERE policy_type_id = ?`,
+              [keep, dupId]
+            )
+            await conn.execute(`DELETE FROM ${table} WHERE policy_type_id = ?`, [dupId])
+          }
+          // Plain references
+          for (const [table, col] of [
+            ['policy_type_characteristics', 'policy_type_id'],
+            ['policy_type_conditions', 'policy_type_id'],
+            ['vessel_dynamic_policies', 'policy_type_id'],
+            ['quotations', 'policy_type_id'],
+            ['quotations', 'quotation_type_id']
+          ]) {
+            await conn.execute(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`, [keep, dupId])
+          }
+          await conn.execute('DELETE FROM policy_types WHERE id = ?', [dupId])
+        }
+        await conn.execute("UPDATE policy_types SET name = 'FD&D' WHERE id = ?", [keep])
+        await conn.commit()
+        console.log(`[migration] merged ${fTypes.length - 1} duplicate FD&D type(s) into ${keep}`)
+      } catch (e) {
+        await conn.rollback()
+        throw e
+      } finally {
+        conn.release()
+      }
+    } else if (fTypes.length === 1 && fTypes[0].name === 'FDD') {
+      await this.pool.execute("UPDATE policy_types SET name = 'FD&D' WHERE id = ?", [fTypes[0].id])
+    }
+
+    // c) FD&D used to see every P&I warranty and subjectivity: keep that, now as an explicit tag
+    if ((await this.getSetting('migration_fdd_scope_v1')) !== '1') {
+      for (const table of [
+        'pi_warranties',
+        'pi_subjectivities',
+        'pi_warranty_tags',
+        'pi_warranty_sets'
+      ]) {
+        await this.pool.query(
+          `UPDATE ${table} SET type_scope = CONCAT(type_scope, ',fdd') WHERE FIND_IN_SET('pi', REPLACE(type_scope, ' ', '')) > 0 AND FIND_IN_SET('fdd', REPLACE(type_scope, ' ', '')) = 0`
+        )
+      }
+      // Items from the FD&D quotations that the P&I lists do not have
+      const [tdOrder] = (await this.pool.query(
+        'SELECT COALESCE(MAX(order_index), -1) + 1 AS n FROM pi_text_deductibles'
+      )) as QueryRows
+      await this.pool.execute(
+        "INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index, type_scope) VALUES (?, ?, ?, 1, ?, 'fdd')",
+        [
+          uuidv4(),
+          'FD&D 25% each dispute',
+          '25% of all costs, fees and expenses, each dispute, subject to,\nUSD 10,000 Minimum Deductible\nUSD 30,000 Maximum Deductible',
+          tdOrder[0].n
+        ]
+      )
+      const [usPol] = (await this.pool.query(
+        "SELECT id FROM pi_exclusions WHERE text LIKE '%Pollution liability in USA%' LIMIT 1"
+      )) as QueryRows
+      if (usPol.length === 0) {
+        const [exOrder] = (await this.pool.query(
+          'SELECT COALESCE(MAX(order_index), -1) + 1 AS n FROM pi_exclusions'
+        )) as QueryRows
+        await this.pool.execute(
+          "INSERT INTO pi_exclusions (id, text, is_cargo_related, order_index, type_scope) VALUES (?, ?, 0, ?, 'fdd')",
+          [
+            uuidv4(),
+            'Excluding Pollution liability in USA ports / waters / USA jurisdiction ports.',
+            exOrder[0].n
+          ]
+        )
+      }
+      await this.setSetting('migration_fdd_scope_v1', '1')
+    }
+  }
+
   async getSetting(key: string): Promise<string | null> {
     if (!this.pool) return null
     const [rows] = await this.pool.execute(
@@ -10120,7 +10253,7 @@ export class MySQLAdapter {
   async getPIClauses(): Promise<PIClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, clause_number as clauseNumber, name, description, is_cargo_related as isCargoRelated, order_index as `order` FROM pi_clauses ORDER BY order_index ASC'
+      "SELECT id, clause_number as clauseNumber, name, description, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'pi') as typeScope, order_index as `order` FROM pi_clauses ORDER BY order_index ASC"
     )
     return (rows as Row<PIClause>[]).map((r) => ({
       ...r,
@@ -10457,7 +10590,7 @@ export class MySQLAdapter {
   async getPIDeductibles(): Promise<PIDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, title, letter_code as letterCode, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC'
+      "SELECT id, title, letter_code as letterCode, description, default_amount as defaultAmount, default_currency as defaultCurrency, has_secondary as hasSecondary, secondary_description as secondaryDescription, secondary_default_amount as secondaryDefaultAmount, COALESCE(type_scope, 'pi') as typeScope, order_index as `order` FROM pi_deductibles ORDER BY order_index ASC"
     )
     return (rows as Row<PIDeductible>[]).map((r) => ({
       ...r,
@@ -10629,7 +10762,7 @@ export class MySQLAdapter {
   async getPITextDeductibles(): Promise<PITextDeductible[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, title, text, default_included as defaultIncluded, order_index as `order` FROM pi_text_deductibles ORDER BY order_index ASC'
+      "SELECT id, title, text, default_included as defaultIncluded, COALESCE(type_scope, 'pi') as typeScope, order_index as `order` FROM pi_text_deductibles ORDER BY order_index ASC"
     )
     return (rows as Row<PITextDeductible>[]).map((r) => ({
       ...r,
@@ -10708,7 +10841,7 @@ export class MySQLAdapter {
   async getPIExclusions(): Promise<PIExclusion[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, text, is_cargo_related as isCargoRelated, order_index as `order` FROM pi_exclusions ORDER BY order_index ASC'
+      "SELECT id, text, is_cargo_related as isCargoRelated, COALESCE(type_scope, 'all') as typeScope, order_index as `order` FROM pi_exclusions ORDER BY order_index ASC"
     )
     // Fetch vessel type mappings
     const [vtRows] = (await this.pool.query(
@@ -10876,9 +11009,36 @@ export class MySQLAdapter {
   async getPIAdditionalClauses(): Promise<PIAdditionalClause[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(
-      'SELECT id, title, code, text, order_index as `order`, default_selected as defaultSelected FROM pi_additional_clauses ORDER BY order_index ASC'
+      "SELECT id, title, code, text, order_index as `order`, default_selected as defaultSelected, COALESCE(type_scope, 'all') as typeScope FROM pi_additional_clauses ORDER BY order_index ASC"
     )
     return rows as PIAdditionalClause[]
+  }
+
+  /** Sets which quotation types (pi / fdd) a P&I settings item is offered for. */
+  async setPIItemTypeScope(
+    kind: 'clause' | 'deductible' | 'textDeductible' | 'exclusion' | 'additionalClause',
+    id: string,
+    scope: string
+  ): Promise<void> {
+    if (!this.pool) return
+    const tables: Record<string, string> = {
+      clause: 'pi_clauses',
+      deductible: 'pi_deductibles',
+      textDeductible: 'pi_text_deductibles',
+      exclusion: 'pi_exclusions',
+      additionalClause: 'pi_additional_clauses'
+    }
+    const table = tables[kind]
+    if (!table) throw new Error('Unknown settings list')
+    const tokens = scope
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t === 'pi' || t === 'fdd' || t === 'all')
+    if (tokens.length === 0) throw new Error('Choose at least one quotation type')
+    await this.pool.execute(`UPDATE ${table} SET type_scope = ? WHERE id = ?`, [
+      tokens.includes('all') ? 'all' : tokens.join(','),
+      id
+    ])
   }
 
   async addPIAdditionalClause(
@@ -11753,7 +11913,7 @@ export class MySQLAdapter {
       r.premiumAmount = r.premiumAmount ? Number(r.premiumAmount) : null
       r.revisionNumber = Number(r.revisionNumber || 0)
       r.vesselCount = vcMap.get(r.id) || 0
-      if (r.quotationTypeCode === 'P') {
+      if (r.quotationTypeCode === 'P' || r.quotationTypeCode === 'F') {
         r.conditionsSummary = (clauseMap.get(r.id) || []).slice(0, 5).join(', ')
       } else if (r.quotationTypeCode === 'H') {
         r.conditionsSummary = (hullMap.get(r.id) || []).slice(0, 3).join(' / ')

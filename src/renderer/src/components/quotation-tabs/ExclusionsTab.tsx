@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import VesselScopeChips from '../VesselScopeChips'
 import { AlternativeScopeChips, AlternativeMultiScopeChips } from './shared'
 import { ok, isIpcError } from '../../utils/ipc'
+import { inTypeScope } from '../../../../shared/quotationTypes'
 
 // A quotation_exclusions row (the IPC type omits alternativeId, which the adapter returns)
 type ExclusionRow = Awaited<ReturnType<typeof window.api.getQuotationExclusions>>[number] & {
@@ -73,7 +74,10 @@ export default function ExclusionsTab({
         window.api.getVesselTypes()
       ])
       setVesselTypes(Array.isArray(vTypes) ? vTypes : [])
-      const safeAll = Array.isArray(all) ? all : []
+      // Only the exclusions offered for this quotation type (P&I or FD&D)
+      const safeAll = (Array.isArray(all) ? all : []).filter((e) =>
+        inTypeScope(e.typeScope, quotation.quotationTypeCode)
+      )
       setAllExclusions(safeAll)
       const safeQe = Array.isArray(qe) ? qe : []
       setSelectedRows(safeQe)
@@ -133,12 +137,15 @@ export default function ExclusionsTab({
       }
     }
     void loadData()
-  }, [quotation.id])
+  }, [quotation.id, quotation.quotationTypeCode])
 
   // Check if any cargo clause is selected (only relevant for cargo quotations)
   const isCargo = quotation.quotationTypeCode?.toLowerCase() === 'c'
+  // FD&D has no cargo clause to select: its cargo exclusions (stowage, glass...) are always offered
   const hasCargoClause =
-    isCargo || allClauses.some((c) => c.isCargoRelated && selectedClauseIds.has(c.id))
+    isCargo ||
+    quotation.quotationTypeCode === 'F' ||
+    allClauses.some((c) => c.isCargoRelated && selectedClauseIds.has(c.id))
 
   // Filter: hide cargo-related exclusions from non-cargo quotations
   const visibleExclusions = allExclusions.filter((e) => {
