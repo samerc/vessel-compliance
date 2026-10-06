@@ -180,8 +180,10 @@ export interface Api {
   }) => Promise<{ success: boolean; user?: Omit<User, 'passwordHash'>; message?: string }>
   /** Legacy fallback: not exposed by the preload */
   authGetSession?: () => Promise<Omit<User, 'passwordHash'> | null>
+  /** Admin reset: options.password = the typed password, omitted = generate one (returned) */
   authResetPassword: (
-    username: string
+    username: string,
+    options?: { password?: string; mustChange?: boolean }
   ) => Promise<{ success: boolean; message?: string; newPassword?: string }>
   authIsPasswordResetRequired: () => Promise<boolean>
   authForceResetPassword: (newPassword: string) => Promise<{ success: boolean }>

@@ -22,6 +22,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateTime } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
+import ResetPasswordModal from './ResetPasswordModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { PageHeader } from './ui'
@@ -88,7 +89,7 @@ async function fetchUsersPageData(): Promise<UsersPageData> {
 }
 
 export default function UserManager(): React.JSX.Element {
-  const { resetPassword, user: currentUser, hasPermission } = useAuth()
+  const { user: currentUser, hasPermission } = useAuth()
   const canManageUsers = hasPermission('admin:users')
   const { showSuccess, showError } = useToast()
   const { theme } = useTheme()
@@ -99,6 +100,7 @@ export default function UserManager(): React.JSX.Element {
   const [editUsername, setEditUsername] = useState('')
   const [editFullName, setEditFullName] = useState('')
   const [tempPassword, setTempPassword] = useState<string | null>(null)
+  const [resetFor, setResetFor] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [userGroupMap, setUserGroupMap] = useState<Record<string, string[]>>({})
   const [userPermCounts, setUserPermCounts] = useState<Record<string, number>>({})
@@ -194,27 +196,9 @@ export default function UserManager(): React.JSX.Element {
     }
   }
 
-  const handleResetPassword = async (username: string): Promise<void> => {
-    setConfirmation({
-      show: true,
-      title: 'Reset Password?',
-      message: `Are you sure you want to reset the password for ${username}?`,
-      onConfirm: async () => {
-        setResettingUser(username)
-        setTempPassword(null)
-        try {
-          const result = await resetPassword(username)
-          if (result.success && result.newPassword) {
-            setTempPassword(result.newPassword)
-          } else {
-            setError(result.message || 'Failed to reset password')
-          }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : String(err))
-        }
-        setConfirmation((prev) => ({ ...prev, show: false }))
-      }
-    })
+  const handleResetPassword = (username: string): void => {
+    setTempPassword(null)
+    setResetFor(username)
   }
 
   const handleDelete = async (id: string): Promise<void> => {
@@ -1699,6 +1683,23 @@ export default function UserManager(): React.JSX.Element {
             </div>
           </div>
         </div>
+      )}
+
+      {resetFor && (
+        <ResetPasswordModal
+          username={resetFor}
+          onClose={() => setResetFor(null)}
+          onDone={(generated) => {
+            const name = resetFor
+            setResetFor(null)
+            if (generated) {
+              setResettingUser(name)
+              setTempPassword(generated)
+            } else {
+              showSuccess(`Password changed for ${name}`)
+            }
+          }}
+        />
       )}
 
       {confirmation.show && (

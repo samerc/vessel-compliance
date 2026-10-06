@@ -186,7 +186,8 @@ const api: Api = {
   changePassword: (currentPassword: string, newPassword: string) =>
     ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
   getSession: () => ipcRenderer.invoke('auth:getSession'),
-  authResetPassword: (username: string) => ipcRenderer.invoke('auth:resetPassword', { username }),
+  authResetPassword: (username: string, options?: { password?: string; mustChange?: boolean }) =>
+    ipcRenderer.invoke('auth:resetPassword', { username, ...options }),
   authIsPasswordResetRequired: () => ipcRenderer.invoke('auth:isPasswordResetRequired'),
   authForceResetPassword: (newPassword: string) =>
     ipcRenderer.invoke('auth:forceResetPassword', newPassword),

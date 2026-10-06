@@ -751,10 +751,23 @@ app.whenReady().then(() => {
     return await auth.changePassword(user.id, currentPassword, newPassword)
   })
 
-  safeHandle('auth:resetPassword', async (event, { username }) => {
-    await requirePermission(event, 'admin:users')
-    return await auth.resetPassword(username)
-  })
+  safeHandle(
+    'auth:resetPassword',
+    async (
+      event,
+      {
+        username,
+        password,
+        mustChange
+      }: { username: string; password?: string; mustChange?: boolean }
+    ) => {
+      await requirePermission(event, 'admin:users')
+      return await auth.resetPassword(username, {
+        password: typeof password === 'string' ? password : undefined,
+        mustChange: mustChange === true
+      })
+    }
+  )
 
   safeHandle('auth:logout', async (event) => {
     const webContents = event.sender

@@ -296,26 +296,41 @@ export class AuthService {
     return { success: true, message: 'Password changed successfully' }
   }
 
+  /**
+   * Admin reset of a user's password: the password the admin typed, or a generated one
+   * (returned so it can be shown once). mustChange asks the user for a new one at next login.
+   */
   async resetPassword(
-    username: string
+    username: string,
+    options: { password?: string; mustChange?: boolean } = {}
   ): Promise<{ success: boolean; message?: string; newPassword?: string }> {
     const user = await db.getUser(username)
     if (!user) {
       return { success: false, message: 'User not found' }
     }
 
-    // Generate a simple temporary password (as requested)
-    const tempPassword = randomBytes(6).toString('base64url').slice(0, 10)
-    const passwordHash = await bcrypt.hash(tempPassword, 10)
+    const typed = options.password
+    if (typed !== undefined) {
+      if (typed.length < 6) {
+        return { success: false, message: 'The password must be at least 6 characters long' }
+      }
+      if (typed === 'admin123') {
+        return { success: false, message: 'Please choose a password other than the default one' }
+      }
+    }
+    const newPassword = typed ?? randomBytes(6).toString('base64url').slice(0, 10)
+    const passwordHash = await bcrypt.hash(newPassword, 10)
 
     await db.updateUserPassword(user.id, passwordHash)
+    if (options.mustChange) await db.setForcePasswordReset(user.id)
     // An admin reset ends that user's remembered logins everywhere
     await db.deleteUserSessionsForUser(user.id).catch(() => {})
 
     return {
       success: true,
       message: 'Password has been reset',
-      newPassword: tempPassword
+      // Only a generated password is sent back (the admin already knows a typed one)
+      newPassword: typed === undefined ? newPassword : undefined
     }
   }
 

@@ -84,6 +84,8 @@ Global notification system for user feedback:
 - **Admin Protection**: Setup and configuration IPC handlers require admin session validation
 - **File Validation**: Backend validation of file extensions against admin-configured allowlists/blocklists
 - **Password Security**: bcrypt hashing with salt rounds, no plaintext storage
+- **Passwords**: users change their own from the user menu (name at the top of the sidebar → Change Password, `UserProfileModal`). Admins reset another user's in User Management (`ResetPasswordModal`): type a password or generate one (shown once), optionally "choose their own password at next login" (`force_password_reset`); a reset ends that user's remembered logins. IPC `auth:resetPassword({ username, password?, mustChange? })`
+- **Remembered login** (30 days): checked against `user_sessions` before it is honoured; `auth:getSession` waits for the startup DB connection (max 30 s) so network PCs are not sent to the login screen
 
 ### Theme System
 - **User-Specific Themes**: Each user's theme preference (light/dark) is stored in the database (`users.theme_preference`)
