@@ -42,6 +42,7 @@ import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { resolvePolicySurveyWarranty } from '../utils/surveyWarrantyText'
 import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
+import { isPiLike } from '../../../shared/quotationTypes'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -503,7 +504,9 @@ export default function PolicySetupWizard({
           window.api.quotationDiscountGetByQuotation(quotationId),
           quot.quotationTypeCode === 'H'
             ? window.api.hullGetAltVesselPremiums(quotationId)
-            : Promise.resolve([]),
+            : isPiLike(quot.quotationTypeCode)
+              ? window.api.piGetAltVesselPremiums(quotationId)
+              : Promise.resolve([]),
           quot.quotationTypeCode === 'W' ? window.api.warGetSettings() : Promise.resolve(null)
         ])
         if (Array.isArray(discRes)) safeDiscounts = discRes

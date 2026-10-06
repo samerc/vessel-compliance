@@ -2329,6 +2329,20 @@ export class MySQLAdapter {
         }
       }
 
+      // Migration: per-vessel premium under a P&I / FD&D alternative (fleet quotes with alternatives)
+      try {
+        await this.pool.query(`CREATE TABLE IF NOT EXISTS quotation_pi_alt_vessel_premiums (
+                    id VARCHAR(36) PRIMARY KEY,
+                    alternative_id VARCHAR(36) NOT NULL,
+                    quotation_vessel_id VARCHAR(36) NOT NULL,
+                    premium_amount DECIMAL(15,2) DEFAULT NULL,
+                    UNIQUE KEY uniq_pi_alt_vessel (alternative_id, quotation_vessel_id),
+                    INDEX idx_piavp_alt (alternative_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+      } catch (e) {
+        console.error('quotation_pi_alt_vessel_premiums migration:', e)
+      }
+
       // Warranty sets tables (disable FK checks to avoid collation mismatch)
       {
         const [t] = (await this.pool.query("SHOW TABLES LIKE 'pi_warranty_sets'")) as QueryRows
@@ -12974,6 +12988,15 @@ export class MySQLAdapter {
       } catch {
         /* table may not exist */
       }
+      try {
+        await fk.execute(
+          `DELETE p FROM quotation_pi_alt_vessel_premiums p
+                    JOIN quotation_pi_alternatives a ON a.id = p.alternative_id WHERE a.quotation_id = ?`,
+          [id]
+        )
+      } catch {
+        /* table may not exist */
+      }
       for (const r of tables as RowDataPacket[]) {
         const t = String(r.t)
         if (!/^[a-z0-9_]+$/i.test(t)) continue
@@ -13425,6 +13448,27 @@ export class MySQLAdapter {
       )
     }
 
+    // Clone per-vessel premiums under P&I alternatives (remap alternative and vessel ids)
+    try {
+      const [srcPiAvp] = await this.pool.query(
+        `SELECT p.* FROM quotation_pi_alt_vessel_premiums p
+                 JOIN quotation_pi_alternatives a ON p.alternative_id = a.id WHERE a.quotation_id = ?`,
+        [sourceId]
+      )
+      for (const r of srcPiAvp as RowDataPacket[]) {
+        const newAlt = piAltIdMap[r.alternative_id]
+        const newVes = vesselIdMap[r.quotation_vessel_id]
+        if (newAlt && newVes) {
+          await this.pool.execute(
+            'INSERT INTO quotation_pi_alt_vessel_premiums (id, alternative_id, quotation_vessel_id, premium_amount) VALUES (?, ?, ?, ?)',
+            [uuidv4(), newAlt, newVes, r.premium_amount ?? null]
+          )
+        }
+      }
+    } catch {
+      /* table may not exist on very old schemas */
+    }
+
     // Helper to remap alternative_id (merged hull + PI maps)
     const combinedAltMap = { ...altIdMap, ...piAltIdMap }
     const remapAlt = (altId: string | null): string | null => {
@@ -13710,7 +13754,17 @@ export class MySQLAdapter {
         /* table might not have alternative_id column */
       }
     }
-    // Delete the PI alternatives themselves (keep only the selected one)
+    // Delete the PI alternatives themselves (keep only the selected one) and their vessel premiums
+    try {
+      await this.pool.execute(
+        `DELETE p FROM quotation_pi_alt_vessel_premiums p
+                 JOIN quotation_pi_alternatives a ON a.id = p.alternative_id
+                 WHERE a.quotation_id = ? AND a.id != ?`,
+        [quotationId, keepAlternativeId]
+      )
+    } catch {
+      /* ignore */
+    }
     try {
       await this.pool.execute(
         'DELETE FROM quotation_pi_alternatives WHERE quotation_id = ? AND id != ?',
@@ -19623,6 +19677,49 @@ export class MySQLAdapter {
     return total
   }
 
+  // Per-vessel premium under a P&I / FD&D alternative (matrix for fleet quotes with alternatives)
+  async getPIAltVesselPremiums(quotationId: string): Promise<HullAltVesselPremium[]> {
+    if (!this.pool) return []
+    const [rows] = await this.pool.query(
+      `SELECT p.id, p.alternative_id AS alternativeId, p.quotation_vessel_id AS quotationVesselId,
+                    p.premium_amount AS premiumAmount
+             FROM quotation_pi_alt_vessel_premiums p
+             JOIN quotation_pi_alternatives a ON p.alternative_id = a.id
+             WHERE a.quotation_id = ?`,
+      [quotationId]
+    )
+    return (rows as Row<HullAltVesselPremium>[]).map((r) => ({
+      ...r,
+      premiumAmount: r.premiumAmount != null ? Number(r.premiumAmount) : null
+    }))
+  }
+
+  // Upsert a vessel's premium under a P&I alternative and store the alternative total (sum of
+  // its vessels) on the alternative. Returns that total.
+  async setPIAltVesselPremium(
+    alternativeId: string,
+    quotationVesselId: string,
+    amount: number | null
+  ): Promise<number> {
+    if (!this.pool) return 0
+    await this.pool.execute(
+      `INSERT INTO quotation_pi_alt_vessel_premiums (id, alternative_id, quotation_vessel_id, premium_amount)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE premium_amount = VALUES(premium_amount)`,
+      [uuidv4(), alternativeId, quotationVesselId, amount ?? null]
+    )
+    const [sumRows] = await this.pool.query(
+      'SELECT COALESCE(SUM(premium_amount), 0) AS total FROM quotation_pi_alt_vessel_premiums WHERE alternative_id = ?',
+      [alternativeId]
+    )
+    const total = Number((sumRows as RowDataPacket[])[0]?.total || 0)
+    await this.pool.execute(
+      'UPDATE quotation_pi_alternatives SET premium_amount = ? WHERE id = ?',
+      [total || null, alternativeId]
+    )
+    return total
+  }
+
   // Generic per-quotation discounts (beyond NCB/UPCC)
   async getQuotationDiscounts(quotationId: string): Promise<QuotationDiscount[]> {
     if (!this.pool) return []
@@ -19878,6 +19975,9 @@ export class MySQLAdapter {
     for (const tbl of piAltTables) {
       await this.pool.execute(`DELETE FROM ${tbl} WHERE alternative_id = ?`, [id])
     }
+    await this.pool
+      .execute('DELETE FROM quotation_pi_alt_vessel_premiums WHERE alternative_id = ?', [id])
+      .catch(() => {})
     await this.pool.execute('DELETE FROM quotation_pi_alternatives WHERE id = ?', [id])
   }
 

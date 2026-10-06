@@ -3838,6 +3838,17 @@ app.whenReady().then(() => {
       return db.setHullAltVesselPremium(altId, vesselId, amount)
     }
   )
+  safeHandle('pi:getAltVesselPremiums', (event, qId: string) => {
+    requireSession(event)
+    return db.getPIAltVesselPremiums(qId)
+  })
+  safeHandle(
+    'pi:setAltVesselPremium',
+    async (event, altId: string, vesselId: string, amount: number | null) => {
+      await requirePermission(event, 'quotations:edit')
+      return db.setPIAltVesselPremium(altId, vesselId, amount)
+    }
+  )
   // Generic per-quotation discounts
   safeHandle('quotationDiscount:getByQuotation', (event, qId: string) => {
     requireSession(event)

@@ -273,7 +273,11 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
           isPiLike(q.quotationTypeCode)
             ? window.api.lolGetOptions(policy.quotationId)
             : Promise.resolve([]),
-          isHull ? window.api.hullGetAltVesselPremiums(policy.quotationId) : Promise.resolve([]),
+          isHull
+            ? window.api.hullGetAltVesselPremiums(policy.quotationId)
+            : isPiLike(q.quotationTypeCode)
+              ? window.api.piGetAltVesselPremiums(policy.quotationId)
+              : Promise.resolve([]),
           window.api.quotationDiscountGetByQuotation(policy.quotationId),
           q.quotationTypeCode === 'W' ? window.api.warGetSettings() : Promise.resolve(null)
         ])

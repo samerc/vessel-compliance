@@ -580,6 +580,10 @@ const api: Api = {
     ipcRenderer.invoke('hull:getAltVesselPremiums', quotationId),
   hullSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) =>
     ipcRenderer.invoke('hull:setAltVesselPremium', altId, vesselId, amount),
+  piGetAltVesselPremiums: (quotationId: string) =>
+    ipcRenderer.invoke('pi:getAltVesselPremiums', quotationId),
+  piSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) =>
+    ipcRenderer.invoke('pi:setAltVesselPremium', altId, vesselId, amount),
   quotationDiscountGetByQuotation: (quotationId: string) =>
     ipcRenderer.invoke('quotationDiscount:getByQuotation', quotationId),
   quotationDiscountAdd: (quotationId: string, data) =>

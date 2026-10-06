@@ -130,6 +130,19 @@ export default function PremiumTab({
     )
   }
 
+  // Fleet P&I / FD&D matrix: same as hull; the alternative keeps the total of its vessels.
+  const updatePIAltVesselPremium = async (
+    altId: string,
+    vesselId: string,
+    amount: number | null
+  ): Promise<void> => {
+    setAltVesselPrems((prev) => ({ ...prev, [`${altId}:${vesselId}`]: amount || 0 }))
+    const newAltTotal = ok(await window.api.piSetAltVesselPremium(altId, vesselId, amount))
+    setPiAlternatives((prev) =>
+      prev.map((a) => (a.id === altId ? { ...a, premiumAmount: newAltTotal || undefined } : a))
+    )
+  }
+
   // Fleet hull matrix: set a vessel's premium under an alternative; adapter recomputes the alt total.
   const updateAltVesselPremium = async (
     altId: string,
@@ -274,6 +287,16 @@ export default function PremiumTab({
         .lolGetOptions(quotation.id)
         .then((o) => setLolOptions(Array.isArray(o) ? o : []))
         .catch(() => {})
+      window.api
+        .piGetAltVesselPremiums(quotation.id)
+        .then((rows) => {
+          const m: Record<string, number> = {}
+          for (const r of Array.isArray(rows) ? rows : [])
+            if (r.premiumAmount != null)
+              m[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)
+          setAltVesselPrems(m)
+        })
+        .catch(() => {})
     }
     if (quotation.quotationTypeCode === 'W') {
       window.api
@@ -345,13 +368,14 @@ export default function PremiumTab({
   const upccPct = quotation.upccEnabled ? quotation.upccDiscountPercent || 0 : 0
   const upccFixedAmt = quotation.upccEnabled ? quotation.upccDiscountAmount || 0 : 0
   const isMultiVessel = qVessels.length >= 2
+  const piMultiAlt = isPiLike(quotation.quotationTypeCode) && piAlternatives.length > 1
   // Hull quotes with alternatives price per alternative (not per vessel), regardless of vessel count.
   const hullMultiAlt =
     quotation.quotationTypeCode === 'H' &&
     (hullAlternatives.filter((a) => !a.vesselScopeId).length > 1 ||
       hullAlternatives.some((a) => a.vesselScopeId))
   const technicalPremium =
-    isMultiVessel && !hullMultiAlt
+    isMultiVessel && !hullMultiAlt && !piMultiAlt
       ? qVessels.reduce((sum, v) => sum + (v.premiumAmount || 0), 0)
       : quotation.premiumAmount || 0
 
@@ -368,10 +392,15 @@ export default function PremiumTab({
   const afterNcb = technicalPremium - ncbDeduction
   const upccDeduction = upccType === 'amount' ? upccFixedAmt : (afterNcb * upccPct) / 100
   const payablePremium =
-    isMultiVessel && !hullMultiAlt && hasDiscount
+    isMultiVessel && !hullMultiAlt && !piMultiAlt && hasDiscount
       ? qVessels.reduce((sum, v) => sum + vesselPayable(v), 0)
       : applyExtraDiscounts(afterNcb - upccDeduction)
   const premiumLabel = hasDiscount ? 'Technical Premium' : 'Premium'
+  // A new-business quotation has no previous premium: the fields show on renewals only (or
+  // when a previous amount was already entered, so it can still be seen and cleared)
+  const showPrevious = !!quotation.isRenewal || quotation.previousPremiumAmount != null
+  const showVesselPrevious =
+    !!quotation.isRenewal || qVessels.some((v) => v.previousPremium != null)
   const currency = quotation.premiumCurrency || 'USD'
 
   const updateVesselPremium = async (
@@ -431,7 +460,6 @@ export default function PremiumTab({
   const numInst = quotation.numInstalments || 1
   const instFor = (tech: number, v: (typeof qVessels)[0]): number =>
     (hasDiscount ? payableFor(tech, v) : tech) / numInst
-  const piMultiAlt = isPiLike(quotation.quotationTypeCode) && piAlternatives.length > 1
   // Payable (after NCB/UPCC + extra discounts) for a plain technical amount, no per-vessel exclusions.
   // Used for single-vessel alternative rows (P&I alternatives) where premium lives on each alternative.
   const payablePlain = (tech: number): number => {
@@ -441,6 +469,171 @@ export default function PremiumTab({
     return applyExtraDiscounts(an - ud)
   }
   const instPlain = (tech: number): number => (hasDiscount ? payablePlain(tech) : tech) / numInst
+  // One alternative of a fleet quote: a premium per vessel, then the alternative total
+  // (hull and P&I / FD&D alternatives share this layout).
+  const renderAltVesselCard = (
+    altId: string,
+    label: string,
+    accentColor: string,
+    onSave: (vesselId: string, amount: number | null) => void
+  ): React.JSX.Element => {
+    const altTotal = qVessels.reduce((s, v) => s + (altVesselPrems[`${altId}:${v.id}`] || 0), 0)
+    const altPayable = qVessels.reduce(
+      (s, v) => s + payableFor(altVesselPrems[`${altId}:${v.id}`] || 0, v),
+      0
+    )
+    return (
+      <div
+        key={altId}
+        style={{
+          padding: '10px 14px',
+          borderRadius: '8px',
+          border: '1px solid var(--table-border)',
+          borderLeft: `3px solid ${accentColor}`
+        }}
+      >
+        <div
+          style={{
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            color: accentColor,
+            marginBottom: '8px'
+          }}
+        >
+          {label}
+        </div>
+        {qVessels.map((v) => {
+          const tech = altVesselPrems[`${altId}:${v.id}`] || 0
+          return (
+            <div
+              key={v.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                marginBottom: '6px'
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  minWidth: '160px',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {v.name || v.vesselLabel}
+              </span>
+              <input
+                type="number"
+                value={altVesselPrems[`${altId}:${v.id}`] || ''}
+                onChange={(e) =>
+                  setAltVesselPrems((prev) => ({
+                    ...prev,
+                    [`${altId}:${v.id}`]: parseFloat(e.target.value) || 0
+                  }))
+                }
+                onBlur={(e) => onSave(v.id, parseFloat(e.target.value) || null)}
+                placeholder={premiumLabel}
+                style={{ width: '160px', textAlign: 'right' }}
+              />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                {currency} p.a.
+              </span>
+              {hasDiscount && tech > 0 && (
+                <span
+                  style={{
+                    fontSize: '0.76rem',
+                    color: 'var(--accent-primary)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  payable {currency} {fmtAmt(payableFor(tech, v))}
+                </span>
+              )}
+              {numInst > 1 && tech > 0 && (
+                <span
+                  style={{
+                    fontSize: '0.76rem',
+                    color: 'var(--text-secondary)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  · {numInst} × {currency} {fmtAmt(instFor(tech, v))}
+                </span>
+              )}
+            </div>
+          )
+        })}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            borderTop: '1px solid var(--table-border)',
+            paddingTop: '6px',
+            marginTop: '2px'
+          }}
+        >
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, minWidth: '160px' }}>Total</span>
+          <span
+            style={{
+              width: '160px',
+              textAlign: 'right',
+              fontWeight: 700,
+              fontSize: '0.85rem'
+            }}
+          >
+            {altTotal > 0 ? fmtAmt(altTotal) : '-'}
+          </span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            {currency} p.a.
+          </span>
+          {hasDiscount && altTotal > 0 && (
+            <span
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: 'var(--accent-primary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              payable {currency} {fmtAmt(altPayable)}
+            </span>
+          )}
+          {numInst > 1 && altTotal > 0 && (
+            <span
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              · {numInst} × {currency} {fmtAmt((hasDiscount ? altPayable : altTotal) / numInst)}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Fleet P&I / FD&D with alternatives: a premium per vessel under each alternative
+  const renderPiAltPremiums = (): React.JSX.Element => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+      {piAlternatives.map((alt, idx) =>
+        renderAltVesselCard(
+          alt.id,
+          alt.label || `Alt ${idx + 1}`,
+          altColors[idx % altColors.length],
+          (vid, amt) => updatePIAltVesselPremium(alt.id, vid, amt)
+        )
+      )}
+    </div>
+  )
   const renderHullAltPremiums = (): React.JSX.Element => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
       {hullAlternatives.map((alt, idx) => {
@@ -450,158 +643,10 @@ export default function PremiumTab({
         const label = vessel
           ? `${(vessel.name || vessel.vesselLabel).toUpperCase()}${clause ? ` (${clause.code})` : ''}`
           : `Alt ${idx + 1}${clause ? ` (${clause.code})` : ''}`
-        if (perVesselAlts) {
-          const altTotal = qVessels.reduce(
-            (s, v) => s + (altVesselPrems[`${alt.id}:${v.id}`] || 0),
-            0
+        if (perVesselAlts)
+          return renderAltVesselCard(alt.id, label, accentColor, (vid, amt) =>
+            updateAltVesselPremium(alt.id, vid, amt)
           )
-          const altPayable = qVessels.reduce(
-            (s, v) => s + payableFor(altVesselPrems[`${alt.id}:${v.id}`] || 0, v),
-            0
-          )
-          return (
-            <div
-              key={alt.id}
-              style={{
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid var(--table-border)',
-                borderLeft: `3px solid ${accentColor}`
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  color: accentColor,
-                  marginBottom: '8px'
-                }}
-              >
-                {label}
-              </div>
-              {qVessels.map((v) => {
-                const tech = altVesselPrems[`${alt.id}:${v.id}`] || 0
-                return (
-                  <div
-                    key={v.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      marginBottom: '6px'
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        minWidth: '160px',
-                        textTransform: 'uppercase',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      {v.name || v.vesselLabel}
-                    </span>
-                    <input
-                      type="number"
-                      value={altVesselPrems[`${alt.id}:${v.id}`] || ''}
-                      onChange={(e) =>
-                        setAltVesselPrems((prev) => ({
-                          ...prev,
-                          [`${alt.id}:${v.id}`]: parseFloat(e.target.value) || 0
-                        }))
-                      }
-                      onBlur={(e) =>
-                        updateAltVesselPremium(alt.id, v.id, parseFloat(e.target.value) || null)
-                      }
-                      placeholder={premiumLabel}
-                      style={{ width: '160px', textAlign: 'right' }}
-                    />
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      {currency} p.a.
-                    </span>
-                    {hasDiscount && tech > 0 && (
-                      <span
-                        style={{
-                          fontSize: '0.76rem',
-                          color: 'var(--accent-primary)',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        payable {currency} {fmtAmt(payableFor(tech, v))}
-                      </span>
-                    )}
-                    {numInst > 1 && tech > 0 && (
-                      <span
-                        style={{
-                          fontSize: '0.76rem',
-                          color: 'var(--text-secondary)',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        · {numInst} × {currency} {fmtAmt(instFor(tech, v))}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  borderTop: '1px solid var(--table-border)',
-                  paddingTop: '6px',
-                  marginTop: '2px'
-                }}
-              >
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, minWidth: '160px' }}>
-                  Total
-                </span>
-                <span
-                  style={{
-                    width: '160px',
-                    textAlign: 'right',
-                    fontWeight: 700,
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  {altTotal > 0 ? fmtAmt(altTotal) : '-'}
-                </span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  {currency} p.a.
-                </span>
-                {hasDiscount && altTotal > 0 && (
-                  <span
-                    style={{
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      color: 'var(--accent-primary)',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    payable {currency} {fmtAmt(altPayable)}
-                  </span>
-                )}
-                {numInst > 1 && altTotal > 0 && (
-                  <span
-                    style={{
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      color: 'var(--text-secondary)',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    · {numInst} × {currency}{' '}
-                    {fmtAmt((hasDiscount ? altPayable : altTotal) / numInst)}
-                  </span>
-                )}
-              </div>
-            </div>
-          )
-        }
         return (
           <div
             key={alt.id}
@@ -1231,34 +1276,36 @@ export default function PremiumTab({
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                       {currency} p.a.
                     </span>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        marginLeft: 'auto'
-                      }}
-                    >
-                      <label
+                    {showPrevious && (
+                      <div
                         style={{
-                          fontSize: '0.72rem',
-                          color: 'var(--danger)',
-                          whiteSpace: 'nowrap'
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          marginLeft: 'auto'
                         }}
                       >
-                        Previous:
-                      </label>
-                      <MoneyInput
-                        value={quotation.previousPremiumAmount}
-                        onChange={(val) =>
-                          setQ((p) => ({ ...p, previousPremiumAmount: val || undefined }))
-                        }
-                        onBlur={(val) => updateField('previousPremiumAmount', val || null)}
-                        placeholder="—"
-                        style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }}
-                        showZero
-                      />
-                    </div>
+                        <label
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--danger)',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Previous:
+                        </label>
+                        <MoneyInput
+                          value={quotation.previousPremiumAmount}
+                          onChange={(val) =>
+                            setQ((p) => ({ ...p, previousPremiumAmount: val || undefined }))
+                          }
+                          onBlur={(val) => updateField('previousPremiumAmount', val || null)}
+                          placeholder="—"
+                          style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }}
+                          showZero
+                        />
+                      </div>
+                    )}
                   </div>
                   <div
                     style={{
@@ -1397,34 +1444,36 @@ export default function PremiumTab({
                         )}
                       </span>
                     )}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        marginLeft: 'auto'
-                      }}
-                    >
-                      <label
+                    {showPrevious && (
+                      <div
                         style={{
-                          fontSize: '0.72rem',
-                          color: 'var(--danger)',
-                          whiteSpace: 'nowrap'
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          marginLeft: 'auto'
                         }}
                       >
-                        Previous:
-                      </label>
-                      <MoneyInput
-                        value={quotation.previousPremiumAmount}
-                        onChange={(val) =>
-                          setQ((p) => ({ ...p, previousPremiumAmount: val || undefined }))
-                        }
-                        onBlur={(val) => updateField('previousPremiumAmount', val || null)}
-                        placeholder="—"
-                        style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }}
-                        showZero
-                      />
-                    </div>
+                        <label
+                          style={{
+                            fontSize: '0.72rem',
+                            color: 'var(--danger)',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Previous:
+                        </label>
+                        <MoneyInput
+                          value={quotation.previousPremiumAmount}
+                          onChange={(val) =>
+                            setQ((p) => ({ ...p, previousPremiumAmount: val || undefined }))
+                          }
+                          onBlur={(val) => updateField('previousPremiumAmount', val || null)}
+                          placeholder="—"
+                          style={{ width: '120px', fontSize: '0.78rem', color: 'var(--danger)' }}
+                          showZero
+                        />
+                      </div>
+                    )}
                   </div>
                   {quotation.quotationTypeCode === 'H' && quotation.ivEnabled && (
                     <div
@@ -1715,9 +1764,13 @@ export default function PremiumTab({
       {/* Multi-vessel hull with alternatives: per-alternative premium (not per vessel) */}
       {isMultiVessel && hullMultiAlt && renderHullAltPremiums()}
 
+      {/* Multi-vessel P&I / FD&D with alternatives: per vessel under each alternative */}
+      {isMultiVessel && piMultiAlt && renderPiAltPremiums()}
+
       {/* Multi-vessel: per-vessel premium table (standard, non-war-excess, non-hull-alternatives) */}
       {isMultiVessel &&
         !hullMultiAlt &&
+        !piMultiAlt &&
         !(quotation.quotationTypeCode === 'W' && quotation.warExcessEnabled) &&
         (() => {
           return (
@@ -1752,16 +1805,18 @@ export default function PremiumTab({
                     >
                       {premiumLabel} ({currency})
                     </th>
-                    <th
-                      style={{
-                        textAlign: 'right',
-                        padding: '6px 10px',
-                        color: 'var(--danger)',
-                        fontWeight: 500
-                      }}
-                    >
-                      Previous
-                    </th>
+                    {showVesselPrevious && (
+                      <th
+                        style={{
+                          textAlign: 'right',
+                          padding: '6px 10px',
+                          color: 'var(--danger)',
+                          fontWeight: 500
+                        }}
+                      >
+                        Previous
+                      </th>
+                    )}
                     {hasDiscount && (
                       <th
                         style={{
@@ -1827,30 +1882,34 @@ export default function PremiumTab({
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                          <MoneyInput
-                            value={v.previousPremium}
-                            onChange={(val) =>
-                              setQVessels((prev) =>
-                                prev.map((pv) =>
-                                  pv.id === v.id ? { ...pv, previousPremium: val || undefined } : pv
+                        {showVesselPrevious && (
+                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                            <MoneyInput
+                              value={v.previousPremium}
+                              onChange={(val) =>
+                                setQVessels((prev) =>
+                                  prev.map((pv) =>
+                                    pv.id === v.id
+                                      ? { ...pv, previousPremium: val || undefined }
+                                      : pv
+                                  )
                                 )
-                              )
-                            }
-                            onBlur={(val) =>
-                              updateVesselPremium(v.id, val || null, 'previousPremium')
-                            }
-                            placeholder="—"
-                            style={{
-                              width: '100px',
-                              padding: '3px 6px',
-                              textAlign: 'right',
-                              fontSize: '0.78rem',
-                              color: 'var(--danger)'
-                            }}
-                            showZero
-                          />
-                        </td>
+                              }
+                              onBlur={(val) =>
+                                updateVesselPremium(v.id, val || null, 'previousPremium')
+                              }
+                              placeholder="—"
+                              style={{
+                                width: '100px',
+                                padding: '3px 6px',
+                                textAlign: 'right',
+                                fontSize: '0.78rem',
+                                color: 'var(--danger)'
+                              }}
+                              showZero
+                            />
+                          </td>
+                        )}
                         {hasDiscount && (
                           <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                             <div
@@ -1975,17 +2034,21 @@ export default function PremiumTab({
                           })
                         : '-'}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--danger)' }}>
-                      {(() => {
-                        const tp = qVessels.reduce((s, v) => s + (v.previousPremium || 0), 0)
-                        return tp > 0
-                          ? tp.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            })
-                          : ''
-                      })()}
-                    </td>
+                    {showVesselPrevious && (
+                      <td
+                        style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--danger)' }}
+                      >
+                        {(() => {
+                          const tp = qVessels.reduce((s, v) => s + (v.previousPremium || 0), 0)
+                          return tp > 0
+                            ? tp.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })
+                            : ''
+                        })()}
+                      </td>
+                    )}
                     {hasDiscount && (
                       <td style={{ padding: '8px 10px', textAlign: 'right' }}>
                         {technicalPremium > 0

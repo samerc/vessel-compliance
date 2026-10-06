@@ -180,6 +180,12 @@ interface QuotationData {
     quotationVesselId: string
     premiumAmount: number | null
   }[]
+  /** Fleet P&I / FD&D: premium of each vessel under each alternative */
+  piAltVesselPremiums: {
+    alternativeId: string
+    quotationVesselId: string
+    premiumAmount: number | null
+  }[]
   discounts: QuotationDiscount[]
   hullCustomConditions: {
     id: string
@@ -380,6 +386,9 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
   // Fetch agreed value options
   const agreedValueOptionsRaw = await window.api.hullGetAgreedValueOptions(quotation.id)
   const hullAltVesselPremiumsRaw = await window.api.hullGetAltVesselPremiums(quotation.id)
+  const piAltVesselPremiumsRaw = isPiLike(quotation.quotationTypeCode)
+    ? await window.api.piGetAltVesselPremiums(quotation.id).catch(() => [])
+    : []
   const discountsRaw = await window.api.quotationDiscountGetByQuotation(quotation.id)
 
   // Fetch cargo-specific data
@@ -599,6 +608,7 @@ async function gatherData(quotation: Quotation): Promise<QuotationData> {
     allHullAdditionalConditions: resolvedAllHullAdditionalConditions,
     hullAlternatives: Array.isArray(hullAlternativesRaw) ? hullAlternativesRaw : [],
     hullAltVesselPremiums: Array.isArray(hullAltVesselPremiumsRaw) ? hullAltVesselPremiumsRaw : [],
+    piAltVesselPremiums: Array.isArray(piAltVesselPremiumsRaw) ? piAltVesselPremiumsRaw : [],
     discounts: Array.isArray(discountsRaw) ? discountsRaw : [],
     hullCustomConditions: Array.isArray(hullCustomConditionsRaw) ? hullCustomConditionsRaw : [],
     surveyWarranties: (Array.isArray(surveyWarrantiesRaw) ? surveyWarrantiesRaw : [])
@@ -4102,14 +4112,23 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
       wSharedAlts.length > 1 &&
       !data.hullAlternatives.some((a) => a.vesselScopeId) &&
       data.hullAltVesselPremiums.length > 0
+    // Fleet P&I / FD&D with alternatives priced per vessel: the same matrix
+    const wPiMatrix =
+      wIsMultiVessel &&
+      isPiLike(wq.quotationTypeCode) &&
+      data.piAlternatives.length > 1 &&
+      data.piAltVesselPremiums.some((r) => r.premiumAmount != null)
     const wAvpMap = new Map(
-      data.hullAltVesselPremiums.map((r) => [
+      [...data.hullAltVesselPremiums, ...data.piAltVesselPremiums].map((r) => [
         `${r.alternativeId}:${r.quotationVesselId}`,
         r.premiumAmount || 0
       ])
     )
+    const wMatrixAlts = wPiMatrix
+      ? data.piAlternatives.map((a, i) => ({ id: a.id, label: a.label || `Alternative ${i + 1}` }))
+      : wSharedAlts.map((a, i) => ({ id: a.id, label: `Alternative ${i + 1}` }))
 
-    if (wHullMatrix) {
+    if (wHullMatrix || wPiMatrix) {
       // Table: column header (Vessel | Technical Premium | Payable Premium), then a block per
       // alternative — alternative name (with "per annum"), vessel rows (plain amounts), bold total.
       // Fit inside the body cell's content area (cell has 80 DXA left+right insets) so the
@@ -4194,10 +4213,10 @@ export async function exportQuotationToWord(quotation: Quotation): Promise<void>
           mCell('Payable Premium', mPayW, { bold: true, align: AlignmentType.RIGHT, bottom: true })
         )
       mRows.push(new TableRow({ children: headerCells }))
-      for (let ai = 0; ai < wSharedAlts.length; ai++) {
-        const alt = wSharedAlts[ai]
+      for (let ai = 0; ai < wMatrixAlts.length; ai++) {
+        const alt = wMatrixAlts[ai]
         if (ai > 0) mRows.push(mSpacerRow())
-        mRows.push(mSpanRow(`Alternative ${ai + 1} (per annum)`))
+        mRows.push(mSpanRow(`${alt.label} (per annum)`))
         let altTech = 0,
           altPay = 0
         for (const v of data.quotationVessels) {

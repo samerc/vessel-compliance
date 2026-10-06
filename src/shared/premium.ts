@@ -161,6 +161,9 @@ export function vesselTechnical(
     else if (hullAlt.vesselScopeId)
       tech = hullAlt.vesselScopeId === qv.id ? (hullAlt.premiumAmount ?? plain) : plain
     else tech = hullAlt.premiumAmount != null ? share(hullAlt.premiumAmount) : plain
+  } else if (piAlt && ctx.altVesselPrems[`${piAlt.id}:${qv.id}`] != null) {
+    // Fleet P&I / FD&D: the vessel's own premium under this alternative
+    tech = ctx.altVesselPrems[`${piAlt.id}:${qv.id}`]
   } else if (piAlt && piAlt.premiumAmount != null) {
     tech = share(piAlt.premiumAmount)
   } else if (lol && lol.premiumAmount != null) {

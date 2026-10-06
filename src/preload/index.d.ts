@@ -824,6 +824,12 @@ export interface Api {
     vesselId: string,
     amount: number | null
   ) => Promise<number>
+  /** Fleet P&I / FD&D quotes: premium of each vessel under each alternative (same shape as hull) */
+  piGetAltVesselPremiums: (
+    quotationId: string
+  ) => Promise<import('../shared/types').HullAltVesselPremium[]>
+  /** Returns the alternative's new total (sum of its vessels) */
+  piSetAltVesselPremium: (altId: string, vesselId: string, amount: number | null) => Promise<number>
   quotationDiscountGetByQuotation: (
     quotationId: string
   ) => Promise<import('../shared/types').QuotationDiscount[]>

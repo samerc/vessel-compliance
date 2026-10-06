@@ -77,6 +77,7 @@ import { numberToWords } from '../utils/numberToWords'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
 import { ok, isIpcError } from '../utils/ipc'
+import { isPiLike } from '../../../shared/quotationTypes'
 // formatDate not needed — blue cards use bcFormatDate, policies use polFormatDateUS
 
 // ==================== Blue Card Types ====================
@@ -1563,8 +1564,11 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   if (vessel) {
     try {
       const altVesselPrems: Record<string, number> = {}
-      if (quotation.quotationTypeCode === 'H') {
-        const avp = await window.api.hullGetAltVesselPremiums(policy.quotationId)
+      if (quotation.quotationTypeCode === 'H' || isPiLike(quotation.quotationTypeCode)) {
+        const avp =
+          quotation.quotationTypeCode === 'H'
+            ? await window.api.hullGetAltVesselPremiums(policy.quotationId)
+            : await window.api.piGetAltVesselPremiums(policy.quotationId)
         for (const r of Array.isArray(avp) ? avp : []) {
           if (r.premiumAmount != null)
             altVesselPrems[`${r.alternativeId}:${r.quotationVesselId}`] = Number(r.premiumAmount)

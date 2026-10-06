@@ -1005,6 +1005,8 @@ Per-quotation P&I alternatives (similar to hull):
 - **Alternative Selector Bar**: Below tab row, colored chips per alternative
 - **Per-Alternative Scoping**: Conditions, warranties, deductibles, exclusions can be scoped to specific alternatives
 - **Export**: Alternative-specific content with "Additional applicable to Alternative N" sections
+- **Fleet premium (2+ vessels)**: a premium per vessel under each alternative (`quotation_pi_alt_vessel_premiums`, no FK: rows are deleted with the alternative / quotation and cloned with it), entered in the same per-alternative cards as fleet hull (`renderAltVesselCard` in PremiumTab); the alternative's `premium_amount` is the sum. The export prints the hull matrix table, `vesselTechnical` takes the vessel's own amount, and converter / policy export / QuickBooks load it into `altVesselPrems`
+- **Previous premium fields** (PremiumTab) show only on renewal quotations, or when a previous amount is already entered
 
 ### Per-Vessel Hull Clauses
 
