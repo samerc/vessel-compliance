@@ -245,6 +245,14 @@ const allowedConfigPaths = new Set<string>()
 // Security: Track session IDs by window
 const windowSessions = new Map<number, string>()
 
+// Resolves once the startup database connection attempt (and schema setup) is over. A
+// remembered login can only be checked against the database, so auth:getSession waits for
+// this instead of showing the login screen while a slower (network) connection is opening.
+let markDbStartupDone: () => void = () => {}
+const dbStartupDone = new Promise<void>((resolve) => {
+  markDbStartupDone = resolve
+})
+
 // Security: Prevent concurrent setup operations
 let setupInProgress = false
 
@@ -480,6 +488,7 @@ function createWindow(): void {
       const connected = await db.connect()
 
       if (!connected) {
+        markDbStartupDone()
         mainWindow.webContents.send('app:db-status', { connected: false })
       } else {
         // Schema init is non-fatal: if it fails the app still opens as connected
@@ -489,6 +498,7 @@ function createWindow(): void {
         } catch (schemaError) {
           console.error('Schema init error (non-fatal):', schemaError)
         }
+        markDbStartupDone()
         // Load file path resolution settings
         initFilePathSettings()
         await loadFilePathSettings()
@@ -539,6 +549,7 @@ function createWindow(): void {
       if (!mainWindow.isDestroyed())
         mainWindow.webContents.send('app:db-status', { connected: false })
     } finally {
+      markDbStartupDone()
       if (!mainWindow.isDestroyed()) mainWindow.show()
     }
   })
@@ -709,6 +720,8 @@ app.whenReady().then(() => {
 
     // If not, try to restore from persistent storage (verified against the DB first)
     if (!sessionId) {
+      // The check needs the database: wait for the startup connection (at most 30 s)
+      await Promise.race([dbStartupDone, new Promise((r) => setTimeout(r, 30000))])
       await auth.validateRestoredSessions().catch(() => {})
       const restoredSession = auth.getFirstSession()
       if (restoredSession) {
