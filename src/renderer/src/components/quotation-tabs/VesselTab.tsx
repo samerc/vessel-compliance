@@ -78,6 +78,122 @@ async function fetchClassificationNames(
   return classMap
 }
 
+// Classification society picker: finds a society by its name or abbreviation ("BV", "RINA");
+// an abbreviation typed in full becomes the society's name when the field is left
+function matchSocieties(q: string, societies: ClassificationSociety[]): ClassificationSociety[] {
+  const t = q.trim().toLowerCase()
+  if (!t) return societies
+  const rank = (c: ClassificationSociety): number => {
+    const abbr = (c.abbreviation || '').toLowerCase()
+    const name = (c.name || '').toLowerCase()
+    if (abbr === t) return 0
+    if (abbr.startsWith(t)) return 1
+    if (name.startsWith(t)) return 2
+    if (name.includes(t) || abbr.includes(t)) return 3
+    return -1
+  }
+  return societies
+    .map((c) => ({ c, r: rank(c) }))
+    .filter((x) => x.r >= 0)
+    .sort((a, b) => a.r - b.r)
+    .map((x) => x.c)
+}
+
+function ClassSocietyInput({
+  value,
+  onChange,
+  societies,
+  isLight,
+  placeholder
+}: {
+  value: string
+  onChange: (v: string) => void
+  societies: ClassificationSociety[]
+  isLight?: boolean
+  placeholder?: string
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const filtered = matchSocieties(value, societies).slice(0, 10)
+  const pick = (c: ClassificationSociety): void => {
+    onChange(c.name)
+    setOpen(false)
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          setTimeout(() => setOpen(false), 150)
+          const t = value.trim().toLowerCase()
+          const exact = societies.find((c) => c.abbreviation && c.abbreviation.toLowerCase() === t)
+          if (exact) onChange(exact.name)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && open && value.trim() && filtered[0]) {
+            e.preventDefault()
+            pick(filtered[0])
+          } else if (e.key === 'Escape') setOpen(false)
+        }}
+        placeholder={placeholder || 'Name or abbreviation (e.g. BV)'}
+        style={{ width: '100%' }}
+      />
+      {open && filtered.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '2px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            background: isLight ? '#ffffff' : '#1a1d28',
+            border: '1px solid var(--input-border)',
+            borderRadius: '8px',
+            zIndex: 100,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}
+        >
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              onMouseDown={() => pick(c)}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                borderBottom: '1px solid var(--table-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = isLight
+                  ? 'rgba(0,150,200,0.06)'
+                  : 'rgba(var(--accent-primary-rgb), 0.06)')
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span>{c.name}</span>
+              {c.abbreviation && (
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  {c.abbreviation}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function VesselTab({
   quotation,
   vessels,
@@ -105,7 +221,6 @@ export default function VesselTab({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState(EMPTY_NEW_VESSEL)
   const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
-  const [classDropdownOpen, setClassDropdownOpen] = useState(false)
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false)
   const [flagStatesLocal, setFlagStatesLocal] = useState<FlagState[]>([])
   const [classSocietiesLocal, setClassSocietiesLocal] = useState<ClassificationSociety[]>([])
@@ -1095,74 +1210,17 @@ export default function VesselTab({
                       ) : null
                     })()}
                 </div>
-                {/* Classification combobox */}
-                <div style={{ position: 'relative' }}>
+                {/* Classification: by name or abbreviation */}
+                <div>
                   <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     Classification
                   </label>
-                  <input
-                    type="text"
+                  <ClassSocietyInput
                     value={newData.classification}
-                    onChange={(e) => {
-                      setNewData((p) => ({ ...p, classification: e.target.value }))
-                      setClassDropdownOpen(true)
-                    }}
-                    onFocus={() => setClassDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setClassDropdownOpen(false), 150)}
-                    placeholder="Search classification societies..."
-                    style={{ width: '100%' }}
+                    onChange={(v) => setNewData((p) => ({ ...p, classification: v }))}
+                    societies={classSocietiesLocal}
+                    isLight={isLight}
                   />
-                  {classDropdownOpen &&
-                    (() => {
-                      const q = newData.classification.toLowerCase()
-                      const filtered = classSocietiesLocal
-                        .filter((c) => c.name?.toLowerCase().includes(q))
-                        .slice(0, 10)
-                      return filtered.length > 0 ? (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            marginTop: '2px',
-                            maxHeight: '200px',
-                            overflowY: 'auto',
-                            background: isLight ? '#ffffff' : '#1a1d28',
-                            border: '1px solid var(--input-border)',
-                            borderRadius: '8px',
-                            zIndex: 100,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                          }}
-                        >
-                          {filtered.map((c) => (
-                            <div
-                              key={c.id}
-                              onMouseDown={() => {
-                                setNewData((p) => ({ ...p, classification: c.name }))
-                                setClassDropdownOpen(false)
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderBottom: '1px solid var(--table-border)'
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = isLight
-                                  ? 'rgba(0,150,200,0.06)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.06)')
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = 'transparent')
-                              }
-                            >
-                              {c.name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null
-                    })()}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -1287,17 +1345,29 @@ export default function VesselTab({
                       <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                         {label}
                       </label>
-                      <input
-                        type="text"
-                        value={editData[field]}
-                        onChange={(e) =>
-                          setEditData((p) => ({
-                            ...p,
-                            [field]: upper ? e.target.value.toUpperCase() : e.target.value
-                          }))
-                        }
-                        style={{ width: '100%', ...(upper ? { textTransform: 'uppercase' } : {}) }}
-                      />
+                      {field === 'classification' ? (
+                        <ClassSocietyInput
+                          value={editData.classification}
+                          onChange={(v) => setEditData((p) => ({ ...p, classification: v }))}
+                          societies={classSocietiesLocal}
+                          isLight={isLight}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={editData[field]}
+                          onChange={(e) =>
+                            setEditData((p) => ({
+                              ...p,
+                              [field]: upper ? e.target.value.toUpperCase() : e.target.value
+                            }))
+                          }
+                          style={{
+                            width: '100%',
+                            ...(upper ? { textTransform: 'uppercase' } : {})
+                          }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
