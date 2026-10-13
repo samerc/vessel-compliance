@@ -419,7 +419,7 @@ Monthly view of expiring policies (`src/renderer/src/components/PolicyRenewals.t
 - **3-Month View**: Toggle button switches between single-month and 3-consecutive-months view; multi-month fetches 3 parallel IPC calls tagged with `_monthLabel`, renders with month group headers in the table
 - **Table Columns**: Vessel, IMO, Customer, Fleet, Policy Type, Policy Number, End Date, Actions (View)
 - **Query**: Joins `vessel_dynamic_policies` → `vessel_policy_values` where characteristic name contains "end" and field_type is date
-- **Filters**: Only active vessels (`v.is_active = TRUE`) and active policies (`vdp.status = 'active'`)
+- **Filters**: Only active vessels (`v.is_active = TRUE`); cancelled policies are left out (expired ones stay, they are due for renewal)
 - **Export**: Excel export via `xlsx` library
 - **IPC Handler**: `policies:getRenewalsByMonth`
 - **Renewal States**: `renewal_status_types` table, `renewal_status_id` FK on `vessel_dynamic_policies`. IPC prefix: `renewalStates:`. Status badge in table: text always black, background `statusColor + "22"` (hex opacity), border `2px solid statusColor`.

@@ -18511,6 +18511,7 @@ export class MySQLAdapter {
                  GROUP BY policy_id, policy_number
              ) rn ON rn.policy_id = vdp.id AND rn.policy_number = COALESCE(vdp.policy_number, '')
              WHERE v.is_active = TRUE
+               AND COALESCE(vdp.status, '') <> 'cancelled'
                AND ptc.field_type = 'date'
                AND LOWER(ptc.name) LIKE '%end%'
                AND vpv.value_date IS NOT NULL
