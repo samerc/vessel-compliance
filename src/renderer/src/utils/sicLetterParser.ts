@@ -66,7 +66,10 @@ export function parseLetterHeader(fileName: string, lines: SicOcrLine[]): Letter
   if (reference && g) reference += `/G${g[1]}.${g[2]}`
   let kind: LetterKind = 'other'
   if (/[اإ]ستعلام/.test(text)) kind = 'inquiry'
-  else if (/تجميد|freeze/i.test(text)) kind = 'freeze'
+  // Circulated ID copies (the decision may also freeze e-wallets)
+  else if (/تعميم\s*نسخ/.test(text)) kind = 'circulate'
+  // The freeze letters ask to keep the life policies linked to investment units (الغاء البوالص)
+  else if (/تجميد|freeze|البوالص|وحدات\s*الاستثمار/i.test(text)) kind = 'freeze'
   else if (/تعميم|الهوية/.test(text)) kind = 'circulate'
   return { reference, letterDate, kind }
 }
@@ -85,6 +88,22 @@ const LIST_END =
 const NOT_A_SUBJECT = /^(ال)?هيئة|^مصرف لبنان|^حاكم|^المصارف|^شركات التأمين|^شركة التأمين/
 const DETAIL_WORDS = /مو\s?اليد|و\s?الدت|سجل|الجواز|جواز|المدني|الهوية|تأسست|تاسست|مسجلة|مسجله/
 
+// The SIC letterhead printed at the top of every page
+const LETTERHEAD =
+  /SPECIAL INVESTIGATION|INVESTIGATION COMMISSION|Fighting Money|Banque du Liban|هيئة\s*التحقيق\s*الخاصة|مكافحة\s*تبييض/i
+
+/** Index of the last letterhead line at the top of a page (-1 if none) */
+function letterheadEnd(lines: SicOcrLine[]): number {
+  let end = -1
+  lines.slice(0, 8).forEach((l, i) => {
+    if (LETTERHEAD.test(l.text)) end = i
+  })
+  // "Banque du Liban" is the letterhead's last line; it is sometimes read on its own line below
+  const next = end >= 0 ? lines[end + 1]?.text || '' : ''
+  if (/Banque|Liban/.test(next) || (/مصرف/.test(next) && next.length < 25)) end++
+  return end
+}
+
 function startsWithBullet(text: string): boolean {
   const words = text.split(' ')
   return words.length > 1 && BULLET_TOKEN.test(words[0])
@@ -100,14 +119,21 @@ function stripBullet(text: string): string {
   const q = words.slice(0, 3).findIndex((w) => /^["“]/.test(w))
   if (q > 0) return words.slice(q).join(' ')
   let i = 0
-  while (i < words.length - 1 && isJunkToken(words[i])) i++
+  // ...but a name written in Latin letters ("JOHN SMITH") is two Latin words in a row
+  const latinWord = (w?: string): boolean => !!w && /^[A-Za-z][A-Za-z'.-]{2,}$/.test(w)
+  while (
+    i < words.length - 1 &&
+    isJunkToken(words[i]) &&
+    !(latinWord(words[i]) && latinWord(words[i + 1]))
+  )
+    i++
   return words.slice(i).join(' ')
 }
 
 /** Does this line start a person / company entry? */
 function looksLikeEntry(text: string): boolean {
   const t = stripBullet(text)
-  if (/^["“][\u0600-\u06ff]/.test(t)) return true
+  if (/^["“][\u0600-\u06ff]/.test(t) || /^["“][A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(t)) return true
   if (COMPANY_START.test(t)) return true
   const paren = t.search(/[()]/)
   if (paren > 0 && paren < 60) {
@@ -121,6 +147,8 @@ function looksLikeEntry(text: string): boolean {
 // ---- English (OFAC style) numbered lists ----
 
 const NUMBERED_EN = /^\s*\d{1,3}\s*[.)]\s+["A-Z]/
+// Counting list items: a Latin capital after the number (an Arabic list may number quoted names)
+const NUMBERED_LATIN = /^\s*\d{1,3}\s*[.)]\s+"?[A-Z]/
 
 function englishDob(text: string): string {
   const d = text.match(/DOB\s+(?:circa\s+)?(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/i)
@@ -139,16 +167,44 @@ function personFromOfac(s: string): string {
   return first ? `${first} ${titleCase(last)}` : titleCase(s)
 }
 
+// A listed vessel: "AL SAFA (3E3958) Oil Products Tanker Panama flag; Vessel Year of Build ..."
+const VESSEL_DETAILS = /\bVessel\b|\bMMSI\b|\bflag\b/i
+const PERSON_DETAILS = /\bDOB\b|nationality|\bPOB\b|Gender|citizen/i
+
 function parseEnglishEntry(text: string, lines: number[]): ParsedEntry {
-  const body = text.replace(/^\s*\d{1,3}\s*[.)]\s*/, '')
-  const nameEnd = body.search(/\s*\(|,\s*(?:DOB|Organization)/)
-  const rawName = (nameEnd > 0 ? body.slice(0, nameEnd) : body.split(/[;(]/)[0])
+  const raw = text.replace(/^\s*\d{1,3}\s*[.)]\s*/, '')
+  // OCR adds stray Arabic letters to English lines ("nationality Turkey ظ"): keep Arabic only
+  // inside "(Arabic: ...)"
+  const body = raw
+    .replace(/(\(Arabic:[^)]*\)?)|[\u0600-\u06ff]+/g, (_m, keep?: string) => keep || ' ')
+    .replace(/\s+/g, ' ')
     .trim()
-    .replace(/[,;]$/, '')
+  const isVessel = VESSEL_DETAILS.test(body) && !PERSON_DETAILS.test(body)
+  const isPerson = !isVessel && PERSON_DETAILS.test(body)
+  // OFAC writes names in capitals: a company / vessel name is the leading capitals, up to a
+  // bracket, a ";" or a ", Word" detail ("ELYSIAN HORIZON CORP, Identification Number ...");
+  // a person is "LAST, First Middle" up to the first detail
+  const caps = body.match(/^[^a-z;({]+?(?=\s*(?:[({]|;|,?\s+[A-Z][a-z]|$))/)
+  const personEnd = body.search(
+    /\s*[({]|;|,\s*(?:DOB|POB|nationality|Gender|citizen|Passport|National ID|Organization)/i
+  )
+  const rawName = (
+    isPerson
+      ? personEnd > 0
+        ? body.slice(0, personEnd)
+        : body
+      : caps && caps[0].trim().length > 1
+        ? caps[0]
+        : body.split(/[;(]/)[0]
+  )
+    .trim()
+    .replace(/[,;\s]+$/, '')
   const isOrg =
-    /Organization|Company|LLC|L\.L\.C|FZE|FZCO|LTD|Limited|Inc\b|S\.?A\.?L\b|Trading|Group|Bank|Brotherhood|Establishment/i.test(
-      body
-    ) && !/DOB|nationality/i.test(body)
+    isVessel ||
+    (!isPerson &&
+      /Organization|Company|\bCO\b|CORP|LLC|L\.L\.C|FZE|FZCO|LTD|Limited|Inc\b|S\.?A\.?L\b|Trading|Group|Bank|Brotherhood|Establishment|Registration|\bIMO\b/i.test(
+        body
+      ))
   const arabicParts = [...body.matchAll(/Arabic:\s*([^)]*)\)?/g)]
     .map((m) => cleanArabic(m[1].replace(/[^\u0600-\u06ff\s]/g, ' ')))
     .filter((a) => a.length > 1)
@@ -287,6 +343,26 @@ export function parseArabicEntry(
   const first = tokens[0] || ''
   const father = tokens.length >= 3 ? tokens[1] : ''
   const family = tokens.slice(tokens.length >= 3 ? 2 : 1)
+  // A foreign name written in Latin letters ("JOHN SMITH" (بريطاني، ...)): use it as written
+  const latinName = (namePart.match(LATIN_RUN) || [])
+    .map((s) => s.trim())
+    .sort((a, b) => b.length - a.length)[0]
+  if (latinName && latinName.length >= 4 && tokens.length < 2) {
+    return {
+      lines,
+      entityType: 'individual',
+      arName: tokens.join(' '),
+      enName: latinName === latinName.toUpperCase() ? titleCase(latinName) : latinName,
+      arFather: '',
+      enFather: '',
+      arMother,
+      enMother: arMother ? transliterateName(arMother, learned) : '',
+      nationality,
+      dob,
+      aliases: [],
+      notes: noteText
+    }
+  }
   return {
     lines,
     entityType: 'individual',
@@ -311,9 +387,14 @@ export function parseLetterEntries(
   lines: SicOcrLine[],
   learned: SpellingDictionary = {}
 ): ParsedEntry[] {
+  // English (OFAC style) list; a later page of one may hold only vessels or companies
+  const numbered = lines.filter((l) => NUMBERED_LATIN.test(l.text)).length
   if (
-    lines.some((l) => NUMBERED_EN.test(l.text)) &&
-    lines.some((l) => /DOB|nationality|Organization|a\.k\.a/i.test(l.text))
+    numbered >= 2 ||
+    (numbered === 1 &&
+      lines.some((l) =>
+        /DOB|nationality|Organization|a\.k\.a|\bIMO\b|MMSI|Registration/i.test(l.text)
+      ))
   ) {
     return englishEntries(lines)
   }
@@ -323,6 +404,8 @@ export function parseLetterEntries(
   // After the subject line: the addressee above it ("شركة التأمين") is not an entry
   let subject = lines.findIndex((l) => /الموضوع/.test(l.text))
   if (subject < 0) subject = lines.findIndex((l) => /المرجع|الرقم/.test(l.text))
+  // A later page has no subject line, only the letterhead: start below it
+  subject = Math.max(subject, letterheadEnd(lines))
   const first = lines.findIndex(
     (l, i) => i > subject && hasArabic(l.text) && looksLikeEntry(l.text)
   )
@@ -382,12 +465,13 @@ function englishEntries(lines: SicOcrLine[]): ParsedEntry[] {
   return groups.map((g) => parseEnglishEntry(g.map((i) => lines[i].text).join(' '), g))
 }
 
-/** Letters about one or two people name them inside the paragraph: العائدة للسيد "X" (والدته Y) */
+/** Letters about one or two people name them inside the paragraph: العائدة للسيد "X" (والدته Y),
+ *  or a circulated ID: الهوية الصادرة بإسم "X" */
 function paragraphEntries(lines: SicOcrLine[], learned: SpellingDictionary): ParsedEntry[] {
   const out: ParsedEntry[] = []
   lines.forEach((l, i) => {
     for (const m of l.text.matchAll(
-      /(?:للسيد[ةه]?|السيد[ةه]?|للآنسة|للانسة)\s*["“”]([^"“”]{3,60})["“”]\s*(\([^)]*\)?)?/g
+      /(?:للسيد[ةه]?|السيد[ةه]?|للآنسة|للانسة|ب[إا]سم)\s*["“”]([^"“”]{3,60})["“”]\s*(\([^)]*\)?)?/g
     )) {
       const next =
         !m[2] && lines[i + 1] ? lines[i + 1].text.match(/^\s*(\([^)]*\)?)/)?.[1] || '' : ''
@@ -398,6 +482,14 @@ function paragraphEntries(lines: SicOcrLine[], learned: SpellingDictionary): Par
   return out
 }
 
+/** Is this text Arabic (a real Arabic word, not a stray letter OCR added to an English line)? */
+export function isArabicText(text: string): boolean {
+  const t = text.replace(/\(Arabic:[^)]*\)?/g, '')
+  const ar = (t.match(/[\u0621-\u064a]/g) || []).length
+  const latin = (t.match(/[A-Za-z]/g) || []).length
+  return /[\u0621-\u064a]{3}/.test(t) && ar * 3 >= latin
+}
+
 /** Parse an entry from any lines the user picked */
 export function parseLinesAsEntry(
   lines: SicOcrLine[],
@@ -406,7 +498,7 @@ export function parseLinesAsEntry(
 ): ParsedEntry {
   const sorted = [...indexes].sort((a, b) => lines[a].bbox.y0 - lines[b].bbox.y0)
   const text = sorted.map((i) => lines[i].text).join(' ')
-  return hasArabic(text.replace(/\(Arabic:[^)]*\)?/g, '')) && !NUMBERED_EN.test(text)
+  return isArabicText(text) && !NUMBERED_LATIN.test(text)
     ? parseArabicEntry(text, sorted, learned)
     : parseEnglishEntry(text, sorted)
 }

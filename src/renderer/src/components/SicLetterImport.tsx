@@ -32,6 +32,7 @@ import {
   parseLetterHeader,
   parseLetterEntries,
   parseLinesAsEntry,
+  isArabicText,
   LetterKind,
   ParsedEntry
 } from '../utils/sicLetterParser'
@@ -77,6 +78,8 @@ type NameField = 'name' | 'father' | 'mother'
 interface Row extends ParsedEntry {
   key: string
   page: number
+  /** Lines picked for this entry on OTHER pages (an entry running onto the next page) */
+  more: Record<number, number[]>
   include: boolean
   /** English typed by the user: no longer follows the Arabic */
   touched: Record<NameField, boolean>
@@ -141,6 +144,7 @@ function englishName(
 const emptyRow = (page: number): Row => ({
   key: newKey(),
   page,
+  more: {},
   include: true,
   lines: [],
   entityType: 'individual',
@@ -198,6 +202,8 @@ export default function SicLetterImport({
 
   const parsedPages = useRef(new Set<number>())
   const headerSet = useRef(false)
+  // The letter type is still the one guessed from the first page ("Other") and not chosen by hand
+  const kindAuto = useRef(true)
   const rowsEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -240,6 +246,7 @@ export default function SicLetterImport({
         ...e,
         key: newKey(),
         page: pg,
+        more: {},
         include: true,
         touched: { name: false, father: false, mother: false }
       }
@@ -275,6 +282,21 @@ export default function SicLetterImport({
           setLetterDate(h.letterDate)
           setKind(h.kind)
           setRemark(KIND_REMARKS[h.kind])
+          if (h.kind !== 'other') kindAuto.current = false
+        } else if (headerSet.current && !parsedPages.current.has(res.page)) {
+          // The decision is sometimes on a later page (cover letter first): take the letter
+          // type and the case code from there while the user has not chosen them
+          const h = parseLetterHeader(filePath, res.lines)
+          if (kindAuto.current && h.kind !== 'other') {
+            kindAuto.current = false
+            setKind(h.kind)
+            setRemark((r) => (r.trim() ? r : KIND_REMARKS[h.kind]))
+          }
+          setReference((r) =>
+            !r.includes('/G') && h.reference.includes('/G') && h.reference.startsWith(r)
+              ? h.reference
+              : r
+          )
         }
         if (!parsedPages.current.has(res.page)) {
           parsedPages.current.add(res.page)
@@ -451,8 +473,42 @@ export default function SicLetterImport({
     addRow({ ...toRow({ ...parsed, lines: menu.lines }, data.page) })
     setMenu(null)
   }
+  // Picked lines are kept per page: the entry's own page, or `more` for a following page
+  const linesPatch = (row: Row, pg: number, picked: number[]): Partial<Row> =>
+    row.page === pg
+      ? { lines: [...new Set([...row.lines, ...picked])] }
+      : { more: { ...row.more, [pg]: [...new Set([...(row.more[pg] || []), ...picked])] } }
+
   const menuAppend = (): void => {
     if (!menu || !data || !selectedRow) return
+    if (selectedRow.page !== data.page) {
+      // The entry continues on this page (its details, usually): fill what it does not have yet
+      const extra = parseLinesAsEntry(data.lines, menu.lines, learned)
+      const r = selectedRow
+      const patch: Partial<Row> = {
+        ...linesPatch(r, data.page, menu.lines),
+        // (a details-only line has no name before its first comma: look at every part)
+        nationality:
+          r.nationality ||
+          extra.nationality ||
+          menu.text
+            .replace(/[()]/g, ' ')
+            .split(/[،,؛;»]/)
+            .map((seg) => nationalityFromArabic(seg.trim()))
+            .find(Boolean) ||
+          '',
+        dob: r.dob || extra.dob,
+        aliases: [...new Set([...r.aliases, ...extra.aliases])],
+        notes: [r.notes, extra.notes].filter(Boolean).join('; ')
+      }
+      if (!r.arName && !r.enName)
+        Object.assign(patch, { arName: extra.arName, enName: extra.enName })
+      if (!r.arMother && extra.arMother) patch.arMother = extra.arMother
+      if (!r.arFather && extra.arFather) patch.arFather = extra.arFather
+      update(r.key, patch)
+      setMenu(null)
+      return
+    }
     const lines = [...new Set([...selectedRow.lines, ...menu.lines])]
     const parsed = parseLinesAsEntry(data.lines, lines, learned)
     setRows((prev) =>
@@ -465,9 +521,9 @@ export default function SicLetterImport({
     setMenu(null)
   }
   const menuFill = (field: (typeof FILL_FIELDS)[number]['key']): void => {
-    if (!menu || !selectedRow) return
+    if (!menu || !data || !selectedRow) return
     const text = menu.text.replace(/^[^\u0600-\u06ffA-Za-z0-9]+/, '').trim()
-    const ar = hasArabic(text)
+    const ar = isArabicText(text)
     const k = selectedRow.key
     if (field === 'name')
       update(
@@ -495,7 +551,7 @@ export default function SicLetterImport({
     if (field === 'dob') update(k, { dob: toWesternDigits(text) })
     if (field === 'notes')
       update(k, { notes: [selectedRow.notes, toWesternDigits(text)].filter(Boolean).join('; ') })
-    update(k, { lines: [...new Set([...selectedRow.lines, ...menu.lines])] })
+    update(k, linesPatch(selectedRow, data.page, menu.lines))
     setMenu(null)
   }
 
@@ -511,6 +567,7 @@ export default function SicLetterImport({
     // Next letter: start over
     parsedPages.current = new Set()
     headerSet.current = false
+    kindAuto.current = true
     setRows([])
     setSelected(null)
     setMenu(null)
@@ -611,7 +668,10 @@ export default function SicLetterImport({
   const usedLines = useMemo(() => {
     const m = new Map<number, string>()
     if (data)
-      for (const r of rows) if (r.page === data.page) for (const i of r.lines) m.set(i, r.key)
+      for (const r of rows) {
+        const own = r.page === data.page ? r.lines : []
+        for (const i of [...own, ...(r.more[data.page] || [])]) m.set(i, r.key)
+      }
     return m
   }, [rows, data])
 
@@ -1047,6 +1107,7 @@ export default function SicLetterImport({
                   value={kind}
                   onChange={(k) => {
                     if (remark === KIND_REMARKS[kind] || !remark.trim()) setRemark(KIND_REMARKS[k])
+                    kindAuto.current = false
                     setKind(k)
                   }}
                 />
@@ -1187,9 +1248,32 @@ export default function SicLetterImport({
                         #{idx + 1}
                       </span>
                       {data && data.pageCount > 1 && (
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        <button
+                          type="button"
+                          title="Show this page"
+                          disabled={loading || page === r.page}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelected(r.key)
+                            setPage(r.page)
+                          }}
+                          style={{
+                            fontSize: '0.72rem',
+                            color:
+                              page === r.page ? 'var(--text-secondary)' : 'var(--accent-primary)',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: page === r.page ? 'default' : 'pointer',
+                            textDecoration: page === r.page ? 'none' : 'underline'
+                          }}
+                        >
                           page {r.page + 1}
-                        </span>
+                          {Object.keys(r.more).length > 0 &&
+                            `+${Object.keys(r.more)
+                              .map((p) => Number(p) + 1)
+                              .join(',')}`}
+                        </button>
                       )}
                       <SegmentedControl
                         items={[
