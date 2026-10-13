@@ -133,7 +133,7 @@ function stripBullet(text: string): string {
 /** Does this line start a person / company entry? */
 function looksLikeEntry(text: string): boolean {
   const t = stripBullet(text)
-  if (/^["“][\u0600-\u06ff]/.test(t) || /^["“][A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(t)) return true
+  if (/^["“][\u0600-\u06ff]/.test(t) || /^["“][A-Za-z]{3,}\s+[A-Za-z]{3,}/.test(t)) return true
   if (COMPANY_START.test(t)) return true
   const paren = t.search(/[()]/)
   if (paren > 0 && paren < 60) {
@@ -344,9 +344,16 @@ export function parseArabicEntry(
   const father = tokens.length >= 3 ? tokens[1] : ''
   const family = tokens.slice(tokens.length >= 3 ? 2 : 1)
   // A foreign name written in Latin letters ("JOHN SMITH" (بريطاني، ...)): use it as written
-  const latinName = (namePart.match(LATIN_RUN) || [])
-    .map((s) => s.trim())
-    .sort((a, b) => b.length - a.length)[0]
+  // (without ID numbers and stray letters OCR leaves around it: "BECERRA e", "820112110")
+  const latinWords = (
+    (namePart.match(LATIN_RUN) || []).map((s) => s.trim()).sort((a, b) => b.length - a.length)[0] ||
+    ''
+  )
+    .split(/\s+/)
+    .filter((w) => !/\d{4,}|[A-Za-z]-?\d/.test(w))
+  while (latinWords.length && !/[A-Za-z]{2}/.test(latinWords[latinWords.length - 1]))
+    latinWords.pop()
+  const latinName = latinWords.join(' ')
   if (latinName && latinName.length >= 4 && tokens.length < 2) {
     return {
       lines,
