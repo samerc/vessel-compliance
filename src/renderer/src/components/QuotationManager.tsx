@@ -54,13 +54,21 @@ export default function QuotationManager({
   } | null>(null)
   const [listKey, setListKey] = useState(0)
   const [listSearch, setListSearch] = useState('')
-  const initialLoadRef = useRef(false)
+  // The quotation id last opened from outside (Recent, a policy...); cleared with the request
+  const initialLoadRef = useRef<string | null>(null)
 
   // Auto-open quotation when navigating from policy
   useEffect(() => {
-    if (initialQuotationId && !initialLoadRef.current) {
-      initialLoadRef.current = true
-      window.api.getQuotation(initialQuotationId).then((q) => {
+    if (!initialQuotationId) {
+      initialLoadRef.current = null
+      return
+    }
+    if (initialLoadRef.current !== initialQuotationId) {
+      const requestedId = initialQuotationId
+      initialLoadRef.current = requestedId
+      window.api.getQuotation(requestedId).then((q) => {
+        // A newer request (another Recent click) replaced this one
+        if (initialLoadRef.current !== requestedId) return
         if (policyContext) setActivePolicyContext(policyContext)
         if (q && !(q as { error?: unknown }).error) {
           setEditingQuotation(q)
@@ -70,7 +78,7 @@ export default function QuotationManager({
         if (onClearPolicyContext) onClearPolicyContext()
       })
     }
-    // initialLoadRef makes this run once, so the callbacks/context changing never re-triggers it
+    // initialLoadRef opens each requested id once, so the callbacks/context changing never re-trigger it
   }, [initialQuotationId, policyContext, onClearInitialQuotation, onClearPolicyContext])
 
   const handleOpenEditor = (quotation: Quotation): void => {

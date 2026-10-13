@@ -183,21 +183,26 @@ export default function VesselManager({
 
   // Open vessel by ID from external navigation
   useEffect(() => {
-    if (initialVesselId) {
-      // Capture section NOW (synchronously) before the async gap clears it
-      const sectionToApply = initialVesselSectionRef.current
-      ;(async () => {
-        const allVessels = await window.api.getVessels()
-        const vessel = Array.isArray(allVessels)
-          ? allVessels.find((v: Vessel) => v.id === initialVesselId)
-          : undefined
-        if (vessel) {
-          setAppliedSection(sectionToApply)
-          setNavigatedExternally(true)
-          setSelectedVessel(vessel)
-        }
-        onClearInitialVesselRef.current?.()
-      })()
+    if (!initialVesselId) return
+    let alive = true
+    // Capture section NOW (synchronously) before the async gap clears it
+    const sectionToApply = initialVesselSectionRef.current
+    ;(async () => {
+      const allVessels = await window.api.getVessels()
+      // A newer pick (e.g. a second Recent click) wins over this slower load
+      if (!alive) return
+      const vessel = Array.isArray(allVessels)
+        ? allVessels.find((v: Vessel) => v.id === initialVesselId)
+        : undefined
+      if (vessel) {
+        setAppliedSection(sectionToApply)
+        setNavigatedExternally(true)
+        setSelectedVessel(vessel)
+      }
+      onClearInitialVesselRef.current?.()
+    })()
+    return () => {
+      alive = false
     }
   }, [initialVesselId])
 
@@ -516,6 +521,7 @@ export default function VesselManager({
         }
       >
         <VesselDetail
+          key={selectedVessel.id}
           vessel={selectedVessel}
           backLabel={backLabel}
           onBack={handleBack}

@@ -1761,6 +1761,7 @@ function App(): React.JSX.Element {
             {activeTab === 'policy-detail' && selectedPolicyId && (
               <Suspense fallback={<LoadingFallback />}>
                 <PolicyDetail
+                  key={selectedPolicyId}
                   policyId={selectedPolicyId}
                   onBack={() => {
                     setSelectedPolicyId(null)
