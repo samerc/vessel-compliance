@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/types'
 import { useTheme } from '../../contexts/ThemeContext'
 import { confirmDialog } from '../DialogHost'
+import { CaseToggleBtn } from '../CaseToggle'
 
 export default function InsuredTab({
   quotation,
@@ -348,7 +349,14 @@ export default function InsuredTab({
               ? 'Search customer or type a name...'
               : 'Search broker or type a name...'
           }
-          style={{ width: '100%', border: '1px solid var(--input-border)' }}
+          style={{ width: '100%', border: '1px solid var(--input-border)', paddingRight: '44px' }}
+        />
+        <CaseToggleBtn
+          value={coInputValue}
+          onChange={(v) => {
+            setCoInputValue(v)
+            saveCoName(v)
+          }}
         />
         {showCoDropdown && coFiltered.length > 0 && (
           <div
@@ -602,8 +610,9 @@ export default function InsuredTab({
               }
             }}
             placeholder="Search entity or type a new assured name..."
-            style={{ width: '100%', border: '1px solid var(--input-border)' }}
+            style={{ width: '100%', border: '1px solid var(--input-border)', paddingRight: '44px' }}
           />
+          <CaseToggleBtn value={newName} onChange={setNewName} />
           {showEntityDropdown && entityFiltered.length > 0 && (
             <div
               style={{
