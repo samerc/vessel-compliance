@@ -61,6 +61,8 @@ import type { ParsedDefect } from './workers/defectParser'
 import Store from 'electron-store'
 import { createPool, type RowDataPacket } from 'mysql2/promise'
 import * as bcrypt from 'bcryptjs'
+// Static: a dynamic import() ignores NODE_PATH and fails when running from the hot-update cache
+import JSZip from 'jszip'
 
 /** Message from the defect-import utility process (workers/parser.ts) */
 type DefectParseResult = { success: boolean; defects?: ParsedDefect[]; error?: string }
@@ -7448,7 +7450,6 @@ app.whenReady().then(() => {
       }
 
       // Process the docx using JSZip
-      const { default: JSZip } = await import('jszip')
       if (!template.fileData) throw new Error('This template has no Word file')
       const zip = await JSZip.loadAsync(template.fileData)
 

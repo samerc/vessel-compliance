@@ -10,6 +10,7 @@ import { app } from 'electron'
 import { net } from 'electron'
 import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, renameSync } from 'fs'
 import { join, resolve, dirname, sep } from 'path'
+import JSZip from 'jszip'
 
 const USER_DATA = app.getPath('userData')
 const HOT_UPDATE_DIR = join(USER_DATA, 'hot-update')
@@ -249,8 +250,8 @@ class HotUpdateService {
       const extractDir = join(stagingDir, 'out')
       mkdirSync(extractDir, { recursive: true })
 
-      // Use JSZip (already a dependency) to extract
-      const { default: JSZip } = await import('jszip')
+      // JSZip is a static import: a dynamic import() ignores NODE_PATH, so it was not found when
+      // this code runs from the hot-update cache (no node_modules there)
       const zip = await JSZip.loadAsync(zipBuffer)
       const entries = Object.keys(zip.files)
 
