@@ -257,8 +257,13 @@ function App(): React.JSX.Element {
       setCheckingUpdate(true)
       try {
         const result = await window.api.hotUpdateCheck()
-        if (result.updated) setHotUpdateAvailable(true)
-        else if (announce) showSuccess('You are on the latest version')
+        if (result.updated) {
+          setHotUpdateAvailable(true)
+          if (announce) showSuccess('An update is ready: restart the app to apply it')
+        } else if (announce) {
+          if (result.error) showError(result.error)
+          else showSuccess('You are on the latest version')
+        }
       } catch {
         if (announce) showError('Could not check for updates')
       }

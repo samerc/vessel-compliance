@@ -90,6 +90,9 @@ function isBlockedBuild(buildNumber: number): boolean {
 
 class HotUpdateService {
   private checkInterval: ReturnType<typeof setInterval> | null = null
+  // The build this process runs (read before any check this session downloads a newer one: the
+  // cache then holds the downloaded build, which only runs after a restart)
+  private readonly runningVersion: HotUpdateVersion | null = this.getLocalVersion()
 
   /** Get the local cache version (or null if no cache) */
   getLocalVersion(): HotUpdateVersion | null {
@@ -162,7 +165,7 @@ class HotUpdateService {
 
   /** Get current running version info */
   async getInfo(): Promise<HotUpdateInfo> {
-    const localVersion = this.getLocalVersion()
+    const localVersion = this.runningVersion
     const source = this.getSource()
     const currentBuild = localVersion?.buildNumber ?? 0
     const currentVersion = localVersion?.version ?? app.getVersion()
@@ -193,7 +196,7 @@ class HotUpdateService {
 
   /** Synchronous version for quick status (no network call) */
   getInfoSync(): Omit<HotUpdateInfo, 'availableBuild' | 'updateReady'> {
-    const localVersion = this.getLocalVersion()
+    const localVersion = this.runningVersion
     const source = this.getSource()
     return {
       currentBuild: localVersion?.buildNumber ?? 0,
@@ -210,13 +213,16 @@ class HotUpdateService {
     try {
       const remoteVersion = await this.getRemoteVersion()
       if (!remoteVersion) {
-        return { updated: false }
+        return { updated: false, error: 'Could not reach the update server. Try again later.' }
       }
 
       const localVersion = this.getLocalVersion()
       const localBuild = localVersion?.buildNumber ?? 0
 
       if (remoteVersion.buildNumber <= localBuild) {
+        // Already downloaded by an earlier check, waiting for a restart
+        if (localVersion && localBuild > (this.runningVersion?.buildNumber ?? 0))
+          return { updated: true, version: localVersion }
         return { updated: false }
       }
       // Built for an older installer: the bootstrap would ignore it, so don't download it
