@@ -45,6 +45,24 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     checkSession()
   }, [loadPermissions])
 
+  // A slow network database can connect after the first check gave up (30 s): ask again once it
+  // is connected, so a remembered login is not sent to the login screen
+  useEffect(() => {
+    if (user || !window.api.onDbStatus) return
+    return window.api.onDbStatus(async (status) => {
+      if (!status?.connected) return
+      try {
+        const session = await window.api.getSession()
+        if (session) {
+          setUser((current) => current || session)
+          await loadPermissions(session.id, session.role)
+        }
+      } catch {
+        /* stay on the login screen */
+      }
+    })
+  }, [user, loadPermissions])
+
   const login = async (credentials: {
     username: string
     password: string

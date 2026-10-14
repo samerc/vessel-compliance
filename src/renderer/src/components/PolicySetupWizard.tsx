@@ -320,6 +320,16 @@ export default function PolicySetupWizard({
   const isMultiVessel = qVessels.length > 1
   // More than one vessel being converted now → one policy per vessel, each with its own premium
   const isMultiSelection = data.selectedVesselIds.length > 1
+  // Price shown on an alternative: for a fleet priced per vessel, the vessels being converted
+  // (the alternative itself holds the whole fleet's total)
+  const altPrice = (alt: { id: string; premiumAmount?: number | null }): number | null => {
+    if (qVessels.length > 1 && Object.keys(altVesselPrems).some((k) => k.startsWith(`${alt.id}:`)))
+      return data.selectedVesselIds.reduce(
+        (t, qvId) => t + (altVesselPrems[`${alt.id}:${qvId}`] || 0),
+        0
+      )
+    return alt.premiumAmount ?? null
+  }
   const hasBroker = useMemo(
     () => quoteHasBroker(quotation, Object.values(data.insuredByVessel || {}).flat()),
     [quotation, data.insuredByVessel]
@@ -1145,6 +1155,7 @@ export default function PolicySetupWizard({
           <StepVesselAlternative
             qVessels={qVessels}
             allAlts={allAlts}
+            altPrice={altPrice}
             hasAlts={hasAlts}
             isMultiVessel={isMultiVessel}
             data={data}
@@ -1259,6 +1270,7 @@ export default function PolicySetupWizard({
             quotation={quotation}
             qVessels={qVessels}
             allAlts={allAlts}
+            altPrice={altPrice}
             hasAlts={hasAlts}
             banks={banks}
             hasBroker={hasBroker}
@@ -1349,6 +1361,7 @@ export default function PolicySetupWizard({
 function StepVesselAlternative({
   qVessels,
   allAlts,
+  altPrice,
   hasAlts,
   isMultiVessel,
   data,
@@ -1365,6 +1378,7 @@ function StepVesselAlternative({
 }: {
   qVessels: QuotationVessel[]
   allAlts: (QuotationPIAlternative | QuotationHullAlternative)[]
+  altPrice: (alt: { id: string; premiumAmount?: number | null }) => number | null
   hasAlts: boolean
   isMultiVessel: boolean
   data: WizardData
@@ -1525,8 +1539,8 @@ function StepVesselAlternative({
                 }}
               >
                 {alt.label || `Alternative ${idx + 1}`}
-                {alt.premiumAmount != null
-                  ? ` — ${quotation.premiumCurrency || 'USD'} ${alt.premiumAmount.toLocaleString()}`
+                {altPrice(alt) != null
+                  ? ` — ${quotation.premiumCurrency || 'USD'} ${altPrice(alt)!.toLocaleString()}`
                   : ''}
                 {quotation.ivEnabled && quotation.ivPremiumAmount
                   ? ` + IV ${quotation.ivPremiumAmount.toLocaleString()}`
@@ -3210,6 +3224,7 @@ function StepReview({
   quotation,
   qVessels,
   allAlts,
+  altPrice,
   hasAlts,
   banks,
   isPI,
@@ -3220,6 +3235,7 @@ function StepReview({
   quotation: Quotation
   qVessels: QuotationVessel[]
   allAlts: (QuotationPIAlternative | QuotationHullAlternative)[]
+  altPrice: (alt: { id: string; premiumAmount?: number | null }) => number | null
   hasAlts: boolean
   banks: { id: string; name: string; details: string; order: number }[]
   hasBroker: boolean
@@ -3318,8 +3334,8 @@ function StepReview({
           </div>
           <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
             {selectedAlt.label || 'Alternative'}
-            {selectedAlt.premiumAmount != null
-              ? ` — ${quotation.premiumCurrency || 'USD'} ${selectedAlt.premiumAmount.toLocaleString()}`
+            {altPrice(selectedAlt) != null
+              ? ` — ${quotation.premiumCurrency || 'USD'} ${altPrice(selectedAlt)!.toLocaleString()}`
               : ''}
           </span>
         </div>

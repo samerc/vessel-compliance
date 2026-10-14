@@ -11264,6 +11264,7 @@ export class MySQLAdapter {
         data.ivValue ?? null
       ]
     )
+    await this.syncAltVesselPremiums(data.quotationId, id)
     return {
       id,
       quotationId: data.quotationId,
@@ -11350,6 +11351,80 @@ export class MySQLAdapter {
     )
   }
 
+  // Keeps the per-vessel alternative premiums (fleet P&I / FD&D and hull grids) in step with the
+  // quotation's vessels: rows of a removed vessel go and each alternative total is the sum again.
+  // P&I / FD&D: a single vessel is priced on the alternative itself, so the grid is folded back;
+  // when a second vessel is added, the premium entered for the first one becomes its grid cell.
+  private async syncAltVesselPremiums(quotationId: string, addedVesselId?: string): Promise<void> {
+    if (!this.pool) return
+    const [vRows] = await this.pool.query(
+      'SELECT id FROM quotation_vessels WHERE quotation_id = ? ORDER BY order_index',
+      [quotationId]
+    )
+    const vesselIds = (vRows as RowDataPacket[]).map((r) => String(r.id))
+    const grids = [
+      { grid: 'quotation_pi_alt_vessel_premiums', alts: 'quotation_pi_alternatives', pi: true },
+      { grid: 'quotation_hull_alt_vessel_premiums', alts: 'quotation_hull_alternatives', pi: false }
+    ]
+    for (const g of grids) {
+      try {
+        const [altRows] = await this.pool.query(
+          `SELECT id, premium_amount FROM ${g.alts} WHERE quotation_id = ?`,
+          [quotationId]
+        )
+        for (const alt of altRows as RowDataPacket[]) {
+          const [cells] = await this.pool.query(
+            `SELECT quotation_vessel_id, premium_amount FROM ${g.grid} WHERE alternative_id = ?`,
+            [alt.id]
+          )
+          const rows = cells as RowDataPacket[]
+          const orphans = rows.filter((r) => !vesselIds.includes(String(r.quotation_vessel_id)))
+          if (orphans.length)
+            await this.pool.execute(
+              `DELETE FROM ${g.grid} WHERE alternative_id = ? AND quotation_vessel_id NOT IN (${vesselIds.map(() => '?').join(',') || "''"})`,
+              [alt.id, ...vesselIds]
+            )
+          const kept = rows.filter((r) => vesselIds.includes(String(r.quotation_vessel_id)))
+          if (
+            g.pi &&
+            addedVesselId &&
+            vesselIds.length === 2 &&
+            kept.length === 0 &&
+            alt.premium_amount != null
+          ) {
+            // 1 -> 2 vessels: the alternative's premium was the first vessel's
+            const first = vesselIds.find((v) => v !== addedVesselId)
+            if (first)
+              await this.pool.execute(
+                `INSERT INTO ${g.grid} (id, alternative_id, quotation_vessel_id, premium_amount) VALUES (?, ?, ?, ?)`,
+                [uuidv4(), alt.id, first, alt.premium_amount]
+              )
+            continue
+          }
+          if (g.pi && vesselIds.length <= 1 && kept.length) {
+            // Back to one vessel: its own cell is the alternative's premium
+            const own = kept[0].premium_amount
+            await this.pool.execute(`DELETE FROM ${g.grid} WHERE alternative_id = ?`, [alt.id])
+            await this.pool.execute(`UPDATE ${g.alts} SET premium_amount = ? WHERE id = ?`, [
+              own ?? null,
+              alt.id
+            ])
+            continue
+          }
+          if (orphans.length && kept.length) {
+            const total = kept.reduce((t, r) => t + (Number(r.premium_amount) || 0), 0)
+            await this.pool.execute(`UPDATE ${g.alts} SET premium_amount = ? WHERE id = ?`, [
+              total || null,
+              alt.id
+            ])
+          }
+        }
+      } catch (e) {
+        console.error('syncAltVesselPremiums:', e)
+      }
+    }
+  }
+
   async deleteQuotationVessel(id: string): Promise<void> {
     if (!this.pool) return
     // Get the vessel info before deleting (for cascade cleanup)
@@ -11362,6 +11437,7 @@ export class MySQLAdapter {
     if (!vessel) return
     const qId = vessel.quotation_id
     const label = vessel.vessel_label
+    await this.syncAltVesselPremiums(qId)
 
     // Clean up assureds linked to this vessel label
     if (label) {
@@ -13927,6 +14003,42 @@ export class MySQLAdapter {
         [newId]
       )
 
+      // 5b. Fleet P&I / FD&D priced per vessel: a vessel's previous premium is its price under
+      //     the alternative the policy was issued on (the vessel row itself holds none)
+      if (policy.selectedAlternativeId) {
+        const [cellRows] = await fk.query(
+          `SELECT qv.vessel_id, qv.order_index, p.premium_amount
+             FROM quotation_pi_alt_vessel_premiums p
+             JOIN quotation_vessels qv ON qv.id = p.quotation_vessel_id
+            WHERE p.alternative_id = ?`,
+          [policy.selectedAlternativeId]
+        )
+        const cells = cellRows as RowDataPacket[]
+        if (cells.length) {
+          const [newRows] = await fk.query(
+            'SELECT id, vessel_id, order_index FROM quotation_vessels WHERE quotation_id = ?',
+            [newId]
+          )
+          let total = 0
+          for (const nv of newRows as RowDataPacket[]) {
+            const cell =
+              cells.find((c) => nv.vessel_id && c.vessel_id === nv.vessel_id) ||
+              cells.find((c) => !nv.vessel_id && c.order_index === nv.order_index)
+            if (!cell || cell.premium_amount == null) continue
+            total += Number(cell.premium_amount) || 0
+            await fk.execute('UPDATE quotation_vessels SET previous_premium = ? WHERE id = ?', [
+              cell.premium_amount,
+              nv.id
+            ])
+          }
+          if (total)
+            await fk.execute('UPDATE quotations SET previous_premium_amount = ? WHERE id = ?', [
+              total,
+              newId
+            ])
+        }
+      }
+
       // 6. Copy current deductible amounts as previous values for renewal comparison
       await fk.execute(
         `UPDATE quotation_deductibles SET
@@ -14125,8 +14237,24 @@ export class MySQLAdapter {
       const sourceQVs = await this.getQuotationVessels(sourceQId)
       const srcQv =
         sourceQVs.find((v) => v.vesselId === vid) || (sourceQVs.length === 1 ? sourceQVs[0] : null)
+      // Priced per vessel under P&I / FD&D alternatives: the cell of the alternative its
+      // policy was issued on
+      let gridPremium: number | null = null
+      const srcPolicyId = policyMap.get(vid)
+      const srcPolicy = srcPolicyId ? await this.getPolicyDocumentById(srcPolicyId) : null
+      if (srcQv && srcPolicy?.selectedAlternativeId) {
+        const [gRows] = await this.pool.query(
+          'SELECT premium_amount FROM quotation_pi_alt_vessel_premiums WHERE alternative_id = ? AND quotation_vessel_id = ?',
+          [srcPolicy.selectedAlternativeId, srcQv.id]
+        )
+        const g = (gRows as RowDataPacket[])[0]?.premium_amount
+        if (g != null) gridPremium = Number(g)
+      }
       const vesselPremium =
-        srcQv?.premiumAmount ?? (sourceQVs.length <= 1 ? sourceQ.premiumAmount : null) ?? null
+        gridPremium ??
+        srcQv?.premiumAmount ??
+        (sourceQVs.length <= 1 ? sourceQ.premiumAmount : null) ??
+        null
       const vesselAgreed =
         srcQv?.agreedValue ?? (sourceQVs.length <= 1 ? sourceQ.agreedValue : null) ?? null
       const vesselIv = srcQv?.ivValue ?? (sourceQVs.length <= 1 ? sourceQ.ivValue : null) ?? null
@@ -22813,8 +22941,23 @@ export class MySQLAdapter {
       }
     }
 
-    // If baseQuery already contains WHERE, append with AND instead of a new WHERE
-    const hasExistingWhere = def.baseQuery.toUpperCase().includes('WHERE')
+    // Renewals: cancelled policies and inactive vessels are not due for renewal (as the
+    // Renewals page), unless the report filters on a status itself
+    if (dataSource === 'renewals') {
+      conditions.push('v.is_active = TRUE')
+      if (!config.filters?.status || config.filters.status === 'all')
+        conditions.push("COALESCE(vdp.status, '') <> 'cancelled'")
+    }
+
+    // If baseQuery already has its own WHERE, append with AND instead of a new WHERE. Only a
+    // top-level WHERE counts: one inside a sub-query or a join condition "(...)" does not
+    // (appending there put the report's filters into the last LEFT JOIN, so nothing was filtered)
+    let topLevel = def.baseQuery
+    for (let prev = ''; prev !== topLevel;) {
+      prev = topLevel
+      topLevel = topLevel.replace(/\([^()]*\)/g, ' ')
+    }
+    const hasExistingWhere = /\bWHERE\b/i.test(topLevel)
     const whereClause =
       conditions.length > 0 ? (hasExistingWhere ? 'AND ' : 'WHERE ') + conditions.join(' AND ') : ''
 

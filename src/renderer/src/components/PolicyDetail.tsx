@@ -71,7 +71,7 @@ import type {
   VesselAssured
 } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
-import { ok } from '../utils/ipc'
+import { ok, asArray } from '../utils/ipc'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
@@ -2857,6 +2857,28 @@ export default function PolicyDetail({
                                   revId,
                                   matchingNewAlt.id
                                 )
+                              }
+                            } else {
+                              // P&I / FD&D alternative: the revision copies them in the same order
+                              const oldPi = asArray(
+                                await window.api.piGetQuotationAlternatives(policy.quotationId)
+                              )
+                              const oldIdx = oldPi.findIndex(
+                                (a) => a.id === policy.selectedAlternativeId
+                              )
+                              if (oldIdx >= 0) {
+                                const newPi = asArray(
+                                  await window.api.piGetQuotationAlternatives(revId)
+                                )
+                                const sameLabel = (x?: { label?: string | null }): boolean =>
+                                  (x?.label || '') === (oldPi[oldIdx].label || '')
+                                const match = sameLabel(newPi[oldIdx])
+                                  ? newPi[oldIdx]
+                                  : newPi.find(sameLabel) || newPi[oldIdx]
+                                if (match) {
+                                  newSelectedAltId = match.id
+                                  await window.api.stripNonSelectedAlternative(revId, match.id)
+                                }
                               }
                             }
                           }

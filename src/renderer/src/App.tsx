@@ -1107,6 +1107,8 @@ function App(): React.JSX.Element {
                           setInitialEntityId(item.itemId)
                           setActiveTab('directory')
                         } else if (item.itemType === 'quotation') {
+                          // Opened on its own: not on behalf of a policy
+                          setQuotationPolicyContext(null)
                           setInitialQuotationId(item.itemId)
                           setActiveTab('quotations')
                         } else if (item.itemType === 'policy') {

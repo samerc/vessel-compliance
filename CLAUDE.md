@@ -931,6 +931,7 @@ Customizable reports with 9 data sources:
 - **Config**: Column checkboxes, dynamic filters per source, group-by, sort
 - **Chart View**: Horizontal bar charts with metrics (Count, Sum Premium, Avg Premium)
 - **Save/Share**: Named report configs saved to DB, shareable with team
+- **Filters**: appended to the source's own top-level WHERE only (a WHERE inside a sub-query / join does not count). Renewals leave out inactive vessels and, unless filtered on status, cancelled policies
 - **Export**: Excel + PDF with company header
 - **Pagination**: 50 rows per page
 
@@ -1005,7 +1006,7 @@ Per-quotation P&I alternatives (similar to hull):
 - **Alternative Selector Bar**: Below tab row, colored chips per alternative
 - **Per-Alternative Scoping**: Conditions, warranties, deductibles, exclusions can be scoped to specific alternatives
 - **Export**: Alternative-specific content with "Additional applicable to Alternative N" sections
-- **Fleet premium (2+ vessels)**: a premium per vessel under each alternative (`quotation_pi_alt_vessel_premiums`, no FK: rows are deleted with the alternative / quotation and cloned with it), entered in the same per-alternative cards as fleet hull (`renderAltVesselCard` in PremiumTab); the alternative's `premium_amount` is the sum. The export prints the hull matrix table, `vesselTechnical` takes the vessel's own amount, and converter / policy export / QuickBooks load it into `altVesselPrems`
+- **Fleet premium (2+ vessels)**: a premium per vessel under each alternative (`quotation_pi_alt_vessel_premiums`, no FK: rows are deleted with the alternative / quotation and cloned with it), entered in the same per-alternative cards as fleet hull (`renderAltVesselCard` in PremiumTab); the alternative's `premium_amount` is the sum. The export prints the hull matrix table, `vesselTechnical` takes the vessel's own amount, and converter / policy export / QuickBooks load it into `altVesselPrems`. `syncAltVesselPremiums` (adapter, on adding / removing a quotation vessel) drops a removed vessel's cells and re-sums; going 1 -> 2 vessels makes the alternative's premium the first vessel's cell, back to 1 folds the grid into the alternative. With 2+ vessels an empty cell is 0 (never a share of the others). A renewal takes each vessel's previous premium from the cell of the alternative its policy was issued on
 - **Previous premium fields** (PremiumTab) show only on renewal quotations, or when a previous amount is already entered
 
 ### Per-Vessel Hull Clauses

@@ -761,11 +761,30 @@ app.whenReady().then(() => {
         mustChange
       }: { username: string; password?: string; mustChange?: boolean }
     ) => {
-      await requirePermission(event, 'admin:users')
-      return await auth.resetPassword(username, {
+      const user = await requirePermission(event, 'admin:users')
+      // Same rule as deleting / changing the role of an administrator
+      const [targetRows] = await db.pool!.query<RowDataPacket[]>(
+        'SELECT id, role FROM users WHERE username = ?',
+        [username]
+      )
+      if (targetRows[0]?.role === 'admin' && user.role !== 'admin')
+        throw new Error("Only an administrator can reset an administrator's password")
+      const result = await auth.resetPassword(username, {
         password: typeof password === 'string' ? password : undefined,
         mustChange: mustChange === true
       })
+      if (result.success)
+        db.logActivity({
+          userId: user.id,
+          username: user.username,
+          action: 'UPDATE',
+          module: 'Users',
+          entityType: 'user',
+          entityId: targetRows[0]?.id,
+          entityName: username,
+          details: `Reset the password of ${username}${mustChange ? ' (new password at next login)' : ''}`
+        }).catch(() => {})
+      return result
     }
   )
 
