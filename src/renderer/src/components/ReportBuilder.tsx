@@ -115,6 +115,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
     columns: [
       { key: 'vesselName', label: 'Vessel', defaultSelected: true },
       { key: 'imoNumber', label: 'IMO Number', defaultSelected: true },
+      { key: 'flagState', label: 'Flag State' },
       { key: 'policyType', label: 'Policy Type', defaultSelected: true },
       { key: 'policyNumber', label: 'Policy Number', defaultSelected: true },
       { key: 'status', label: 'Status', defaultSelected: true },
@@ -129,6 +130,12 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
     ],
     filters: [
       {
+        key: 'flagStateId',
+        label: 'Flag State',
+        type: 'select',
+        loadOptions: loadFlagStateOptions
+      },
+      {
         key: 'policyTypeId',
         label: 'Policy Type',
         type: 'select',
@@ -141,6 +148,8 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
         options: [
           { value: 'all', label: 'All' },
           { value: 'active', label: 'Active' },
+          { value: 'expired', label: 'Expired' },
+          { value: 'cancelled', label: 'Cancelled' },
           { value: 'inactive', label: 'Inactive' }
         ]
       },
@@ -159,6 +168,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, policy #, customer...' }
     ],
     groupBy: [
+      { key: 'flagState', label: 'Flag State' },
       { key: 'policyType', label: 'Policy Type' },
       { key: 'customer', label: 'Customer' },
       { key: 'fleet', label: 'Fleet' },
@@ -198,6 +208,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
     columns: [
       { key: 'vesselName', label: 'Vessel', defaultSelected: true },
       { key: 'imoNumber', label: 'IMO Number', defaultSelected: true },
+      { key: 'flagState', label: 'Flag State' },
       { key: 'policyType', label: 'Policy Type', defaultSelected: true },
       { key: 'policyNumber', label: 'Policy Number', defaultSelected: true },
       { key: 'endDate', label: 'End Date', defaultSelected: true },
@@ -207,6 +218,12 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'daysUntilExpiry', label: 'Days Until Expiry', defaultSelected: true }
     ],
     filters: [
+      {
+        key: 'flagStateId',
+        label: 'Flag State',
+        type: 'select',
+        loadOptions: loadFlagStateOptions
+      },
       {
         key: 'policyTypeId',
         label: 'Policy Type',
@@ -228,6 +245,7 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'search', label: 'Search', type: 'text', placeholder: 'Vessel, policy #, customer...' }
     ],
     groupBy: [
+      { key: 'flagState', label: 'Flag State' },
       { key: 'policyType', label: 'Policy Type' },
       { key: 'customer', label: 'Customer' },
       { key: 'fleet', label: 'Fleet' },

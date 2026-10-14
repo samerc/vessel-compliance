@@ -22556,6 +22556,7 @@ export class MySQLAdapter {
                     LEFT JOIN vessels v ON vdp.vessel_id = v.id
                     LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                     LEFT JOIN fleets f ON v.fleet_id = f.id
+                    LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
                     LEFT JOIN entities cust ON vdp.customer_entity_id = cust.id
                     LEFT JOIN entities broker ON vdp.broker_entity_id = broker.id
                     LEFT JOIN vessel_policy_values vpv_inc ON (
@@ -22582,6 +22583,7 @@ export class MySQLAdapter {
                     ) vprem ON vprem.policy_id = vdp.id`,
         columnMap: {
           vesselName: 'v.name AS vesselName',
+          flagState: 'fs.name AS flagState',
           imoNumber: 'v.imo_number AS imoNumber',
           policyType: 'pt.name AS policyType',
           policyNumber: 'vdp.policy_number AS policyNumber',
@@ -22596,6 +22598,10 @@ export class MySQLAdapter {
           createdAt: 'vdp.created_at AS createdAt'
         },
         filterMap: {
+          flagStateId: (params, val) => {
+            params.push(val)
+            return 'v.flag_state_id = ?'
+          },
           policyTypeId: (params, val) => {
             params.push(val)
             return 'vdp.policy_type_id = ?'
@@ -22630,6 +22636,7 @@ export class MySQLAdapter {
           }
         },
         groupMap: {
+          flagState: 'fs.name',
           policyType: 'pt.name',
           customer: 'cust.name',
           fleet: 'f.name',
@@ -22671,6 +22678,7 @@ export class MySQLAdapter {
                     LEFT JOIN vessels v ON vdp.vessel_id = v.id
                     LEFT JOIN policy_types pt ON vdp.policy_type_id = pt.id
                     LEFT JOIN fleets f ON v.fleet_id = f.id
+                    LEFT JOIN flag_states fs ON v.flag_state_id = fs.id
                     LEFT JOIN entities cust ON vdp.customer_entity_id = cust.id
                     LEFT JOIN renewal_status_types rst ON vdp.renewal_status_id = rst.id
                     LEFT JOIN vessel_policy_values vpv_end ON (
@@ -22682,6 +22690,7 @@ export class MySQLAdapter {
                     )`,
         columnMap: {
           vesselName: 'v.name AS vesselName',
+          flagState: 'fs.name AS flagState',
           imoNumber: 'v.imo_number AS imoNumber',
           policyType: 'pt.name AS policyType',
           policyNumber: 'vdp.policy_number AS policyNumber',
@@ -22692,6 +22701,10 @@ export class MySQLAdapter {
           daysUntilExpiry: 'DATEDIFF(vpv_end.value_date, CURDATE()) AS daysUntilExpiry'
         },
         filterMap: {
+          flagStateId: (params, val) => {
+            params.push(val)
+            return 'v.flag_state_id = ?'
+          },
           policyTypeId: (params, val) => {
             params.push(val)
             return 'vdp.policy_type_id = ?'
@@ -22715,6 +22728,7 @@ export class MySQLAdapter {
           }
         },
         groupMap: {
+          flagState: 'fs.name',
           policyType: 'pt.name',
           customer: 'cust.name',
           fleet: 'f.name',
