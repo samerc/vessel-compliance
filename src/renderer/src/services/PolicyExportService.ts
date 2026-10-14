@@ -77,7 +77,7 @@ import { numberToWords } from '../utils/numberToWords'
 import { stripHtml } from '../utils/htmlToPdfText'
 import { getReportSettings } from './ReportSettingsService'
 import { ok, isIpcError } from '../utils/ipc'
-import { isPiLike } from '../../../shared/quotationTypes'
+import { isPiLike, textsForType } from '../../../shared/quotationTypes'
 // formatDate not needed — blue cards use bcFormatDate, policies use polFormatDateUS
 
 // ==================== Blue Card Types ====================
@@ -1427,13 +1427,14 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
   const safeWarrantyRows = filterByAlt(Array.isArray(warrantyRows) ? warrantyRows : [])
   const selectedWarrantyIds = [...new Set(safeWarrantyRows.map((r) => r.piWarrantyId))]
 
-  const piAlternativesRaw =
-    quotation.quotationTypeCode === 'P'
-      ? await window.api.piGetQuotationAlternatives(policy.quotationId)
-      : []
+  // P&I and FD&D: alternatives and limit options
+  const piAlternativesRaw = isPiLike(quotation.quotationTypeCode)
+    ? await window.api.piGetQuotationAlternatives(policy.quotationId)
+    : []
 
-  const lolOptionsRaw =
-    quotation.quotationTypeCode === 'P' ? await window.api.lolGetOptions(policy.quotationId) : []
+  const lolOptionsRaw = isPiLike(quotation.quotationTypeCode)
+    ? await window.api.lolGetOptions(policy.quotationId)
+    : []
 
   // Resolve IACS classification from junction table
   const vesselClassificationNames: Record<string, string> = {}
@@ -1493,9 +1494,12 @@ async function loadPolicyExportData(policyId: string): Promise<PolicyExportData>
     /* classification names are optional */
   }
 
+  // FD&D uses the FD&D wording of the texts that have one (as its quotation)
   const mergedTexts: PISectionTexts = {
-    ...DEFAULT_SECTION_TEXTS,
-    ...(sectionTexts || {}),
+    ...textsForType(
+      { ...DEFAULT_SECTION_TEXTS, ...(sectionTexts || {}) },
+      quotation.quotationTypeCode
+    ),
     ...(quotation.sectionTextsOverride || {})
   }
 
@@ -2809,7 +2813,9 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const content: (Paragraph | Table)[] = []
 
-  if (typeCode === 'P') {
+  if (isPiLike(typeCode)) {
+    // FD&D conditions are custom (no Section B numbering): their name on the left, as the quotation
+    const isFdd = typeCode === 'F'
     const selectedClauses = data.allClauses.filter((c) => data.selectedClauseIds.includes(c.id))
     if (polSt(data, 'conditionsIntro')) content.push(...polMp(polSt(data, 'conditionsIntro')))
     if (selectedClauses.length > 0) {
@@ -2832,7 +2838,11 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
             const displayName = (c.name || '')
               .replace(/^Section\s*B\s*Cl\.?\s*\d+\s*[-\u2013\u2014]?\s*/i, '')
               .trim()
-            const rightText = displayName ? `${displayName}${clauseDesc}` : desc || ''
+            const rightText = isFdd
+              ? desc || ''
+              : displayName
+                ? `${displayName}${clauseDesc}`
+                : desc || ''
             return new TableRow({
               children: [
                 new TableCell({
@@ -2842,7 +2852,9 @@ function polBuildConditionsSection(data: PolicyExportData): (Paragraph | Table)[
                     new Paragraph({
                       children: [
                         new TextRun({
-                          text: `Section B Cl.${c.clauseNumber}`,
+                          text: isFdd
+                            ? c.name || `Cl.${c.clauseNumber}`
+                            : `Section B Cl.${c.clauseNumber}`,
                           size: POL_FONT_SIZE,
                           font: 'Arial',
                           color: '000000'
@@ -3292,7 +3304,7 @@ function polBuildValueSection(data: PolicyExportData): (Paragraph | Table)[] {
   const typeCode = data.quotation.quotationTypeCode || 'P'
   const content: (Paragraph | Table)[] = []
 
-  if (typeCode === 'P') {
+  if (isPiLike(typeCode)) {
     // Resolve LOL amount: selected LOL option → selected PI alternative → quotation
     let resolvedLolAmount = data.quotation.limitOfLiabilityAmount
     let resolvedLolCurrency = data.quotation.limitOfLiabilityCurrency || 'USD'
@@ -4086,6 +4098,9 @@ async function polBuildPremiumPaymentSection(
 }
 
 function polGetDefaultOpeningClause(typeCode: string): string {
+  if (typeCode === 'F') {
+    return 'In consideration of the Insured paying the premium as hereinafter set out, the Insurer hereby agrees to insure the Insured against the legal costs and expenses as set out below and subject to the terms and conditions as hereinafter provided.'
+  }
   if (typeCode === 'P') {
     return 'In consideration of the Insured paying the premium as hereinafter set out, the Insurer hereby agrees to insure the Insured against their legal liabilities, costs and expenses as set out below and subject to the terms and conditions as hereinafter provided.'
   }
@@ -4352,8 +4367,8 @@ export async function exportPolicyDocx(
   const warrantiesContent = polBuildWarrantiesSection(data)
   if (warrantiesContent.length > 0) addRow('warranties', makeRow('Warranties', warrantiesContent))
 
-  // DEDUCTIBLES (P&I only)
-  if (typeCode === 'P') {
+  // DEDUCTIBLES (P&I and FD&D)
+  if (isPiLike(typeCode)) {
     const dedContent = polBuildDeductiblesSection(data)
     if (dedContent.length > 0) addRow('deductibles', makeRow('Deductibles', dedContent))
   }
@@ -4605,7 +4620,10 @@ export async function exportPolicyDocx(
   children.push(polEmptyP())
 
   // Important Notice — make type-aware by replacing P&I references for other types
-  let importantNotice = data.policy.importantNotice || polSt(data, 'importantNotice')
+  let importantNotice =
+    data.policy.importantNotice ||
+    (typeCode === 'F' ? polSt(data, 'importantNoticeFDD') : '') ||
+    polSt(data, 'importantNotice')
   if (importantNotice) {
     // Replace type-specific references if not P&I
     if (typeCode === 'H') {
@@ -4616,6 +4634,11 @@ export async function exportPolicyDocx(
       importantNotice = importantNotice
         .replace(/P&I Terms and Conditions/gi, 'War Terms and Conditions')
         .replace(/P&I terms and conditions/gi, 'War Terms and Conditions')
+    } else if (typeCode === 'F') {
+      importantNotice = importantNotice.replace(
+        /P&I Terms and Conditions/gi,
+        'FD&D Terms and Conditions'
+      )
     }
     const plainNotice = htmlToPlainText(importantNotice)
     if (plainNotice.startsWith('IMPORTANT NOTICE')) {
@@ -4870,7 +4893,8 @@ export async function exportPolicyDocx(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   let tcFooterText = ''
   let tcTitleLine = '{type} Cover {number}'
@@ -5246,7 +5270,7 @@ export async function exportPolicyPdfWithTC(policyId: string): Promise<void> {
     P: 'P&I',
     H: 'Hull',
     W: 'War Risk',
-    F: 'FDD',
+    F: 'FD&D',
     L: 'Loss of Hire',
     C: 'Cargo'
   }
@@ -5523,7 +5547,8 @@ async function buildDebitAdviceBlobFresh(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   try {
     const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
@@ -5992,7 +6017,8 @@ async function buildCreditAdviceBlobFresh(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   try {
     const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
@@ -6853,7 +6879,8 @@ export async function exportEndorsementDocx(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   try {
     const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
@@ -7138,7 +7165,8 @@ export async function exportEndorsementDADocx(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   try {
     const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null
@@ -7510,7 +7538,8 @@ export async function exportEndorsementCADocx(
   let headerTitles: Record<string, string> = {
     P: 'Protection and Indemnity Certificate',
     H: 'Hull Cover',
-    W: 'War Risk Certificate'
+    W: 'War Risk Certificate',
+    F: 'Freight, Demurrage and Defence Certificate'
   }
   try {
     const settings = data.frozen?.exportSettings ? JSON.stringify(data.frozen.exportSettings) : null

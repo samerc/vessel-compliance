@@ -5399,6 +5399,7 @@ function TradingCountriesTab({ showSuccess, showError, isLight }: TabProps): Rea
 
   const TYPE_CODES_SHORT = [
     { code: 'P', label: 'P&I', color: '#6464ff' },
+    { code: 'F', label: 'FD&D', color: '#a855f7' },
     { code: 'H', label: 'H&M', color: '#ff64c8' },
     { code: 'W', label: 'War', color: '#ff8c32' }
   ]

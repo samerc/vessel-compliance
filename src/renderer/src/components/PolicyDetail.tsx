@@ -72,6 +72,7 @@ import type {
 } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
 import { ok, asArray } from '../utils/ipc'
+import { isPiLike } from '../../../shared/quotationTypes'
 import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
@@ -785,7 +786,7 @@ export default function PolicyDetail({
       try {
         const [cs, lol] = await Promise.all([
           window.api.getQuotationCustomSections(policy.quotationId),
-          policy.quotationTypeCode === 'P' || q?.quotationTypeCode === 'P'
+          isPiLike(policy.quotationTypeCode) || isPiLike(q?.quotationTypeCode)
             ? window.api.lolGetOptions(policy.quotationId)
             : Promise.resolve([])
         ])

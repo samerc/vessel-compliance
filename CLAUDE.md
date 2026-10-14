@@ -1376,7 +1376,9 @@ FD&D (Freight, Demurrage & Defence) quotations are built on P&I:
 - **Text deductibles** are exported line by line (`mp`), so multi-line ones (FD&D 25% / min / max) keep their breaks
 - **Wording**: title "FREIGHT DEMURRAGE & DEFENCE QUOTATION FOR", standard texts `conditionsIntroFDD`, `limitOfLiabilityDefaultTextFDD` (applied over the P&I key by `textsForType`), `importantNoticeFDD`
 - **One type**: a startup migration merges duplicate code-F types into one named "FD&D" (moves quotations, vessel policies, characteristics, commissions, document tags)
-- **Policy side not done yet**: converter / policy export / DA for FD&D are the next phase
+- **Policy**: the policy export treats F like P&I (alternatives, limit options, Limit of Liability, Conditions with the clause name instead of Section B, Deductibles), with the FD&D texts (`textsForType`, `importantNoticeFDD`), its own opening clause default and certificate title ("Freight, Demurrage and Defence Certificate"). Policy Settings has an FD&D category (`policy_text_F_openingClause` / `_closingText` / `_premiumIntro`) and FD&D in Header Titles, Cancel & Replace and Section Order. Blue cards and QR stay P&I only
+- **Trading countries**: the excluded / DDQ type chips include FD&D (`F`); a one-time migration (`migration_fdd_trading_v1`) added F wherever P was
+- **Migration order**: `migrateFddQuotations` runs after the warranty / subjectivity `type_scope` columns are created, widens them, and inserts its items only when missing
 
 ### Cargo Quotation Specifics
 

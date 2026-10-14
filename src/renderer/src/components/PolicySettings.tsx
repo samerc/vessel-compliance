@@ -123,7 +123,7 @@ async function fetchSignaturePageData(): Promise<SignaturePageData> {
 
 const policySectionOrderKey = (tc: string): string => `policy_section_order_defaults_${tc}`
 
-type PolicySettingsCategory = 'general' | 'pi' | 'hull' | 'war'
+type PolicySettingsCategory = 'general' | 'pi' | 'fdd' | 'hull' | 'war'
 
 type PolicySettingsTab =
   | 'fontSize'
@@ -139,6 +139,9 @@ type PolicySettingsTab =
   | 'piClosing'
   | 'piNotice'
   | 'piPremiumIntro'
+  | 'fddOpening'
+  | 'fddClosing'
+  | 'fddPremiumIntro'
   | 'hullOpening'
   | 'hullClosing'
   | 'hullNotice'
@@ -158,6 +161,7 @@ type PolicySettingsTab =
 const CATEGORIES: { id: PolicySettingsCategory; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--accent-primary)' },
   { id: 'pi', label: 'P&I', color: '#6464ff' },
+  { id: 'fdd', label: 'FD&D', color: '#a855f7' },
   { id: 'hull', label: 'H&M', color: '#ff64c8' },
   { id: 'war', label: 'War', color: '#ffb020' }
 ]
@@ -189,6 +193,11 @@ const CATEGORY_TABS: Record<
     { id: 'piClosing', label: 'Closing Text', icon: <FileText size={15} /> },
     { id: 'piNotice', label: 'Important Notice', icon: <AlertTriangle size={15} /> },
     { id: 'piPremiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> }
+  ],
+  fdd: [
+    { id: 'fddOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
+    { id: 'fddClosing', label: 'Closing Text', icon: <FileText size={15} /> },
+    { id: 'fddPremiumIntro', label: 'Premium Intro', icon: <DollarSign size={15} /> }
   ],
   hull: [
     { id: 'hullOpening', label: 'Opening Clause', icon: <BookOpen size={15} /> },
@@ -369,6 +378,30 @@ export default function PolicySettings(): React.JSX.Element {
             settingKey="policy_text_P_premiumIntro"
             label="P&I Premium Intro"
             description="The premium introduction text for P&I policy documents. Use placeholders: {currency}, {amount}, {instalments}, {time}, {timezone}."
+            showSuccess={showSuccess}
+          />
+        )}
+        {activeTab === 'fddOpening' && (
+          <RichTextSettingTab
+            settingKey="policy_text_F_openingClause"
+            label="FD&D Opening Clause"
+            description="The opening clause text for FD&D policy documents (empty = the standard FD&D wording)."
+            showSuccess={showSuccess}
+          />
+        )}
+        {activeTab === 'fddClosing' && (
+          <RichTextSettingTab
+            settingKey="policy_text_F_closingText"
+            label="FD&D Closing Text"
+            description="The closing section text for FD&D policy documents."
+            showSuccess={showSuccess}
+          />
+        )}
+        {activeTab === 'fddPremiumIntro' && (
+          <RichTextSettingTab
+            settingKey="policy_text_F_premiumIntro"
+            label="FD&D Premium Intro"
+            description="The premium introduction text for FD&D policy documents. Use placeholders: {currency}, {amount}, {instalments}, {time}, {timezone}."
             showSuccess={showSuccess}
           />
         )}
@@ -807,7 +840,8 @@ function FooterTextTab({ showSuccess }: { showSuccess: (msg: string) => void }):
 const DEFAULT_HEADER_TITLES: Record<string, string> = {
   P: 'Protection and Indemnity Certificate',
   H: 'Hull & Machinery Certificate',
-  W: 'War Risk Certificate'
+  W: 'War Risk Certificate',
+  F: 'Freight, Demurrage and Defence Certificate'
 }
 
 function HeaderTitlesTab({
@@ -816,7 +850,7 @@ function HeaderTitlesTab({
   showSuccess: (msg: string) => void
 }): React.JSX.Element {
   const defaultTitles = DEFAULT_HEADER_TITLES
-  const typeLabels: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War' }
+  const typeLabels: Record<string, string> = { P: 'P&I', F: 'FD&D', H: 'Hull', W: 'War' }
 
   const [headerTitles, setHeaderTitles] = useState(defaultTitles)
   const [loading, setLoading] = useState(true)
@@ -1208,7 +1242,7 @@ function CancelReplaceTab({
   const [templates, setTemplates] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
-  const typeLabels: Record<string, string> = { P: 'P&I', H: 'Hull', W: 'War' }
+  const typeLabels: Record<string, string> = { P: 'P&I', F: 'FD&D', H: 'Hull', W: 'War' }
 
   useEffect(() => {
     ;(async () => {
@@ -3823,6 +3857,7 @@ function PolicySectionOrderTab({
 }): React.JSX.Element {
   const TYPES: { code: string; label: string; color: string }[] = [
     { code: 'P', label: 'P&I', color: '#6464ff' },
+    { code: 'F', label: 'FD&D', color: '#a855f7' },
     { code: 'H', label: 'Hull', color: '#ff64c8' },
     { code: 'W', label: 'War', color: '#ffb020' }
   ]

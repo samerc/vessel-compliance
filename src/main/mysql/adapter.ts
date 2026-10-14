@@ -2807,13 +2807,6 @@ export class MySQLAdapter {
         }
       }
 
-      // Migration: FD&D quotations (code F) - one FD&D type, type scope on the P&I lists, FD&D items
-      try {
-        await this.migrateFddQuotations()
-      } catch (e) {
-        console.error('FD&D migration:', e)
-      }
-
       // Final collation normalization pass — catches any tables created or altered
       // during migration blocks above (must run after all CREATE/ALTER Table statements).
       // Each table is converted independently so one failure never blocks the rest.
@@ -3044,6 +3037,14 @@ export class MySQLAdapter {
         await this.pool.query(
           "UPDATE pi_warranty_sets SET type_scope = 'all' WHERE type_scope = 'both'"
         )
+      }
+
+      // Migration: FD&D quotations (code F) - one FD&D type, type scope on the P&I lists, FD&D
+      // items. Runs after the warranty / subjectivity type_scope columns exist (new installs).
+      try {
+        await this.migrateFddQuotations()
+      } catch (e) {
+        console.error('FD&D migration:', e)
       }
 
       // Migration: Hull IV extension — condition_section, iv_value, iv_currency, iv_premium_amount
@@ -8228,23 +8229,33 @@ export class MySQLAdapter {
         'pi_warranty_tags',
         'pi_warranty_sets'
       ]) {
+        // A new install creates these columns 10 characters wide: room for "pi,hull,war,fdd"
+        await this.pool
+          .query(`ALTER TABLE ${table} MODIFY COLUMN type_scope VARCHAR(50) DEFAULT 'all'`)
+          .catch(() => {})
         await this.pool.query(
           `UPDATE ${table} SET type_scope = CONCAT(type_scope, ',fdd') WHERE FIND_IN_SET('pi', REPLACE(type_scope, ' ', '')) > 0 AND FIND_IN_SET('fdd', REPLACE(type_scope, ' ', '')) = 0`
         )
       }
       // Items from the FD&D quotations that the P&I lists do not have
-      const [tdOrder] = (await this.pool.query(
-        'SELECT COALESCE(MAX(order_index), -1) + 1 AS n FROM pi_text_deductibles'
+      // (only once: a run that stopped half way must not add it again)
+      const [tdHave] = (await this.pool.query(
+        "SELECT id FROM pi_text_deductibles WHERE title = 'FD&D 25% each dispute' LIMIT 1"
       )) as QueryRows
-      await this.pool.execute(
-        "INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index, type_scope) VALUES (?, ?, ?, 1, ?, 'fdd')",
-        [
-          uuidv4(),
-          'FD&D 25% each dispute',
-          '25% of all costs, fees and expenses, each dispute, subject to,\nUSD 10,000 Minimum Deductible\nUSD 30,000 Maximum Deductible',
-          tdOrder[0].n
-        ]
-      )
+      if (tdHave.length === 0) {
+        const [tdOrder] = (await this.pool.query(
+          'SELECT COALESCE(MAX(order_index), -1) + 1 AS n FROM pi_text_deductibles'
+        )) as QueryRows
+        await this.pool.execute(
+          "INSERT INTO pi_text_deductibles (id, title, text, default_included, order_index, type_scope) VALUES (?, ?, ?, 1, ?, 'fdd')",
+          [
+            uuidv4(),
+            'FD&D 25% each dispute',
+            '25% of all costs, fees and expenses, each dispute, subject to,\nUSD 10,000 Minimum Deductible\nUSD 30,000 Maximum Deductible',
+            tdOrder[0].n
+          ]
+        )
+      }
       const [usPol] = (await this.pool.query(
         "SELECT id FROM pi_exclusions WHERE text LIKE '%Pollution liability in USA%' LIMIT 1"
       )) as QueryRows
@@ -8262,6 +8273,20 @@ export class MySQLAdapter {
         )
       }
       await this.setSetting('migration_fdd_scope_v1', '1')
+    }
+
+    // d) Excluded / DDQ countries limited to some types: FD&D had none of them (the type chips
+    //    were P&I, H&M, War only). Give FD&D every country set for P&I, as for the warranties.
+    //    (a new install adds exclude_types later in the startup: then it runs on the next start)
+    if ((await this.getSetting('migration_fdd_trading_v1')) !== '1') {
+      try {
+        await this.pool.query(
+          "UPDATE trading_excluded_countries SET exclude_types = CONCAT(exclude_types, ',F') WHERE exclude_types IS NOT NULL AND exclude_types <> '' AND FIND_IN_SET('P', exclude_types) > 0 AND FIND_IN_SET('F', exclude_types) = 0"
+        )
+        await this.setSetting('migration_fdd_trading_v1', '1')
+      } catch {
+        /* exclude_types not there yet */
+      }
     }
   }
 
