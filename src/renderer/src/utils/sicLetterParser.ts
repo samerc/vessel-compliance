@@ -180,7 +180,12 @@ function parseEnglishEntry(text: string, lines: number[]): ParsedEntry {
     .replace(/\s+/g, ' ')
     .trim()
   const isVessel = VESSEL_DETAILS.test(body) && !PERSON_DETAILS.test(body)
-  const isPerson = !isVessel && PERSON_DETAILS.test(body)
+  const orgWords =
+    /Organization|Compan(?:y|ies)|\bCO\b|CORP|LLC|L\.L\.C|FZE|FZCO|LTD|Limited|Inc\b|S\.?A\.?L\b|Trading|Group|Bank|Brotherhood|Establishment|Registr|\bIMO\b/i.test(
+      body
+    )
+  // A person when the details say so, or when nothing marks a company (an OCR-damaged "D0B")
+  const isPerson = !isVessel && (PERSON_DETAILS.test(body) || !orgWords)
   // OFAC writes names in capitals: a company / vessel name is the leading capitals, up to a
   // bracket, a ";" or a ", Word" detail ("ELYSIAN HORIZON CORP, Identification Number ...");
   // a person is "LAST, First Middle" up to the first detail
@@ -199,12 +204,7 @@ function parseEnglishEntry(text: string, lines: number[]): ParsedEntry {
   )
     .trim()
     .replace(/[,;\s]+$/, '')
-  const isOrg =
-    isVessel ||
-    (!isPerson &&
-      /Organization|Company|\bCO\b|CORP|LLC|L\.L\.C|FZE|FZCO|LTD|Limited|Inc\b|S\.?A\.?L\b|Trading|Group|Bank|Brotherhood|Establishment|Registration|\bIMO\b/i.test(
-        body
-      ))
+  const isOrg = !isPerson
   const arabicParts = [...body.matchAll(/Arabic:\s*([^)]*)\)?/g)]
     .map((m) => cleanArabic(m[1].replace(/[^\u0600-\u06ff\s]/g, ' ')))
     .filter((a) => a.length > 1)

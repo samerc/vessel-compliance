@@ -197,6 +197,7 @@ export default function VesselManager({
       if (vessel) {
         setAppliedSection(sectionToApply)
         setNavigatedExternally(true)
+        setOpenInEditMode(false)
         setSelectedVessel(vessel)
       }
       onClearInitialVesselRef.current?.()
@@ -1395,7 +1396,10 @@ export default function VesselManager({
                             })()}
                           </div>
                           <span
-                            onClick={() => setSelectedVessel(v)}
+                            onClick={() => {
+                              setOpenInEditMode(false)
+                              setSelectedVessel(v)
+                            }}
                             style={{
                               fontWeight: '600',
                               cursor: 'pointer',
@@ -1661,7 +1665,10 @@ export default function VesselManager({
                     {visibleSet.has('actions') && (
                       <td style={{ padding: '16px', textAlign: 'right' }}>
                         <button
-                          onClick={() => setSelectedVessel(v)}
+                          onClick={() => {
+                            setOpenInEditMode(false)
+                            setSelectedVessel(v)
+                          }}
                           className="btn-secondary"
                           style={{
                             padding: '6px 8px',

@@ -141,6 +141,22 @@ function englishName(
     .join(' ')
 }
 
+/** English the parser read off the letter (an English list, a Latin name) is not respelled
+ *  from the Arabic when the entry is edited */
+function englishTouched(
+  e: Pick<
+    ParsedEntry,
+    'arName' | 'enName' | 'arFather' | 'enFather' | 'arMother' | 'enMother' | 'entityType'
+  >,
+  learned: SpellingDictionary
+): Record<NameField, boolean> {
+  return {
+    name: !!e.enName && e.enName !== englishName(e, learned),
+    father: !!e.enFather && e.enFather !== transliterateName(e.arFather, learned),
+    mother: !!e.enMother && e.enMother !== transliterateName(e.arMother, learned)
+  }
+}
+
 const emptyRow = (page: number): Row => ({
   key: newKey(),
   page,
@@ -248,12 +264,12 @@ export default function SicLetterImport({
         page: pg,
         more: {},
         include: true,
-        touched: { name: false, father: false, mother: false }
+        touched: englishTouched(e, learned)
       }
       row.include = !isDuplicate(row)
       return row
     },
-    [isDuplicate]
+    [isDuplicate, learned]
   )
 
   // ---- reading a page ----
@@ -329,13 +345,14 @@ export default function SicLetterImport({
           (patch.arName !== undefined ||
             patch.arFather !== undefined ||
             patch.entityType !== undefined) &&
+          patch.enName === undefined &&
           !next.touched.name
         ) {
           next.enName = englishName(next, learned)
         }
-        if (patch.arFather !== undefined && !next.touched.father)
+        if (patch.arFather !== undefined && patch.enFather === undefined && !next.touched.father)
           next.enFather = transliterateName(next.arFather, learned)
-        if (patch.arMother !== undefined && !next.touched.mother)
+        if (patch.arMother !== undefined && patch.enMother === undefined && !next.touched.mother)
           next.enMother = transliterateName(next.arMother, learned)
         return next
       })
@@ -514,7 +531,7 @@ export default function SicLetterImport({
     setRows((prev) =>
       prev.map((r) =>
         r.key === selectedRow.key
-          ? { ...r, ...parsed, lines, touched: { name: false, father: false, mother: false } }
+          ? { ...r, ...parsed, lines, touched: englishTouched(parsed, learned) }
           : r
       )
     )

@@ -163,7 +163,11 @@ function ClassSocietyInput({
           {filtered.map((c) => (
             <div
               key={c.id}
-              onMouseDown={() => pick(c)}
+              onMouseDown={(e) => {
+                // Keep the focus in the field: no blur runs with the text typed before the pick
+                e.preventDefault()
+                pick(c)
+              }}
               style={{
                 padding: '8px 12px',
                 cursor: 'pointer',
