@@ -2572,7 +2572,15 @@ app.whenReady().then(() => {
   safeHandle('shell:showItemInFolder', (event, filePath: string) => {
     requireSession(event)
     if (typeof filePath !== 'string' || !filePath) return
-    shell.showItemInFolder(normalize(resolveFilePath(filePath)))
+    const target = normalize(resolveFilePath(filePath))
+    if (existsSync(target)) {
+      shell.showItemInFolder(target)
+      return
+    }
+    // The file was moved or deleted: open the nearest folder of its path that still exists
+    let dir = dirname(target)
+    while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir)
+    if (existsSync(dir)) shell.openPath(dir)
   })
 
   // War Breach Records

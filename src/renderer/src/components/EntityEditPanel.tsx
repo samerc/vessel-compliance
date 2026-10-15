@@ -641,6 +641,7 @@ export default function EntityEditPanel({
               <span
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   fontSize: '0.82rem',
                   color: onFile
                     ? isLight
@@ -658,6 +659,30 @@ export default function EntityEditPanel({
                 {fileMissing && (
                   <span style={{ fontSize: '0.7rem', fontWeight: 600, marginLeft: '6px' }}>
                     (file missing)
+                  </span>
+                )}
+                {fileMissing && (
+                  // Where the stored path points (as in the vessel documents): click to copy
+                  <span
+                    title={`${doc!.filePath} (click to copy)`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(doc!.filePath!)
+                      showSuccess('Path copied')
+                    }}
+                    style={{
+                      display: 'block',
+                      marginTop: '2px',
+                      fontSize: '0.68rem',
+                      fontFamily: 'monospace',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      cursor: 'copy',
+                      opacity: 0.85
+                    }}
+                  >
+                    {doc!.filePath}
                   </span>
                 )}
               </span>
