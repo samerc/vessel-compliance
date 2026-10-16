@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import type { NavTarget } from '../features'
+import { TypeChip } from './ui'
 import type {
   ComplianceCheckResult,
   DocumentType,
@@ -59,59 +60,8 @@ function greeting(): string {
   return 'Good evening'
 }
 
-// Category colours for policy / quotation types (same in both themes, tinted for the chip)
-const TYPE_COLORS: Record<string, string> = {
-  P: '#2E5C99',
-  H: '#9B3D78',
-  W: '#A86A08',
-  F: '#1D7A70',
-  C: '#4A6A8A',
-  L: '#6B5BA8'
-}
-
-function typeColorFor(code?: string | null, name?: string | null): string {
-  if (code && TYPE_COLORS[code]) return TYPE_COLORS[code]
-  const n = (name || '').toLowerCase()
-  if (n.includes('p&i') || n.includes('protection')) return TYPE_COLORS.P
-  if (n.includes('hull') || n.includes('h&m')) return TYPE_COLORS.H
-  if (n.includes('war')) return TYPE_COLORS.W
-  if (n.includes('fd')) return TYPE_COLORS.F
-  return '#5F6F82'
-}
-
-function typeShortName(code?: string | null, name?: string | null): string {
-  const byCode: Record<string, string> = { P: 'P&I', H: 'H&M', W: 'War', F: 'FD&D' }
-  if (code && byCode[code]) return byCode[code]
-  return name || '-'
-}
-
 const tint = (color: string, pct = 14): string =>
   `color-mix(in srgb, ${color} ${pct}%, transparent)`
-
-function TypeChip({
-  code,
-  name
-}: {
-  code?: string | null
-  name?: string | null
-}): React.JSX.Element {
-  const c = typeColorFor(code, name)
-  return (
-    <span
-      style={{
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        padding: '3px 8px',
-        borderRadius: '6px',
-        background: tint(c),
-        color: `color-mix(in srgb, ${c} 55%, var(--text-primary))`,
-        whiteSpace: 'nowrap'
-      }}
-    >
-      {typeShortName(code, name)}
-    </span>
-  )
-}
 
 function Pill({ label, color }: { label: string; color: string }): React.JSX.Element {
   return (
