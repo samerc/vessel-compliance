@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import {
-  LayoutDashboard,
+  House,
   Ship,
   Settings,
   ShieldAlert,
@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from './contexts/ThemeContext'
 import Dashboard from './components/Dashboard'
+import HomePage from './components/HomePage'
 import VesselManager from './components/VesselManager'
 import { SetupScreen } from './components/SetupScreen'
 import { LoginScreen } from './components/LoginScreen'
@@ -334,6 +335,27 @@ function App(): React.JSX.Element {
     [runAction]
   )
 
+  /** Opens a recently viewed record (sidebar Recent list and Home) */
+  const openRecentItem = (item: RecentItem): void => {
+    if (item.itemType === 'vessel') {
+      setNavigateToVesselId(item.itemId)
+      setNavigateToVesselSection(undefined)
+      setNavigateBackTab(undefined)
+      setActiveTab('vessels')
+    } else if (item.itemType === 'entity') {
+      setInitialEntityId(item.itemId)
+      setActiveTab('directory')
+    } else if (item.itemType === 'quotation') {
+      // Opened on its own: not on behalf of a policy
+      setQuotationPolicyContext(null)
+      setInitialQuotationId(item.itemId)
+      setActiveTab('quotations')
+    } else if (item.itemType === 'policy') {
+      setSelectedPolicyId(item.itemId)
+      setActiveTab('policy-detail')
+    }
+  }
+
   // When the session user changes: restore the sidebar state from the DB and read the
   // one-time Ctrl+K tip flag (adjusting state during render, not in an effect)
   const userId = user?.id
@@ -538,7 +560,7 @@ function App(): React.JSX.Element {
   // Derive breadcrumbs from current state
   const breadcrumbs: { label: string; onClick?: () => void }[] = []
   const TAB_LABELS: Record<string, string> = {
-    dashboard: 'Dashboard',
+    dashboard: 'Home',
     features: 'Features',
     vessels: 'Vessels',
     fleets: 'Fleets',
@@ -1094,7 +1116,7 @@ function App(): React.JSX.Element {
               overflowY: 'auto'
             }}
           >
-            {navItem('dashboard', <LayoutDashboard size={18} />, 'Dashboard')}
+            {navItem('dashboard', <House size={18} />, 'Home')}
             {recentItems.length > 0 && (
               <NavGroup
                 id="recent"
@@ -1115,25 +1137,7 @@ function App(): React.JSX.Element {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => {
-                        if (item.itemType === 'vessel') {
-                          setNavigateToVesselId(item.itemId)
-                          setNavigateToVesselSection(undefined)
-                          setNavigateBackTab(undefined)
-                          setActiveTab('vessels')
-                        } else if (item.itemType === 'entity') {
-                          setInitialEntityId(item.itemId)
-                          setActiveTab('directory')
-                        } else if (item.itemType === 'quotation') {
-                          // Opened on its own: not on behalf of a policy
-                          setQuotationPolicyContext(null)
-                          setInitialQuotationId(item.itemId)
-                          setActiveTab('quotations')
-                        } else if (item.itemType === 'policy') {
-                          setSelectedPolicyId(item.itemId)
-                          setActiveTab('policy-detail')
-                        }
-                      }}
+                      onClick={() => openRecentItem(item)}
                       title={
                         item.itemSublabel
                           ? `${item.itemLabel} — ${item.itemSublabel}`
@@ -1493,27 +1497,45 @@ function App(): React.JSX.Element {
           )}
           <ErrorBoundary key={activeTab} variant="page">
             {activeTab === 'dashboard' && (
-              <Dashboard
-                onViewAlerts={() => setActiveTab('compliance')}
-                onViewSurveyFollowUp={() => setActiveTab('survey-followup')}
-                onNavigateToVessel={(vesselId, section) => {
+              <HomePage
+                onNavigate={navigateTo}
+                onOpenVessel={(vesselId, section) => {
                   setNavigateToVesselId(vesselId)
                   setNavigateToVesselSection(section)
                   setNavigateBackTab('dashboard')
                   setActiveTab('vessels')
                 }}
-                onNavigate={(tab) => {
-                  if (tab === 'search') {
-                    setSearchOpen(true)
-                    return
-                  }
-                  if (tab === 'new-vessel' || tab === 'new-quotation' || tab === 'new-entity') {
-                    startCreate(tab.slice(4) as 'vessel' | 'quotation' | 'entity')
-                    return
-                  }
-                  setPageRequest(null)
-                  setActiveTab(tab as AppTab)
+                onOpenQuotation={(qId) => {
+                  setQuotationPolicyContext(null)
+                  setInitialQuotationId(qId)
+                  setActiveTab('quotations')
                 }}
+                onOpenRecent={openRecentItem}
+                dashboard={(viewSwitch) => (
+                  <Dashboard
+                    headerExtra={viewSwitch}
+                    onViewAlerts={() => setActiveTab('compliance')}
+                    onViewSurveyFollowUp={() => setActiveTab('survey-followup')}
+                    onNavigateToVessel={(vesselId, section) => {
+                      setNavigateToVesselId(vesselId)
+                      setNavigateToVesselSection(section)
+                      setNavigateBackTab('dashboard')
+                      setActiveTab('vessels')
+                    }}
+                    onNavigate={(tab) => {
+                      if (tab === 'search') {
+                        setSearchOpen(true)
+                        return
+                      }
+                      if (tab === 'new-vessel' || tab === 'new-quotation' || tab === 'new-entity') {
+                        startCreate(tab.slice(4) as 'vessel' | 'quotation' | 'entity')
+                        return
+                      }
+                      setPageRequest(null)
+                      setActiveTab(tab as AppTab)
+                    }}
+                  />
+                )}
               />
             )}
             {activeTab === 'vessels' && (
@@ -1536,7 +1558,7 @@ function App(): React.JSX.Element {
                   navigateBackTab
                     ? (
                         {
-                          dashboard: 'Back to Dashboard',
+                          dashboard: 'Back to Home',
                           surveys: 'Back to Surveys',
                           compliance: 'Back to Compliance',
                           directory: 'Back to Directory',

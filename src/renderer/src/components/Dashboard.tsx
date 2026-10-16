@@ -344,12 +344,15 @@ export default function Dashboard({
   onViewAlerts,
   onViewSurveyFollowUp,
   onNavigateToVessel,
-  onNavigate
+  onNavigate,
+  headerExtra
 }: {
   onViewAlerts: () => void
   onViewSurveyFollowUp?: () => void
   onNavigateToVessel?: (vesselId: string, section: 'documents' | 'policies') => void
   onNavigate?: (tab: string) => void
+  /** Shown first among the header buttons (the Home view switch) */
+  headerExtra?: React.ReactNode
 }): React.JSX.Element {
   const { theme } = useTheme()
   const { user } = useAuth()
@@ -884,6 +887,7 @@ export default function Dashboard({
         }
         actions={
           <>
+            {headerExtra}
             <button
               onClick={() => setEditMode(!editMode)}
               className={`${editMode ? 'btn-primary' : 'btn-secondary'} btn-sm`}

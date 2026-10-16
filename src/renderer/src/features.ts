@@ -83,13 +83,13 @@ export const FEATURES: Feature[] = [
   // ── Fleet ──
   {
     id: 'dashboard',
-    title: 'Dashboard',
+    title: 'Home',
     area: 'Fleet',
     kind: 'page',
     target: { tab: 'dashboard' },
     description:
-      'Key numbers, upcoming expirations, renewals calendar and recent changes. Customize the widgets.',
-    keywords: 'home overview widgets kpi'
+      'What needs you today: renewals, draft quotations, expired documents, sanctions to review, your quotations, alerts and recent items. Switch to Dashboard for the customizable widgets.',
+    keywords: 'home dashboard today overview widgets kpi alerts'
   },
   {
     id: 'vessels',

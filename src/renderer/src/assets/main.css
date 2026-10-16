@@ -103,6 +103,18 @@ kbd,
   font-family: var(--font-mono);
 }
 
+/* Home page: clickable rows and attention cards */
+.home-row:hover {
+  background: var(--row-hover);
+}
+.home-attention {
+  transition: var(--transition);
+}
+.home-attention:hover {
+  border-color: var(--accent-border) !important;
+  box-shadow: var(--shadow-lg);
+}
+
 /* Cards: solid surface, hairline border, soft shadow */
 .glass-card {
   background: var(--bg-card);

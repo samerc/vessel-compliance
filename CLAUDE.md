@@ -300,9 +300,16 @@ Centralized compliance monitoring with four tabs:
 
 The standalone Document Reminders page (ReminderCenter) and its per-vessel snooze system were removed — document expiry is covered by the Compliance Center, Dashboard alerts, and the vessel Documents tab. The `vessel_reminder_snoozes` table is dropped on migration. The old Admin "Vessel Reminders" section was repurposed to **Annual Doc Grace** (still section id `reminders`), which configures only `annual_grace_days`.
 
+### Home (redesign 2026-10)
+
+The first page (tab id still `dashboard`, menu label "Home"; `src/renderer/src/components/HomePage.tsx`). Two views, remembered per user in localStorage (`home_view_u{id}`):
+
+- **Today** (default): greeting + date; "needs your attention" cards (Renewals in 30 days via `getRenewalPipeline`, Draft quotations, Expired documents with the Dashboard's expiry rule, Sanctions to review), each shown only with its permission and linking to its page; My quotations (`createdBy` = user, not converted); Renewals this month (`getPolicyRenewalsByMonth`); Alerts (up to 3 expired documents, 2 policies ending within 14 days, 2 overdue defects, filled to 6) opening the vessel tab; Recent (shares `openRecentItem` with the sidebar)
+- **Dashboard**: the customizable widget dashboard below, rendered by `HomePage` through its `dashboard(viewSwitch)` prop; the switch shows in the Dashboard header (`headerExtra`)
+
 ### Dashboard
 
-Aggregate health overview (`src/renderer/src/components/Dashboard.tsx`):
+Aggregate health overview (`src/renderer/src/components/Dashboard.tsx`), the "Dashboard" view of Home:
 
 - **Layout** (top to bottom):
   1. KPI row (5 cards): Active Vessels | Entities | Doc Compliance % | Critical Issues | Sanctions Pending
@@ -950,7 +957,7 @@ Customizable reports with 9 data sources:
 - **`navigateTo(target)`** in App.tsx is the one way to go anywhere: sets the tab, a requested sub-tab (`pageRequest`), or runs an `AppAction` (new vessel/quotation/entity, what's new, release history, profile, check updates, theme, density)
 - **Sub-tabs**: pages with tabs take `subTab`/`subTabNonce` (`SubTabProps`) and apply them with `useRequestedSubTab` (`utils/useRequestedSubTab.ts`): Directory, Compliance, Sanctions Search, Fleets, Survey Follow-Up, Calculators, Reports, Quotations (list/settings), Settings sections. Policies list/settings uses `policyView`. Sidebar clicks clear the request
 - **What's New "Try it"**: `featureId` on a `WHATS_NEW` item, or `[try:feature-id]` at the end of a release-note line
-- **Sidebar menu** (redesign 2026-10, App.tsx): Dashboard, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Vessel Filter, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
+- **Sidebar menu** (redesign 2026-10, App.tsx): Home, Recent, then job-based groups **Underwriting** (Renewals, Quotations, Policies, Receipts), **Fleet** (Vessels, Vessel Filter, Fleets, Surveys, Survey Follow-Up), **Compliance** (Compliance Center, Sanctions Search, Directory), **Insights** (Reports, Fleet Analytics, Activity Log), **Tools** (Calculators, Templates); Features and Settings pinned at the bottom. `FEATURE_AREAS` in features.ts uses the same areas and order
 - **Settings hub** (AdminPanel = the Settings page): one place for every setting. The left list is grouped (`SETTINGS_GROUPS`: Quotations & policies, Vessels & documents, Compliance, Users & access, Files, System) with a search box (section names + `SECTION_KEYWORDS`). Quotation Settings, Policy Settings & Banks and User Management open INSIDE it (`HUB_PAGES`, outside the read-only fieldset, each with its own permission); a dot marks sections shared with regular users. The sidebar shows Settings when the user has admin:settings, fileManager:view, quotations:settings or admin:users. `navigateTo({ tab: 'users' })` redirects to `{ tab: 'admin', sub: 'users' }`; the Quotations and Policies pages keep their own Settings toggle too. Banks are managed only in Policy Settings
 - **First-run tip**: one-time Dashboard banner about Ctrl+K and Features (`localStorage tip_discover_u{userId}`)
 
