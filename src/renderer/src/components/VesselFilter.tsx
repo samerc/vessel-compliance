@@ -55,12 +55,10 @@ interface CompareData {
   flag2: string
 }
 
-// NOTE: Vessel has no `sanctionsStatus` (the field is ofacStatus), so the comparison always
-// shows PENDING. Kept as is (lint-only change).
-type VesselWithSanctionsStatus = Vessel & { sanctionsStatus?: string }
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { PageHeader } from './ui'
+import SanctionsBadge from './ui/SanctionsBadge'
 
 interface VesselFilterProps {
   onNavigateToVessel?: (vesselId: string) => void
@@ -355,7 +353,7 @@ const SectionLabel = ({ children }: { children: string }): React.JSX.Element => 
   </div>
 )
 const Divider = (): React.JSX.Element => (
-  <div style={{ height: '1px', background: 'var(--glass-border)', opacity: 0.6 }} />
+  <div style={{ height: '1px', background: 'var(--glass-border-color)', opacity: 0.6 }} />
 )
 
 const CompareRow = ({
@@ -1922,38 +1920,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                       <SectionHeader label="Sanctions" />
                       <CompareRow
                         label="Status"
-                        val1={
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: '600',
-                              background: 'rgba(0,255,136,0.1)',
-                              color: '#10b981'
-                            }}
-                          >
-                            {(
-                              vessel1 as VesselWithSanctionsStatus
-                            ).sanctionsStatus?.toUpperCase() || 'PENDING'}
-                          </span>
-                        }
-                        val2={
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: '600',
-                              background: 'rgba(0,255,136,0.1)',
-                              color: '#10b981'
-                            }}
-                          >
-                            {(
-                              vessel2 as VesselWithSanctionsStatus
-                            ).sanctionsStatus?.toUpperCase() || 'PENDING'}
-                          </span>
-                        }
+                        val1={<SanctionsBadge status={vessel1.ofacStatus} />}
+                        val2={<SanctionsBadge status={vessel2.ofacStatus} />}
                       />
                     </tbody>
                   </table>
