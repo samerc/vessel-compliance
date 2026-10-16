@@ -2032,7 +2032,7 @@ export default function PolicyRenewals({
                               fontSize: '0.85rem',
                               color: 'var(--text-primary)',
                               position: 'sticky' as const,
-                              top: '49px',
+                              top: '52px',
                               zIndex: 1,
                               background: 'var(--bg-sticky-header)',
                               letterSpacing: '0.02em'
@@ -2105,7 +2105,7 @@ export default function PolicyRenewals({
                           textTransform: 'uppercase' as const,
                           letterSpacing: '0.5px',
                           position: 'sticky' as const,
-                          top: '49px',
+                          top: '52px',
                           zIndex: 1,
                           background: 'var(--bg-sticky-header)'
                         }}
