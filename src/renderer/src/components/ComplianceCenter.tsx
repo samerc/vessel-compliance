@@ -47,6 +47,7 @@ import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
 import { confirmDialog } from './DialogHost'
 import { PageHeader, Tabs, Badge, Field } from './ui'
+import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
 
 const STATIC_RULES = [
   {
@@ -187,6 +188,8 @@ export default function ComplianceCenter({
 }: ComplianceCenterProps): React.JSX.Element {
   const [vessels, setVessels] = useState<Vessel[]>([])
   const [docs, setDocs] = useState<VesselDocument[]>([])
+  // vesselId -> policy end date that annual documents follow
+  const [policyExpiries, setPolicyExpiries] = useState<Record<string, string>>({})
   const [docTypes, setDocTypes] = useState<DocumentType[]>([])
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
@@ -255,15 +258,18 @@ export default function ComplianceCenter({
 
   const loadData = useCallback(async (): Promise<void> => {
     try {
-      const [vData, dData, tData, edtData, edData, assuredData, endorsements] = await Promise.all([
-        window.api.getVessels(),
-        window.api.getVesselDocuments(),
-        window.api.getDocumentTypes(),
-        window.api.getEntityDocumentTypes(),
-        window.api.getEntityDocuments(),
-        window.api.getVesselAssureds(),
-        window.api.surveyWarrantyGetEndorsementsDue().catch(() => [])
-      ])
+      const [vData, dData, tData, edtData, edData, assuredData, endorsements, peData] =
+        await Promise.all([
+          window.api.getVessels(),
+          window.api.getVesselDocuments(),
+          window.api.getDocumentTypes(),
+          window.api.getEntityDocumentTypes(),
+          window.api.getEntityDocuments(),
+          window.api.getVesselAssureds(),
+          window.api.surveyWarrantyGetEndorsementsDue().catch(() => []),
+          window.api.getVesselPolicyExpiries()
+        ])
+      setPolicyExpiries(peData && typeof peData === 'object' && !('error' in peData) ? peData : {})
       setVessels(Array.isArray(vData) ? vData.filter((v) => v.isActive !== false) : [])
       setDocs(Array.isArray(dData) ? dData : [])
       setDocTypes(Array.isArray(tData) ? tData : [])
@@ -536,16 +542,19 @@ export default function ComplianceCenter({
   // Every document/entity alert across the fleet — recomputed only when its inputs change
   // (it used to rebuild on every render, e.g. each keystroke and every progress tick)
   const alerts = useMemo((): DocAlert[] => {
-    const today = new Date()
+    // Midnight, like the vessel page: a document expiring today is not expired yet
+    const today = new Date(new Date().setHours(0, 0, 0, 0))
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(today.getDate() + 30)
 
     const alerts: DocAlert[] = []
+    const docMap = new Map<string, VesselDocument>()
+    for (const d of docs) docMap.set(`${d.vesselId}:${d.documentTypeId}`, d)
 
     vessels.forEach((v) => {
       // Vessel document alerts
       docTypes.forEach((t) => {
-        const doc = docs.find((d) => d.vesselId === v.id && d.documentTypeId === t.id)
+        const doc = docMap.get(`${v.id}:${t.id}`)
         const isRequired = doc ? doc.required : t.required
         const hasFile = !!doc?.filePath
 
@@ -563,9 +572,25 @@ export default function ComplianceCenter({
           })
         }
 
-        if (hasFile && doc?.expiryDate) {
-          const expiry = new Date(doc.expiryDate)
-          if (expiry < today) {
+        // Annual documents follow the vessel's policy end date (same rule as the vessel page)
+        const effExpiry = effectiveDocExpiry(
+          t.annualRenewal,
+          doc?.expiryDate,
+          policyExpiries[v.id] || v.policyExpiryDate
+        )
+        const status = hasFile
+          ? getDocStatus({
+              hasFile,
+              expiryDate: effExpiry,
+              required: isRequired,
+              annualRenewal: t.annualRenewal,
+              receivedDate: doc?.receivedDate,
+              soonDays: 30,
+              today
+            })
+          : null
+        if (hasFile && effExpiry) {
+          if (status === 'expired') {
             alerts.push({
               id: `${v.id}-${t.id}-expired`,
               vesselId: v.id,
@@ -575,9 +600,9 @@ export default function ComplianceCenter({
               type: 'expired',
               severity: 'critical',
               message: 'Document expired',
-              date: doc.expiryDate
+              date: effExpiry
             })
-          } else if (expiry < thirtyDaysFromNow) {
+          } else if (status === 'expiring') {
             alerts.push({
               id: `${v.id}-${t.id}-soon`,
               vesselId: v.id,
@@ -587,7 +612,7 @@ export default function ComplianceCenter({
               type: 'soon',
               severity: 'medium',
               message: 'Expiring soon',
-              date: doc.expiryDate
+              date: effExpiry
             })
           }
         }
@@ -686,7 +711,8 @@ export default function ComplianceCenter({
     allAssureds,
     filter,
     docSearch,
-    endorsementsDue
+    endorsementsDue,
+    policyExpiries
   ])
 
   // Group alerts by vessel

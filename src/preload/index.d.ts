@@ -1175,6 +1175,8 @@ export interface Api {
 
   // Policy Expiry Alerts
   getExpiredActivePolicies: () => Promise<PolicyExpiryRow[]>
+  /** vesselId -> end date annual documents follow (active P&I, else H&M) */
+  getVesselPolicyExpiries: () => Promise<Record<string, string>>
   getExpiringSoonPolicies: (days?: number) => Promise<PolicyExpiryRow[]>
   getPolicyRenewalsByMonth: (year: number, month: number) => Promise<PolicyRenewalRow[]>
   setQuotationSentDate: (policyId: string, date: string | null) => Promise<void>

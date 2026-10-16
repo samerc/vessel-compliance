@@ -18774,6 +18774,37 @@ export class MySQLAdapter {
     )
     return rows as Row<PolicyExpiryRow>[]
   }
+  /**
+   * vesselId -> policy end date that annual-renewal documents follow: the active P&I policy's
+   * end date, else the active H&M one (same priority as resolveEffectivePolicyExpiry).
+   */
+  async getVesselPolicyExpiries(): Promise<Record<string, string>> {
+    if (!this.pool) return {}
+    const [rows] = await this.pool.query(
+      `SELECT vdp.vessel_id AS vesselId, LOWER(pt.name) AS typeName, vpv.value_date AS endDate
+         FROM vessel_dynamic_policies vdp
+         JOIN policy_types pt ON pt.id = vdp.policy_type_id
+         JOIN vessel_policy_values vpv ON vpv.policy_id = vdp.id
+         JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+        WHERE vdp.status = 'active' AND ptc.field_type = 'date'
+          AND LOWER(ptc.name) LIKE '%end date%' AND vpv.value_date IS NOT NULL AND vpv.value_date <> ''`
+    )
+    const rank = (t: string): number =>
+      t.includes('p&i') || t.includes('protection')
+        ? 1
+        : t.includes('hull') || t.includes('h&m')
+          ? 2
+          : 0
+    const best: Record<string, { rank: number; date: string }> = {}
+    for (const r of rows as RowDataPacket[]) {
+      const k = rank(String(r.typeName))
+      if (!k) continue
+      const cur = best[r.vesselId]
+      if (!cur || k < cur.rank) best[r.vesselId] = { rank: k, date: String(r.endDate).slice(0, 10) }
+    }
+    return Object.fromEntries(Object.entries(best).map(([id, b]) => [id, b.date]))
+  }
+
   async getExpiringSoonPolicies(daysAhead = 90): Promise<PolicyExpiryRow[]> {
     if (!this.pool) return []
     const [rows] = await this.pool.query(

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import type { NavTarget } from '../features'
 import { TypeChip } from './ui'
+import { effectiveDocExpiry, isDocExpired } from '../utils/docStatus'
 import type {
   ComplianceCheckResult,
   DocumentType,
@@ -286,11 +287,19 @@ export default function HomePage({
         Promise.all([
           window.api.getVessels(),
           window.api.getVesselDocuments(),
-          window.api.getDocumentTypes()
-        ]).then(([v, d, t]) => {
+          window.api.getDocumentTypes(),
+          window.api.getVesselPolicyExpiries()
+        ]).then(([v, d, t, pe]) => {
           if (cancelled) return
+          const policyExpiries = pe && typeof pe === 'object' && !('error' in pe) ? pe : {}
           setExpiredDocs(
-            findExpiredDocs(arr<Vessel>(v), arr<VesselDocument>(d), arr<DocumentType>(t), today)
+            findExpiredDocs(
+              arr<Vessel>(v),
+              arr<VesselDocument>(d),
+              arr<DocumentType>(t),
+              policyExpiries,
+              today
+            )
           )
         })
       )
@@ -724,6 +733,7 @@ function findExpiredDocs(
   vessels: Vessel[],
   docs: VesselDocument[],
   docTypes: DocumentType[],
+  policyExpiries: Record<string, string>,
   today: Date
 ): ExpiredDoc[] {
   const active = vessels.filter((v) => v.isActive)
@@ -735,8 +745,13 @@ function findExpiredDocs(
     for (const t of docTypes) {
       const doc = docMap.get(`${v.id}:${t.id}`)
       if (!doc?.filePath) continue
-      const expiry = t.annualRenewal && v.policyExpiryDate ? v.policyExpiryDate : doc.expiryDate
-      if (expiry && new Date(expiry) < today) {
+      // Same rule as the vessel page and the Compliance Center (utils/docStatus)
+      const expiry = effectiveDocExpiry(
+        t.annualRenewal,
+        doc.expiryDate,
+        policyExpiries[v.id] || v.policyExpiryDate
+      )
+      if (expiry && isDocExpired(expiry, today)) {
         out.push({ vesselId: v.id, vesselName: v.name, docName: t.name, expiryDate: expiry })
       }
     }

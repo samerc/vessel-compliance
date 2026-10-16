@@ -28,6 +28,7 @@ import { resolveEffectivePolicyExpiry, getActivePIPolicies } from '../utils/poli
 import { formatDate } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
 import MissingFilePath from './MissingFilePath'
+import { getDocStatus as sharedDocStatus, type DocStatus } from '../utils/docStatus'
 
 interface Props {
   vessel: Vessel
@@ -42,33 +43,6 @@ interface Props {
   onReload: () => void
 }
 
-const isExpired = (d: string | null | undefined): boolean => {
-  if (!d) return false
-  return new Date(d) < new Date(new Date().setHours(0, 0, 0, 0))
-}
-const isExpiringSoon = (d: string | null | undefined): boolean => {
-  if (!d) return false
-  const today = new Date(new Date().setHours(0, 0, 0, 0))
-  const exp = new Date(d)
-  const threshold = new Date(today)
-  threshold.setDate(today.getDate() + 60)
-  return exp >= today && exp <= threshold
-}
-
-// If the gap between receipt and expiry is < 60 days the document was placed knowing the
-// policy renews soon — treat it as compliant rather than "expiring soon".
-const annualShortCycle = (
-  expiryDate: string | null | undefined,
-  receivedDate: string | null | undefined
-): boolean => {
-  if (!expiryDate || !receivedDate) return false
-  const span =
-    (new Date(expiryDate).getTime() - new Date(receivedDate).getTime()) / (1000 * 60 * 60 * 24)
-  return span < 60
-}
-
-type DocStatus = 'compliant' | 'expiring' | 'expired' | 'missing' | 'optional'
-
 function getDocStatus(
   hasFile: boolean,
   expiryDate: string | null | undefined,
@@ -76,13 +50,7 @@ function getDocStatus(
   annualRenewal = false,
   receivedDate?: string
 ): DocStatus {
-  if (!hasFile) return required ? 'missing' : 'optional'
-  if (isExpired(expiryDate)) return 'expired'
-  if (isExpiringSoon(expiryDate)) {
-    if (annualRenewal && annualShortCycle(expiryDate, receivedDate)) return 'compliant'
-    return 'expiring'
-  }
-  return 'compliant'
+  return sharedDocStatus({ hasFile, expiryDate, required, annualRenewal, receivedDate })
 }
 
 export default function VesselDocumentsView({

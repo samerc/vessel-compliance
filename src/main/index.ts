@@ -5380,6 +5380,10 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getExpiredActivePolicies()
   })
+  safeHandle('policies:getVesselPolicyExpiries', (event) => {
+    requireSession(event)
+    return db.getVesselPolicyExpiries()
+  })
   safeHandle('policies:getExpiringSoon', (event, days?: number) => {
     requireSession(event)
     return db.getExpiringSoonPolicies(days || 90)
