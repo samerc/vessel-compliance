@@ -83,6 +83,7 @@ class ComplianceScheduler {
       await db.failStaleComplianceRuns().catch(() => 0)
 
       // Without every list loaded the run would mark everyone clear: record a failed run instead
+      await sanctionsService.whenReady()
       const problem = sanctionsService.screeningProblem()
       if (problem) {
         const failedId = await db.createComplianceCheckLog({ totalChecked: 0, status: 'running' })

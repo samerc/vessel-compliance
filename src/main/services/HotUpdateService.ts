@@ -35,10 +35,34 @@ export interface HotUpdateInfo {
   updateReady: boolean
 }
 
-/** Simple HTTPS GET that returns a buffer */
-function httpsGet(url: string, headers: Record<string, string> = {}): Promise<Buffer> {
+/**
+ * Simple HTTPS GET that returns a buffer. Gives up after `idleMs` without any data, so a dead
+ * or blackholed network cannot hold the startup check (the window waits on it) for minutes.
+ */
+function httpsGet(
+  url: string,
+  headers: Record<string, string> = {},
+  idleMs = 15000
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const request = net.request(url)
+    let timer: NodeJS.Timeout | null = null
+    const arm = (): void => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        request.abort()
+        reject(new Error('Update server did not respond'))
+      }, idleMs)
+    }
+    const settle =
+      <T>(fn: (v: T) => void) =>
+      (v: T) => {
+        if (timer) clearTimeout(timer)
+        fn(v)
+      }
+    resolve = settle(resolve)
+    reject = settle(reject)
+    arm()
     for (const [k, v] of Object.entries(headers)) {
       request.setHeader(k, v)
     }
@@ -48,7 +72,8 @@ function httpsGet(url: string, headers: Record<string, string> = {}): Promise<Bu
         const location = Array.isArray(response.headers.location)
           ? response.headers.location[0]
           : response.headers.location
-        httpsGet(location, headers).then(resolve, reject)
+        if (timer) clearTimeout(timer)
+        httpsGet(location, headers, idleMs).then(resolve, reject)
         return
       }
       if (response.statusCode !== 200) {
@@ -56,7 +81,10 @@ function httpsGet(url: string, headers: Record<string, string> = {}): Promise<Bu
         return
       }
       const chunks: Buffer[] = []
-      response.on('data', (chunk: Buffer) => chunks.push(chunk))
+      response.on('data', (chunk: Buffer) => {
+        chunks.push(chunk)
+        arm()
+      })
       response.on('end', () => resolve(Buffer.concat(chunks)))
       response.on('error', reject)
     })

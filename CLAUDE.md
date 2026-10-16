@@ -761,7 +761,7 @@ Bootstrap + overlay architecture for code-only deployments without full installe
 - **Startup check**: On launch, checks `%APPDATA%/vessel-compliance/hot-update/out/` for cached code; if found, loads that instead of bundled code
 - **Extract path**: Zip extracts into `out/` subdirectory (fixes path mismatch between zip structure and expected load path)
 - **HotUpdateService** (`src/main/services/HotUpdateService.ts`): Checks GitHub `code-latest` prerelease tag for newer builds
-- **Auto-apply**: Downloads and applies updates on startup (before window shows), restarts automatically
+- **Auto-apply**: Downloads and applies updates on startup (the window already shows its loading state), restarts automatically. Each update request gives up after 15 s without data
 - **Window safety**: All `mainWindow` calls guarded against `isDestroyed()` during restart to prevent crashes
 - **Background check**: Every 30 min while running; shows notification bar in renderer if update found
 - **Deploy command**: `npm run deploy` builds + uploads `code-update.zip` to GitHub via `gh` CLI
@@ -788,7 +788,7 @@ On first launch, admin enters MySQL credentials which are saved to `db-config.js
 
 ### Schema Migration Pattern
 
-- Migration function: `initSchema()` in `adapter.ts` (around line 84)
+- Migration function: `initSchema()` in `adapter.ts` runs `runMigrations()` only when the code changed: a SHA-1 of schema.sql + the MySQLAdapter class source is stored in `app_settings.schema_fingerprint` after a successful run (one PC migrates at a time, named lock `vc_schema_migrate`). Any adapter change re-runs it once per deploy. Never put per-start work (cleanups, caches) in `runMigrations`
 - Pattern: `SHOW COLUMNS FROM table` → check if column exists → `ALTER TABLE ADD COLUMN` if missing
 - All new columns must be **nullable** or have a **DEFAULT** value — never add `NOT NULL` without a default, as older versions may INSERT without the new column
 - Add new table migrations before the `} catch (error)` block at the end of `initSchema()`

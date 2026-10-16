@@ -399,6 +399,24 @@ const getConfigPath = (): string | null => {
   return configDir ? join(configDir, 'db-config.json') : null
 }
 
+// Load the local sanctions lists (shared config dir, not per-user appData). Building the search
+// index takes about a second, so it runs once the window is visible; checks wait on whenReady().
+let sanctionsInitStarted = false
+function initSanctionsService(): void {
+  if (sanctionsInitStarted) return
+  sanctionsInitStarted = true
+  try {
+    const sanctionsConfigPath = getConfigPath()
+    const sanctionsDir = sanctionsConfigPath
+      ? dirname(sanctionsConfigPath)
+      : app.getPath('userData')
+    sanctionsService.initialize(sanctionsDir)
+    console.log('Sanctions service initialized at:', sanctionsDir)
+  } catch (err) {
+    console.error('Failed to initialize sanctions service:', err)
+  }
+}
+
 function createWindow(): void {
   const windowState = store.get('windowState', {
     width: 1200,
@@ -481,6 +499,10 @@ function createWindow(): void {
     if (validX === undefined) {
       mainWindow.center()
     }
+    // Show at once: the renderer shows its loading state until app:db-status arrives, instead
+    // of the app staying invisible while the database and update checks run
+    mainWindow.show()
+    initSanctionsService()
     try {
       // Check DB Connection
       const configPath = getConfigPath()
@@ -523,19 +545,21 @@ function createWindow(): void {
           // Hot-update is non-fatal
         }
 
-        // Cleanup old activity log entries based on retention setting
-        try {
-          const retentionDays = await db.getActivityLogRetention()
-          if (retentionDays > 0) {
-            const deleted = await db.cleanupActivityLog(retentionDays)
-            if (deleted > 0)
-              console.log(
-                `Activity log cleanup: removed ${deleted} entries older than ${retentionDays} days`
-              )
+        // Cleanup old activity log entries based on retention setting (in the background)
+        void (async () => {
+          try {
+            const retentionDays = await db.getActivityLogRetention()
+            if (retentionDays > 0) {
+              const deleted = await db.cleanupActivityLog(retentionDays)
+              if (deleted > 0)
+                console.log(
+                  `Activity log cleanup: removed ${deleted} entries older than ${retentionDays} days`
+                )
+            }
+          } catch (cleanupErr) {
+            console.error('Activity log cleanup error (non-fatal):', cleanupErr)
           }
-        } catch (cleanupErr) {
-          console.error('Activity log cleanup error (non-fatal):', cleanupErr)
-        }
+        })()
         // Verify restored sessions against the DB (user_sessions row + fresh user/role)
         await auth.validateRestoredSessions().catch(() => {})
         // Update last_login for auto-restored sessions (no password re-entry on startup)
@@ -3104,6 +3128,8 @@ app.whenReady().then(() => {
         const effectiveThreshold = threshold ?? (compSettings.threshold || 85) / 100
         const autoMarkCleanOnCheck = compSettings.autoMarkCleanOnCheck ?? true
 
+        // The lists load right after the window shows: a check started earlier waits for them
+        await sanctionsService.whenReady()
         // An empty or unopened list finds nothing: report an error, never CLEARED
         const problem = sanctionsService.screeningProblem(sources)
         if (problem) {
@@ -7132,18 +7158,6 @@ app.whenReady().then(() => {
 
   // Cleanup old read notifications on startup
   db.deleteOldNotifications(90).catch(() => {})
-
-  // Initialize local sanctions screening database (use shared config dir, not per-user appData)
-  try {
-    const sanctionsConfigPath = getConfigPath()
-    const sanctionsDir = sanctionsConfigPath
-      ? dirname(sanctionsConfigPath)
-      : app.getPath('userData')
-    sanctionsService.initialize(sanctionsDir)
-    console.log('Sanctions service initialized at:', sanctionsDir)
-  } catch (err) {
-    console.error('Failed to initialize sanctions service:', err)
-  }
 
   createWindow()
 

@@ -32,7 +32,7 @@ import type {
   VesselRef,
   WithId
 } from './rowTypes'
-import { randomUUID as uuidv4 } from 'crypto'
+import { randomUUID as uuidv4, createHash } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 import { extname } from 'path'
 import {
@@ -515,7 +515,46 @@ export class MySQLAdapter {
     }
   }
 
+  /**
+   * Brings the schema up to date. The full migration (several hundred sequential queries, about
+   * 20 s over VPN) runs only when its code changed: a fingerprint of schema.sql and this class is
+   * stored after a successful run, and a later start with the same code skips it. One PC at a
+   * time migrates (named lock); the others wait, then see the new fingerprint and skip.
+   */
   async initSchema(): Promise<void> {
+    if (!this.pool) throw new Error('Not connected')
+    const fingerprint = createHash('sha1')
+      .update(schemaSql)
+      .update(MySQLAdapter.toString())
+      .digest('hex')
+    const readFingerprint = async (): Promise<string | null> => {
+      try {
+        const [rows] = await this.pool!.query(
+          "SELECT setting_value FROM app_settings WHERE setting_key = 'schema_fingerprint'"
+        )
+        return ((rows as RowDataPacket[])[0]?.setting_value as string) || null
+      } catch {
+        return null // no app_settings table yet: first start
+      }
+    }
+    if ((await readFingerprint()) === fingerprint) return
+
+    const conn = await this.pool.getConnection()
+    try {
+      await conn.query("SELECT GET_LOCK('vc_schema_migrate', 300)")
+      if ((await readFingerprint()) === fingerprint) return
+      await this.runMigrations()
+      await this.pool.query(
+        "INSERT INTO app_settings (setting_key, setting_value) VALUES ('schema_fingerprint', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
+        [fingerprint]
+      )
+    } finally {
+      await conn.query("SELECT RELEASE_LOCK('vc_schema_migrate')").catch(() => {})
+      conn.release()
+    }
+  }
+
+  private async runMigrations(): Promise<void> {
     if (!this.pool) throw new Error('Not connected')
 
     try {

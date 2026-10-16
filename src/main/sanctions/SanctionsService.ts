@@ -103,11 +103,22 @@ export class SanctionsService {
   // Slots of `searchable` replaced/removed by a SIC edit since the last full build (tombstones)
   private dead = new Set<number>()
   public initialized = false
+  private markReady: () => void = () => {}
+  private readonly ready = new Promise<void>((resolve) => (this.markReady = resolve))
+
+  /** Resolves once initialize() has run (whether or not the lists could be opened) */
+  whenReady(): Promise<void> {
+    return this.ready
+  }
 
   initialize(dbDir: string): void {
-    this.db.open(dbDir)
-    this.buildIndex()
-    this.initialized = true
+    try {
+      this.db.open(dbDir)
+      this.buildIndex()
+      this.initialized = true
+    } finally {
+      this.markReady()
+    }
   }
 
   close(): void {
