@@ -13,7 +13,8 @@ import {
   Pencil,
   Loader2,
   LayoutList,
-  ListChecks
+  ListChecks,
+  FileWarning
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
@@ -43,6 +44,7 @@ import { resolvePolicySurveyWarranty } from '../utils/surveyWarrantyText'
 import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
 import { isPiLike } from '../../../shared/quotationTypes'
+import { TypeChip } from './ui'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -64,7 +66,26 @@ const STEP_LABELS = [
   'Subjectivities',
   'Survey Warranties'
 ]
-const STEP_ICONS = [Ship, Calendar, DollarSign, Settings, Shield, ClipboardCheck, ListChecks]
+const STEP_ICONS = [
+  Ship,
+  Calendar,
+  DollarSign,
+  Settings,
+  Shield,
+  ClipboardCheck,
+  ListChecks,
+  FileWarning
+]
+const STEP_HINTS = [
+  'Vessels and alternative',
+  'Dates and time zone',
+  'Premium and instalments',
+  'Insured, commission, bank',
+  'Blue cards to issue',
+  'Check and create',
+  'Kept on the policy',
+  'Wording per vessel'
+]
 
 interface InsuredRow {
   entityId: string
@@ -1010,8 +1031,51 @@ export default function PolicySetupWizard({
     )
   }
 
+  const fmtMoney = (n: number): string =>
+    `${quotation?.premiumCurrency || 'USD'} ${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+  const selectedVesselNames = qVessels
+    .filter((v) => data.selectedVesselIds.includes(v.vesselId || v.id))
+    .map((v) => v.name || '-')
+  const selectedAlt = allAlts.find((a) => a.id === data.selectedAltId)
+  const summaryRows: { label: string; value: React.ReactNode }[] = [
+    {
+      label: selectedVesselNames.length > 1 ? 'Vessels' : 'Vessel',
+      value: selectedVesselNames.length ? selectedVesselNames.join(', ') : 'None selected'
+    },
+    ...(hasAlts ? [{ label: 'Alternative', value: selectedAlt?.label || '-' }] : []),
+    {
+      label: 'Period',
+      value:
+        data.inceptionDate && data.expiryDate
+          ? `${formatDate(data.inceptionDate)} to ${formatDate(data.expiryDate)}`
+          : '-'
+    },
+    { label: 'Premium', value: data.totalPremium ? fmtMoney(data.totalPremium) : '-' },
+    {
+      label: 'Instalments',
+      value: data.instalmentAmounts.length ? String(data.instalmentAmounts.length) : '-'
+    },
+    {
+      label: 'Commission',
+      value:
+        data.commissionEnabled && data.commissionPercent !== ''
+          ? `${data.commissionPercent}%`
+          : 'None'
+    },
+    { label: 'Bank', value: banks.find((b) => b.id === data.bankId)?.name || '-' },
+    ...(isPI
+      ? [
+          {
+            label: 'Blue cards',
+            value:
+              data.blueCardNone || data.blueCards.length === 0 ? 'None' : data.blueCards.join(', ')
+          }
+        ]
+      : [])
+  ]
+
   return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '24px 32px 40px', maxWidth: '1320px', margin: '0 auto' }}>
       {/* Cancel link */}
       <button
         onClick={onCancel}
@@ -1024,7 +1088,7 @@ export default function PolicySetupWizard({
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          marginBottom: '16px',
+          marginBottom: '12px',
           padding: 0
         }}
       >
@@ -1032,295 +1096,309 @@ export default function PolicySetupWizard({
       </button>
 
       {/* Title */}
-      <h1
-        style={{
-          fontSize: '1.5rem',
-          margin: '0 0 8px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}
-      >
-        <Shield size={24} color="var(--accent-primary)" />
-        Policy Setup
-      </h1>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 24px' }}>
-        {quotation.referenceNumber} — {quotation.quotationTypeName || quotation.quotationTypeCode}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 600, margin: 0 }}>Policy setup</h1>
+        <TypeChip code={quotation.quotationTypeCode} name={quotation.quotationTypeName} />
+      </div>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '4px 0 20px' }}>
+        From quotation <span className="mono">{quotation.referenceNumber}</span>
       </p>
 
-      {/* Progress Bar */}
-      <div
-        style={{
-          background: cardBg,
-          borderRadius: '14px',
-          padding: '24px 32px',
-          border: '1px solid var(--glass-border-color)',
-          marginBottom: '24px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Steps */}
+        <nav
+          aria-label="Policy setup steps"
+          style={{
+            flex: '0 0 220px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            position: 'sticky',
+            top: '16px'
+          }}
+        >
           {steps.map((step, idx) => {
-            const StepIcon = STEP_ICONS[step]
+            const StepIcon = STEP_ICONS[step] ?? Check
             const isCompleted = idx < currentStepIndex
             const isCurrent = idx === currentStepIndex
-            const isFuture = idx > currentStepIndex
             return (
-              <div key={step} style={{ display: 'flex', alignItems: 'center' }}>
-                {/* Step circle */}
-                <div
-                  onClick={() => (isCompleted ? goToStep(step) : undefined)}
+              <button
+                key={step}
+                type="button"
+                onClick={() => (isCompleted ? goToStep(step) : undefined)}
+                aria-current={isCurrent ? 'step' : undefined}
+                disabled={!isCompleted && !isCurrent}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  background: isCurrent ? 'var(--accent-tint)' : 'transparent',
+                  color: 'var(--text-primary)',
+                  cursor: isCompleted ? 'pointer' : 'default',
+                  opacity: !isCompleted && !isCurrent ? 0.75 : 1
+                }}
+              >
+                <span
                   style={{
+                    width: '26px',
+                    height: '26px',
+                    flex: 'none',
+                    borderRadius: '50%',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '6px',
-                    cursor: isCompleted ? 'pointer' : 'default'
+                    justifyContent: 'center',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    background: isCompleted || isCurrent ? 'var(--accent-primary)' : 'transparent',
+                    border: isCompleted || isCurrent ? 'none' : '1.5px solid var(--input-border)',
+                    color:
+                      isCompleted || isCurrent ? 'var(--accent-contrast)' : 'var(--text-secondary)'
                   }}
                 >
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: isCompleted
-                        ? 'var(--accent-primary)'
-                        : isCurrent
-                          ? 'var(--accent-primary)'
-                          : 'transparent',
-                      border: isCurrent
-                        ? '3px solid var(--accent-primary)'
-                        : isCompleted
-                          ? 'none'
-                          : '2px solid var(--text-secondary)',
-                      boxShadow: isCurrent
-                        ? '0 0 0 4px rgba(var(--accent-primary-rgb), 0.2)'
-                        : 'none',
-                      color: isCompleted || isCurrent ? '#fff' : 'var(--text-secondary)',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {isCompleted ? <Check size={16} /> : <StepIcon size={16} />}
-                  </div>
+                  {isCompleted ? <Check size={14} /> : <StepIcon size={14} />}
+                </span>
+                <span style={{ minWidth: 0 }}>
                   <span
                     style={{
-                      fontSize: '0.68rem',
-                      fontWeight: 600,
-                      color: isCurrent
-                        ? 'var(--accent-primary)'
-                        : isFuture
-                          ? 'var(--text-secondary)'
-                          : 'var(--text-primary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      display: 'block',
+                      fontSize: '0.88rem',
+                      fontWeight: isCurrent ? 600 : 500,
+                      color: isCurrent ? 'var(--accent-primary)' : 'var(--text-primary)'
                     }}
                   >
                     {STEP_LABELS[step]}
                   </span>
-                </div>
-                {/* Connector line */}
-                {idx < steps.length - 1 && (
-                  <div
-                    style={{
-                      width: '48px',
-                      height: '2px',
-                      margin: '0 8px',
-                      marginBottom: '22px',
-                      background:
-                        idx < currentStepIndex ? 'var(--accent-primary)' : 'var(--glass-border)',
-                      transition: 'background 0.2s'
-                    }}
-                  />
-                )}
-              </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {STEP_HINTS[step]}
+                  </span>
+                </span>
+              </button>
             )
           })}
-        </div>
-      </div>
+        </nav>
 
-      {/* Step Content */}
-      <div
-        style={{
-          background: cardBg,
-          borderRadius: '14px',
-          padding: '28px',
-          border: '1px solid var(--glass-border-color)',
-          marginBottom: '24px',
-          minHeight: '200px'
-        }}
-      >
-        {currentStep === 0 && (
-          <StepVesselAlternative
-            qVessels={qVessels}
-            allAlts={allAlts}
-            altPrice={altPrice}
-            hasAlts={hasAlts}
-            isMultiVessel={isMultiVessel}
-            data={data}
-            quotation={quotation}
-            isLight={isLight}
-            lolOptions={lolOptions}
-            agreedValueOptions={agreedValueOptions}
-            convertedVesselIds={convertedVesselIds}
-            onToggleVessel={(id) => {
-              if (convertedVesselIds.includes(id)) return
-              const newSelection = data.selectedVesselIds.includes(id)
-                ? data.selectedVesselIds.filter((v) => v !== id)
-                : [...data.selectedVesselIds, id]
-              updateData({
-                selectedVesselIds: newSelection,
-                ...reseedPremiums(newSelection, data.selectedAltId, data.selectedLolOptionId)
-              })
+        {/* Step content, with Back / Next at its foot */}
+        <section
+          style={{
+            flex: '1 1 520px',
+            minWidth: 0,
+            background: cardBg,
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--glass-border-color)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{ padding: '24px 28px', minHeight: '200px' }}>
+            {currentStep === 0 && (
+              <StepVesselAlternative
+                qVessels={qVessels}
+                allAlts={allAlts}
+                altPrice={altPrice}
+                hasAlts={hasAlts}
+                isMultiVessel={isMultiVessel}
+                data={data}
+                quotation={quotation}
+                isLight={isLight}
+                lolOptions={lolOptions}
+                agreedValueOptions={agreedValueOptions}
+                convertedVesselIds={convertedVesselIds}
+                onToggleVessel={(id) => {
+                  if (convertedVesselIds.includes(id)) return
+                  const newSelection = data.selectedVesselIds.includes(id)
+                    ? data.selectedVesselIds.filter((v) => v !== id)
+                    : [...data.selectedVesselIds, id]
+                  updateData({
+                    selectedVesselIds: newSelection,
+                    ...reseedPremiums(newSelection, data.selectedAltId, data.selectedLolOptionId)
+                  })
+                }}
+                onSelectAlt={handleAltChange}
+                onSelectLolOption={(id) =>
+                  updateData({
+                    selectedLolOptionId: id,
+                    ...reseedPremiums(data.selectedVesselIds, data.selectedAltId, id)
+                  })
+                }
+                onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
+                labelStyle={labelStyle}
+              />
+            )}
+
+            {currentStep === 1 && (
+              <StepPeriodPremium
+                data={data}
+                timezoneOptions={timezoneOptions}
+                onUpdate={updateData}
+                labelStyle={labelStyle}
+                inputStyle={inputStyle}
+              />
+            )}
+
+            {currentStep === 2 && (
+              <StepInstalments
+                data={data}
+                quotation={quotation}
+                isLight={isLight}
+                onUpdate={updateData}
+                recalcPremiumFromInstalments={recalcPremiumFromInstalments}
+                onChangeCount={changeInstalmentCount}
+                hullTechnical={hullTechnical}
+                inputStyle={inputStyle}
+                qVessels={qVessels}
+                isMultiSelection={isMultiSelection}
+                onUpdateVesselPremium={updateVesselPremium}
+                computePayable={computePayable}
+              />
+            )}
+
+            {currentStep === 3 && (
+              <StepDetails
+                data={data}
+                banks={banks}
+                hasBroker={hasBroker}
+                premiumCurrency={quotation?.premiumCurrency || 'USD'}
+                baseCurrency={baseCurrency}
+                onUpdate={updateData}
+                allEntities={allEntities}
+                entityAddrs={entityAddrs}
+                qVessels={qVessels}
+                isLight={isLight}
+                labelStyle={labelStyle}
+                inputStyle={inputStyle}
+                onEditSectionOrder={() => setShowSectionOrder(true)}
+              />
+            )}
+
+            {currentStep === 4 && (
+              <StepBlueCards
+                data={data}
+                qVessels={qVessels}
+                flagStates={flagStates}
+                isLight={isLight}
+                onUpdate={updateData}
+                ownerOptions={ownerOptions}
+                labelStyle={labelStyle}
+              />
+            )}
+
+            {currentStep === 6 && (
+              <StepSubjectivities
+                items={subjectivityItems}
+                selectedIds={data.selectedSubjectivityIds}
+                subjectivityDays={data.subjectivityDays}
+                isLight={isLight}
+                onUpdate={updateData}
+              />
+            )}
+
+            {currentStep === 7 && (
+              <StepSurveyWarranties
+                items={surveyItems}
+                qVessels={qVessels}
+                selectedVesselIds={data.selectedVesselIds}
+                altId={data.selectedAltId}
+                edits={data.surveyWarrantyEdits}
+                onUpdate={updateData}
+              />
+            )}
+
+            {currentStep === 5 && (
+              <StepReview
+                data={data}
+                quotation={quotation}
+                qVessels={qVessels}
+                allAlts={allAlts}
+                altPrice={altPrice}
+                hasAlts={hasAlts}
+                banks={banks}
+                hasBroker={hasBroker}
+                isPI={!!isPI}
+                isLight={isLight}
+                onGoToStep={setCurrentStep}
+              />
+            )}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 28px',
+              borderTop: '1px solid var(--glass-border-color)',
+              background: 'var(--bg-secondary)'
             }}
-            onSelectAlt={handleAltChange}
-            onSelectLolOption={(id) =>
-              updateData({
-                selectedLolOptionId: id,
-                ...reseedPremiums(data.selectedVesselIds, data.selectedAltId, id)
-              })
-            }
-            onSelectAgreedValueOption={(id) => updateData({ selectedAgreedValueOptionId: id })}
-            labelStyle={labelStyle}
-          />
-        )}
+          >
+            <div>
+              {!isFirstStep && (
+                <button
+                  onClick={handleBack}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Step {currentStepIndex + 1} of {steps.length}
+            </span>
+            <div>
+              {isLastStep ? (
+                <button
+                  onClick={handleConvert}
+                  disabled={converting}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  {converting ? <Loader2 size={18} className="spinner" /> : <Check size={18} />}
+                  Create Policy
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Continue <ArrowRight size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
 
-        {currentStep === 1 && (
-          <StepPeriodPremium
-            data={data}
-            timezoneOptions={timezoneOptions}
-            onUpdate={updateData}
-            labelStyle={labelStyle}
-            inputStyle={inputStyle}
-          />
-        )}
-
-        {currentStep === 2 && (
-          <StepInstalments
-            data={data}
-            quotation={quotation}
-            isLight={isLight}
-            onUpdate={updateData}
-            recalcPremiumFromInstalments={recalcPremiumFromInstalments}
-            onChangeCount={changeInstalmentCount}
-            hullTechnical={hullTechnical}
-            inputStyle={inputStyle}
-            qVessels={qVessels}
-            isMultiSelection={isMultiSelection}
-            onUpdateVesselPremium={updateVesselPremium}
-            computePayable={computePayable}
-          />
-        )}
-
-        {currentStep === 3 && (
-          <StepDetails
-            data={data}
-            banks={banks}
-            hasBroker={hasBroker}
-            premiumCurrency={quotation?.premiumCurrency || 'USD'}
-            baseCurrency={baseCurrency}
-            onUpdate={updateData}
-            allEntities={allEntities}
-            entityAddrs={entityAddrs}
-            qVessels={qVessels}
-            isLight={isLight}
-            labelStyle={labelStyle}
-            inputStyle={inputStyle}
-            onEditSectionOrder={() => setShowSectionOrder(true)}
-          />
-        )}
-
-        {currentStep === 4 && (
-          <StepBlueCards
-            data={data}
-            qVessels={qVessels}
-            flagStates={flagStates}
-            isLight={isLight}
-            onUpdate={updateData}
-            ownerOptions={ownerOptions}
-            labelStyle={labelStyle}
-          />
-        )}
-
-        {currentStep === 6 && (
-          <StepSubjectivities
-            items={subjectivityItems}
-            selectedIds={data.selectedSubjectivityIds}
-            subjectivityDays={data.subjectivityDays}
-            isLight={isLight}
-            onUpdate={updateData}
-          />
-        )}
-
-        {currentStep === 7 && (
-          <StepSurveyWarranties
-            items={surveyItems}
-            qVessels={qVessels}
-            selectedVesselIds={data.selectedVesselIds}
-            altId={data.selectedAltId}
-            edits={data.surveyWarrantyEdits}
-            onUpdate={updateData}
-          />
-        )}
-
-        {currentStep === 5 && (
-          <StepReview
-            data={data}
-            quotation={quotation}
-            qVessels={qVessels}
-            allAlts={allAlts}
-            altPrice={altPrice}
-            hasAlts={hasAlts}
-            banks={banks}
-            hasBroker={hasBroker}
-            isPI={!!isPI}
-            isLight={isLight}
-            onGoToStep={setCurrentStep}
-          />
-        )}
-      </div>
-
-      {/* Navigation Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          {!isFirstStep && (
-            <button
-              onClick={handleBack}
-              className="btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px' }}
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-          )}
-        </div>
-        <div>
-          {isLastStep ? (
-            <button
-              onClick={handleConvert}
-              disabled={converting}
-              className="btn-primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 28px',
-                fontSize: '0.95rem'
-              }}
-            >
-              {converting ? <Loader2 size={18} className="spinner" /> : <Check size={18} />}
-              Create Policy
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px' }}
-            >
-              Next <ArrowRight size={16} />
-            </button>
-          )}
-        </div>
+        {/* Live summary of the choices so far */}
+        <aside
+          aria-label="Policy summary"
+          style={{
+            flex: '0 1 280px',
+            minWidth: '240px',
+            position: 'sticky',
+            top: '16px',
+            background: cardBg,
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--glass-border-color)',
+            padding: '18px'
+          }}
+        >
+          <h2 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 600 }}>Summary</h2>
+          <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {summaryRows.map((r) => (
+              <div key={r.label}>
+                <dt style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{r.label}</dt>
+                <dd style={{ margin: '2px 0 0', fontSize: '0.88rem', fontWeight: 500 }}>
+                  {r.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </aside>
       </div>
 
       {showSectionOrder && quotation && (
