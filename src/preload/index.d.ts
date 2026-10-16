@@ -457,9 +457,11 @@ export interface Api {
   ) => Promise<PaginatedResult<ComplianceCheckResult>>
   complianceGetPendingResults: () => Promise<ComplianceCheckResult[]>
   complianceMarkResultReviewed: (resultId: string) => Promise<void>
+  /** note: the reviewer's reason (stored with the result) */
   complianceDecideResult: (
     resultId: string,
-    decision: 'sanctioned' | 'cleared'
+    decision: 'sanctioned' | 'cleared',
+    note?: string | null
   ) => Promise<{ success: boolean; message?: string }>
   complianceRunManualCheck: () => Promise<{ success: boolean; message?: string }>
   onComplianceCheckProgress: (

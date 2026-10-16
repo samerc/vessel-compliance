@@ -3501,9 +3501,14 @@ app.whenReady().then(() => {
 
   safeHandle(
     'compliance:decideResult',
-    async (event, resultId: string, decision: 'sanctioned' | 'cleared') => {
+    async (event, resultId: string, decision: 'sanctioned' | 'cleared', note?: string | null) => {
       const user = await requirePermission(event, 'compliance:review')
-      await db.decideComplianceResult(resultId, decision, user.username)
+      await db.decideComplianceResult(
+        resultId,
+        decision,
+        user.username,
+        typeof note === 'string' ? note.slice(0, 2000) : null
+      )
       db.logActivity({
         userId: user.id,
         username: user.username,
@@ -3511,7 +3516,7 @@ app.whenReady().then(() => {
         module: 'Compliance',
         entityType: 'compliance_result',
         entityId: resultId,
-        details: `Marked compliance result as ${decision}`
+        details: `Marked compliance result as ${decision}${typeof note === 'string' && note.trim() ? `: ${note.trim().slice(0, 200)}` : ''}`
       }).catch(() => {})
       return { success: true }
     }

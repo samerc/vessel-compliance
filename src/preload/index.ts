@@ -283,8 +283,11 @@ const api: Api = {
   complianceGetPendingResults: () => ipcRenderer.invoke('compliance:getPendingResults'),
   complianceMarkResultReviewed: (resultId: string) =>
     ipcRenderer.invoke('compliance:markResultReviewed', resultId),
-  complianceDecideResult: (resultId: string, decision: 'sanctioned' | 'cleared') =>
-    ipcRenderer.invoke('compliance:decideResult', resultId, decision),
+  complianceDecideResult: (
+    resultId: string,
+    decision: 'sanctioned' | 'cleared',
+    note?: string | null
+  ) => ipcRenderer.invoke('compliance:decideResult', resultId, decision, note),
   complianceRunManualCheck: () => ipcRenderer.invoke('compliance:runManualCheck'),
   onComplianceCheckProgress: (
     callback: (data: { current: number; total: number; entityName: string }) => void

@@ -1659,6 +1659,11 @@ function App(): React.JSX.Element {
                       setNavigateBackTab('compliance')
                       setActiveTab('vessels')
                     }}
+                    onNavigateToEntity={(entityId) => {
+                      setInitialEntityId(entityId)
+                      setNavigateBackTab('compliance')
+                      setActiveTab('directory')
+                    }}
                   />
                 ) : (
                   <div

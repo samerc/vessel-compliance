@@ -1868,6 +1868,57 @@ export class MySQLAdapter {
         )
       }
 
+      // Migration: list entries a reviewer cleared for an entity / vessel, so the weekly check
+      // flags only new hits instead of the same ones every week
+      try {
+        await this.pool.query(`
+          CREATE TABLE IF NOT EXISTS sanctions_cleared_hits (
+            subject_type VARCHAR(10) NOT NULL,
+            subject_id VARCHAR(36) NOT NULL,
+            hit_key VARCHAR(255) NOT NULL,
+            cleared_by VARCHAR(100) NULL,
+            cleared_at DATETIME NULL,
+            note TEXT NULL,
+            PRIMARY KEY (subject_type, subject_id, hit_key)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+        const [noteCols] = await this.pool.query(
+          "SHOW COLUMNS FROM compliance_check_results LIKE 'decision_note'"
+        )
+        if ((noteCols as RowDataPacket[]).length === 0)
+          await this.pool.query(
+            'ALTER TABLE compliance_check_results ADD COLUMN decision_note TEXT NULL'
+          )
+        // Results cleared before this memory existed count as cleared hits too (once)
+        if ((await this.getSetting('migration_cleared_hits_v1')) !== '1') {
+          const [cleared] = await this.pool.query(
+            "SELECT entity_type, entity_id, match_details, reviewed_by, reviewed_at FROM compliance_check_results WHERE decision = 'cleared'"
+          )
+          for (const r of cleared as RowDataPacket[]) {
+            let hits: { source?: string; source_id?: string; names?: string[] }[] = []
+            try {
+              const parsed = JSON.parse(String(r.match_details || '[]'))
+              if (Array.isArray(parsed)) hits = parsed
+            } catch {
+              /* no details */
+            }
+            for (const h of hits)
+              await this.pool.query(
+                'INSERT IGNORE INTO sanctions_cleared_hits (subject_type, subject_id, hit_key, cleared_by, cleared_at) VALUES (?, ?, ?, ?, ?)',
+                [
+                  r.entity_type === 'vessel' ? 'vessel' : 'entity',
+                  r.entity_id,
+                  MySQLAdapter.sanctionsHitKey(h),
+                  r.reviewed_by || null,
+                  r.reviewed_at || null
+                ]
+              )
+          }
+          await this.setSetting('migration_cleared_hits_v1', '1')
+        }
+      } catch (e) {
+        console.error('Migration warning (sanctions cleared hits):', e)
+      }
+
       // Migration: link vessel policies to the policy document a conversion made them from
       for (const [col, ddl] of [
         ['policy_document_id', 'VARCHAR(36) NULL'],
@@ -10007,26 +10058,74 @@ export class MySQLAdapter {
     )
   }
 
+  /** Key of one sanctions list entry in a result's match details (source, id and listed name) */
+  static sanctionsHitKey(m: { source?: string; source_id?: string; names?: string[] }): string {
+    return `${m.source || ''}:${m.source_id || ''}:${(m.names?.[0] || '').toLowerCase()}`.slice(
+      0,
+      255
+    )
+  }
+
+  /** subject ("entity:<id>" / "vessel:<id>") -> list entries a reviewer cleared for it */
+  async getSanctionsClearedHits(): Promise<Map<string, Set<string>>> {
+    const map = new Map<string, Set<string>>()
+    if (!this.pool) return map
+    const [rows] = await this.pool.query(
+      'SELECT subject_type, subject_id, hit_key FROM sanctions_cleared_hits'
+    )
+    for (const r of rows as RowDataPacket[]) {
+      const k = `${r.subject_type}:${r.subject_id}`
+      if (!map.has(k)) map.set(k, new Set())
+      map.get(k)!.add(r.hit_key)
+    }
+    return map
+  }
+
   async decideComplianceResult(
     id: string,
     decision: 'sanctioned' | 'cleared',
-    reviewedBy: string
+    reviewedBy: string,
+    note?: string | null
   ): Promise<void> {
     if (!this.pool) return
 
     // 1. Get the result to know the entity/vessel
     const [results] = await this.pool.query<RowDataPacket[]>(
-      'SELECT entity_type as entityType, entity_id as entityId FROM compliance_check_results WHERE id = ?',
+      'SELECT entity_type as entityType, entity_id as entityId, match_details as matchDetails FROM compliance_check_results WHERE id = ?',
       [id]
     )
     if (results.length === 0) return
     const { entityType, entityId } = results[0]
 
-    // 2. Update the result status and decision
+    // 2. Update the result status and decision (with the reviewer's reason)
     await this.pool.execute(
-      `UPDATE compliance_check_results SET status = 'reviewed', decision = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
-      [decision, reviewedBy, id]
+      `UPDATE compliance_check_results SET status = 'reviewed', decision = ?, reviewed_by = ?, reviewed_at = NOW(), decision_note = ? WHERE id = ?`,
+      [decision, reviewedBy, note?.trim() || null, id]
     )
+
+    // A cleared result's list entries are remembered for this subject: later checks skip them
+    if (decision === 'cleared') {
+      let hits: { source?: string; source_id?: string; names?: string[] }[] = []
+      try {
+        const parsed = JSON.parse(String(results[0].matchDetails || '[]'))
+        if (Array.isArray(parsed)) hits = parsed
+      } catch {
+        /* no details */
+      }
+      for (const h of hits)
+        await this.pool.execute(
+          `INSERT INTO sanctions_cleared_hits (subject_type, subject_id, hit_key, cleared_by, cleared_at, note)
+           VALUES (?, ?, ?, ?, NOW(), ?)
+           ON DUPLICATE KEY UPDATE cleared_by = VALUES(cleared_by), cleared_at = NOW(), note = VALUES(note)`,
+          [
+            entityType === 'vessel' ? 'vessel' : 'entity',
+            entityId,
+            MySQLAdapter.sanctionsHitKey(h),
+            reviewedBy,
+            note?.trim() || null
+          ]
+        )
+    }
 
     // 3. Update the related vessel or entity
     if (decision === 'sanctioned') {

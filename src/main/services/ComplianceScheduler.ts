@@ -1,5 +1,5 @@
 import { BrowserWindow, Notification } from 'electron'
-import { db } from '../mysql/adapter'
+import { db, MySQLAdapter } from '../mysql/adapter'
 import { sanctionsService } from '../sanctions/SanctionsService'
 
 class ComplianceScheduler {
@@ -117,126 +117,100 @@ class ComplianceScheduler {
       let checkedCount = 0
       const threshold = settings.threshold / 100 // Convert to decimal
 
-      // Check entities
+      // List entries a reviewer already cleared per subject: only NEW hits are flagged
+      const clearedHits = await db.getSanctionsClearedHits()
       const yieldToEventLoop = (): Promise<void> => new Promise<void>((r) => setImmediate(r))
-      for (const entity of entitiesToCheck) {
+      const subjects: {
+        kind: 'entity' | 'vessel'
+        id: string
+        name: string
+        status?: string | null
+      }[] = [
+        ...entitiesToCheck.map((e) => ({
+          kind: 'entity' as const,
+          id: e.id,
+          name: e.name,
+          status: e.ofacStatus
+        })),
+        ...vesselsToCheck.map((v) => ({
+          kind: 'vessel' as const,
+          id: v.id,
+          name: v.name,
+          status: v.ofacStatus
+        }))
+      ]
+      for (const subject of subjects) {
         checkedCount++
-        this.sendProgress(checkedCount, totalToCheck, entity.name)
+        this.sendProgress(checkedCount, totalToCheck, subject.name)
         await yieldToEventLoop()
+        const update = (fields: {
+          ofacCheckedAt: string
+          ofacMatchFound?: boolean
+          ofacStatus?: 'CLEARED' | 'POTENTIAL_MATCH'
+        }): Promise<unknown> =>
+          subject.kind === 'vessel'
+            ? db.updateVessel(subject.id, fields)
+            : db.updateEntity(subject.id, fields)
         try {
-          const data = sanctionsService.search(entity.name, {
+          const data = sanctionsService.search(subject.name, {
             threshold: 0.6,
             limit: 10,
             mode: 'both',
             minScore: threshold
           })
-          const highScoreMatches = data.results.filter((r) => r.score >= threshold)
+          const cleared = clearedHits.get(`${subject.kind}:${subject.id}`)
+          const details = data.results
+            .filter((r) => r.score >= threshold)
+            .map((r) => ({
+              id: r.entity.source_id || '',
+              target_type: r.entity.entity_type || 'unknown',
+              source: r.entity.source || 'unknown',
+              source_id: r.entity.source_id || '',
+              names: [r.entity.name, ...(r.entity.aliases || [])].filter(Boolean),
+              score: r.score
+            }))
+          const newHits = details.filter((d) => !cleared?.has(MySQLAdapter.sanctionsHitKey(d)))
+          const checkedAt = new Date().toISOString()
 
-          if (highScoreMatches.length > 0) {
+          if (newHits.length > 0) {
             matchesFound++
-            const bestScore = Math.max(...highScoreMatches.map((r) => r.score))
-
-            await db.updateEntity(entity.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: true,
-              ofacStatus: 'POTENTIAL_MATCH'
-            })
-
+            const bestScore = Math.max(...newHits.map((d) => d.score))
+            // A confirmed match keeps its status; it still gets the new hits to review
+            if (subject.status === 'MATCH' || subject.status === 'SANCTIONED')
+              await update({ ofacCheckedAt: checkedAt, ofacMatchFound: true })
+            else
+              await update({
+                ofacCheckedAt: checkedAt,
+                ofacMatchFound: true,
+                ofacStatus: 'POTENTIAL_MATCH'
+              })
             await db.addComplianceCheckResult({
               logId,
-              entityType: 'entity',
-              entityId: entity.id,
-              entityName: entity.name,
+              entityType: subject.kind,
+              entityId: subject.id,
+              entityName: subject.name,
               matchScore: bestScore * 100,
-              matchDetails: JSON.stringify(
-                highScoreMatches.map((r) => ({
-                  id: r.entity.source_id || '',
-                  target_type: r.entity.entity_type || 'unknown',
-                  source: r.entity.source || 'unknown',
-                  source_id: r.entity.source_id || '',
-                  names: [r.entity.name, ...(r.entity.aliases || [])].filter(Boolean),
-                  score: r.score
-                }))
-              )
+              matchDetails: JSON.stringify(newHits)
             })
-
             db.notifyGroupsForEvent(
               'compliance_match',
-              `Sanctions match found: ${entity.name}`,
+              `Sanctions match found: ${subject.name}`,
               `Score: ${Math.round(bestScore * 100)}%`,
-              'entity',
-              entity.id
+              subject.kind,
+              subject.id
             ).catch(() => {})
+          } else if (
+            subject.status === 'MATCH' ||
+            subject.status === 'SANCTIONED' ||
+            subject.status === 'POTENTIAL_MATCH'
+          ) {
+            // Nothing new: a decision (or a review still pending) is never overturned automatically
+            await update({ ofacCheckedAt: checkedAt })
           } else {
-            await db.updateEntity(entity.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: false,
-              ofacStatus: 'CLEARED'
-            })
+            await update({ ofacCheckedAt: checkedAt, ofacMatchFound: false, ofacStatus: 'CLEARED' })
           }
         } catch (error) {
-          console.error(`Error checking entity ${entity.name}:`, error)
-        }
-      }
-
-      // Check vessels
-      for (const vessel of vesselsToCheck) {
-        checkedCount++
-        this.sendProgress(checkedCount, totalToCheck, vessel.name)
-        await yieldToEventLoop()
-        try {
-          const data = sanctionsService.search(vessel.name, {
-            threshold: 0.6,
-            limit: 10,
-            mode: 'both',
-            minScore: threshold
-          })
-          const highScoreMatches = data.results.filter((r) => r.score >= threshold)
-
-          if (highScoreMatches.length > 0) {
-            matchesFound++
-            const bestScore = Math.max(...highScoreMatches.map((r) => r.score))
-
-            await db.updateVessel(vessel.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: true,
-              ofacStatus: 'POTENTIAL_MATCH'
-            })
-
-            await db.addComplianceCheckResult({
-              logId,
-              entityType: 'vessel',
-              entityId: vessel.id,
-              entityName: vessel.name,
-              matchScore: bestScore * 100,
-              matchDetails: JSON.stringify(
-                highScoreMatches.map((r) => ({
-                  id: r.entity.source_id || '',
-                  target_type: r.entity.entity_type || 'unknown',
-                  source: r.entity.source || 'unknown',
-                  source_id: r.entity.source_id || '',
-                  names: [r.entity.name, ...(r.entity.aliases || [])].filter(Boolean),
-                  score: r.score
-                }))
-              )
-            })
-
-            db.notifyGroupsForEvent(
-              'compliance_match',
-              `Sanctions match found: ${vessel.name}`,
-              `Score: ${Math.round(bestScore * 100)}%`,
-              'vessel',
-              vessel.id
-            ).catch(() => {})
-          } else {
-            await db.updateVessel(vessel.id, {
-              ofacCheckedAt: new Date().toISOString(),
-              ofacMatchFound: false,
-              ofacStatus: 'CLEARED'
-            })
-          }
-        } catch (error) {
-          console.error(`Error checking vessel ${vessel.name}:`, error)
+          console.error(`Error checking ${subject.kind} ${subject.name}:`, error)
         }
       }
 

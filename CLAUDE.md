@@ -152,7 +152,8 @@ Automated weekly sanctions screening for all entities and vessels:
 - **Settings** (Admin Panel): Enable/disable, day of week, time, match threshold (50-100%), include vessels, skip cleared
 - **Match Threshold**: Only matches above configured score (default 85%) are flagged as `POTENTIAL_MATCH`
 - **Results Storage**: `compliance_check_logs` table stores run history, `compliance_check_results` stores individual matches
-- **Review Workflow**: Pending results shown in Compliance Center → Sanctions Screening tab
+- **Review Workflow**: Pending results shown in Compliance Center → Sanctions Screening tab; each decision (single or bulk) asks an optional reason (`compliance_check_results.decision_note`). The screened name opens the vessel / entity
+- **Cleared hits are remembered**: clearing a result stores its list entries in `sanctions_cleared_hits` (subject + `MySQLAdapter.sanctionsHitKey` = source:source_id:name); the weekly run flags only NEW hits, never turns MATCH/SANCTIONED or a pending POTENTIAL_MATCH into CLEARED by itself, and refuses to run (failed log) when a downloaded list is not loaded
 - **Desktop Notifications**: System notification when matches are found (if supported)
 - **Manual Trigger**: "Run Now" button in Admin Panel for immediate check
 - **IPC Handlers**: `compliance:getScheduleSettings`, `compliance:setScheduleSettings`, `compliance:runManualCheck`, `compliance:getCheckLogs`, `compliance:getCheckResults`, `compliance:getPendingResults`, `compliance:markResultReviewed`

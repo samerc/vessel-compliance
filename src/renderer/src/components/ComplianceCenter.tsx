@@ -45,7 +45,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { ok } from '../utils/ipc'
-import { confirmDialog } from './DialogHost'
+import { confirmDialog, promptDialog } from './DialogHost'
 import { PageHeader, Tabs, Badge, Field } from './ui'
 import { effectiveDocExpiry, getDocStatus } from '../utils/docStatus'
 
@@ -185,12 +185,14 @@ const alertSection = (alert: DocAlert): VesselSection =>
 
 interface ComplianceCenterProps extends SubTabProps {
   onNavigateToVessel?: (vesselId: string, section?: VesselSection) => void
+  onNavigateToEntity?: (entityId: string) => void
   initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
   onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
 }
 
 export default function ComplianceCenter({
   onNavigateToVessel,
+  onNavigateToEntity,
   initialTab,
   onTabChange,
   subTab,
@@ -506,8 +508,15 @@ export default function ComplianceCenter({
     resultId: string,
     decision: 'sanctioned' | 'cleared'
   ): Promise<void> => {
+    // The reason is kept with the decision (audit); cancelling the prompt cancels the decision
+    const note = await promptDialog(
+      decision === 'cleared'
+        ? 'Why is this not a match? (optional, kept with the decision)'
+        : 'Reason for sanctioning (optional, kept with the decision)'
+    )
+    if (note === null) return
     try {
-      await window.api.complianceDecideResult(resultId, decision)
+      await window.api.complianceDecideResult(resultId, decision, note)
       showSuccess(`Match marked as ${decision}`)
       loadSanctionsData()
     } catch (error) {
@@ -528,13 +537,15 @@ export default function ComplianceCenter({
       `${label} ${n} selected match${n === 1 ? '' : 'es'}? This updates each subject's sanctions status.`
     )
     if (!confirmed) return
+    const note = await promptDialog('Reason (optional, kept with each decision)')
+    if (note === null) return
     bulkDecidingRef.current = true
     setBulkDeciding(true)
     let failed = 0
     try {
       for (const id of selectedSanctions) {
         try {
-          ok(await window.api.complianceDecideResult(id, decision))
+          ok(await window.api.complianceDecideResult(id, decision, note))
         } catch {
           failed++
         }
@@ -2397,7 +2408,31 @@ export default function ComplianceCenter({
                               />
                             </td>
                           )}
-                          <td style={{ fontWeight: '600' }}>{result.entityName}</td>
+                          <td style={{ fontWeight: '600' }}>
+                            {/* Open the screened vessel / entity to see what it is linked to */}
+                            <button
+                              type="button"
+                              title={`Open ${result.entityType === 'vessel' ? 'vessel' : 'entity'}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (result.entityType === 'vessel')
+                                  onNavigateToVessel?.(result.entityId, 'assureds')
+                                else onNavigateToEntity?.(result.entityId)
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                font: 'inherit',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {result.entityName}
+                            </button>
+                          </td>
                           <td>
                             <span
                               style={{
