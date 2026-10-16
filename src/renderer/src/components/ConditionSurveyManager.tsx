@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  ChevronDown,
-  ChevronUp,
   Plus,
   Trash2,
   Upload,
@@ -431,6 +429,11 @@ export default function ConditionSurveyManager({
     return attachments.filter((a) => a.surveyId === surveyId)
   }
 
+  // The survey shown on the right: the one picked, else the first in the list
+  const selectedSurveyId = surveys.some((sv) => sv.id === expandedSurveyId)
+    ? expandedSurveyId
+    : (surveys[0]?.id ?? null)
+
   return (
     <>
       <section className="fade-in" style={{ marginTop: '32px' }}>
@@ -738,532 +741,614 @@ export default function ConditionSurveyManager({
             No condition surveys recorded
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {surveys.map((survey) => {
-              const isExpanded = expandedSurveyId === survey.id
-              const isEditing = editingSurveyId === survey.id
-              const counts = defectCounts[survey.id] || { open: 0, closed: 0 }
-              const totalDefects = counts.open + counts.closed
-              const surveyAttachments = getSurveyAttachments(survey.id)
-              const isDragOver = dragOverSurveyId === survey.id
-              const allClosed = counts.open === 0 && totalDefects > 0
-
-              return (
-                <div
-                  key={survey.id}
-                  style={{
-                    borderRadius: '12px',
-                    border: isDragOver
-                      ? '2px dashed var(--accent-primary)'
-                      : isLight
-                        ? '1px solid rgba(0,0,0,0.08)'
-                        : '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                    transition: 'all 0.2s ease',
-                    background: 'var(--bg-card)'
-                  }}
-                >
-                  {/* Survey Header */}
-                  <div
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            {/* Surveys of this vessel: pick one to see it on the right */}
+            <nav
+              aria-label="Surveys of this vessel"
+              style={{
+                flex: '1 1 240px',
+                maxWidth: '290px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              {surveys.map((survey) => {
+                const counts = defectCounts[survey.id] || { open: 0, closed: 0 }
+                const total = counts.open + counts.closed
+                const selected = survey.id === selectedSurveyId
+                const pill = survey.completedAt
+                  ? { label: 'Survey closed', color: 'var(--success)' }
+                  : counts.overdue > 0
+                    ? { label: `${counts.overdue} overdue`, color: 'var(--danger)' }
+                    : counts.open > 0
+                      ? { label: `${counts.open} open`, color: 'var(--warning)' }
+                      : total > 0
+                        ? { label: 'All closed', color: 'var(--success)' }
+                        : { label: 'No defects', color: 'var(--text-secondary)' }
+                return (
+                  <button
+                    key={survey.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setExpandedSurveyId(survey.id)}
                     style={{
-                      padding: '16px 20px',
                       display: 'flex',
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
                       alignItems: 'flex-start',
-                      cursor: isEditing ? 'default' : 'pointer',
-                      background: isExpanded
-                        ? isLight
-                          ? 'rgba(0,0,0,0.02)'
-                          : 'rgba(255,255,255,0.02)'
-                        : 'transparent',
-                      transition: 'background 0.2s ease'
+                      gap: '4px',
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: selected
+                        ? '1.5px solid var(--accent-primary)'
+                        : '1px solid var(--glass-border-color)',
+                      background: selected ? 'var(--accent-tint)' : 'var(--bg-card)',
+                      color: 'var(--text-primary)',
+                      font: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer'
                     }}
-                    onClick={() => !isEditing && setExpandedSurveyId(isExpanded ? null : survey.id)}
                   >
-                    <div style={{ flex: 1 }}>
-                      {/* Top row: Type + Date + Status badge */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          marginBottom: '6px'
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: '700',
-                            fontSize: '1rem',
-                            color: 'var(--text-primary)'
-                          }}
-                        >
-                          {survey.surveyType}
-                        </span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                          {formatDate(survey.surveyDate) || survey.surveyDate}
-                        </span>
-                        {survey.reference && (
-                          <span
-                            style={{
-                              color: 'var(--text-secondary)',
-                              padding: '2px 8px',
-                              background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
-                              borderRadius: '4px',
-                              fontSize: '0.8rem',
-                              fontFamily: 'monospace'
-                            }}
-                          >
-                            {survey.reference}
-                          </span>
-                        )}
-                        {allClosed && (
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              background: isLight
-                                ? 'rgba(0, 140, 70, 0.1)'
-                                : 'rgba(0, 255, 136, 0.08)',
-                              border: isLight
-                                ? '1px solid rgba(0, 140, 70, 0.3)'
-                                : '1px solid rgba(0, 255, 136, 0.2)',
-                              color: isLight ? '#008c46' : '#00ff88',
-                              fontSize: '0.7rem',
-                              fontWeight: '600',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px'
-                            }}
-                          >
-                            ALL CLOSED
-                          </span>
-                        )}
-                      </div>
-                      {/* Bottom row: Surveyor, Location, Counts */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '16px',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)'
-                        }}
-                      >
-                        <span>{getSurveyorName(survey.surveyorId)}</span>
-                        {survey.location && (
-                          <>
-                            <span style={{ opacity: 0.3 }}>|</span>
-                            <span>{survey.location}</span>
-                          </>
-                        )}
-                        <span style={{ opacity: 0.3 }}>|</span>
-                        <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {counts.open > 0 && (
-                            <span style={{ color: 'var(--danger)', fontWeight: '600' }}>
-                              {counts.open} open
-                            </span>
-                          )}
-                          {counts.closed > 0 && (
-                            <span
-                              style={{ color: isLight ? '#008c46' : '#00ff88', fontWeight: '500' }}
-                            >
-                              {counts.closed} closed
-                            </span>
-                          )}
-                          {counts.overdue > 0 && (
-                            <span
-                              style={{
-                                color: '#ffa726',
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              <AlertTriangle size={12} /> {counts.overdue} overdue
-                            </span>
-                          )}
-                          {totalDefects === 0 && <span>No defects</span>}
-                        </span>
-                        {surveyAttachments.length > 0 && (
-                          <>
-                            <span style={{ opacity: 0.3 }}>|</span>
-                            <span>
-                              {surveyAttachments.length} file
-                              {surveyAttachments.length !== 1 ? 's' : ''}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div
+                    <span
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
+                        justifyContent: 'space-between',
                         gap: '8px',
-                        marginLeft: '12px'
+                        width: '100%'
                       }}
                     >
-                      {isEditing ? (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSaveEdit(survey.id)
-                            }}
-                            className="btn-primary"
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                        {survey.surveyType}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {formatDate(survey.surveyDate) || survey.surveyDate}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {getSurveyorName(survey.surveyorId)}
+                    </span>
+                    <span
+                      style={{
+                        marginTop: '2px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        background: `color-mix(in srgb, ${pill.color} 15%, transparent)`,
+                        color: pill.color
+                      }}
+                    >
+                      {pill.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+
+            <div style={{ flex: '999 1 560px', minWidth: 0 }}>
+              {surveys
+                .filter((s) => s.id === selectedSurveyId)
+                .map((survey) => {
+                  const isEditing = editingSurveyId === survey.id
+                  const counts = defectCounts[survey.id] || { open: 0, closed: 0 }
+                  const totalDefects = counts.open + counts.closed
+                  const surveyAttachments = getSurveyAttachments(survey.id)
+                  const isDragOver = dragOverSurveyId === survey.id
+                  const allClosed = counts.open === 0 && totalDefects > 0
+
+                  return (
+                    <div
+                      key={survey.id}
+                      style={{
+                        borderRadius: '12px',
+                        border: isDragOver
+                          ? '2px dashed var(--accent-primary)'
+                          : isLight
+                            ? '1px solid rgba(0,0,0,0.08)'
+                            : '1px solid rgba(255,255,255,0.06)',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease',
+                        background: 'var(--bg-card)'
+                      }}
+                    >
+                      {/* Survey Header */}
+                      <div
+                        style={{
+                          padding: '16px 20px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          {/* Top row: Type + Date + Status badge */}
+                          <div
                             style={{
-                              padding: '6px 12px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '0.8rem'
+                              gap: '10px',
+                              marginBottom: '6px'
                             }}
                           >
-                            <Save size={14} />
-                            Save
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCancelEdit()
-                            }}
-                            className="btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          {survey.completedAt && (
                             <span
                               style={{
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                background: 'rgba(0,148,74,0.15)',
-                                color: 'var(--success, #00944a)',
-                                fontSize: 11,
-                                fontWeight: 600
+                                fontWeight: '700',
+                                fontSize: '1rem',
+                                color: 'var(--text-primary)'
                               }}
                             >
-                              Survey Closed
+                              {survey.surveyType}
                             </span>
-                          )}
-                          {canManage && !survey.completedAt && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setClosingSurveyId(survey.id)
-                              }}
-                              style={{
-                                padding: '5px 10px',
-                                borderRadius: 6,
-                                border: '1px solid var(--input-border)',
-                                background: 'var(--input-bg)',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer',
-                                fontSize: 12
-                              }}
-                            >
-                              Close Survey
-                            </button>
-                          )}
-                          {canManage && (
-                            <button
-                              title="Edit"
-                              aria-label="Edit"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEditSurvey(survey)
-                              }}
-                              className="btn-secondary"
-                              style={{
-                                padding: '6px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '0.8rem'
-                              }}
-                            >
-                              <Edit size={14} />
-                            </button>
-                          )}
-                          {canManage && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteSurvey(survey)
-                              }}
-                              style={{
-                                padding: '6px 12px',
-                                background: 'transparent',
-                                color: 'var(--danger)',
-                                border: '1px solid var(--danger)',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center'
-                              }}
-                              title="Delete survey"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                          {isExpanded ? (
-                            <ChevronUp size={18} color="var(--text-secondary)" />
-                          ) : (
-                            <ChevronDown size={18} color="var(--text-secondary)" />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div
-                      style={{
-                        padding: '20px',
-                        borderTop: isLight
-                          ? '1px solid rgba(0,0,0,0.06)'
-                          : '1px solid rgba(255,255,255,0.06)'
-                      }}
-                    >
-                      {isEditing ? (
-                        <div
-                          style={{
-                            marginBottom: '20px',
-                            padding: '20px',
-                            background: 'var(--input-bg)',
-                            borderRadius: '12px',
-                            border: '1px solid var(--input-border)'
-                          }}
-                        >
-                          <h4
-                            style={{
-                              color: 'var(--text-primary)',
-                              marginBottom: '15px',
-                              marginTop: 0
-                            }}
-                          >
-                            Edit Survey Details
-                          </h4>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {formatDate(survey.surveyDate) || survey.surveyDate}
+                            </span>
+                            {survey.reference && (
+                              <span
+                                style={{
+                                  color: 'var(--text-secondary)',
+                                  padding: '2px 8px',
+                                  background: isLight
+                                    ? 'rgba(0,0,0,0.05)'
+                                    : 'rgba(255,255,255,0.06)',
+                                  borderRadius: '4px',
+                                  fontSize: '0.8rem',
+                                  fontFamily: 'monospace'
+                                }}
+                              >
+                                {survey.reference}
+                              </span>
+                            )}
+                            {allClosed && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  background: isLight
+                                    ? 'rgba(0, 140, 70, 0.1)'
+                                    : 'rgba(0, 255, 136, 0.08)',
+                                  border: isLight
+                                    ? '1px solid rgba(0, 140, 70, 0.3)'
+                                    : '1px solid rgba(0, 255, 136, 0.2)',
+                                  color: isLight ? '#008c46' : '#00ff88',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '600',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px'
+                                }}
+                              >
+                                ALL CLOSED
+                              </span>
+                            )}
+                          </div>
+                          {/* Bottom row: Surveyor, Location, Counts */}
                           <div
                             style={{
-                              display: 'grid',
-                              gridTemplateColumns: '150px 1fr 1fr 1fr',
-                              gap: '15px',
-                              marginBottom: '15px'
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '16px',
+                              fontSize: '0.8rem',
+                              color: 'var(--text-secondary)'
                             }}
                           >
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  marginBottom: '5px',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '14px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Survey Date *
-                              </label>
-                              <input
-                                type="date"
-                                value={editDate}
-                                onChange={(e) => setEditDate(e.target.value)}
-                                required
-                                min="1900-01-01"
-                                max="2100-12-31"
-                                aria-label="Edit survey date"
-                              />
-                            </div>
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  marginBottom: '5px',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '14px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Survey Type *
-                              </label>
-                              <select
-                                value={editType}
-                                onChange={(e) => setEditType(e.target.value)}
-                                required
-                                style={{
-                                  width: '100%',
-                                  padding: '10px',
-                                  borderRadius: '8px',
-                                  background: 'var(--bg-card)',
-                                  color: 'var(--text-primary)',
-                                  border: '1px solid var(--input-border)'
-                                }}
-                                aria-label="Edit survey type"
-                              >
-                                <option value="">-- Select Type --</option>
-                                {surveyTypes.map((t) => (
-                                  <option key={t.id} value={t.name}>
-                                    {t.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  marginBottom: '5px',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '14px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Reference
-                              </label>
-                              <input
-                                type="text"
-                                value={editReference}
-                                onChange={(e) => setEditReference(e.target.value)}
-                                aria-label="Edit survey reference"
-                              />
-                            </div>
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  marginBottom: '5px',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '14px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Location
-                              </label>
-                              <input
-                                type="text"
-                                value={editLocation}
-                                onChange={(e) => setEditLocation(e.target.value)}
-                                aria-label="Edit survey location"
-                              />
-                            </div>
-                          </div>
-                          <div style={{ marginBottom: '15px' }}>
-                            <label
-                              style={{
-                                display: 'block',
-                                marginBottom: '5px',
-                                color: 'var(--text-secondary)',
-                                fontSize: '14px',
-                                fontWeight: '500'
-                              }}
-                            >
-                              Surveyor *
-                            </label>
-                            <select
-                              value={editSurveyorId}
-                              onChange={(e) => setEditSurveyorId(e.target.value)}
-                              required
-                              style={{ color: 'var(--text-primary)' }}
-                              aria-label="Edit surveyor"
-                            >
-                              <option value="">-- Select Surveyor --</option>
-                              {surveyors.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.companyName} ({s.country})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label
-                              style={{
-                                display: 'block',
-                                marginBottom: '5px',
-                                color: 'var(--text-secondary)',
-                                fontSize: '14px',
-                                fontWeight: '500'
-                              }}
-                            >
-                              Notes
-                            </label>
-                            <textarea
-                              value={editNotes}
-                              onChange={(e) => setEditNotes(e.target.value)}
-                              rows={3}
-                              style={{ resize: 'vertical', width: '100%' }}
-                              aria-label="Edit survey notes"
-                            />
+                            <span>{getSurveyorName(survey.surveyorId)}</span>
+                            {survey.location && (
+                              <>
+                                <span style={{ opacity: 0.3 }}>|</span>
+                                <span>{survey.location}</span>
+                              </>
+                            )}
+                            <span style={{ opacity: 0.3 }}>|</span>
+                            <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {counts.open > 0 && (
+                                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>
+                                  {counts.open} open
+                                </span>
+                              )}
+                              {counts.closed > 0 && (
+                                <span
+                                  style={{
+                                    color: isLight ? '#008c46' : '#00ff88',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  {counts.closed} closed
+                                </span>
+                              )}
+                              {counts.overdue > 0 && (
+                                <span
+                                  style={{
+                                    color: '#ffa726',
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                >
+                                  <AlertTriangle size={12} /> {counts.overdue} overdue
+                                </span>
+                              )}
+                              {totalDefects === 0 && <span>No defects</span>}
+                            </span>
+                            {surveyAttachments.length > 0 && (
+                              <>
+                                <span style={{ opacity: 0.3 }}>|</span>
+                                <span>
+                                  {surveyAttachments.length} file
+                                  {surveyAttachments.length !== 1 ? 's' : ''}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
-                      ) : (
-                        survey.notes && (
-                          <div
-                            style={{
-                              marginBottom: '20px',
-                              padding: '12px 16px',
-                              background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                              borderRadius: '8px',
-                              borderLeft: '3px solid var(--accent-primary)'
-                            }}
-                          >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginLeft: '12px'
+                          }}
+                        >
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSaveEdit(survey.id)
+                                }}
+                                className="btn-primary"
+                                style={{
+                                  padding: '6px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                <Save size={14} />
+                                Save
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleCancelEdit()
+                                }}
+                                className="btn-secondary"
+                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {survey.completedAt && (
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: 4,
+                                    background: 'rgba(0,148,74,0.15)',
+                                    color: 'var(--success, #00944a)',
+                                    fontSize: 11,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  Survey Closed
+                                </span>
+                              )}
+                              {canManage && !survey.completedAt && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setClosingSurveyId(survey.id)
+                                  }}
+                                  style={{
+                                    padding: '5px 10px',
+                                    borderRadius: 6,
+                                    border: '1px solid var(--input-border)',
+                                    background: 'var(--input-bg)',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    fontSize: 12
+                                  }}
+                                >
+                                  Close Survey
+                                </button>
+                              )}
+                              {canManage && (
+                                <button
+                                  title="Edit"
+                                  aria-label="Edit"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditSurvey(survey)
+                                  }}
+                                  className="btn-secondary"
+                                  style={{
+                                    padding: '6px 12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.8rem'
+                                  }}
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+                              {canManage && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteSurvey(survey)
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: 'transparent',
+                                    color: 'var(--danger)',
+                                    border: '1px solid var(--danger)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                  }}
+                                  title="Delete survey"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {
+                        <div
+                          style={{
+                            padding: '20px',
+                            borderTop: isLight
+                              ? '1px solid rgba(0,0,0,0.06)'
+                              : '1px solid rgba(255,255,255,0.06)'
+                          }}
+                        >
+                          {isEditing ? (
                             <div
                               style={{
-                                color: 'var(--text-secondary)',
-                                fontSize: '0.75rem',
-                                fontWeight: '600',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
+                                marginBottom: '20px',
+                                padding: '20px',
+                                background: 'var(--input-bg)',
+                                borderRadius: '12px',
+                                border: '1px solid var(--input-border)'
                               }}
                             >
-                              Notes
+                              <h4
+                                style={{
+                                  color: 'var(--text-primary)',
+                                  marginBottom: '15px',
+                                  marginTop: 0
+                                }}
+                              >
+                                Edit Survey Details
+                              </h4>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '150px 1fr 1fr 1fr',
+                                  gap: '15px',
+                                  marginBottom: '15px'
+                                }}
+                              >
+                                <div>
+                                  <label
+                                    style={{
+                                      display: 'block',
+                                      marginBottom: '5px',
+                                      color: 'var(--text-secondary)',
+                                      fontSize: '14px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    Survey Date *
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={editDate}
+                                    onChange={(e) => setEditDate(e.target.value)}
+                                    required
+                                    min="1900-01-01"
+                                    max="2100-12-31"
+                                    aria-label="Edit survey date"
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    style={{
+                                      display: 'block',
+                                      marginBottom: '5px',
+                                      color: 'var(--text-secondary)',
+                                      fontSize: '14px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    Survey Type *
+                                  </label>
+                                  <select
+                                    value={editType}
+                                    onChange={(e) => setEditType(e.target.value)}
+                                    required
+                                    style={{
+                                      width: '100%',
+                                      padding: '10px',
+                                      borderRadius: '8px',
+                                      background: 'var(--bg-card)',
+                                      color: 'var(--text-primary)',
+                                      border: '1px solid var(--input-border)'
+                                    }}
+                                    aria-label="Edit survey type"
+                                  >
+                                    <option value="">-- Select Type --</option>
+                                    {surveyTypes.map((t) => (
+                                      <option key={t.id} value={t.name}>
+                                        {t.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label
+                                    style={{
+                                      display: 'block',
+                                      marginBottom: '5px',
+                                      color: 'var(--text-secondary)',
+                                      fontSize: '14px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    Reference
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editReference}
+                                    onChange={(e) => setEditReference(e.target.value)}
+                                    aria-label="Edit survey reference"
+                                  />
+                                </div>
+                                <div>
+                                  <label
+                                    style={{
+                                      display: 'block',
+                                      marginBottom: '5px',
+                                      color: 'var(--text-secondary)',
+                                      fontSize: '14px',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    Location
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editLocation}
+                                    onChange={(e) => setEditLocation(e.target.value)}
+                                    aria-label="Edit survey location"
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ marginBottom: '15px' }}>
+                                <label
+                                  style={{
+                                    display: 'block',
+                                    marginBottom: '5px',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Surveyor *
+                                </label>
+                                <select
+                                  value={editSurveyorId}
+                                  onChange={(e) => setEditSurveyorId(e.target.value)}
+                                  required
+                                  style={{ color: 'var(--text-primary)' }}
+                                  aria-label="Edit surveyor"
+                                >
+                                  <option value="">-- Select Surveyor --</option>
+                                  {surveyors.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.companyName} ({s.country})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label
+                                  style={{
+                                    display: 'block',
+                                    marginBottom: '5px',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Notes
+                                </label>
+                                <textarea
+                                  value={editNotes}
+                                  onChange={(e) => setEditNotes(e.target.value)}
+                                  rows={3}
+                                  style={{ resize: 'vertical', width: '100%' }}
+                                  aria-label="Edit survey notes"
+                                />
+                              </div>
                             </div>
-                            <p
-                              style={{
-                                color: 'var(--text-primary)',
-                                margin: 0,
-                                lineHeight: '1.6',
-                                fontSize: '0.9rem'
-                              }}
-                            >
-                              {survey.notes}
-                            </p>
-                          </div>
-                        )
-                      )}
+                          ) : (
+                            survey.notes && (
+                              <div
+                                style={{
+                                  marginBottom: '20px',
+                                  padding: '12px 16px',
+                                  background: isLight
+                                    ? 'rgba(0,0,0,0.02)'
+                                    : 'rgba(255,255,255,0.02)',
+                                  borderRadius: '8px',
+                                  borderLeft: '3px solid var(--accent-primary)'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    marginBottom: '6px'
+                                  }}
+                                >
+                                  Notes
+                                </div>
+                                <p
+                                  style={{
+                                    color: 'var(--text-primary)',
+                                    margin: 0,
+                                    lineHeight: '1.6',
+                                    fontSize: '0.9rem'
+                                  }}
+                                >
+                                  {survey.notes}
+                                </p>
+                              </div>
+                            )
+                          )}
 
-                      {/* File Attachments - Hidden when editing */}
-                      {!isEditing && (
-                        <SurveyAttachments
-                          attachments={surveyAttachments}
-                          isDragOver={isDragOver}
-                          onDragOver={(e) => handleDragOver(e, survey.id)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, survey.id)}
-                          onDelete={handleDeleteAttachment}
-                          onOpenFile={handleOpenFile}
-                          onImportWord={() => handleImportDefectsFromWord(survey.id)}
-                          canManage={canManage}
-                        />
-                      )}
+                          {/* File Attachments - Hidden when editing */}
+                          {!isEditing && (
+                            <SurveyAttachments
+                              attachments={surveyAttachments}
+                              isDragOver={isDragOver}
+                              onDragOver={(e) => handleDragOver(e, survey.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, survey.id)}
+                              onDelete={handleDeleteAttachment}
+                              onOpenFile={handleOpenFile}
+                              onImportWord={() => handleImportDefectsFromWord(survey.id)}
+                              canManage={canManage}
+                            />
+                          )}
 
-                      {/* Defects Manager - Hidden when editing */}
-                      {!isEditing && (
-                        <DefectManager
-                          survey={survey}
-                          vessel={vessel}
-                          onUpdate={refreshDefectCounts}
-                          refreshKey={defectRefreshKey}
-                        />
-                      )}
+                          {/* Defects Manager - Hidden when editing */}
+                          {!isEditing && (
+                            <DefectManager
+                              survey={survey}
+                              vessel={vessel}
+                              onUpdate={refreshDefectCounts}
+                              refreshKey={defectRefreshKey}
+                            />
+                          )}
+                        </div>
+                      }
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+            </div>
           </div>
         )}
       </section>

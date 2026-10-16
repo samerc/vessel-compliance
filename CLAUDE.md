@@ -160,7 +160,7 @@ Automated weekly sanctions screening for all entities and vessels:
 ### Condition Surveys
 Vessel inspection tracking with defects management:
 - **Surveyors**: Directory of surveyor companies (`SurveyorDirectory.tsx`) — table + slide-in panel layout (see UI Pattern below). Stats strip: Total Surveyors / Total Surveys / Open Surveys. Slide-in panel shows per-surveyor survey history with OPEN / CLOSED / NO DEFECTS status computed from defects (open=0 → CLOSED, no defects → NO DEFECTS). Add/Edit via modal.
-- **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location
+- **Surveys**: Condition surveys attached to vessels (`ConditionSurveyManager.tsx`) with date, surveyor, type, location. Master-detail (redesign 2026-10): survey cards on the left (type, date, surveyor, status pill), the selected survey (default the first, `expandedSurveyId`) with its notes, attachments and defects on the right
 - **Survey List**: Cross-vessel survey overview (`ConditionSurveyList.tsx`) with search, navigates directly to vessel's survey section. Sortable columns (vessel, date, type, surveyor, location, defects); default sort: date desc.
 - **Defect import** (Word/PDF of the report's "Deficiencies & Recommendations" pages): parsing rules in `src/main/workers/defectParser.ts` (pure, testable); `parser.ts` is the entry. Word files are read from their TABLE rows (exact); PDFs from text, where a defect starts at a reference line (`7.6`, `13`, `8.4 / 27.2`, `N/I 3`, `01`) and runs to the next one (multi-line text and numbered sub-items stay together; page headers, NOTE and signature lines are skipped). Items in "This section is for the observations and the outstanding tests" get severity `Observation`. A "time scale" / "time for rectification" line becomes the due date counted from the report's survey date (`10 day`, `3 month`, `on week`; `immediately`/`ASAP` = survey date); an event time scale (`at next dry dock`, `before next sailing`, `upon completion of job`) is stored as `survey_defects.due_event` instead. Wrapped reference cells (`10.1`/`0/1`/`0.1`/`1` = `10.10/10.11`) are rejoined; an item after a time scale with no reference is imported with number `-`. A trailing date only counts as due when worded so (`due`, `by`, `before`...). Re-importing skips defects already on the survey (same ref + text).
 - **Defect import process**: the parser runs in an Electron `utilityProcess`, NOT a worker thread - pdf.js in a main-process worker thread caused native crashes of the whole app on repeated PDF imports. pdf.js treats non-'browser' Electron processes as web pages, so `parser.ts` hides `process.type` before requiring pdf-parse. The parser loads from the installed ASAR, so parser changes only reach users with a FULL installer.
@@ -671,6 +671,8 @@ MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) cau
 
 ### Vessel Detail Navigation
 
+- **Header card** (redesign 2026-10): name, flag, Active/Inactive pill, labelled key facts, actions; below it `VesselSummaryTiles` (Documents, Policies, Quotations, Sanctions, Surveys), each opening its tab
+
 - **Sections**: Toggle between Documents, Assured, Surveys, Policies, and Activity views via `detailView` state
 - **External Navigation**: `initialSection` prop allows navigating directly to any tab
 - **Navigation Chain**: App.tsx → VesselManager (initialVesselSection) → VesselDetail (initialSection)
@@ -809,7 +811,7 @@ Insurance policy document management:
 
 - **Policy Documents** (`policy_documents`): Created from quotations via 6-step conversion wizard
 - **Policy Numbering**: `{type_code}{inverted_year}{4-digit serial}` (e.g., P26200001)
-- **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review
+- **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review. Layout (redesign 2026-10): step list on the left (`STEP_LABELS` / `STEP_HINTS` / `STEP_ICONS`, all indexed by step id 0-7), content with Back / Continue at its foot, live summary on the right
 - **Policy Detail** (`PolicyDetail.tsx`): Overview, Financial, Addresses, Blue Cards, Revision History, editing mode with 4 tabs
 - **Policy List** (`PolicyList.tsx`): Stats, search, filters, sortable table with conversion/export dates
 - **Policy Settings** (`PolicySettings.tsx`): Two-tier navigation (General/P&I/Hull/War) for opening clause, closing text, important notice, premium intro, font size, timezones, page numbering, footer, header titles, banks, cancel & replace, blue card texts, signatures, QR verification, T&C templates
