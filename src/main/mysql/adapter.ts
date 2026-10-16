@@ -110,6 +110,8 @@ import {
   PolicyListRow,
   PolicyRenewalNote,
   PolicyRenewalRow,
+  CustomerOverview,
+  VesselCustomerMap,
   PolicyType,
   PolicyTypeCharacteristic,
   PolicyTypeCondition,
@@ -18935,6 +18937,104 @@ export class MySQLAdapter {
    * vesselId -> policy end date that annual-renewal documents follow: the active P&I policy's
    * end date, else the active H&M one (same priority as resolveEffectivePolicyExpiry).
    */
+  /** Quotations, policies, vessel policies and receipts of one customer / broker entity */
+  async getCustomerOverview(entityId: string): Promise<CustomerOverview> {
+    const empty: CustomerOverview = {
+      quotations: [],
+      policies: [],
+      vesselPolicies: [],
+      receipts: []
+    }
+    if (!this.pool) return empty
+    const [[q], [p], [vp], [r]] = await Promise.all([
+      this.pool.query(
+        `SELECT q.id, q.reference_number AS referenceNumber, q.quotation_date AS quotationDate,
+                q.status, pt.code AS typeCode, ws.name AS stepName,
+                (SELECT GROUP_CONCAT(COALESCE(v.name, qv.name) ORDER BY qv.order_index SEPARATOR ', ')
+                   FROM quotation_vessels qv LEFT JOIN vessels v ON v.id = qv.vessel_id
+                  WHERE qv.quotation_id = q.id) AS vesselNames
+           FROM quotations q
+           LEFT JOIN policy_types pt ON pt.id = q.quotation_type_id
+           LEFT JOIN quotation_workflow_steps ws ON ws.id = q.workflow_step_id
+          WHERE q.customer_entity_id = ? AND q.deleted_at IS NULL
+          ORDER BY q.quotation_date DESC, q.created_at DESC
+          LIMIT 200`,
+        [entityId]
+      ),
+      this.pool.query(
+        `SELECT pd.id, pd.policy_number AS policyNumber, pd.status,
+                pd.inception_date AS inceptionDate, pd.expiry_date AS expiryDate,
+                pt.code AS typeCode, v.name AS vesselName, pd.premium_amount AS premiumAmount,
+                q.premium_currency AS currency
+           FROM policy_documents pd
+           JOIN quotations q ON q.id = pd.quotation_id
+           LEFT JOIN policy_types pt ON pt.id = q.quotation_type_id
+           LEFT JOIN vessels v ON v.id = pd.vessel_id
+          WHERE q.customer_entity_id = ?
+          ORDER BY pd.inception_date DESC
+          LIMIT 200`,
+        [entityId]
+      ),
+      this.pool.query(
+        `SELECT vdp.id, vdp.vessel_id AS vesselId, v.name AS vesselName, pt.name AS policyTypeName,
+                vdp.policy_number AS policyNumber, vdp.status,
+                (SELECT vpv.value_date FROM vessel_policy_values vpv
+                   JOIN policy_type_characteristics ptc ON ptc.id = vpv.characteristic_id
+                  WHERE vpv.policy_id = vdp.id AND ptc.field_type = 'date'
+                    AND LOWER(ptc.name) LIKE '%end%' LIMIT 1) AS endDate
+           FROM vessel_dynamic_policies vdp
+           JOIN vessels v ON v.id = vdp.vessel_id
+           JOIN policy_types pt ON pt.id = vdp.policy_type_id
+          WHERE (vdp.customer_entity_id = ? OR vdp.broker_entity_id = ?) AND vdp.status = 'active'
+          ORDER BY v.name, pt.name`,
+        [entityId, entityId]
+      ),
+      this.pool.query(
+        `SELECT id, receipt_number AS receiptNumber, receipt_date AS receiptDate, amount, currency,
+                vessel_name AS vesselName
+           FROM receipts WHERE payer_entity_id = ?
+          ORDER BY receipt_date DESC LIMIT 200`,
+        [entityId]
+      )
+    ])
+    return {
+      quotations: q as CustomerOverview['quotations'],
+      policies: (p as RowDataPacket[]).map((x) => ({
+        ...(x as CustomerOverview['policies'][number]),
+        premiumAmount: x.premiumAmount != null ? Number(x.premiumAmount) : null
+      })),
+      vesselPolicies: vp as CustomerOverview['vesselPolicies'],
+      receipts: (r as RowDataPacket[]).map((x) => ({
+        ...(x as CustomerOverview['receipts'][number]),
+        amount: Number(x.amount || 0)
+      }))
+    }
+  }
+
+  /** vesselId -> customers / brokers of its active vessel policies */
+  async getVesselCustomers(): Promise<VesselCustomerMap> {
+    if (!this.pool) return {}
+    const [rows] = await this.pool.query(
+      `SELECT DISTINCT vdp.vessel_id AS vesselId, e.id AS entityId, e.name, e.email,
+              vdp.customer_type AS type
+         FROM vessel_dynamic_policies vdp
+         JOIN entities e ON e.id = COALESCE(vdp.customer_entity_id, vdp.broker_entity_id)
+        WHERE vdp.status = 'active'`
+    )
+    const map: VesselCustomerMap = {}
+    for (const r of rows as RowDataPacket[]) {
+      const list = (map[r.vesselId] ||= [])
+      if (!list.some((c) => c.entityId === r.entityId))
+        list.push({
+          entityId: r.entityId,
+          name: r.name,
+          email: r.email || null,
+          type: r.type || null
+        })
+    }
+    return map
+  }
+
   async getVesselPolicyExpiries(): Promise<Record<string, string>> {
     if (!this.pool) return {}
     const [rows] = await this.pool.query(

@@ -5417,6 +5417,14 @@ app.whenReady().then(() => {
     requireSession(event)
     return db.getExpiredActivePolicies()
   })
+  safeHandle('entities:getCustomerOverview', (event, entityId: string) => {
+    requireSession(event)
+    return db.getCustomerOverview(entityId)
+  })
+  safeHandle('entities:getVesselCustomers', (event) => {
+    requireSession(event)
+    return db.getVesselCustomers()
+  })
   safeHandle('policies:getVesselPolicyExpiries', (event) => {
     requireSession(event)
     return db.getVesselPolicyExpiries()

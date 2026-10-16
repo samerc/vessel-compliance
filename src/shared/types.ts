@@ -2043,6 +2043,54 @@ export interface PolicyExpiryRow {
 }
 
 /** A vessel policy ending in the requested period (policies:getRenewalsByMonth / renewals:getPipeline) */
+/** Everything done for one customer / broker entity (Directory panel "Business") */
+export interface CustomerOverview {
+  quotations: {
+    id: string
+    referenceNumber: string
+    quotationDate: string | null
+    status: string
+    typeCode: string | null
+    stepName: string | null
+    vesselNames: string | null
+  }[]
+  policies: {
+    id: string
+    policyNumber: string
+    status: string
+    inceptionDate: string | null
+    expiryDate: string | null
+    typeCode: string | null
+    vesselName: string | null
+    premiumAmount: number | null
+    currency: string | null
+  }[]
+  /** Active vessel policy records this entity is customer / broker on (Renewals rows) */
+  vesselPolicies: {
+    id: string
+    vesselId: string
+    vesselName: string
+    policyTypeName: string
+    policyNumber: string | null
+    endDate: string | null
+    status: string
+  }[]
+  receipts: {
+    id: string
+    receiptNumber: string
+    receiptDate: string | null
+    amount: number
+    currency: string
+    vesselName: string | null
+  }[]
+}
+
+/** vesselId -> customers / brokers on its active policies (for grouping alerts by customer) */
+export type VesselCustomerMap = Record<
+  string,
+  { entityId: string; name: string; email: string | null; type: string | null }[]
+>
+
 export interface PolicyRenewalRow {
   id: string
   vesselId: string
