@@ -75,6 +75,7 @@ import RemapFilePathsModal from './RemapFilePathsModal'
 import VesselQuotationsView from './VesselQuotationsView'
 import ReceiptManager from './ReceiptManager'
 import { ok, asArray } from '../utils/ipc'
+import { useUnsavedGuard, leaveThen } from '../utils/useUnsavedGuard'
 
 /** Vessel update where null clears the column (updateVessel accepts it at runtime) */
 type NullableVesselUpdate = { [K in keyof Vessel]?: Vessel[K] | null }
@@ -494,6 +495,20 @@ export default function VesselDetail({
   const [flagDropdownOpen, setFlagDropdownOpen] = useState(false)
   const [flagSearch, setFlagSearch] = useState('')
   const [editCallSign, setEditCallSign] = useState(vessel.callSign || '')
+  // Leaving the page while editing with changed details asks first
+  useUnsavedGuard(
+    isEditing &&
+      (editName !== (vessel.name || '') ||
+        editImo !== (vessel.imoNumber || '') ||
+        editBuiltYear !== (vessel.builtYear?.toString() || '') ||
+        editRebuiltYear !== (vessel.rebuiltYear?.toString() || '') ||
+        editGrossTonnage !== (vessel.grossTonnage?.toString() || '') ||
+        (editVesselType !== (vessel.vesselTypeId || '') &&
+          editVesselType !== (vessel.vesselType || '')) ||
+        editClassification !== (vessel.classificationSociety || '') ||
+        editCallSign !== (vessel.callSign || '') ||
+        selectedFlagStateId !== (vessel.flagStateId || ''))
+  )
   const [classSocieties, setClassSocieties] = useState<ClassificationSociety[]>([])
   const [vesselTypes, setVesselTypes] = useState<VesselType[]>([])
   const [customDocTypes, setCustomDocTypes] = useState<VesselCustomDocType[]>([])
@@ -1111,7 +1126,7 @@ export default function VesselDetail({
   return (
     <div className="fade-in">
       <button
-        onClick={onBack}
+        onClick={() => leaveThen(onBack)}
         className="btn-secondary"
         style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}
       >
@@ -2009,7 +2024,7 @@ export default function VesselDetail({
                   setEditRebuiltYear(vessel.rebuiltYear?.toString() || '')
                   setShowRebuiltYear(!!vessel.rebuiltYear)
                   setEditGrossTonnage(vessel.grossTonnage?.toString() || '')
-                  setEditVesselType(vessel.vesselType || '')
+                  setEditVesselType(vessel.vesselTypeId || '')
                   setEditClassification(vessel.classificationSociety || '')
                   setEditCallSign(vessel.callSign || '')
                   const vcs = await window.api.getVesselClassifications(vessel.id)

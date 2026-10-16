@@ -81,6 +81,9 @@ export default function DefectManager({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [showAddForm, setShowAddForm] = useState(false)
   const defectNumberRef = useRef<HTMLInputElement>(null)
+  // "Add & next": keep the form open with severity and due, ready for the next defect
+  const addNextRef = useRef(false)
+  const newDescriptionWrapRef = useRef<HTMLDivElement>(null)
   const [closeModalDefect, setCloseModalDefect] = useState<SurveyDefect | null>(null)
   const [closureNotes, setClosureNotes] = useState('')
   const [editingDefectId, setEditingDefectId] = useState<string | null>(null)
@@ -170,13 +173,19 @@ export default function DefectManager({
       notes: newNotes || undefined
     })
 
+    const keepOpen = addNextRef.current
+    addNextRef.current = false
     setNewNumber('')
     setNewDescription('')
-    setNewSeverity('')
-    setNewDueDate('')
-    setNewDueEvent('')
     setNewNotes('')
-    setShowAddForm(false)
+    if (keepOpen) {
+      requestAnimationFrame(() => newDescriptionWrapRef.current?.querySelector('textarea')?.focus())
+    } else {
+      setNewSeverity('')
+      setNewDueDate('')
+      setNewDueEvent('')
+      setShowAddForm(false)
+    }
     loadDefects()
     onUpdate()
   }
@@ -694,16 +703,18 @@ export default function DefectManager({
               />
             </Field>
             <Field label="Description" required span="all">
-              <FormattedTextArea
-                placeholder="Description *"
-                value={newDescription}
-                onChange={setNewDescription}
-                required
-                rows={4}
-                ariaLabel="Defect description"
-                isLight={isLight}
-                marginBottom="0"
-              />
+              <div ref={newDescriptionWrapRef}>
+                <FormattedTextArea
+                  placeholder="Description *"
+                  value={newDescription}
+                  onChange={setNewDescription}
+                  required
+                  rows={4}
+                  ariaLabel="Defect description"
+                  isLight={isLight}
+                  marginBottom="0"
+                />
+              </div>
             </Field>
             <Field label="Notes" hint="Optional" span="all">
               <textarea
@@ -717,9 +728,23 @@ export default function DefectManager({
             </Field>
           </div>
           <div className="form-actions" style={{ marginTop: '14px' }}>
-            <button type="submit" className="btn-primary">
+            {/* Add Defect first in the DOM so Enter keeps submitting it; Add & next shows first */}
+            <button
+              type="submit"
+              className="btn-primary"
+              onClick={() => (addNextRef.current = false)}
+            >
               <Plus size={16} />
               Add Defect
+            </button>
+            <button
+              type="submit"
+              className="btn-secondary"
+              style={{ order: -1 }}
+              onClick={() => (addNextRef.current = true)}
+              title="Add this defect and start the next one with the same severity and due"
+            >
+              Add &amp; next
             </button>
           </div>
         </form>

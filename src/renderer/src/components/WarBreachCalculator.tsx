@@ -129,7 +129,7 @@ function calcVessel(row: VesselRow, settings: TaxSettings, baseDays: number): Ve
 /** A vessel row as stored in a saved record's vesselsJson */
 type SavedVesselRow = VesselRow & {
   calc: VesselCalc | null
-  /** Never written by the save (rows carry `vessel`); kept because the history list reads it */
+  /** Older field name; the save writes `vessel` */
   vesselName?: string
 }
 
@@ -1094,8 +1094,8 @@ export default function WarBreachCalculator(): React.JSX.Element {
                             }}
                           >
                             {vessels
-                              .filter((v) => v.vesselName)
-                              .map((v) => v.vesselName)
+                              .map((v) => (v.vessel || v.vesselName || '').trim())
+                              .filter(Boolean)
                               .join(', ') ||
                               rec.coverNoteNo || (
                                 <span

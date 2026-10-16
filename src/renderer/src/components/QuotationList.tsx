@@ -98,7 +98,10 @@ type SavedFilterValues = QuotationSavedFilterValues & { registryOnly?: boolean }
 function monthWindow(navYear: number, navMonth: number): { from: string; to: string } {
   const from = new Date(navYear, navMonth - 1, 1) // first day of M-1
   const toEnd = new Date(navYear, navMonth + 2, 0) // last day of M+1
-  return { from: from.toISOString().split('T')[0], to: toEnd.toISOString().split('T')[0] }
+  // Local date parts: toISOString would shift local midnight back a day east of UTC (Beirut)
+  const ymd = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return { from: ymd(from), to: ymd(toEnd) }
 }
 
 interface PaginatedData {

@@ -52,6 +52,7 @@ import WhatsNewModal from './components/WhatsNewModal'
 import GlobalSearch from './components/GlobalSearch'
 import { PageHeader, SegmentedControl } from './components/ui'
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from './utils/accent'
+import { leaveThen } from './utils/useUnsavedGuard'
 import { useToast } from './contexts/ToastContext'
 import { AppTab, AppAction, NavTarget, visibleFeatures, FEATURES } from './features'
 import type { RecentItem } from '../../shared/types'
@@ -129,9 +130,18 @@ function App(): React.JSX.Element {
     activeTab === 'vessels' && breadcrumbVessel && breadcrumbVessel.id === navigateToVesselId
       ? breadcrumbVessel.name
       : null
-  // Nothing sets these yet: the quotation / policy breadcrumbs end at the list label
-  const [breadcrumbQuotationRef] = useState<string | null>(null)
-  const [breadcrumbPolicyRef] = useState<string | null>(null)
+  // Reference fetched for the quotation / policy the breadcrumb points at (keyed by id, like the vessel)
+  const [breadcrumbQuotation, setBreadcrumbQuotation] = useState<{
+    id: string
+    ref: string
+  } | null>(null)
+  const [breadcrumbPolicy, setBreadcrumbPolicy] = useState<{ id: string; ref: string } | null>(null)
+  const breadcrumbQuotationRef =
+    breadcrumbQuotation && breadcrumbQuotation.id === initialQuotationId
+      ? breadcrumbQuotation.ref
+      : null
+  const breadcrumbPolicyRef =
+    breadcrumbPolicy && breadcrumbPolicy.id === selectedPolicyId ? breadcrumbPolicy.ref : null
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
@@ -215,6 +225,36 @@ function App(): React.JSX.Element {
     }
   }, [navigateToVesselId, activeTab])
 
+  // Resolve breadcrumb quotation reference / policy number when one is opened
+  useEffect(() => {
+    if (!initialQuotationId || activeTab !== 'quotations') return
+    let alive = true
+    window.api
+      .getQuotation(initialQuotationId)
+      .then((q) => {
+        if (q && alive) setBreadcrumbQuotation({ id: q.id, ref: q.referenceNumber })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [initialQuotationId, activeTab])
+
+  useEffect(() => {
+    if (!selectedPolicyId || activeTab !== 'policy-detail') return
+    let alive = true
+    window.api
+      .policyGetById(selectedPolicyId)
+      .then((p) => {
+        if (p?.policyNumber && alive)
+          setBreadcrumbPolicy({ id: selectedPolicyId, ref: p.policyNumber })
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [selectedPolicyId, activeTab])
+
   // Ctrl+K global search shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
@@ -228,26 +268,28 @@ function App(): React.JSX.Element {
   }, [])
 
   const handleSearchNavigate = useCallback((type: string, id: string) => {
-    if (type === 'vessel') {
-      setNavigateToVesselId(id)
-      setNavigateToVesselSection(undefined)
-      setNavigateBackTab(undefined)
-      setActiveTab('vessels')
-    } else if (type === 'entity') {
-      setInitialEntityId(id)
-      setActiveTab('directory')
-    } else if (type === 'quotation') {
-      setInitialQuotationId(id)
-      setActiveTab('quotations')
-    } else if (type === 'policy') {
-      setSelectedPolicyId(id)
-      setActiveTab('policy-detail')
-    } else if (type === 'vessel_policy') {
-      setNavigateToVesselId(id)
-      setNavigateToVesselSection('policies')
-      setNavigateBackTab(undefined)
-      setActiveTab('vessels')
-    }
+    leaveThen(() => {
+      if (type === 'vessel') {
+        setNavigateToVesselId(id)
+        setNavigateToVesselSection(undefined)
+        setNavigateBackTab(undefined)
+        setActiveTab('vessels')
+      } else if (type === 'entity') {
+        setInitialEntityId(id)
+        setActiveTab('directory')
+      } else if (type === 'quotation') {
+        setInitialQuotationId(id)
+        setActiveTab('quotations')
+      } else if (type === 'policy') {
+        setSelectedPolicyId(id)
+        setActiveTab('policy-detail')
+      } else if (type === 'vessel_policy') {
+        setNavigateToVesselId(id)
+        setNavigateToVesselSection('policies')
+        setNavigateBackTab(undefined)
+        setActiveTab('vessels')
+      }
+    })
   }, [])
 
   const checkForUpdates = useCallback(
@@ -271,13 +313,17 @@ function App(): React.JSX.Element {
   )
 
   const startCreate = useCallback((kind: 'vessel' | 'quotation' | 'entity') => {
-    setCreateIntent(kind)
-    if (kind === 'vessel') {
-      setNavigateToVesselId(null)
-      setNavigateToVesselSection(undefined)
-    }
-    setPageRequest(null)
-    setActiveTab(kind === 'vessel' ? 'vessels' : kind === 'quotation' ? 'quotations' : 'directory')
+    leaveThen(() => {
+      setCreateIntent(kind)
+      if (kind === 'vessel') {
+        setNavigateToVesselId(null)
+        setNavigateToVesselSection(undefined)
+      }
+      setPageRequest(null)
+      setActiveTab(
+        kind === 'vessel' ? 'vessels' : kind === 'quotation' ? 'quotations' : 'directory'
+      )
+    })
   }, [])
 
   const runAction = useCallback(
@@ -320,22 +366,28 @@ function App(): React.JSX.Element {
         return
       }
       // User Management lives in the Settings hub
-      if (t.tab === 'users') t = { tab: 'admin', sub: 'users' }
-      if (!t.tab) return
-      if (t.tab === 'policies-list') setPolicyView(t.sub === 'settings' ? 'settings' : 'list')
-      if (t.tab === 'compliance' && t.sub) setComplianceSubTab(t.sub as typeof complianceSubTab)
-      if (t.tab === 'vessels') {
-        setNavigateToVesselId(null)
-        setNavigateToVesselSection(undefined)
-      }
-      setPageRequest(t.sub ? { tab: t.tab, sub: t.sub, n: Date.now() } : null)
-      setActiveTab(t.tab)
+      const target: NavTarget = t.tab === 'users' ? { tab: 'admin', sub: 'users' } : t
+      const tab = target.tab
+      if (!tab) return
+      leaveThen(() => {
+        if (tab === 'policies-list') setPolicyView(target.sub === 'settings' ? 'settings' : 'list')
+        if (tab === 'compliance' && target.sub)
+          setComplianceSubTab(target.sub as typeof complianceSubTab)
+        if (tab === 'vessels') {
+          setNavigateToVesselId(null)
+          setNavigateToVesselSection(undefined)
+        }
+        setPageRequest(target.sub ? { tab, sub: target.sub, n: Date.now() } : null)
+        setActiveTab(tab)
+      })
     },
     [runAction]
   )
 
   /** Opens a recently viewed record (sidebar Recent list and Home) */
-  const openRecentItem = (item: RecentItem): void => {
+  const openRecentItem = (item: RecentItem): void => leaveThen(() => openRecentNow(item))
+
+  const openRecentNow = (item: RecentItem): void => {
     if (item.itemType === 'vessel') {
       setNavigateToVesselId(item.itemId)
       setNavigateToVesselSection(undefined)
@@ -545,10 +597,12 @@ function App(): React.JSX.Element {
       icon={icon}
       label={label}
       active={activeTab === tab}
-      onClick={() => {
-        setPageRequest(null)
-        setActiveTab(tab)
-      }}
+      onClick={() =>
+        leaveThen(() => {
+          setPageRequest(null)
+          setActiveTab(tab)
+        })
+      }
       sidebarCollapsed={sc}
     />
   )
@@ -764,8 +818,10 @@ function App(): React.JSX.Element {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setPageRequest(null)
-                  setActiveTab('notifications')
+                  leaveThen(() => {
+                    setPageRequest(null)
+                    setActiveTab('notifications')
+                  })
                 }}
                 style={{
                   position: 'relative',
@@ -1424,7 +1480,7 @@ function App(): React.JSX.Element {
                   {i > 0 && <ChevronRight size={12} style={{ opacity: 0.5 }} />}
                   {bc.onClick ? (
                     <button
-                      onClick={bc.onClick}
+                      onClick={() => bc.onClick && leaveThen(bc.onClick)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -1784,26 +1840,32 @@ function App(): React.JSX.Element {
                 <PolicyDetail
                   key={selectedPolicyId}
                   policyId={selectedPolicyId}
-                  onBack={() => {
-                    setSelectedPolicyId(null)
-                    setActiveTab('policies-list')
-                  }}
-                  onNavigateToVessel={(vesselId) => {
-                    setNavigateToVesselId(vesselId)
-                    setNavigateBackTab('policies-list')
-                    setActiveTab('vessels')
-                  }}
+                  onBack={() =>
+                    leaveThen(() => {
+                      setSelectedPolicyId(null)
+                      setActiveTab('policies-list')
+                    })
+                  }
+                  onNavigateToVessel={(vesselId) =>
+                    leaveThen(() => {
+                      setNavigateToVesselId(vesselId)
+                      setNavigateBackTab('policies-list')
+                      setActiveTab('vessels')
+                    })
+                  }
                   onNavigateToQuotation={(
                     quotationId: string,
                     policyCtx?: { policyId: string; policyNumber: string }
-                  ) => {
-                    setInitialQuotationId(quotationId)
-                    if (policyCtx) setQuotationPolicyContext(policyCtx)
-                    setActiveTab('quotations')
-                  }}
-                  onNavigateToPolicy={(newPolicyId: string) => {
-                    setSelectedPolicyId(newPolicyId)
-                  }}
+                  ) =>
+                    leaveThen(() => {
+                      setInitialQuotationId(quotationId)
+                      if (policyCtx) setQuotationPolicyContext(policyCtx)
+                      setActiveTab('quotations')
+                    })
+                  }
+                  onNavigateToPolicy={(newPolicyId: string) =>
+                    leaveThen(() => setSelectedPolicyId(newPolicyId))
+                  }
                 />
               </Suspense>
             )}
@@ -1844,10 +1906,12 @@ function App(): React.JSX.Element {
                     setSelectedPolicyId(policyId)
                     setActiveTab('policy-detail')
                   }}
-                  onCancel={() => {
-                    setPolicySetupQuotationId(null)
-                    setActiveTab('quotations')
-                  }}
+                  onCancel={() =>
+                    leaveThen(() => {
+                      setPolicySetupQuotationId(null)
+                      setActiveTab('quotations')
+                    })
+                  }
                 />
               </Suspense>
             )}

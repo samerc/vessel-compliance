@@ -429,8 +429,7 @@ export default function PremiumTab({
     field: 'daysFromInception' | 'instalmentNumber',
     value: number
   ): Promise<void> => {
-    const updated = [...instalments]
-    updated[index][field] = value
+    const updated = instalments.map((inst, i) => (i === index ? { ...inst, [field]: value } : inst))
     await window.api.setQuotationInstalments(
       quotation.id,
       updated.map((i) => ({

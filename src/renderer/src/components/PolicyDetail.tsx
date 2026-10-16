@@ -55,7 +55,8 @@ import type {
   QuotationCustomWarranty,
   QuotationHullAdditionalCondition,
   QuotationHullCondition,
-  VesselAssured
+  VesselAssured,
+  EntityAddress
 } from '../../../shared/types'
 import { splitInstalments } from '../../../shared/premium'
 import { ok, asArray } from '../utils/ipc'
@@ -64,6 +65,7 @@ import { MoneyInput } from './quotation-tabs/shared'
 import SectionOrderModal from './quotation-tabs/SectionOrderModal'
 import { Modal, Field } from './ui'
 import { DEFAULT_UPCC_TITLE } from '../utils/surveyWarrantyText'
+import { useUnsavedGuard, confirmLeave } from '../utils/useUnsavedGuard'
 
 const DEFAULT_TIMEZONE_OPTIONS = [
   'Lebanon Standard Time',
@@ -266,6 +268,33 @@ export default function PolicyDetail({
   const [editSectionOrder, setEditSectionOrder] = useState<string[] | null>(null)
   const [showSectionOrder, setShowSectionOrder] = useState(false)
 
+  // Unsaved edits: the edit fields compared with what they held when edit mode opened
+  // (baseline taken on the first render in edit mode, reset during render on leaving it)
+  const editState = isEditing
+    ? JSON.stringify([
+        editInception,
+        editInceptionTime,
+        editExpiry,
+        editExpiryTime,
+        editTimezone,
+        editPremium,
+        editCommission,
+        editBankId,
+        editInstalments,
+        editAddresses,
+        editCancelReplace,
+        editCancelReplaceText,
+        editHideBroker,
+        editSubjectivityDays,
+        editUpccTitle,
+        editSectionOrder
+      ])
+    : null
+  const [editBaseline, setEditBaseline] = useState<string | null>(null)
+  if (editState !== null && editBaseline === null) setEditBaseline(editState)
+  if (editState === null && editBaseline !== null) setEditBaseline(null)
+  useUnsavedGuard(editState !== null && editBaseline !== null && editState !== editBaseline)
+
   // Supplementary data for editing
   const [banks, setBanks] = useState<
     { id: string; name: string; details: string; order: number }[]
@@ -320,6 +349,7 @@ export default function PolicyDetail({
   const [flagStates, setFlagStates] = useState<FlagState[]>([])
   const [flagPorts, setFlagPorts] = useState<FlagStatePort[]>([])
   const [vesselAssureds, setVesselAssureds] = useState<VesselAssured[]>([])
+  const [entityAddresses, setEntityAddresses] = useState<EntityAddress[]>([])
   const [assuredEntities, setAssuredEntities] = useState<
     Array<{ id: string; name: string; address?: string }>
   >([])
@@ -414,11 +444,13 @@ export default function PolicyDetail({
   useEffect(() => {
     const loadSupplementary = async (): Promise<void> => {
       try {
-        const [fs, entities, bnks] = await Promise.all([
+        const [fs, entities, bnks, addrs] = await Promise.all([
           window.api.getFlagStates(),
           window.api.getEntities(),
-          window.api.bankGetAll()
+          window.api.bankGetAll(),
+          window.api.getEntityAddresses()
         ])
+        setEntityAddresses(Array.isArray(addrs) ? addrs : [])
         setFlagStates(Array.isArray(fs) ? fs : [])
         setBanks(Array.isArray(bnks) ? bnks : [])
         // Build a simple entity lookup for assured entities
@@ -869,11 +901,27 @@ export default function PolicyDetail({
 
   // Build owner options from vessel assureds
   const ownerOptions = useMemo(() => {
+    // Address as the conversion writes it: the assured's chosen address, else the entity's first
+    const formatAddress = (a?: EntityAddress): string =>
+      a
+        ? [
+            a.addressLine1,
+            a.addressLine2,
+            [a.city, a.postalCode].filter(Boolean).join(' '),
+            a.country
+          ]
+            .map((x) => (x || '').trim())
+            .filter(Boolean)
+            .join('\n')
+        : ''
     const opts: Array<{ id: string; name: string; address?: string; role?: string }> = []
     for (const va of vesselAssureds) {
       const entity = assuredEntities.find((e) => e.id === va.entityId)
       if (entity) {
-        opts.push({ ...entity, role: va.role })
+        const addr =
+          entityAddresses.find((a) => a.id === va.addressId) ||
+          entityAddresses.find((a) => a.entityId === va.entityId)
+        opts.push({ ...entity, address: formatAddress(addr) || entity.address, role: va.role })
       }
     }
     // Sort: "Registered Owner" roles first
@@ -883,7 +931,7 @@ export default function PolicyDetail({
       return aIsOwner - bIsOwner
     })
     return opts
-  }, [vesselAssureds, assuredEntities])
+  }, [vesselAssureds, assuredEntities, entityAddresses])
 
   // Increment card number for reissue
   const incrementCardNumber = (cardNumber: string): string => {
@@ -3363,7 +3411,11 @@ export default function PolicyDetail({
             <button
               className="btn-secondary"
               style={{ padding: '8px 20px', fontSize: '0.85rem' }}
-              onClick={() => setIsEditing(false)}
+              onClick={() =>
+                void confirmLeave().then((leave) => {
+                  if (leave) setIsEditing(false)
+                })
+              }
               disabled={saving}
             >
               Cancel

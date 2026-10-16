@@ -720,10 +720,12 @@ function GenerateModal({
   useEffect(() => {
     // Clearing the vessel resets the policy list in the select's onChange
     if (!selectedVesselId) return
+    // Ignore a late answer for a vessel that is no longer selected
+    let alive = true
     window.api
       .getVesselDynamicPolicies(selectedVesselId)
       .then((p) => {
-        if (Array.isArray(p)) {
+        if (alive && Array.isArray(p)) {
           setPolicies(
             p.map((x) => ({
               id: x.id,
@@ -733,6 +735,9 @@ function GenerateModal({
         }
       })
       .catch(() => {})
+    return () => {
+      alive = false
+    }
   }, [selectedVesselId])
 
   const handleAction = async (): Promise<void> => {

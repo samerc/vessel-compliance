@@ -10,7 +10,8 @@ import {
   Edit,
   Save,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Link2
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import {
@@ -18,7 +19,8 @@ import {
   ConditionSurvey,
   SurveyAttachment,
   Surveyor,
-  ConditionSurveyType
+  ConditionSurveyType,
+  SurveyWarranty
 } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -104,6 +106,11 @@ export default function ConditionSurveyManager({
   const [showNewSurveyorForm, setShowNewSurveyorForm] = useState(false)
   const [closingSurveyId, setClosingSurveyId] = useState<string | null>(null)
   const [endorsementSurveyId, setEndorsementSurveyId] = useState<string | null>(null)
+  // After a new survey: the vessel's pending survey warranties it may satisfy
+  const [warrantyOffer, setWarrantyOffer] = useState<{
+    surveyId: string
+    warranties: SurveyWarranty[]
+  } | null>(null)
   const { theme } = useTheme()
   const isLight = theme === 'light' || theme === 'aurora'
 
@@ -230,6 +237,7 @@ export default function ConditionSurveyManager({
     })
 
     setEndorsementSurveyId(newSurvey.id)
+    void offerPendingWarranties(newSurvey.id)
     setNewDate('')
     setNewSurveyorId('')
     setNewType('')
@@ -242,6 +250,37 @@ export default function ConditionSurveyManager({
     setShowNewSurveyorForm(false)
     setShowAddForm(false)
     loadData()
+  }
+
+  /** Offer to link the new survey to the vessel's pending, unlinked survey warranties */
+  const offerPendingWarranties = async (surveyId: string): Promise<void> => {
+    try {
+      const data = await window.api.surveyWarrantyGetByVessel(vessel.id)
+      const pending = (Array.isArray(data) ? data : []).filter(
+        (w) => w.status === 'pending' && !w.conditionSurveyId
+      )
+      if (pending.length > 0) setWarrantyOffer({ surveyId, warranties: pending })
+    } catch (error) {
+      console.error('Failed to load survey warranties:', error)
+    }
+  }
+
+  // Same update as WarrantyManager's "Link to Survey"
+  const handleLinkWarranty = async (warranty: SurveyWarranty): Promise<void> => {
+    if (!warrantyOffer) return
+    try {
+      ok(
+        await window.api.surveyWarrantyUpdate(warranty.id, {
+          conditionSurveyId: warrantyOffer.surveyId,
+          status: 'survey_done'
+        })
+      )
+      showSuccess('Survey linked to warranty')
+      const rest = warrantyOffer.warranties.filter((w) => w.id !== warranty.id)
+      setWarrantyOffer(rest.length > 0 ? { ...warrantyOffer, warranties: rest } : null)
+    } catch (err) {
+      showError((err instanceof Error && err.message) || 'Failed to link survey')
+    }
   }
 
   const handleEditSurvey = (survey: ConditionSurvey): void => {
@@ -1210,6 +1249,57 @@ export default function ConditionSurveyManager({
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
             Did you issue a reservations endorsement for this survey?
           </p>
+        </Modal>
+      )}
+
+      {/* Pending survey warranties question (after the endorsement question) */}
+      {warrantyOffer && !endorsementSurveyId && (
+        <Modal
+          title="Pending Survey Warranties"
+          icon={<Link2 size={18} />}
+          onClose={() => setWarrantyOffer(null)}
+          width={560}
+          closeOnOverlay={false}
+          footer={
+            <button className="btn-secondary" onClick={() => setWarrantyOffer(null)}>
+              Not now
+            </button>
+          }
+        >
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 12px' }}>
+            Does this survey satisfy a pending warranty?
+          </p>
+          <div className="table-wrap">
+            <table className="data-table">
+              <tbody>
+                {warrantyOffer.warranties.map((w) => (
+                  <tr key={w.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{w.description}</div>
+                      <div className="muted" style={{ fontSize: '0.78rem' }}>
+                        {[
+                          w.reference,
+                          w.deadlineEvent
+                            ? w.deadlineEvent
+                            : w.deadlineDays != null
+                              ? `Within ${w.deadlineDays} days of inception`
+                              : null,
+                          w.inceptionDate ? `Inception ${formatDate(w.inceptionDate)}` : null
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    </td>
+                    <td style={{ width: 1, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <button className="btn-primary btn-sm" onClick={() => handleLinkWarranty(w)}>
+                        <Link2 size={14} /> Link
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Modal>
       )}
     </>

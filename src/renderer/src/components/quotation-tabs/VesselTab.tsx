@@ -287,6 +287,10 @@ export default function VesselTab({
     if (!selectedVesselId) return
     const v = vessels.find((vv) => vv.id === selectedVesselId)
     if (!v) return
+    await addFromRegistry(v)
+  }
+
+  const addFromRegistry = async (v: Vessel): Promise<void> => {
     try {
       const assuredsAdded = await addRegistryVessel(
         quotation,
@@ -310,6 +314,33 @@ export default function VesselTab({
 
   const handleAddNew = async (): Promise<void> => {
     if (!newData.name.trim()) return
+    // A typed IMO that is already in the registry: offer to link that vessel instead
+    const imo = newData.imoNumber.replace(/\D/g, '')
+    if (imo) {
+      try {
+        const all = await window.api.getVessels()
+        const match = (Array.isArray(all) ? all : []).find(
+          (v) => (v.imoNumber || '').replace(/\D/g, '') === imo
+        )
+        if (
+          match &&
+          (await confirmDialog(
+            `IMO ${newData.imoNumber.trim()} is ${match.name} in the vessel registry. Link to it instead?`,
+            {
+              title: 'Vessel in registry',
+              confirmLabel: 'Link to registry vessel',
+              cancelLabel: 'Add as typed',
+              isDangerous: false
+            }
+          ))
+        ) {
+          await addFromRegistry(match)
+          return
+        }
+      } catch {
+        /* registry lookup failed: add as typed */
+      }
+    }
     try {
       await window.api.addQuotationVessel({
         quotationId: quotation.id,

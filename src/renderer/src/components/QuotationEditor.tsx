@@ -656,7 +656,59 @@ export default function QuotationEditor({
       warnings.push('Insured Value is not set')
     }
 
+    warnings.push(...(await sanctionsWarnings(quotation.id)))
+
     return warnings
+  }
+
+  /** Sanctions status of the quotation's assureds and registry vessels (read-only check) */
+  const sanctionsWarnings = async (quotationId: string): Promise<string[]> => {
+    const out: string[] = []
+    const describe = (status?: string): string | null => {
+      if (status === 'MATCH' || status === 'SANCTIONED') return 'is a sanctions MATCH'
+      if (status === 'POTENTIAL_MATCH') return 'has a potential sanctions match to review'
+      if (!status || status === 'PENDING' || status === 'ERROR')
+        return 'has not been screened for sanctions'
+      return null
+    }
+    try {
+      const [assureds, entities] = await Promise.all([
+        window.api.getQuotationAssureds(quotationId),
+        window.api.getEntities()
+      ])
+      const entityById = new Map((Array.isArray(entities) ? entities : []).map((e) => [e.id, e]))
+      const seen = new Set<string>()
+      for (const a of Array.isArray(assureds) ? assureds : []) {
+        const key = a.entityId || `name:${a.name.trim().toLowerCase()}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        if (!a.entityId) {
+          out.push(`Sanctions: assured ${a.name} is typed without a linked entity (not screened)`)
+          continue
+        }
+        const entity = entityById.get(a.entityId)
+        const issue = describe(entity?.ofacStatus)
+        if (issue) out.push(`Sanctions: assured ${entity?.name || a.name} ${issue}`)
+      }
+    } catch {
+      /* best-effort check */
+    }
+    try {
+      const [qVessels, vessels] = await Promise.all([
+        window.api.getQuotationVessels(quotationId),
+        window.api.getVessels()
+      ])
+      const vesselById = new Map((Array.isArray(vessels) ? vessels : []).map((v) => [v.id, v]))
+      for (const qv of Array.isArray(qVessels) ? qVessels : []) {
+        const v = qv.vesselId ? vesselById.get(qv.vesselId) : undefined
+        if (!v) continue
+        const issue = describe(v.ofacStatus)
+        if (issue) out.push(`Sanctions: vessel ${v.name} ${issue}`)
+      }
+    } catch {
+      /* best-effort check */
+    }
+    return out
   }
 
   const doExport = async (
@@ -1800,7 +1852,11 @@ export default function QuotationEditor({
       {/* Export validation warnings modal */}
       {exportWarnings && (
         <Modal
-          title="Missing Required Fields"
+          title={
+            exportWarnings.warnings.some((w) => w.startsWith('Sanctions:'))
+              ? 'Check Before Export'
+              : 'Missing Required Fields'
+          }
           icon={<AlertTriangle size={18} />}
           onClose={() => setExportWarnings(null)}
           width={460}
@@ -1823,7 +1879,9 @@ export default function QuotationEditor({
               lineHeight: 1.5
             }}
           >
-            The following required amount fields are empty. The export may be incomplete.
+            {exportWarnings.warnings.some((w) => w.startsWith('Sanctions:'))
+              ? 'Please check the following before exporting.'
+              : 'The following required amount fields are empty. The export may be incomplete.'}
           </p>
           <ul style={{ margin: 0, padding: '0 0 0 20px', listStyle: 'disc' }}>
             {exportWarnings.warnings.map((w, i) => (

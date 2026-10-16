@@ -11302,7 +11302,7 @@ function SurveyWarrantyTemplatesTab({
         newTitle.trim() || undefined
       )) as IpcResultLike | null
       if (result?.error) {
-        showError(result.message ?? '')
+        showError(result.message || 'Failed to add template')
         return
       }
       setNewText('')
@@ -11356,7 +11356,7 @@ function SurveyWarrantyTemplatesTab({
         setTemplateIds
       )) as IpcResultLike | null
       if (result?.error) {
-        showError(result.message ?? '')
+        showError(result.message || 'Failed to create set')
         return
       }
       setAddingSet(false)

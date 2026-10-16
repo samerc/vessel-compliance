@@ -56,9 +56,20 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'waived', label: 'Waived' }
 ]
 
+/** 'YYYY-MM-DD' (optionally with a time part) as local midnight; date-only maths stays in local time */
+function parseDateOnly(s: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s)
+}
+
+/** Local date parts as 'YYYY-MM-DD' (toISOString would shift local midnight to the day before) */
+function toYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function calcDueDate(w: SurveyWarranty): Date | null {
   if (w.deadlineType === 'days' && w.deadlineDays != null && w.inceptionDate) {
-    const d = new Date(w.inceptionDate)
+    const d = parseDateOnly(w.inceptionDate)
     if (isNaN(d.getTime())) return null
     d.setDate(d.getDate() + w.deadlineDays)
     return d
@@ -68,7 +79,7 @@ function calcDueDate(w: SurveyWarranty): Date | null {
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
-  const d = new Date(iso)
+  const d = parseDateOnly(iso)
   if (isNaN(d.getTime())) return '—'
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
 }
@@ -102,7 +113,7 @@ export default function ConditionSurveyReport(): React.JSX.Element {
   const rows = useMemo<ReportRow[]>(() => {
     return warranties.map((w) => {
       const due = calcDueDate(w)
-      const dueISO = due ? due.toISOString().split('T')[0] : null
+      const dueISO = due ? toYmd(due) : null
       const monthKey = due
         ? `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`
         : NO_DATE_KEY

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useEffectEvent } from 'react'
+import React, { useState, useEffect, useEffectEvent, useRef } from 'react'
 import {
   Building2,
   User,
@@ -92,6 +92,8 @@ export default function EntityEditPanel({
   const [commissions, setCommissions] = useState<
     { policyTypeId: string; commissionPercent: number }[]
   >([])
+  // Saved override per policy type when its input got focus, restored if the save fails
+  const commSavedRef = useRef<Record<string, number | undefined>>({})
   const [policyTypes, setPolicyTypes] = useState<{ id: string; name: string; code: string }[]>([])
   const [commDefaults, setCommDefaults] = useState<Record<string, number>>({})
 
@@ -1324,6 +1326,9 @@ export default function EntityEditPanel({
                         disabled={!canManage}
                         value={override?.commissionPercent ?? ''}
                         placeholder={defaultVal != null ? `${defaultVal}%` : '—'}
+                        onFocus={() => {
+                          commSavedRef.current[pt.id] = override?.commissionPercent
+                        }}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value)
                           if (!isNaN(val)) {
@@ -1340,7 +1345,22 @@ export default function EntityEditPanel({
                         onBlur={(e) => {
                           const val = parseFloat(e.target.value)
                           if (!isNaN(val)) {
-                            window.api.commissionSetOverride(entity.id, pt.id, val).catch(() => {})
+                            window.api.commissionSetOverride(entity.id, pt.id, val).catch((err) => {
+                              showError(
+                                (err instanceof Error && err.message) ||
+                                  'Failed to save commission override'
+                              )
+                              const previous = commSavedRef.current[pt.id]
+                              setCommissions((prev) =>
+                                previous === undefined
+                                  ? prev.filter((c) => c.policyTypeId !== pt.id)
+                                  : prev.map((c) =>
+                                      c.policyTypeId === pt.id
+                                        ? { ...c, commissionPercent: previous }
+                                        : c
+                                    )
+                              )
+                            })
                           } else if (e.target.value === '' && override) {
                             window.api
                               .commissionDeleteOverride(entity.id, pt.id)
@@ -1349,7 +1369,12 @@ export default function EntityEditPanel({
                                   prev.filter((c) => c.policyTypeId !== pt.id)
                                 )
                               })
-                              .catch(() => {})
+                              .catch((err) =>
+                                showError(
+                                  (err instanceof Error && err.message) ||
+                                    'Failed to remove commission override'
+                                )
+                              )
                           }
                         }}
                         style={{

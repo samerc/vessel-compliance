@@ -45,6 +45,7 @@ import { formatDate } from '../utils/dateUtils'
 import { MoneyInput } from './quotation-tabs/shared'
 import { isPiLike } from '../../../shared/quotationTypes'
 import { TypeChip } from './ui'
+import { useUnsavedGuard } from '../utils/useUnsavedGuard'
 
 interface PolicySetupWizardProps {
   quotationId: string
@@ -371,6 +372,11 @@ export default function PolicySetupWizard({
   const isLastStep = currentStepIndex === steps.length - 1
   const isFirstStep = currentStepIndex === 0
 
+  // Leaving (Back to Quotation, sidebar, Ctrl+K) asks first once the user changed anything
+  // or moved past the first step
+  const [touched, setTouched] = useState(false)
+  useUnsavedGuard(!loading && (touched || currentStepIndex > 0))
+
   // A different quotation shows the loading state again (reset during render, not in the effect)
   const [loadedFor, setLoadedFor] = useState(quotationId)
   if (loadedFor !== quotationId) {
@@ -687,6 +693,7 @@ export default function PolicySetupWizard({
   // Inception changes re-derive the expiry date/time and the instalment dates
   // (applied in the same update, see applyInceptionChange)
   const updateData = (partial: Partial<WizardData>): void => {
+    setTouched(true)
     setData((prev) => applyInceptionChange(prev, { ...prev, ...partial }, instalments))
   }
 
@@ -1199,7 +1206,10 @@ export default function PolicySetupWizard({
             overflow: 'hidden'
           }}
         >
-          <div style={{ padding: '24px 28px', minHeight: '200px' }}>
+          <div
+            style={{ padding: '24px 28px', minHeight: '200px' }}
+            onChangeCapture={() => setTouched(true)}
+          >
             {currentStep === 0 && (
               <StepVesselAlternative
                 qVessels={qVessels}

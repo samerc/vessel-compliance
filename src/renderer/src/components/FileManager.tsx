@@ -166,6 +166,82 @@ function TreeNode({
 // FileManager
 // ---------------------------------------------------------------------------
 
+// -------------------------------------------------------------------------
+// Move modal tree (simplified). Module level so expanded folders survive re-renders
+// -------------------------------------------------------------------------
+
+function MoveTreeNode({
+  node,
+  depth,
+  sourcePath,
+  destination,
+  onSelect
+}: {
+  node: FileNode
+  depth: number
+  sourcePath: string
+  destination: string | null
+  onSelect: (path: string) => void
+}): React.JSX.Element | null {
+  const [expanded, setExpanded] = useState(depth < 2)
+  if (!node.isDirectory) return null
+  // Don't allow moving into itself or its children
+  const isSelf = node.path === sourcePath
+  const isChild = node.path.startsWith(sourcePath + '\\')
+  const isSelected = destination === node.path
+
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '3px 6px',
+          paddingLeft: depth * 16 + 6,
+          cursor: isSelf || isChild ? 'not-allowed' : 'pointer',
+          borderRadius: 6,
+          background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
+          opacity: isSelf || isChild ? 0.4 : 1,
+          fontSize: '0.83rem',
+          color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)'
+        }}
+        onClick={() => {
+          if (!isSelf && !isChild) onSelect(node.path)
+        }}
+      >
+        <span
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded(!expanded)
+          }}
+          style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
+        >
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </span>
+        <Folder size={14} style={{ color: '#ffb020', flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {node.name}
+        </span>
+      </div>
+      {expanded &&
+        node.children
+          ?.filter((c) => c.isDirectory)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((child) => (
+            <MoveTreeNode
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              sourcePath={sourcePath}
+              destination={destination}
+              onSelect={onSelect}
+            />
+          ))}
+    </>
+  )
+}
+
 export default function FileManager(): React.JSX.Element {
   const { showSuccess, showError, showToast } = useToast()
 
@@ -654,76 +730,6 @@ export default function FileManager(): React.JSX.Element {
   const healthOk = healthCheckResults?.filter((r) => r.exists).length ?? 0
   const healthBroken = healthCheckResults?.filter((r) => !r.exists).length ?? 0
   const healthTotal = healthCheckResults?.length ?? 0
-
-  // -------------------------------------------------------------------------
-  // Move modal tree (simplified)
-  // -------------------------------------------------------------------------
-
-  function MoveTreeNode({
-    node,
-    depth,
-    sourcePath
-  }: {
-    node: FileNode
-    depth: number
-    sourcePath: string
-  }): React.JSX.Element | null {
-    const [expanded, setExpanded] = useState(depth < 2)
-    if (!node.isDirectory) return null
-    // Don't allow moving into itself or its children
-    const isSelf = node.path === sourcePath
-    const isChild = node.path.startsWith(sourcePath + '\\')
-    const isSelected = moveDestination === node.path
-
-    return (
-      <>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '3px 6px',
-            paddingLeft: depth * 16 + 6,
-            cursor: isSelf || isChild ? 'not-allowed' : 'pointer',
-            borderRadius: 6,
-            background: isSelected ? 'rgba(var(--accent-primary-rgb), 0.12)' : 'transparent',
-            opacity: isSelf || isChild ? 0.4 : 1,
-            fontSize: '0.83rem',
-            color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)'
-          }}
-          onClick={() => {
-            if (!isSelf && !isChild) setMoveDestination(node.path)
-          }}
-        >
-          <span
-            onClick={(e) => {
-              e.stopPropagation()
-              setExpanded(!expanded)
-            }}
-            style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
-          >
-            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          </span>
-          <Folder size={14} style={{ color: '#ffb020', flexShrink: 0 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {node.name}
-          </span>
-        </div>
-        {expanded &&
-          node.children
-            ?.filter((c) => c.isDirectory)
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((child) => (
-              <MoveTreeNode
-                key={child.path}
-                node={child}
-                depth={depth + 1}
-                sourcePath={sourcePath}
-              />
-            ))}
-      </>
-    )
-  }
 
   // -------------------------------------------------------------------------
   // Render
@@ -1345,7 +1351,13 @@ export default function FileManager(): React.JSX.Element {
             }}
           >
             {tree ? (
-              <MoveTreeNode node={tree} depth={0} sourcePath={moveModal.sourcePath} />
+              <MoveTreeNode
+                node={tree}
+                depth={0}
+                sourcePath={moveModal.sourcePath}
+                destination={moveDestination}
+                onSelect={setMoveDestination}
+              />
             ) : (
               <div
                 style={{

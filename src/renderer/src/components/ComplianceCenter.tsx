@@ -173,8 +173,18 @@ interface DocAlert {
   date: string
 }
 
+type VesselSection = 'documents' | 'assureds' | 'surveys' | 'policies'
+
+/** Vessel tab that shows what an alert is about (entity documents live with the assureds) */
+const alertSection = (alert: DocAlert): VesselSection =>
+  alert.category === 'entity'
+    ? 'assureds'
+    : alert.category === 'endorsement'
+      ? 'surveys'
+      : 'documents'
+
 interface ComplianceCenterProps extends SubTabProps {
-  onNavigateToVessel?: (vesselId: string, section?: 'policies') => void
+  onNavigateToVessel?: (vesselId: string, section?: VesselSection) => void
   initialTab?: 'documents' | 'policies' | 'sanctions' | 'dataQuality'
   onTabChange?: (tab: 'documents' | 'policies' | 'sanctions' | 'dataQuality') => void
 }
@@ -978,7 +988,14 @@ export default function ComplianceCenter({
                                 ? 'var(--danger)'
                                 : 'var(--warning)'
                             return (
-                              <tr key={alert.id} style={{ borderLeft: `4px solid ${rowBorder}` }}>
+                              <tr
+                                key={alert.id}
+                                className="clickable"
+                                style={{ borderLeft: `4px solid ${rowBorder}` }}
+                                onClick={() =>
+                                  onNavigateToVessel?.(alert.vesselId, alertSection(alert))
+                                }
+                              >
                                 <td>
                                   {alert.category === 'entity' && (
                                     <span
@@ -1116,7 +1133,9 @@ export default function ComplianceCenter({
                                 key={alert.id}
                                 className="clickable"
                                 style={{ borderLeft: `4px solid ${rowBorder}` }}
-                                onClick={() => onNavigateToVessel?.(alert.vesselId)}
+                                onClick={() =>
+                                  onNavigateToVessel?.(alert.vesselId, alertSection(alert))
+                                }
                               >
                                 <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
                                 <td style={{ width: '120px' }}>
@@ -1191,7 +1210,12 @@ export default function ComplianceCenter({
                         ? 'var(--danger)'
                         : 'var(--warning)'
                     return (
-                      <tr key={alert.id} style={{ borderLeft: `4px solid ${rowBorder}` }}>
+                      <tr
+                        key={alert.id}
+                        className="clickable"
+                        style={{ borderLeft: `4px solid ${rowBorder}` }}
+                        onClick={() => onNavigateToVessel?.(alert.vesselId, alertSection(alert))}
+                      >
                         <td style={{ fontWeight: 600 }}>{alert.vessel}</td>
                         <td>
                           {alert.category === 'entity' && (
@@ -2045,7 +2069,7 @@ export default function ComplianceCenter({
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         if (item.type === 'vessel' && onNavigateToVessel)
-                                          onNavigateToVessel(item.id)
+                                          onNavigateToVessel(item.id, 'documents')
                                       }}
                                       style={{
                                         display: 'flex',

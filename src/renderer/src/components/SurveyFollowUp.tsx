@@ -55,8 +55,19 @@ const STATUS_TONES: Record<WarrantyStatus, BadgeTone> = {
   waived: 'neutral'
 }
 
+/** 'YYYY-MM-DD' (optionally with a time part) as local midnight; date-only maths stays in local time */
+function parseDateOnly(s: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s)
+}
+
+/** Local date parts as 'YYYY-MM-DD' (toISOString would shift local midnight to the day before) */
+function toYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function calcDeadlineDate(inceptionDate: string, deadlineDays: number): Date {
-  const d = new Date(inceptionDate)
+  const d = parseDateOnly(inceptionDate)
   d.setDate(d.getDate() + deadlineDays)
   return d
 }
@@ -64,7 +75,8 @@ function calcDeadlineDate(inceptionDate: string, deadlineDays: number): Date {
 function daysRemaining(deadlineDate: Date): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  // Both are local midnights: round, as a DST change makes the gap 23 or 25 hours
+  return Math.round((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 type UrgencyLevel = 'overdue' | 'urgent' | 'normal' | 'done'
@@ -291,9 +303,7 @@ export default function SurveyFollowUp({
 
   const calcDeadlineStr = (w: SurveyWarranty): string => {
     if (!w.inceptionDate || !w.deadlineDays) return ''
-    const d = new Date(w.inceptionDate)
-    d.setDate(d.getDate() + w.deadlineDays)
-    return d.toISOString().split('T')[0]
+    return toYmd(calcDeadlineDate(w.inceptionDate, w.deadlineDays))
   }
 
   const loadHistory = async (warrantyId: string): Promise<void> => {
@@ -856,9 +866,7 @@ export default function SurveyFollowUp({
                                   }}
                                 >
                                   {formatDateOrDash(
-                                    calcDeadlineDate(w.inceptionDate, w.deadlineDays)
-                                      .toISOString()
-                                      .split('T')[0]
+                                    toYmd(calcDeadlineDate(w.inceptionDate, w.deadlineDays))
                                   )}
                                 </div>
                                 {renderUrgencyPill(w)}
