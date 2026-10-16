@@ -165,11 +165,7 @@ export default function EntityEditPanel({
       // Only check this entity's docs + its UBOs' docs to bound the number of fs calls.
       const relevantEntityIds = new Set<string>([
         entityId,
-        // NOTE: EntityUBO has no `entityId` (it is `assuredEntityId`), so this matches nothing
-        // and UBO documents are not existence-checked. Kept as is (lint-only change).
-        ...safeUbos
-          .filter((u) => (u as EntityUBO & { entityId?: string }).entityId === entityId)
-          .map((u) => u.uboEntityId)
+        ...safeUbos.filter((u) => u.assuredEntityId === entityId).map((u) => u.uboEntityId)
       ])
       const fstatus: Record<string, boolean> = {}
       const withFile = safeDocs.filter((d) => d.filePath && relevantEntityIds.has(d.entityId))
