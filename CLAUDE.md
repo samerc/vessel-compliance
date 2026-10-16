@@ -672,6 +672,8 @@ MariaDB collation mismatch (`utf8mb4_uca1400_ai_ci` vs `utf8mb4_unicode_ci`) cau
 ### Vessel Detail Navigation
 
 - **Header card** (redesign 2026-10): name, flag, Active/Inactive pill, labelled key facts, actions; below it `VesselSummaryTiles` (Documents, Policies, Quotations, Sanctions, Surveys), each opening its tab
+- **Notes & activity panel** (`VesselSidePanel`): beside the tabs, latest 3 notes + quick add (vessels:edit, Ctrl+Enter), last 5 audit entries; "All notes" opens the notes window, "See all" the Activity tab; hidden/shown per computer (localStorage `vessel_side_panel`)
+- **New quotation** (header, quotations:create): type menu → draft quotation with the vessel already added via `addRegistryVessel` (`utils/addRegistryVessel.ts`, shared with the quotation Vessel tab: particulars, assureds by role order, c/o as broker, customer from the vessel's active policy of the same type)
 
 - **Sections**: Toggle between Documents, Assured, Surveys, Policies, and Activity views via `detailView` state
 - **External Navigation**: `initialSection` prop allows navigating directly to any tab
@@ -811,7 +813,7 @@ Insurance policy document management:
 
 - **Policy Documents** (`policy_documents`): Created from quotations via 6-step conversion wizard
 - **Policy Numbering**: `{type_code}{inverted_year}{4-digit serial}` (e.g., P26200001)
-- **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review. Layout (redesign 2026-10): step list on the left (`STEP_LABELS` / `STEP_HINTS` / `STEP_ICONS`, all indexed by step id 0-7), content with Back / Continue at its foot, live summary on the right
+- **Conversion Wizard** (`PolicySetupWizard.tsx`): Step 1: Vessel & Alternative, Step 2: Period & Premium, Step 3: Instalments, Step 4: Details, Step 5: Blue Cards (P&I only), Step 6: Review. Layout (redesign 2026-10): 6 visible steps (Vessel and cover, Period and premium, Insured and bank, Subjectivities and warranties, Blue cards, Review) on the left, content with Back / Continue at its foot, live summary on the right. Step ids stay 0-7 (`STEP_LABELS` / `STEP_HINTS` / `STEP_ICONS` indexed by id): Premium (2) renders inside step 1 and `validateStep(1)` also runs step 2's checks; Survey Warranties (7) renders inside step 6, which shows when the quotation has subjectivities or survey warranties
 - **Policy Detail** (`PolicyDetail.tsx`): Overview, Financial, Addresses, Blue Cards, Revision History, editing mode with 4 tabs
 - **Policy List** (`PolicyList.tsx`): Stats, search, filters, sortable table with conversion/export dates
 - **Policy Settings** (`PolicySettings.tsx`): Two-tier navigation (General/P&I/Hull/War) for opening clause, closing text, important notice, premium intro, font size, timezones, page numbering, footer, header titles, banks, cancel & replace, blue card texts, signatures, QR verification, T&C templates

@@ -54,16 +54,16 @@ interface PolicySetupWizardProps {
 
 const DEFAULT_TIMEZONE_OPTIONS = ['Lebanon Standard Time', 'GMT', 'UTC', 'CET', 'EST', 'PST']
 
-// Step id 6 (Subjectivities) is inserted between Details and Cards when the quotation has any;
-// step id 7 (Survey Warranties) after it when the selected vessels have survey warranties.
+// Step ids stay 0-7 (validation, review links and conversion use them), but 6 steps show:
+// Premium (2) renders inside Period (1), Survey Warranties (7) inside Subjectivities (6)
 const STEP_LABELS = [
-  'Vessel',
-  'Period',
+  'Vessel and cover',
+  'Period and premium',
   'Premium',
-  'Details',
-  'Cards',
+  'Insured and bank',
+  'Blue cards',
   'Review',
-  'Subjectivities',
+  'Subjectivities and warranties',
   'Survey Warranties'
 ]
 const STEP_ICONS = [
@@ -78,7 +78,7 @@ const STEP_ICONS = [
 ]
 const STEP_HINTS = [
   'Vessels and alternative',
-  'Dates and time zone',
+  'Dates, premium, instalments',
   'Premium and instalments',
   'Insured, commission, bank',
   'Blue cards to issue',
@@ -358,9 +358,9 @@ export default function PolicySetupWizard({
 
   // Determine which steps to show
   const steps = useMemo(() => {
-    const s = [0, 1, 2, 3] // Vessel, Period, Instalments, Details
-    if (subjectivityItems.length > 0) s.push(6) // Subjectivities (any type) when the quotation has any
-    if (surveyItems.length > 0) s.push(7) // Survey warranties: wording can be edited per policy
+    const s = [0, 1, 3] // Vessel, Period and premium (with instalments), Insured and bank
+    // Subjectivities and survey warranty wording share one step, shown when either exists
+    if (subjectivityItems.length > 0 || surveyItems.length > 0) s.push(6)
     // Step 4 (Blue Cards) only for P&I
     if (isPI) s.push(4)
     s.push(5) // Review is always last
@@ -819,7 +819,7 @@ export default function PolicySetupWizard({
         if (!data.expiryTime) return 'Expiry time is required'
         if (!data.timezone.trim()) return 'Timezone is required'
         if (data.totalPremium <= 0) return 'Premium must be greater than 0'
-        return null
+        return validateStep(2) // instalments are on the same step
       case 2: // Instalments
         if (data.instalmentDates.some((d) => !d)) return 'All instalment dates are required'
         if (data.instalmentAmounts.some((a) => !a || a <= 0))
@@ -1008,6 +1008,11 @@ export default function PolicySetupWizard({
   }
 
   const cardBg = isLight ? '#ffffff' : 'var(--bg-card)'
+  const stepDivider: React.CSSProperties = {
+    border: 'none',
+    borderTop: '1px solid var(--glass-border-color)',
+    margin: '24px 0'
+  }
 
   if (loading) {
     return (
@@ -1239,8 +1244,8 @@ export default function PolicySetupWizard({
                 inputStyle={inputStyle}
               />
             )}
-
-            {currentStep === 2 && (
+            {currentStep === 1 && <hr style={stepDivider} />}
+            {currentStep === 1 && (
               <StepInstalments
                 data={data}
                 quotation={quotation}
@@ -1287,7 +1292,7 @@ export default function PolicySetupWizard({
               />
             )}
 
-            {currentStep === 6 && (
+            {currentStep === 6 && subjectivityItems.length > 0 && (
               <StepSubjectivities
                 items={subjectivityItems}
                 selectedIds={data.selectedSubjectivityIds}
@@ -1297,7 +1302,10 @@ export default function PolicySetupWizard({
               />
             )}
 
-            {currentStep === 7 && (
+            {currentStep === 6 && subjectivityItems.length > 0 && surveyItems.length > 0 && (
+              <hr style={stepDivider} />
+            )}
+            {currentStep === 6 && surveyItems.length > 0 && (
               <StepSurveyWarranties
                 items={surveyItems}
                 qVessels={qVessels}
@@ -3453,7 +3461,7 @@ function StepReview({
           }}
         >
           <span style={{ ...labelStyle, marginBottom: 0 }}>Premium & Instalments</span>
-          {editLink(2)}
+          {editLink(1)}
         </div>
         <div
           style={{
