@@ -2278,6 +2278,9 @@ export interface PolicyListRow {
   policyTypeId: string | null
   policyTypeName: string | null
   brokerName: string | null
+  /** The quotation premium currency */
+  currency: string
+  fleetName: string | null
 }
 
 /** A full policy document with its vessel, quotation and bank details (policy:getById) */

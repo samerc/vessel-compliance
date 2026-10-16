@@ -1,6 +1,10 @@
 import { MySQLAdapter } from '../mysql/adapter'
 import type { RowDataPacket } from 'mysql2/promise'
 
+// Local calendar date (toISOString is UTC: between midnight and 03:00 in Beirut it gave yesterday)
+const localISO = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 export class DailyAlertScheduler {
   private db: MySQLAdapter
   private timer: NodeJS.Timeout | null = null
@@ -29,10 +33,10 @@ export class DailyAlertScheduler {
 
     // Check if we missed today's run (app was closed)
     const lastRun = await this.db.getSetting('daily_alerts_last_run')
-    const today = new Date().toISOString().split('T')[0]
+    const today = localISO(new Date())
     if (lastRun !== today) {
       console.log('[DailyAlerts] Missed run detected — running immediately')
-      this.run()
+      void this.run()
     }
 
     console.log(
@@ -40,8 +44,8 @@ export class DailyAlertScheduler {
     )
 
     this.timer = setTimeout(() => {
-      this.run()
-      this.intervalTimer = setInterval(() => this.run(), DAY_MS)
+      void this.run()
+      this.intervalTimer = setInterval(() => void this.run(), DAY_MS)
     }, msUntilFirst)
   }
 
@@ -51,11 +55,25 @@ export class DailyAlertScheduler {
   }
 
   async run(): Promise<void> {
+    // Every open app has this scheduler: only one workstation runs it, once a day
+    const release = await this.db.tryNamedLock('vc_daily_alerts').catch(() => null)
+    if (!release) {
+      console.log('[DailyAlerts] Running on another workstation, skipping')
+      return
+    }
+    try {
+      await this.runLocked()
+    } finally {
+      await release().catch(() => {})
+    }
+  }
+
+  private async runLocked(): Promise<void> {
     console.log('[DailyAlerts] Running daily alert check...')
 
     // Check if already ran today
     const lastRun = await this.db.getSetting('daily_alerts_last_run')
-    const today = new Date().toISOString().split('T')[0]
+    const today = localISO(new Date())
     if (lastRun === today) {
       console.log('[DailyAlerts] Already ran today, skipping')
       return
@@ -98,8 +116,8 @@ export class DailyAlertScheduler {
     if (!this.db.pool) return
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
-    const futureDateStr = futureDate.toISOString().split('T')[0]
-    const todayStr = new Date().toISOString().split('T')[0]
+    const futureDateStr = localISO(futureDate)
+    const todayStr = localISO(new Date())
 
     const [rows] = await this.db.pool.query(
       `SELECT vd.vessel_id, v.name as vesselName, dt.name as docTypeName, vd.expiry_date as expiryDate
@@ -156,8 +174,8 @@ export class DailyAlertScheduler {
     if (!this.db.pool) return
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
-    const futureDateStr = futureDate.toISOString().split('T')[0]
-    const todayStr = new Date().toISOString().split('T')[0]
+    const futureDateStr = localISO(futureDate)
+    const todayStr = localISO(new Date())
 
     const [rows] = await this.db.pool.query(
       `SELECT pd.id, pd.policy_number as policyNumber, pd.expiry_date as expiryDate,
@@ -192,8 +210,8 @@ export class DailyAlertScheduler {
     if (!this.db.pool) return
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
-    const futureDateStr = futureDate.toISOString().split('T')[0]
-    const todayStr = new Date().toISOString().split('T')[0]
+    const futureDateStr = localISO(futureDate)
+    const todayStr = localISO(new Date())
 
     const [rows] = await this.db.pool.query(
       `SELECT bc.card_number as cardNumber, bc.card_type as cardType, bc.expiry_date as expiryDate,
@@ -227,8 +245,8 @@ export class DailyAlertScheduler {
     if (!this.db.pool) return
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
-    const futureDateStr = futureDate.toISOString().split('T')[0]
-    const todayStr = new Date().toISOString().split('T')[0]
+    const futureDateStr = localISO(futureDate)
+    const todayStr = localISO(new Date())
 
     const [rows] = await this.db.pool.query(
       `SELECT sw.id, sw.description, sw.inception_date as inceptionDate,

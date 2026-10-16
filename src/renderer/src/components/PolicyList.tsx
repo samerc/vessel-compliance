@@ -19,8 +19,7 @@ import { Badge, EmptyState, Spinner } from './ui'
 import type { BadgeTone } from './ui'
 import type { PolicyListRow } from '../../../shared/types'
 
-// policy:list row; currency/fleetName are not returned by the IPC today (read as undefined)
-type PolicyListItem = PolicyListRow & { currency?: string; fleetName?: string }
+type PolicyListItem = PolicyListRow
 
 interface PolicyListProps {
   onSelectPolicy: (policyId: string) => void

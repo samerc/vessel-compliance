@@ -905,7 +905,7 @@ Personal event-driven notifications:
 
 - **Threaded Replies**: `parent_note_id` on note tables, indented view in UI
 - **@Mentions**: Type `@` for username autocomplete, creates `note_mention` notification
-- **Vessel Notes + Quotation Notes**: Both support replies and mentions
+- **Vessel Notes + Quotation Notes**: Both support replies and mentions (both notify: reply to the parent author, @mention to the user; vessel note notifications open the vessel)
 
 ### Activity Log
 

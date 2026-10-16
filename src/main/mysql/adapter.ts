@@ -489,6 +489,25 @@ export class MySQLAdapter {
 
   // Non-blocking variant: returns a release function, or null when another app instance holds
   // the lock (used for long jobs that must run once across all workstations)
+  /**
+   * Runs a delete-then-insert save on one connection in a transaction: a failure part-way keeps
+   * the previous rows instead of leaving half of them (e.g. a policy with only some instalments).
+   */
+  private async inTransaction(fn: (conn: PoolConnection) => Promise<void>): Promise<void> {
+    if (!this.pool) return
+    const conn = await this.pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      await fn(conn)
+      await conn.commit()
+    } catch (e) {
+      await conn.rollback().catch(() => {})
+      throw e
+    } finally {
+      conn.release()
+    }
+  }
+
   async tryNamedLock(name: string): Promise<(() => Promise<void>) | null> {
     if (!this.pool) return null
     const conn = await this.pool.getConnection()
@@ -14268,11 +14287,13 @@ export class MySQLAdapter {
         const g = (gRows as RowDataPacket[])[0]?.premium_amount
         if (g != null) gridPremium = Number(g)
       }
-      const vesselPremium =
+      // DECIMAL columns arrive as strings ("0.00" is truthy): compare as a number
+      const rawPremium =
         gridPremium ??
         srcQv?.premiumAmount ??
         (sourceQVs.length <= 1 ? sourceQ.premiumAmount : null) ??
         null
+      const vesselPremium = rawPremium != null ? Number(rawPremium) || null : null
       const vesselAgreed =
         srcQv?.agreedValue ?? (sourceQVs.length <= 1 ? sourceQ.agreedValue : null) ?? null
       const vesselIv = srcQv?.ivValue ?? (sourceQVs.length <= 1 ? sourceQ.ivValue : null) ?? null
@@ -15882,15 +15903,15 @@ export class MySQLAdapter {
     instalments: { instalmentNumber: number; daysFromInception: number }[]
   ): Promise<void> {
     if (!this.pool) return
-    await this.pool.execute('DELETE FROM quotation_instalments WHERE quotation_id = ?', [
-      quotationId
-    ])
-    for (const inst of instalments) {
-      await this.pool.execute(
-        'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception) VALUES (?, ?, ?, ?)',
-        [uuidv4(), quotationId, inst.instalmentNumber, inst.daysFromInception]
-      )
-    }
+    await this.inTransaction(async (conn) => {
+      await conn.execute('DELETE FROM quotation_instalments WHERE quotation_id = ?', [quotationId])
+      for (const inst of instalments) {
+        await conn.execute(
+          'INSERT INTO quotation_instalments (id, quotation_id, instalment_number, days_from_inception) VALUES (?, ?, ?, ?)',
+          [uuidv4(), quotationId, inst.instalmentNumber, inst.daysFromInception]
+        )
+      }
+    })
   }
 
   // -- Quotation Information --
@@ -16817,16 +16838,19 @@ export class MySQLAdapter {
                     pd.created_at as createdAt,
                     pd.exported_at as exportedAt,
                     v.name as vesselName, v.imo_number as imoNumber,
-                    COALESCE(q.co_name, e.name) as customerName,
+                    COALESCE(ce.name, q.co_name, e.name) as customerName,
                     qt.code as quotationTypeCode, qt.name as quotationTypeName,
                     qt.id as policyTypeId, qt.name as policyTypeName,
-                    b.name as brokerName
+                    CASE WHEN q.customer_type = 'broker' THEN ce.name END as brokerName,
+                    COALESCE(q.premium_currency, 'USD') as currency,
+                    f.name as fleetName
              FROM policy_documents pd
              LEFT JOIN vessels v ON pd.vessel_id = v.id
+             LEFT JOIN fleets f ON v.fleet_id = f.id
              LEFT JOIN entities e ON v.customer_id = e.id
              LEFT JOIN quotations q ON pd.quotation_id = q.id
+             LEFT JOIN entities ce ON q.customer_entity_id = ce.id
              LEFT JOIN policy_types qt ON q.quotation_type_id = qt.id
-             LEFT JOIN banks b ON pd.bank_id = b.id
              WHERE pd.revision_number = (
                 SELECT MAX(pd2.revision_number) FROM policy_documents pd2
                 WHERE pd2.policy_number = pd.policy_number
@@ -17564,26 +17588,26 @@ export class MySQLAdapter {
     }[]
   ): Promise<void> {
     if (!this.pool) return
-    await this.pool.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [
-      policyId
-    ])
-    for (const inst of instalments) {
-      await this.pool.execute(
-        `
-                INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number, due_date, premium_amount, commission_amount, is_non_refundable)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `,
-        [
-          uuidv4(),
-          policyId,
-          inst.instalmentNumber,
-          inst.dueDate,
-          inst.premiumAmount,
-          inst.commissionAmount,
-          inst.isNonRefundable ? 1 : 0
-        ]
-      )
-    }
+    await this.inTransaction(async (conn) => {
+      await conn.execute('DELETE FROM policy_doc_instalments WHERE policy_doc_id = ?', [policyId])
+      for (const inst of instalments) {
+        await conn.execute(
+          `
+                  INSERT INTO policy_doc_instalments (id, policy_doc_id, instalment_number, due_date, premium_amount, commission_amount, is_non_refundable)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
+              `,
+          [
+            uuidv4(),
+            policyId,
+            inst.instalmentNumber,
+            inst.dueDate,
+            inst.premiumAmount,
+            inst.commissionAmount,
+            inst.isNonRefundable ? 1 : 0
+          ]
+        )
+      }
+    })
   }
 
   async setPolicyAddresses(
@@ -17591,27 +17615,29 @@ export class MySQLAdapter {
     addresses: { entityId: string; entityName?: string; role: string; addressText: string }[]
   ): Promise<void> {
     if (!this.pool) return
-    await this.pool.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [policyId])
-    let ai = 0
-    for (const addr of addresses) {
-      // Preserve custom insured names (no linked entity) so they survive an edit
-      const customName = addr.entityId ? null : (addr.entityName || '').trim() || null
-      await this.pool.execute(
-        `
-                INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, entity_name, role, address_text, \`order\`)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `,
-        [
-          uuidv4(),
-          policyId,
-          addr.entityId || null,
-          customName,
-          addr.role || '',
-          addr.addressText || '',
-          ai++
-        ]
-      )
-    }
+    await this.inTransaction(async (conn) => {
+      await conn.execute('DELETE FROM policy_doc_addresses WHERE policy_doc_id = ?', [policyId])
+      let ai = 0
+      for (const addr of addresses) {
+        // Preserve custom insured names (no linked entity) so they survive an edit
+        const customName = addr.entityId ? null : (addr.entityName || '').trim() || null
+        await conn.execute(
+          `
+                  INSERT INTO policy_doc_addresses (id, policy_doc_id, entity_id, entity_name, role, address_text, \`order\`)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
+              `,
+          [
+            uuidv4(),
+            policyId,
+            addr.entityId || null,
+            customName,
+            addr.role || '',
+            addr.addressText || '',
+            ai++
+          ]
+        )
+      }
+    })
   }
 
   async createPolicyRevision(policyId: string, createdBy: string): Promise<string> {
@@ -18736,21 +18762,23 @@ export class MySQLAdapter {
     values: Omit<VesselPolicyValue, 'id' | 'policyId' | 'characteristicName' | 'fieldType'>[]
   ): Promise<void> {
     if (!this.pool) return
-    await this.pool.execute('DELETE FROM vessel_policy_values WHERE policy_id = ?', [policyId])
-    for (const v of values) {
-      await this.pool.execute(
-        'INSERT INTO vessel_policy_values (id, policy_id, characteristic_id, value_text, value_amount, value_date, value_boolean) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-          uuidv4(),
-          policyId,
-          v.characteristicId,
-          v.valueText || null,
-          v.valueAmount ?? null,
-          v.valueDate || null,
-          v.valueBoolean != null ? (v.valueBoolean ? 1 : 0) : null
-        ]
-      )
-    }
+    await this.inTransaction(async (conn) => {
+      await conn.execute('DELETE FROM vessel_policy_values WHERE policy_id = ?', [policyId])
+      for (const v of values) {
+        await conn.execute(
+          'INSERT INTO vessel_policy_values (id, policy_id, characteristic_id, value_text, value_amount, value_date, value_boolean) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            uuidv4(),
+            policyId,
+            v.characteristicId,
+            v.valueText || null,
+            v.valueAmount ?? null,
+            v.valueDate || null,
+            v.valueBoolean != null ? (v.valueBoolean ? 1 : 0) : null
+          ]
+        )
+      }
+    })
   }
 
   // --- Policy Expiry Alerts ---
@@ -22161,18 +22189,21 @@ export class MySQLAdapter {
         .query(
           `(SELECT pd.id, pd.policy_number AS policyNumber,
                         pd.vessel_id AS vesselId, v.name AS vesselName,
-                        'policy_document' AS source, pd.status
+                        'policy_document' AS source, pd.status, pt.name AS policyTypeName
                  FROM policy_documents pd
                  LEFT JOIN vessels v ON pd.vessel_id = v.id
+                 LEFT JOIN quotations q ON q.id = pd.quotation_id
+                 LEFT JOIN policy_types pt ON pt.id = q.quotation_type_id
                  WHERE pd.policy_number LIKE ?
                  ORDER BY pd.created_at DESC
                  LIMIT ?)
                  UNION ALL
                  (SELECT vdp.id, vdp.policy_number AS policyNumber,
                         vdp.vessel_id AS vesselId, v.name AS vesselName,
-                        'vessel_policy' AS source, vdp.status
+                        'vessel_policy' AS source, vdp.status, pt.name AS policyTypeName
                  FROM vessel_dynamic_policies vdp
                  LEFT JOIN vessels v ON vdp.vessel_id = v.id
+                 LEFT JOIN policy_types pt ON pt.id = vdp.policy_type_id
                  WHERE vdp.policy_number LIKE ? OR v.name LIKE ?
                  ORDER BY vdp.status ASC, v.name ASC
                  LIMIT ?)`,
@@ -23290,7 +23321,11 @@ export class MySQLAdapter {
       'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE section = ? ORDER BY order_index ASC',
       [section]
     )
-    return rows as Row<CargoClause>[]
+    return (rows as Row<CargoClause>[]).map((r) => ({
+      ...r,
+      active: Boolean(r.active),
+      hasAmount: Boolean(r.hasAmount)
+    }))
   }
 
   async getAllCargoClauses(): Promise<CargoClause[]> {
@@ -23298,7 +23333,11 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, section, title, text, code, order_index as `order`, active, has_amount as hasAmount, amount_placeholder as amountPlaceholder FROM cargo_clauses WHERE active = TRUE ORDER BY section, order_index ASC'
     )
-    return rows as Row<CargoClause>[]
+    return (rows as Row<CargoClause>[]).map((r) => ({
+      ...r,
+      active: Boolean(r.active),
+      hasAmount: Boolean(r.hasAmount)
+    }))
   }
 
   async addCargoClause(
@@ -23479,7 +23518,10 @@ export class MySQLAdapter {
              ORDER BY qcc.order_index ASC`,
       [quotationId, section]
     )
-    return rows as Row<QuotationCargoClause>[]
+    return (rows as Row<QuotationCargoClause>[]).map((r) => ({
+      ...r,
+      hasAmount: Boolean(r.hasAmount)
+    }))
   }
 
   async setQuotationCargoClauses(
@@ -23580,7 +23622,7 @@ export class MySQLAdapter {
     const [rows] = await this.pool.query(
       'SELECT id, name, code, description, order_index as `order`, active FROM cargo_institute_clauses ORDER BY order_index ASC'
     )
-    return rows as Row<CargoInstituteClause>[]
+    return (rows as Row<CargoInstituteClause>[]).map((r) => ({ ...r, active: Boolean(r.active) }))
   }
 
   async addCargoInstituteClause(
@@ -24006,23 +24048,25 @@ export class MySQLAdapter {
   ): Promise<void> {
     if (!this.pool) return
     await this.clearEndorsementExportFiles(endorsementId)
-    await this.pool.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [
-      endorsementId
-    ])
-    for (const inst of instalments) {
-      await this.pool.execute(
-        `INSERT INTO endorsement_instalments (id, endorsement_id, instalment_number, due_date, premium_amount, commission_amount)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          uuidv4(),
-          endorsementId,
-          inst.instalmentNumber,
-          inst.dueDate,
-          inst.premiumAmount,
-          inst.commissionAmount
-        ]
-      )
-    }
+    await this.inTransaction(async (conn) => {
+      await conn.execute('DELETE FROM endorsement_instalments WHERE endorsement_id = ?', [
+        endorsementId
+      ])
+      for (const inst of instalments) {
+        await conn.execute(
+          `INSERT INTO endorsement_instalments (id, endorsement_id, instalment_number, due_date, premium_amount, commission_amount)
+                   VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            uuidv4(),
+            endorsementId,
+            inst.instalmentNumber,
+            inst.dueDate,
+            inst.premiumAmount,
+            inst.commissionAmount
+          ]
+        )
+      }
+    })
   }
 
   async getEndorsementCountForPolicy(policyDocId: string): Promise<number> {

@@ -201,16 +201,11 @@ function encodeDeductibles(
     .join('')
 }
 
-// `code` is not on PIClause; kept as the original lookup (falls back to name)
-type ClauseLike = PIClause & { code?: string }
-
-function getConditionsSummary(quotation: Quotation | null, clauses: ClauseLike[]): string {
+/** The conditions the policy was issued on: its chosen alternative's hull clause, else the
+ *  quotation's selected P&I clauses (not the whole settings list) */
+function getConditionsSummary(quotation: Quotation | null, clauseNames: string[]): string {
   if (!quotation) return '--'
-  if (quotation.quotationTypeCode === 'H') {
-    return clauses[0]?.name || clauses[0]?.code || '--'
-  }
-  const codes = clauses.map((c) => c.code || c.name).filter(Boolean)
-  return codes.length > 0 ? codes.join(', ') : '--'
+  return clauseNames.length > 0 ? clauseNames.join(', ') : '--'
 }
 
 function getInterestLabel(typeCode: string | null, typeName: string | null): string {
@@ -237,7 +232,7 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
   let qDeductibles: QuotationDeductible[] = []
   let qWarranties: QuotationWarrantyRow[] = []
   let qSubjectivities: QuotationSubjectivity[] = []
-  let qClauses: PIClause[] = []
+  let qClauseNames: string[] = []
   let deductibleDefs: PIDeductible[] = []
   // This policy's own technical premium (one policy per vessel) — null = fall back to quotation
   let vesselTech: number | null = null
@@ -246,19 +241,38 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
 
   if (policy.quotationId) {
     try {
-      const [q, deds, wars, subs, cls, dedDefs] = await Promise.all([
-        window.api.getQuotation(policy.quotationId),
-        window.api.getQuotationDeductibles(policy.quotationId),
-        window.api.getQuotationWarranties(policy.quotationId),
-        window.api.getQuotationSubjectivities(policy.quotationId),
-        window.api.piGetClauses(),
-        window.api.piGetDeductibles()
-      ])
+      const [q, deds, wars, subs, cls, dedDefs, selectedCls, hullAlts, hullCls] = await Promise.all(
+        [
+          window.api.getQuotation(policy.quotationId),
+          window.api.getQuotationDeductibles(policy.quotationId),
+          window.api.getQuotationWarranties(policy.quotationId),
+          window.api.getQuotationSubjectivities(policy.quotationId),
+          window.api.piGetClauses(),
+          window.api.piGetDeductibles(),
+          window.api.getQuotationClauses(policy.quotationId),
+          window.api.hullGetQuotationAlternatives(policy.quotationId),
+          window.api.hullGetClauses()
+        ]
+      )
       quotation = q
       qDeductibles = Array.isArray(deds) ? deds : []
       qWarranties = Array.isArray(wars) ? wars : []
       qSubjectivities = Array.isArray(subs) ? subs : []
-      qClauses = Array.isArray(cls) ? cls : []
+      const altId = policy.selectedAlternativeId || null
+      if (q?.quotationTypeCode === 'H') {
+        const alts = Array.isArray(hullAlts) ? hullAlts : []
+        const alt = alts.find((a) => a.id === altId) || alts[0]
+        const hc = (Array.isArray(hullCls) ? hullCls : []).find((c) => c.id === alt?.hullClauseId)
+        qClauseNames = hc ? [hc.code || hc.name] : []
+      } else {
+        const master = new Map(
+          (Array.isArray(cls) ? (cls as PIClause[]) : []).map((c) => [c.id, c])
+        )
+        qClauseNames = (Array.isArray(selectedCls) ? selectedCls : [])
+          .filter((r) => !r.alternativeId || !altId || r.alternativeId === altId)
+          .map((r) => master.get(r.piClauseId)?.name || '')
+          .filter(Boolean)
+      }
       deductibleDefs = Array.isArray(dedDefs) ? dedDefs : []
       if (q && !(q as { error?: unknown }).error) {
         const isHull = q.quotationTypeCode === 'H'
@@ -364,10 +378,11 @@ export async function exportPolicyToQuickBooks(policyId: string): Promise<void> 
       : policy.flagStateName || '--'
 
   // Shipping method
-  const shippingMethod = policy.customerType === 'broker' ? 'Indirect' : 'Direct'
+  // The customer type lives on the quotation (policy documents have none)
+  const shippingMethod = quotation?.customerType === 'broker' ? 'Indirect' : 'Direct'
 
   // Conditions summary
-  const conditionsSummary = getConditionsSummary(quotation, qClauses)
+  const conditionsSummary = getConditionsSummary(quotation, qClauseNames)
 
   // Deductible encoded
   const deductibleStr = encodeDeductibles(qDeductibles, deductibleDefs)

@@ -637,6 +637,21 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
+// One copy per user: a second one would run its own hot-update staging, sanctions database
+// writes and schedulers next to the first. A second launch brings the open window forward.
+// Packaged builds only (development runs a test copy next to the user's own).
+if (app.isPackaged && !app.requestSingleInstanceLock()) {
+  app.quit()
+  process.exit(0)
+}
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+})
+
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
@@ -1537,7 +1552,7 @@ app.whenReady().then(() => {
       const vDocName = vDocRows[0]?.name || doc.vesselId
       const [dtRows] = await db.pool!.query<RowDataPacket[]>(
         'SELECT name FROM document_types WHERE id = ? UNION SELECT name FROM vessel_custom_doc_types WHERE id = ?',
-        [doc.docTypeId, doc.docTypeId]
+        [doc.documentTypeId || doc.docTypeId, doc.documentTypeId || doc.docTypeId]
       )
       const docTypeName = dtRows[0]?.name || 'document'
       db.logActivity({
@@ -2147,8 +2162,8 @@ app.whenReady().then(() => {
         action: 'CREATE',
         module: 'Surveyors',
         entityType: 'surveyor',
-        entityName: surveyor.name,
-        details: `Created surveyor ${surveyor.name}`
+        entityName: surveyor.companyName || surveyor.name,
+        details: `Created surveyor ${surveyor.companyName || surveyor.name || ''}`
       }).catch(() => {})
       return result
     }
@@ -2158,7 +2173,7 @@ app.whenReady().then(() => {
     async (event, id: string, updates: Partial<Surveyor> & { name?: string }) => {
       const user = await requirePermission(event, 'surveys:manage')
       const result = await db.updateSurveyor(id, updates)
-      const surveyorName = updates.name || id
+      const surveyorName = updates.companyName || updates.name || id
       db.logActivity({
         userId: user.id,
         username: user.username,
@@ -2702,10 +2717,24 @@ app.whenReady().then(() => {
     return fileExistsAsync(filePath)
   })
   // Many paths in one round-trip, checked in parallel (document lists)
+  // For the "file missing" badges: only a file the share says is gone counts as missing. A share
+  // that is down or slow (timeout, unreachable, access denied) is "unknown" and shown as present,
+  // instead of flagging every document as missing.
+  const fileMissingAsync = async (filePath: unknown): Promise<boolean> => {
+    if (typeof filePath !== 'string' || !filePath) return true
+    try {
+      await fsAccess(normalize(resolveFilePath(filePath)))
+      return false
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      return code === 'ENOENT' || code === 'ENOTDIR'
+    }
+  }
   safeHandle('fs:existsMany', async (event, filePaths: string[]) => {
     requireSession(event)
     if (!Array.isArray(filePaths)) return []
-    return Promise.all(filePaths.slice(0, 5000).map(fileExistsAsync))
+    const missing = await Promise.all(filePaths.slice(0, 5000).map(fileMissingAsync))
+    return missing.map((m) => !m)
   })
 
   safeHandle('fs:open', async (event, filePath: string) => {
@@ -4940,9 +4969,9 @@ app.whenReady().then(() => {
         action: 'CREATE',
         module: 'Policies',
         entityType: 'blue_card',
-        entityId: data.policyDocumentId,
-        entityName: data.cardType || 'Blue Card',
-        details: `Added ${data.cardType || 'blue card'}${data.policyNumber ? ' for policy ' + data.policyNumber : ''}`
+        entityId: data.policyId,
+        entityName: data.cardNumber || data.cardType || 'Blue Card',
+        details: `Added ${data.cardType || 'blue card'} ${data.cardNumber || ''}`.trim()
       }).catch(() => {})
       return result
     }
@@ -5023,7 +5052,8 @@ app.whenReady().then(() => {
       const result = await db.updatePolicyDocument(id, fields)
       try {
         const changedKeys = Object.keys(fields).filter((k) => fields[k] !== undefined)
-        const policyLabel = fields.policyNumber || id
+        const policyLabel =
+          fields.policyNumber || (await db.getPolicyDocumentById(id))?.policyNumber || id
         db.logActivity({
           userId: user.id,
           username: user.username,
@@ -5255,6 +5285,8 @@ app.whenReady().then(() => {
     ) => {
       const user = await requirePermission(event, 'policies:manage')
       const endorsementId = await db.cancelPolicy(policyDocId, { ...options, createdBy: user.id })
+      const cancelledNumber =
+        options.policyNumber || (await db.getPolicyDocumentById(policyDocId))?.policyNumber
       db.logActivity({
         userId: user.id,
         username: user.username,
@@ -5262,7 +5294,7 @@ app.whenReady().then(() => {
         module: 'Policies',
         entityType: 'policy_document',
         entityId: policyDocId,
-        entityName: options.policyNumber || policyDocId,
+        entityName: cancelledNumber || policyDocId,
         details: `Cancelled policy effective ${options.effectiveDate}`
       }).catch(() => {})
       return endorsementId
@@ -5540,7 +5572,44 @@ app.whenReady().then(() => {
     'vesselNotes:add',
     async (event, vesselId: string, note: string, parentNoteId?: string) => {
       const user = await requirePermission(event, 'vessels:edit')
-      return db.addVesselNote(vesselId, note, user.id, user.username, parentNoteId)
+      const result = await db.addVesselNote(vesselId, note, user.id, user.username, parentNoteId)
+      // Same notifications as quotation notes: the author of the note replied to, and @mentions
+      const notified = new Set<string>([user.id])
+      try {
+        if (parentNoteId) {
+          const parent = (await db.getVesselNotes(vesselId)).find((n) => n.id === parentNoteId)
+          if (parent?.createdByUserId && !notified.has(parent.createdByUserId)) {
+            await db.notifyUser(
+              parent.createdByUserId,
+              'note_reply',
+              `${user.username} replied to your vessel note`,
+              note,
+              'vessel',
+              vesselId
+            )
+            notified.add(parent.createdByUserId)
+          }
+        }
+        const mentions = note.match(/@(\w+)/g)
+        if (mentions) {
+          const usernames = [...new Set(mentions.map((m) => m.slice(1)))]
+          for (const mu of await db.getUsersByUsername(usernames)) {
+            if (notified.has(mu.id)) continue
+            await db.notifyUser(
+              mu.id,
+              'note_mention',
+              `${user.username} mentioned you in a vessel note`,
+              note,
+              'vessel',
+              vesselId
+            )
+            notified.add(mu.id)
+          }
+        }
+      } catch (err) {
+        console.error('Vessel note notification error:', err)
+      }
+      return result
     }
   )
   safeHandle('vesselNotes:delete', async (event, noteId: string) => {
@@ -5699,8 +5768,8 @@ app.whenReady().then(() => {
       module: 'Quotations',
       entityType: 'quotation',
       entityId: result?.id || q.id,
-      entityName: q.reference,
-      details: `Created quotation ${q.reference || ''}`
+      entityName: result?.referenceNumber || q.referenceNumber || q.reference,
+      details: `Created quotation ${result?.referenceNumber || q.referenceNumber || q.reference || ''}`
     }).catch(() => {})
     return result
   })
@@ -7160,8 +7229,10 @@ app.whenReady().then(() => {
     }
   )
 
-  // Cleanup old read notifications on startup
-  db.deleteOldNotifications(90).catch(() => {})
+  // Cleanup old read notifications once the startup connection is made
+  void dbStartupDone.then(() => {
+    if (db.pool) db.deleteOldNotifications(90).catch(() => {})
+  })
 
   createWindow()
 
@@ -7170,7 +7241,10 @@ app.whenReady().then(() => {
 
   // Start the daily alert scheduler
   const dailyAlertScheduler = new DailyAlertScheduler(db)
-  dailyAlertScheduler.start()
+  // Its settings (enabled, time) live in the DB: start once the startup connection is made
+  void dbStartupDone.then(() => {
+    if (db.pool) void dailyAlertScheduler.start().catch((e) => console.error('[DailyAlerts]', e))
+  })
 
   safeHandle('dailyAlerts:runNow', async (event) => {
     await requirePermission(event, 'admin:settings')
