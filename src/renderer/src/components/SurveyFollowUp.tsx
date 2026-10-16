@@ -5,7 +5,6 @@ import {
   Check,
   AlertTriangle,
   RefreshCw,
-  X,
   FileWarning,
   Ship,
   ChevronRight,
@@ -15,7 +14,8 @@ import {
   Download,
   CheckSquare
 } from 'lucide-react'
-import { PageHeader, Badge } from './ui'
+import { PageHeader, Badge, Field, Modal, Tabs } from './ui'
+import type { BadgeTone } from './ui'
 import XLSX from 'xlsx-js-style'
 import {
   SurveyWarranty,
@@ -24,7 +24,6 @@ import {
   EndorsementDueRow
 } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateOrDash } from '../utils/dateUtils'
 import { ok, isIpcError } from '../utils/ipc'
@@ -50,11 +49,11 @@ const STATUS_LABELS: Record<WarrantyStatus, string> = {
   waived: 'Waived'
 }
 
-const STATUS_COLORS: Record<WarrantyStatus, { bg: string; color: string }> = {
-  pending: { bg: 'rgba(255,165,0,0.12)', color: '#e6a800' },
-  survey_done: { bg: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff' },
-  completed: { bg: 'rgba(0,200,100,0.12)', color: '#00c864' },
-  waived: { bg: 'rgba(128,128,128,0.1)', color: '#888' }
+const STATUS_TONES: Record<WarrantyStatus, BadgeTone> = {
+  pending: 'warning',
+  survey_done: 'info',
+  completed: 'success',
+  waived: 'neutral'
 }
 
 function calcDeadlineDate(inceptionDate: string, deadlineDays: number): Date {
@@ -89,9 +88,7 @@ export default function SurveyFollowUp({
   subTabNonce
 }: SurveyFollowUpProps): React.JSX.Element {
   const { user } = useAuth()
-  const { theme } = useTheme()
   const { showSuccess, showError } = useToast()
-  const isLight = theme === 'light' || theme === 'aurora'
 
   const [warranties, setWarranties] = useState<SurveyWarranty[]>([])
   const [endorsementsDue, setEndorsementsDue] = useState<EndorsementRow[]>([])
@@ -450,46 +447,6 @@ export default function SurveyFollowUp({
   ).length
   const overdueCount = warranties.filter((w) => getUrgency(w) === 'overdue').length
 
-  // ── Styles ──────────────────────────────────────────────────────
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 12px',
-    borderRadius: '8px',
-    fontSize: '0.85rem',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)'
-  }
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    color: 'var(--text-secondary)',
-    marginBottom: '4px',
-    display: 'block'
-  }
-  const modalBg: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1100
-  }
-  const modalCard: React.CSSProperties = {
-    background: isLight ? '#ffffff' : '#1a1d28',
-    borderRadius: '16px',
-    padding: '24px',
-    width: '440px',
-    maxWidth: '92vw',
-    border: '1px solid var(--glass-border-color)',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-    maxHeight: '85vh',
-    overflowY: 'auto'
-  }
-
   const renderUrgencyPill = (w: SurveyWarranty): React.JSX.Element | null => {
     if (w.deadlineType !== 'days' || !w.deadlineDays || !w.inceptionDate) return null
     if (w.status !== 'pending' && w.status !== 'survey_done') return null
@@ -498,24 +455,10 @@ export default function SurveyFollowUp({
     const isUrgent = remaining >= 0 && remaining <= 7
     if (!isOverdue && !isUrgent) return null
     return (
-      <span
-        style={{
-          padding: '2px 8px',
-          borderRadius: '8px',
-          fontSize: '0.7rem',
-          fontWeight: '700',
-          background: isOverdue ? 'rgba(255,77,77,0.15)' : 'rgba(255,165,0,0.15)',
-          color: isOverdue ? 'var(--danger)' : '#e6a800',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
-          whiteSpace: 'nowrap',
-          flexShrink: 0
-        }}
-      >
+      <Badge tone={isOverdue ? 'danger' : 'warning'} style={{ flexShrink: 0 }}>
         <AlertTriangle size={10} />
         {isOverdue ? `${Math.abs(remaining)}d overdue` : `${remaining}d left`}
-      </span>
+      </Badge>
     )
   }
 
@@ -550,24 +493,17 @@ export default function SurveyFollowUp({
         }}
       >
         {[
-          { label: 'Active', value: activeCount, color: '#e6a800', bg: 'rgba(255,165,0,0.08)' },
-          {
-            label: 'Overdue',
-            value: overdueCount,
-            color: 'var(--danger)',
-            bg: 'rgba(255,77,77,0.08)'
-          },
+          { label: 'Active', value: activeCount, color: 'var(--warning)' },
+          { label: 'Overdue', value: overdueCount, color: 'var(--danger)' },
           {
             label: 'Survey Carried Out',
             value: warranties.filter((w) => w.status === 'survey_done').length,
-            color: '#00aaff',
-            bg: 'rgba(var(--accent-primary-rgb), 0.08)'
+            color: 'var(--info)'
           },
           {
             label: 'Unsent Endorsements',
             value: endorsementsDue.length,
-            color: '#e6a800',
-            bg: 'rgba(255,165,0,0.08)'
+            color: 'var(--warning)'
           }
         ].map((s) => (
           <div
@@ -575,8 +511,8 @@ export default function SurveyFollowUp({
             style={{
               padding: '14px 16px',
               borderRadius: '10px',
-              background: s.bg,
-              border: `1px solid ${s.bg.replace('0.08', '0.18')}`
+              background: `color-mix(in srgb, ${s.color} 8%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${s.color} 18%, transparent)`
             }}
           >
             <div style={{ fontSize: '1.6rem', fontWeight: '800', color: s.color, lineHeight: 1 }}>
@@ -590,80 +526,25 @@ export default function SurveyFollowUp({
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '2px', marginBottom: '16px' }}>
-        <button
-          onClick={() => setActiveTab('warranties')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: activeTab === 'warranties' ? 700 : 400,
-            background: activeTab === 'warranties' ? 'var(--bg-card)' : 'transparent',
-            color: activeTab === 'warranties' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            borderBottom:
-              activeTab === 'warranties'
-                ? '2px solid var(--accent-primary)'
-                : '2px solid transparent',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <FileWarning size={15} /> Warranties
-          {activeCount > 0 && (
-            <span
-              style={{
-                padding: '1px 8px',
-                borderRadius: '10px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                background: 'rgba(255,165,0,0.15)',
-                color: '#e6a800'
-              }}
-            >
-              {activeCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('endorsements')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px 8px 0 0',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: activeTab === 'endorsements' ? 700 : 400,
-            background: activeTab === 'endorsements' ? 'var(--bg-card)' : 'transparent',
-            color: activeTab === 'endorsements' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            borderBottom:
-              activeTab === 'endorsements'
-                ? '2px solid var(--accent-primary)'
-                : '2px solid transparent',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <Bell size={15} /> Endorsements
-          {endorsementsDue.length > 0 && (
-            <span
-              style={{
-                padding: '1px 8px',
-                borderRadius: '10px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                background: 'rgba(255,165,0,0.15)',
-                color: '#e6a800'
-              }}
-            >
-              {endorsementsDue.length}
-            </span>
-          )}
-        </button>
-      </div>
+      <Tabs
+        items={[
+          {
+            key: 'warranties',
+            label: 'Warranties',
+            icon: <FileWarning size={15} />,
+            count: activeCount > 0 ? activeCount : undefined
+          },
+          {
+            key: 'endorsements',
+            label: 'Endorsements',
+            icon: <Bell size={15} />,
+            count: endorsementsDue.length > 0 ? endorsementsDue.length : undefined
+          }
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: '16px' }}
+      />
 
       {/* ── Survey Warranties Tab ─────────────────────────────────── */}
       {activeTab === 'warranties' && (
@@ -713,15 +594,7 @@ export default function SurveyFollowUp({
                     setWarrantyPage(1)
                   }}
                   placeholder="Search vessels or warranties..."
-                  style={{
-                    padding: '6px 10px 6px 28px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--input-bg, transparent)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.82rem',
-                    width: '220px'
-                  }}
+                  style={{ paddingLeft: '28px', width: '220px' }}
                 />
               </div>
               <button
@@ -765,9 +638,7 @@ export default function SurveyFollowUp({
                 marginBottom: '12px',
                 padding: '10px 14px',
                 borderRadius: '8px',
-                background: isLight
-                  ? 'rgba(0,150,200,0.06)'
-                  : 'rgba(var(--accent-primary-rgb), 0.06)',
+                background: 'rgba(var(--accent-primary-rgb), 0.06)',
                 border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
                 alignItems: 'center'
               }}
@@ -828,16 +699,8 @@ export default function SurveyFollowUp({
               {statusFilter === 'active' ? 'No active warranties.' : 'No warranties found.'}
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                ref={tableRef}
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '0.82rem',
-                  tableLayout: 'fixed'
-                }}
-              >
+            <div className="table-wrap">
+              <table ref={tableRef} className="data-table" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
                   {[
                     { key: 'vessel', def: '14%' },
@@ -855,7 +718,7 @@ export default function SurveyFollowUp({
                   ))}
                 </colgroup>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
+                  <tr>
                     {[
                       { key: 'vessel', label: 'Vessel' },
                       { key: 'warranty', label: 'Warranty' },
@@ -865,20 +728,7 @@ export default function SurveyFollowUp({
                       { key: 'reminders', label: 'Reminders' },
                       { key: 'actions', label: 'Actions' }
                     ].map((h) => (
-                      <th
-                        key={h.key}
-                        style={{
-                          padding: '6px 8px',
-                          textAlign: 'left',
-                          fontSize: '0.7rem',
-                          fontWeight: '700',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          color: 'var(--text-secondary)',
-                          whiteSpace: 'nowrap',
-                          position: 'relative'
-                        }}
-                      >
+                      <th key={h.key}>
                         {h.key !== 'actions' ? (
                           <SortHeader field={h.key} label={h.label} />
                         ) : (
@@ -890,36 +740,25 @@ export default function SurveyFollowUp({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredWarranties.map((w, idx) => {
-                    const sc = STATUS_COLORS[w.status]
+                  {filteredWarranties.map((w) => {
                     const urgency = getUrgency(w)
                     const rowBg =
                       urgency === 'overdue'
-                        ? 'rgba(255,77,77,0.04)'
+                        ? 'color-mix(in srgb, var(--danger) 4%, transparent)'
                         : urgency === 'urgent'
-                          ? 'rgba(255,165,0,0.04)'
-                          : idx % 2 === 0
-                            ? 'transparent'
-                            : isLight
-                              ? 'rgba(0,0,0,0.02)'
-                              : 'rgba(255,255,255,0.01)'
+                          ? 'color-mix(in srgb, var(--warning) 4%, transparent)'
+                          : undefined
                     const isHistoryExpanded = expandedReminderId === w.id
+                    // The history row continues this row, so no divider between them
+                    const hbStyle = isHistoryExpanded ? { borderBottom: 'none' } : undefined
                     const history = reminderHistory[w.id]
 
                     return (
                       <>
-                        <tr
-                          key={w.id}
-                          style={{
-                            background: rowBg,
-                            borderBottom: isHistoryExpanded
-                              ? 'none'
-                              : '1px solid var(--table-border)'
-                          }}
-                        >
+                        <tr key={w.id} style={{ background: rowBg }}>
                           {/* Bulk select checkbox */}
                           {selectMode && (
-                            <td style={{ padding: '6px 4px', width: '24px' }}>
+                            <td style={{ width: '24px', ...hbStyle }}>
                               {(w.status === 'pending' || w.status === 'survey_done') && (
                                 <input
                                   type="checkbox"
@@ -938,7 +777,7 @@ export default function SurveyFollowUp({
                             </td>
                           )}
                           {/* Vessel */}
-                          <td style={{ padding: '6px 8px', overflow: 'hidden' }}>
+                          <td style={{ overflow: 'hidden', ...hbStyle }}>
                             {onNavigateToVessel ? (
                               <button
                                 onClick={() => onNavigateToVessel(w.vesselId)}
@@ -949,7 +788,7 @@ export default function SurveyFollowUp({
                                   cursor: 'pointer',
                                   fontWeight: '600',
                                   padding: 0,
-                                  fontSize: '0.82rem',
+                                  fontSize: 'inherit',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -960,26 +799,26 @@ export default function SurveyFollowUp({
                                 {w.vesselName || '—'}
                               </button>
                             ) : (
-                              <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>
-                                {w.vesselName || '—'}
-                              </span>
+                              <span style={{ fontWeight: '600' }}>{w.vesselName || '—'}</span>
                             )}
                             {w.imoNumber && (
-                              <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                              <div
+                                className="mono"
+                                style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}
+                              >
                                 {w.imoNumber}
                               </div>
                             )}
                           </td>
 
                           {/* Warranty description */}
-                          <td style={{ padding: '6px 8px', overflow: 'hidden' }}>
+                          <td style={{ overflow: 'hidden', ...hbStyle }}>
                             <div
                               style={{
                                 fontWeight: '500',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                fontSize: '0.82rem'
+                                whiteSpace: 'nowrap'
                               }}
                             >
                               {w.description}
@@ -1001,18 +840,12 @@ export default function SurveyFollowUp({
                           </td>
 
                           {/* Policy */}
-                          <td
-                            style={{
-                              padding: '6px 8px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.78rem'
-                            }}
-                          >
+                          <td className="muted" style={hbStyle}>
                             {w.policyTypeName || '—'}
                           </td>
 
                           {/* Deadline */}
-                          <td style={{ padding: '6px 8px' }}>
+                          <td style={hbStyle}>
                             {w.deadlineType === 'days' && w.deadlineDays && w.inceptionDate ? (
                               <div>
                                 <div
@@ -1040,24 +873,12 @@ export default function SurveyFollowUp({
                           </td>
 
                           {/* Status */}
-                          <td style={{ padding: '6px 8px' }}>
-                            <span
-                              style={{
-                                padding: '2px 7px',
-                                borderRadius: '8px',
-                                fontSize: '0.68rem',
-                                fontWeight: '700',
-                                textTransform: 'uppercase',
-                                background: sc.bg,
-                                color: sc.color
-                              }}
-                            >
-                              {STATUS_LABELS[w.status]}
-                            </span>
+                          <td style={hbStyle}>
+                            <Badge tone={STATUS_TONES[w.status]}>{STATUS_LABELS[w.status]}</Badge>
                           </td>
 
                           {/* Reminders */}
-                          <td style={{ padding: '6px 8px' }}>
+                          <td style={hbStyle}>
                             <div
                               style={{
                                 display: 'flex',
@@ -1072,7 +893,7 @@ export default function SurveyFollowUp({
                               </span>
                               {w.nextReminderDate &&
                                 (w.status === 'pending' || w.status === 'survey_done') && (
-                                  <span style={{ fontSize: '0.68rem', color: '#e6a800' }}>
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--warning)' }}>
                                     → {formatDateOrDash(w.nextReminderDate)}
                                   </span>
                                 )}
@@ -1103,7 +924,7 @@ export default function SurveyFollowUp({
                           </td>
 
                           {/* Actions */}
-                          <td style={{ padding: '6px 8px' }}>
+                          <td style={hbStyle}>
                             <div
                               style={{
                                 display: 'flex',
@@ -1138,8 +959,8 @@ export default function SurveyFollowUp({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '3px',
-                                    color: '#00aaff',
-                                    borderColor: 'rgba(var(--accent-primary-rgb), 0.35)'
+                                    color: 'var(--info)',
+                                    borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)'
                                   }}
                                   title="Mark survey received"
                                 >
@@ -1159,8 +980,9 @@ export default function SurveyFollowUp({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '3px',
-                                    color: '#00c864',
-                                    borderColor: 'rgba(0,200,100,0.35)'
+                                    color: 'var(--success)',
+                                    borderColor:
+                                      'color-mix(in srgb, var(--success) 35%, transparent)'
                                   }}
                                   title="Mark complete"
                                 >
@@ -1177,8 +999,7 @@ export default function SurveyFollowUp({
                                   style={{
                                     fontSize: '0.7rem',
                                     padding: '2px 7px',
-                                    color: '#888',
-                                    borderColor: 'rgba(128,128,128,0.3)'
+                                    color: 'var(--text-secondary)'
                                   }}
                                   title="Waive"
                                 >
@@ -1195,8 +1016,7 @@ export default function SurveyFollowUp({
                             <td
                               colSpan={7}
                               style={{
-                                padding: '0 12px 12px 32px',
-                                borderBottom: '1px solid var(--table-border)'
+                                padding: '0 12px 12px 32px'
                               }}
                             >
                               {!history ? (
@@ -1236,9 +1056,7 @@ export default function SurveyFollowUp({
                                         fontSize: '0.8rem',
                                         padding: '6px 10px',
                                         borderRadius: '7px',
-                                        background: isLight
-                                          ? 'rgba(0,0,0,0.04)'
-                                          : 'rgba(255,255,255,0.04)'
+                                        background: 'var(--bg-card-hover)'
                                       }}
                                     >
                                       <div
@@ -1265,8 +1083,9 @@ export default function SurveyFollowUp({
                                             padding: '1px 6px',
                                             borderRadius: '5px',
                                             fontSize: '0.7rem',
-                                            background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                                            color: '#00aaff',
+                                            background:
+                                              'color-mix(in srgb, var(--info) 12%, transparent)',
+                                            color: 'var(--info)',
                                             textTransform: 'uppercase'
                                           }}
                                         >
@@ -1278,11 +1097,9 @@ export default function SurveyFollowUp({
                                               padding: '1px 7px',
                                               borderRadius: '5px',
                                               fontSize: '0.7rem',
-                                              background: isLight
-                                                ? 'rgba(0,0,0,0.07)'
-                                                : 'rgba(255,255,255,0.08)',
+                                              background: 'var(--bg-card-hover)',
                                               color: 'var(--text-primary)',
-                                              fontFamily: 'monospace',
+                                              fontFamily: 'var(--font-mono)',
                                               fontWeight: '600'
                                             }}
                                           >
@@ -1293,7 +1110,7 @@ export default function SurveyFollowUp({
                                           <span
                                             style={{
                                               fontSize: '0.74rem',
-                                              color: '#e6a800',
+                                              color: 'var(--warning)',
                                               whiteSpace: 'nowrap',
                                               display: 'flex',
                                               alignItems: 'center',
@@ -1390,7 +1207,7 @@ export default function SurveyFollowUp({
             <div className="glass-card" style={{ padding: '20px' }}>
               <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 Reservations endorsements not yet sent.{' '}
-                <strong style={{ color: '#e6a800' }}>DUE</strong> means the reminder date has
+                <strong style={{ color: 'var(--warning)' }}>DUE</strong> means the reminder date has
                 arrived; <strong>Upcoming</strong> is still within the reminder window. Mark issued
                 once you send it.
               </p>
@@ -1406,185 +1223,125 @@ export default function SurveyFollowUp({
                   No unsent endorsements.
                 </div>
               ) : (
-                <table
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    fontSize: '0.82rem',
-                    tableLayout: 'fixed'
-                  }}
-                >
-                  <colgroup>
-                    {[
-                      { key: 'e_vessel', def: '20%' },
-                      { key: 'e_ref', def: '12%' },
-                      { key: 'e_date', def: '13%' },
-                      { key: 'e_type', def: '12%' },
-                      { key: 'e_reminder', def: '15%' },
-                      { key: 'e_status', def: '11%' },
-                      { key: 'e_action', def: '17%' }
-                    ].map((c) => (
-                      <col
-                        key={c.key}
-                        style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : c.def }}
-                      />
-                    ))}
-                  </colgroup>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--table-border)' }}>
+                <div className="table-wrap">
+                  <table className="data-table" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
                       {[
-                        { key: 'e_vessel', label: 'Vessel' },
-                        { key: 'e_ref', label: 'Reference' },
-                        { key: 'e_date', label: 'Survey Date' },
-                        { key: 'e_type', label: 'Type' },
-                        { key: 'e_reminder', label: 'Reminder Date' },
-                        { key: 'e_status', label: 'Status' },
-                        { key: 'e_action', label: 'Action' }
-                      ].map((h) => (
-                        <th
-                          key={h.key}
-                          style={{
-                            padding: '6px 8px',
-                            textAlign: 'left',
-                            fontSize: '0.7rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                            color: 'var(--text-secondary)',
-                            position: 'relative'
-                          }}
-                        >
-                          {h.label}
-                          <ResizeHandle colKey={h.key} />
-                        </th>
+                        { key: 'e_vessel', def: '20%' },
+                        { key: 'e_ref', def: '12%' },
+                        { key: 'e_date', def: '13%' },
+                        { key: 'e_type', def: '12%' },
+                        { key: 'e_reminder', def: '15%' },
+                        { key: 'e_status', def: '11%' },
+                        { key: 'e_action', def: '17%' }
+                      ].map((c) => (
+                        <col
+                          key={c.key}
+                          style={{ width: colWidths[c.key] ? `${colWidths[c.key]}px` : c.def }}
+                        />
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {endorsementsDue.map((e, idx: number) => {
-                      const isDue =
-                        remYmd(e.endorsementReminderDate || e.endorsement_reminder_date) <=
-                        dueTodayYmd
-                      return (
-                        <tr
-                          key={e.surveyId || e.id}
-                          style={{
-                            borderBottom: '1px solid var(--table-border)',
-                            background:
-                              idx % 2 === 0
-                                ? 'transparent'
-                                : isLight
-                                  ? 'rgba(0,0,0,0.02)'
-                                  : 'rgba(255,255,255,0.01)'
-                          }}
-                        >
-                          <td style={{ padding: '8px 10px' }}>
-                            <div
-                              style={{
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px'
-                              }}
-                            >
-                              <Ship size={13} style={{ color: 'var(--text-secondary)' }} />
-                              {onNavigateToVessel ? (
-                                <button
-                                  onClick={() => onNavigateToVessel(e.vesselId)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--accent-primary)',
-                                    cursor: 'pointer',
-                                    fontWeight: '600',
-                                    padding: 0,
-                                    fontSize: '0.85rem',
-                                    textAlign: 'left'
-                                  }}
-                                >
-                                  {e.vesselName || e.vessel_name || '—'}
-                                </button>
-                              ) : (
-                                e.vesselName || e.vessel_name || '—'
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>
-                            {e.reference ? (
-                              <span
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {[
+                          { key: 'e_vessel', label: 'Vessel' },
+                          { key: 'e_ref', label: 'Reference' },
+                          { key: 'e_date', label: 'Survey Date' },
+                          { key: 'e_type', label: 'Type' },
+                          { key: 'e_reminder', label: 'Reminder Date' },
+                          { key: 'e_status', label: 'Status' },
+                          { key: 'e_action', label: 'Action' }
+                        ].map((h) => (
+                          <th key={h.key}>
+                            {h.label}
+                            <ResizeHandle colKey={h.key} />
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {endorsementsDue.map((e) => {
+                        const isDue =
+                          remYmd(e.endorsementReminderDate || e.endorsement_reminder_date) <=
+                          dueTodayYmd
+                        return (
+                          <tr key={e.surveyId || e.id}>
+                            <td>
+                              <div
                                 style={{
-                                  fontFamily: 'monospace',
-                                  fontWeight: 600,
-                                  color: 'var(--accent-primary)'
+                                  fontWeight: '600',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
                                 }}
                               >
-                                {e.reference}
-                              </span>
-                            ) : (
-                              <span style={{ color: 'var(--text-secondary)' }}>—</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>
-                            {formatDateOrDash(e.surveyDate || e.survey_date)}
-                          </td>
-                          <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>
-                            {e.surveyType || e.survey_type || '—'}
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>
-                            <span
-                              style={{
-                                color: isDue ? '#e6a800' : 'var(--text-secondary)',
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <Bell size={12} />
-                              {formatDateOrDash(
-                                e.endorsementReminderDate || e.endorsement_reminder_date
+                                <Ship size={13} style={{ color: 'var(--text-secondary)' }} />
+                                {onNavigateToVessel ? (
+                                  <button
+                                    onClick={() => onNavigateToVessel(e.vesselId)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--accent-primary)',
+                                      cursor: 'pointer',
+                                      fontWeight: '600',
+                                      padding: 0,
+                                      fontSize: 'inherit',
+                                      textAlign: 'left'
+                                    }}
+                                  >
+                                    {e.vesselName || e.vessel_name || '—'}
+                                  </button>
+                                ) : (
+                                  e.vesselName || e.vessel_name || '—'
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              {e.reference ? (
+                                <span
+                                  style={{
+                                    fontFamily: 'var(--font-mono)',
+                                    fontWeight: 600,
+                                    color: 'var(--accent-primary)'
+                                  }}
+                                >
+                                  {e.reference}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-secondary)' }}>—</span>
                               )}
-                            </span>
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.03em',
-                                background: isDue
-                                  ? 'rgba(255,165,0,0.15)'
-                                  : 'rgba(128,128,128,0.12)',
-                                color: isDue ? '#e6a800' : 'var(--text-secondary)'
-                              }}
-                            >
-                              {isDue ? 'Due' : 'Upcoming'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '8px 10px' }}>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              <button
-                                onClick={() => handleMarkEndorsementIssued(e.surveyId || e.id!)}
-                                className="btn-primary"
+                            </td>
+                            <td className="muted">
+                              {formatDateOrDash(e.surveyDate || e.survey_date)}
+                            </td>
+                            <td className="muted">{e.surveyType || e.survey_type || '—'}</td>
+                            <td>
+                              <span
                                 style={{
-                                  fontSize: '0.78rem',
-                                  padding: '4px 10px',
+                                  color: isDue ? 'var(--warning)' : 'var(--text-secondary)',
+                                  fontWeight: '600',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px'
                                 }}
-                                title="Mark this reservations endorsement as issued"
                               >
-                                <Check size={12} /> Mark Issued
-                              </button>
-                              {onNavigateToVessel && (
+                                <Bell size={12} />
+                                {formatDateOrDash(
+                                  e.endorsementReminderDate || e.endorsement_reminder_date
+                                )}
+                              </span>
+                            </td>
+                            <td>
+                              <Badge tone={isDue ? 'warning' : 'neutral'}>
+                                {isDue ? 'Due' : 'Upcoming'}
+                              </Badge>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                 <button
-                                  onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id!)}
-                                  className="btn-secondary"
+                                  onClick={() => handleMarkEndorsementIssued(e.surveyId || e.id!)}
+                                  className="btn-primary"
                                   style={{
                                     fontSize: '0.78rem',
                                     padding: '4px 10px',
@@ -1592,17 +1349,33 @@ export default function SurveyFollowUp({
                                     alignItems: 'center',
                                     gap: '4px'
                                   }}
+                                  title="Mark this reservations endorsement as issued"
                                 >
-                                  <Ship size={12} /> View
+                                  <Check size={12} /> Mark Issued
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                                {onNavigateToVessel && (
+                                  <button
+                                    onClick={() => onNavigateToVessel(e.vesselId || e.vessel_id!)}
+                                    className="btn-secondary"
+                                    style={{
+                                      fontSize: '0.78rem',
+                                      padding: '4px 10px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Ship size={12} /> View
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )
@@ -1610,244 +1383,150 @@ export default function SurveyFollowUp({
 
       {/* ── Log Reminder Modal ───────────────────────────────────── */}
       {logReminderFor && (
-        <div style={modalBg} onClick={() => setLogReminderFor(null)}>
-          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '8px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setLogReminderFor(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p
-              style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}
-            >
-              {logReminderFor.vesselName} — {logReminderFor.description}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Sent On *</label>
-                <input
-                  type="date"
-                  value={reminderSentAt}
-                  onChange={(e) => setReminderSentAt(e.target.value)}
-                  style={inputStyle}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Channel</label>
-                <select
-                  value={reminderChannel}
-                  onChange={(e) => setReminderChannel(e.target.value as typeof reminderChannel)}
-                  style={inputStyle}
-                >
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>
-                  Reference{' '}
-                  <span style={{ fontWeight: 400, opacity: 0.6 }}>
-                    (e.g. email subject / survey ref)
-                  </span>
-                </label>
-                <input
-                  value={reminderReference}
-                  onChange={(e) => setReminderReference(e.target.value)}
-                  placeholder="Optional — helps locate the email later"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Notes</label>
-                <input
-                  value={reminderNotes}
-                  onChange={(e) => setReminderNotes(e.target.value)}
-                  placeholder="Optional"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Next Reminder Date</label>
-                <input
-                  type="date"
-                  value={reminderNextDate}
-                  onChange={(e) => setReminderNextDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Log Reminder"
+          icon={<Bell size={18} />}
+          onClose={() => setLogReminderFor(null)}
+          width={440}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setLogReminderFor(null)} className="btn-secondary">
                 Cancel
               </button>
               <button onClick={handleLogReminder} className="btn-primary">
                 Log Reminder
               </button>
-            </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+            {logReminderFor.vesselName} — {logReminderFor.description}
+          </p>
+          <div className="form-grid">
+            <Field label="Sent on" required>
+              <input
+                type="date"
+                value={reminderSentAt}
+                onChange={(e) => setReminderSentAt(e.target.value)}
+                autoFocus
+              />
+            </Field>
+            <Field label="Channel">
+              <select
+                value={reminderChannel}
+                onChange={(e) => setReminderChannel(e.target.value as typeof reminderChannel)}
+              >
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+            <Field label="Reference" hint="e.g. email subject / survey ref" span="all">
+              <input
+                value={reminderReference}
+                onChange={(e) => setReminderReference(e.target.value)}
+                placeholder="Optional — helps locate the email later"
+              />
+            </Field>
+            <Field label="Notes" span="all">
+              <input
+                value={reminderNotes}
+                onChange={(e) => setReminderNotes(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
+            <Field label="Next reminder date">
+              <input
+                type="date"
+                value={reminderNextDate}
+                onChange={(e) => setReminderNextDate(e.target.value)}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Waive Modal ──────────────────────────────────────────── */}
       {waiveFor && (
-        <div style={modalBg} onClick={() => setWaiveFor(null)}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '8px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setWaiveFor(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p
-              style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}
-            >
-              {waiveFor.vesselName} — {waiveFor.description}
-            </p>
-            <div>
-              <label style={labelStyle}>Waiver Reason *</label>
-              <textarea
-                value={waiveReason}
-                onChange={(e) => setWaiveReason(e.target.value)}
-                placeholder="Explain why this warranty is being waived…"
-                rows={4}
-                style={{ ...inputStyle, resize: 'vertical' }}
-                autoFocus
-              />
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Waive Warranty"
+          onClose={() => setWaiveFor(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setWaiveFor(null)} className="btn-secondary">
                 Cancel
               </button>
               <button
                 onClick={handleWaive}
                 disabled={!waiveReason.trim()}
+                className="btn-secondary"
                 style={{
-                  background: 'rgba(255,165,0,0.15)',
-                  border: '1px solid rgba(255,165,0,0.35)',
-                  color: '#e6a800',
-                  borderRadius: '8px',
-                  padding: '6px 16px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.85rem',
-                  opacity: waiveReason.trim() ? 1 : 0.5
+                  color: 'var(--warning)',
+                  borderColor: 'color-mix(in srgb, var(--warning) 35%, transparent)',
+                  background: 'color-mix(in srgb, var(--warning) 15%, transparent)'
                 }}
               >
                 Waive
               </button>
-            </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+            {waiveFor.vesselName} — {waiveFor.description}
+          </p>
+          <div className="form-grid">
+            <Field label="Waiver reason" required span="all">
+              <textarea
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                placeholder="Explain why this warranty is being waived…"
+                rows={4}
+                style={{ resize: 'vertical' }}
+                autoFocus
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Complete Modal ───────────────────────────────────────── */}
       {completeFor && (
-        <div style={modalBg} onClick={() => setCompleteFor(null)}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '8px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setCompleteFor(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
+        <Modal
+          title="Complete Warranty"
+          icon={<Check size={18} />}
+          onClose={() => setCompleteFor(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setCompleteFor(null)} className="btn-secondary">
+                Cancel
               </button>
-            </div>
-            <p
-              style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}
-            >
-              {completeFor.vesselName} — {completeFor.description}
-            </p>
-            <div>
-              <label style={labelStyle}>Completion Notes (optional)</label>
+              <button onClick={handleComplete} className="btn-primary">
+                Mark Complete
+              </button>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+            {completeFor.vesselName} — {completeFor.description}
+          </p>
+          <div className="form-grid">
+            <Field label="Completion notes (optional)" span="all">
               <textarea
                 value={completeNotes}
                 onChange={(e) => setCompleteNotes(e.target.value)}
                 placeholder="Any notes on completion…"
                 rows={3}
-                style={{ ...inputStyle, resize: 'vertical' }}
+                style={{ resize: 'vertical' }}
                 autoFocus
               />
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
-              <button onClick={() => setCompleteFor(null)} className="btn-secondary">
-                Cancel
-              </button>
-              <button
-                onClick={handleComplete}
-                style={{
-                  background: 'rgba(0,200,100,0.15)',
-                  border: '1px solid rgba(0,200,100,0.35)',
-                  color: '#00c864',
-                  borderRadius: '8px',
-                  padding: '6px 16px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.85rem'
-                }}
-              >
-                Mark Complete
-              </button>
-            </div>
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

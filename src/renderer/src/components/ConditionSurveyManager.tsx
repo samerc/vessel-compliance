@@ -9,7 +9,8 @@ import {
   FileUp,
   Edit,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import {
@@ -23,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
+import { Field, Modal } from './ui'
 import XLSX from 'xlsx-js-style'
 import { ok } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
@@ -485,254 +487,130 @@ export default function ConditionSurveyManager({
             style={{
               marginBottom: '20px',
               padding: '20px',
-              background: 'var(--input-bg)',
+              background: 'var(--bg-card)',
               borderRadius: '12px',
-              border: '1px solid var(--input-border)'
+              border: 'var(--glass-border)'
             }}
           >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '150px 1fr 1fr 1fr',
-                gap: '15px',
-                marginBottom: '15px'
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Survey Date *
-                </label>
-                <input
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  required
-                  min="1900-01-01"
-                  max="2100-12-31"
-                  aria-label="Survey date"
-                />
+            <div className="form-section">
+              <div className="form-grid">
+                <Field label="Survey date" required>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    required
+                    min="1900-01-01"
+                    max="2100-12-31"
+                    aria-label="Survey date"
+                  />
+                </Field>
+                <Field label="Survey type" required>
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value)}
+                    required
+                    aria-label="Survey type"
+                  >
+                    <option value="">-- Select Type --</option>
+                    {surveyTypes.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Reference">
+                  <input
+                    type="text"
+                    value={newReference}
+                    onChange={(e) => setNewReference(e.target.value)}
+                    placeholder="e.g. REF-2024-001"
+                    aria-label="Survey reference"
+                  />
+                </Field>
+                <Field label="Location">
+                  <input
+                    type="text"
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    placeholder="e.g. Singapore, Rotterdam"
+                    aria-label="Survey location"
+                  />
+                </Field>
+                <Field label="Surveyor" required span="all">
+                  <select
+                    value={newSurveyorId}
+                    onChange={(e) => {
+                      setNewSurveyorId(e.target.value)
+                      setShowNewSurveyorForm(e.target.value === 'new')
+                    }}
+                    required
+                    aria-label="Surveyor"
+                  >
+                    <option value="">-- Select Surveyor --</option>
+                    {surveyors.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.companyName} ({s.country})
+                      </option>
+                    ))}
+                    <option value="new">+ Add New Surveyor</option>
+                  </select>
+                </Field>
               </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Survey Type *
-                </label>
-                <select
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--input-border)'
-                  }}
-                  aria-label="Survey type"
-                >
-                  <option value="">-- Select Type --</option>
-                  {surveyTypes.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Reference
-                </label>
-                <input
-                  type="text"
-                  value={newReference}
-                  onChange={(e) => setNewReference(e.target.value)}
-                  placeholder="e.g. REF-2024-001"
-                  aria-label="Survey reference"
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  placeholder="e.g. Singapore, Rotterdam"
-                  aria-label="Survey location"
-                />
-              </div>
-            </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '5px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                Surveyor *
-              </label>
-              <select
-                value={newSurveyorId}
-                onChange={(e) => {
-                  setNewSurveyorId(e.target.value)
-                  setShowNewSurveyorForm(e.target.value === 'new')
-                }}
-                required
-                style={{ color: 'var(--text-primary)' }}
-                aria-label="Surveyor"
-              >
-                <option value="">-- Select Surveyor --</option>
-                {surveyors.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.companyName} ({s.country})
-                  </option>
-                ))}
-                <option value="new">+ Add New Surveyor</option>
-              </select>
             </div>
             {showNewSurveyorForm && (
-              <div
-                style={{
-                  padding: '15px',
-                  background: 'var(--bg-card)',
-                  borderRadius: '8px',
-                  marginBottom: '15px',
-                  border: '1px solid var(--input-border)'
-                }}
-              >
-                <h4 style={{ marginTop: 0, marginBottom: '10px', color: 'var(--text-primary)' }}>
-                  New Surveyor Details
-                </h4>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '10px',
-                    marginBottom: '10px'
-                  }}
-                >
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '5px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '14px'
-                      }}
-                    >
-                      Company Name *
-                    </label>
+              <div className="form-section">
+                <h4 className="form-section-title">New surveyor details</h4>
+                <div className="form-grid">
+                  <Field label="Company name" required>
                     <input
                       type="text"
                       value={newSurveyorCompany}
                       onChange={(e) => setNewSurveyorCompany(e.target.value)}
                       required={newSurveyorId === 'new'}
-                      style={{ width: '100%' }}
                       aria-label="Surveyor company name"
                     />
-                  </div>
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '5px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '14px'
-                      }}
-                    >
-                      Country *
-                    </label>
+                  </Field>
+                  <Field label="Country" required>
                     <input
                       type="text"
                       value={newSurveyorCountry}
                       onChange={(e) => setNewSurveyorCountry(e.target.value)}
                       required={newSurveyorId === 'new'}
-                      style={{ width: '100%' }}
                       aria-label="Surveyor country"
                     />
-                  </div>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '5px',
-                      color: 'var(--text-secondary)',
-                      fontSize: '14px'
-                    }}
-                  >
-                    Contact Person
-                  </label>
-                  <input
-                    type="text"
-                    value={newSurveyorContactPerson}
-                    onChange={(e) => setNewSurveyorContactPerson(e.target.value)}
-                    placeholder="e.g., John Smith"
-                    style={{ width: '100%' }}
-                    aria-label="Surveyor contact person"
-                  />
+                  </Field>
+                  <Field label="Contact person">
+                    <input
+                      type="text"
+                      value={newSurveyorContactPerson}
+                      onChange={(e) => setNewSurveyorContactPerson(e.target.value)}
+                      placeholder="e.g., John Smith"
+                      aria-label="Surveyor contact person"
+                    />
+                  </Field>
                 </div>
               </div>
             )}
-            <div style={{ marginBottom: '15px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '5px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                Notes
-              </label>
-              <textarea
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                rows={3}
-                style={{ resize: 'vertical', width: '100%' }}
-                aria-label="Survey notes"
-              />
+            <div className="form-section">
+              <div className="form-grid">
+                <Field label="Notes" span="all">
+                  <textarea
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                    aria-label="Survey notes"
+                  />
+                </Field>
+              </div>
             </div>
-            <button type="submit" className="btn-primary" disabled={addingSurvey}>
-              Add Survey
-            </button>
+            <div className="form-actions">
+              <button type="submit" className="btn-primary" disabled={addingSurvey}>
+                Add Survey
+              </button>
+            </div>
           </form>
         )}
 
@@ -911,7 +789,7 @@ export default function ConditionSurveyManager({
                                   border: isLight
                                     ? '1px solid rgba(0, 140, 70, 0.3)'
                                     : '1px solid rgba(0, 255, 136, 0.2)',
-                                  color: isLight ? '#008c46' : '#00ff88',
+                                  color: 'var(--success)',
                                   fontSize: '0.7rem',
                                   fontWeight: '600',
                                   textTransform: 'uppercase',
@@ -949,7 +827,7 @@ export default function ConditionSurveyManager({
                               {counts.closed > 0 && (
                                 <span
                                   style={{
-                                    color: isLight ? '#008c46' : '#00ff88',
+                                    color: 'var(--success)',
                                     fontWeight: '500'
                                   }}
                                 >
@@ -959,7 +837,7 @@ export default function ConditionSurveyManager({
                               {counts.overdue > 0 && (
                                 <span
                                   style={{
-                                    color: '#ffa726',
+                                    color: 'var(--warning)',
                                     fontWeight: '600',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -1115,169 +993,81 @@ export default function ConditionSurveyManager({
                               style={{
                                 marginBottom: '20px',
                                 padding: '20px',
-                                background: 'var(--input-bg)',
+                                background: 'var(--bg-card)',
                                 borderRadius: '12px',
-                                border: '1px solid var(--input-border)'
+                                border: 'var(--glass-border)'
                               }}
                             >
-                              <h4
-                                style={{
-                                  color: 'var(--text-primary)',
-                                  marginBottom: '15px',
-                                  marginTop: 0
-                                }}
-                              >
-                                Edit Survey Details
-                              </h4>
-                              <div
-                                style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '150px 1fr 1fr 1fr',
-                                  gap: '15px',
-                                  marginBottom: '15px'
-                                }}
-                              >
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      marginBottom: '5px',
-                                      color: 'var(--text-secondary)',
-                                      fontSize: '14px',
-                                      fontWeight: '500'
-                                    }}
-                                  >
-                                    Survey Date *
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={editDate}
-                                    onChange={(e) => setEditDate(e.target.value)}
-                                    required
-                                    min="1900-01-01"
-                                    max="2100-12-31"
-                                    aria-label="Edit survey date"
-                                  />
+                              <div className="form-section">
+                                <h4 className="form-section-title">Edit survey details</h4>
+                                <div className="form-grid">
+                                  <Field label="Survey date" required>
+                                    <input
+                                      type="date"
+                                      value={editDate}
+                                      onChange={(e) => setEditDate(e.target.value)}
+                                      required
+                                      min="1900-01-01"
+                                      max="2100-12-31"
+                                      aria-label="Edit survey date"
+                                    />
+                                  </Field>
+                                  <Field label="Survey type" required>
+                                    <select
+                                      value={editType}
+                                      onChange={(e) => setEditType(e.target.value)}
+                                      required
+                                      aria-label="Edit survey type"
+                                    >
+                                      <option value="">-- Select Type --</option>
+                                      {surveyTypes.map((t) => (
+                                        <option key={t.id} value={t.name}>
+                                          {t.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </Field>
+                                  <Field label="Reference">
+                                    <input
+                                      type="text"
+                                      value={editReference}
+                                      onChange={(e) => setEditReference(e.target.value)}
+                                      aria-label="Edit survey reference"
+                                    />
+                                  </Field>
+                                  <Field label="Location">
+                                    <input
+                                      type="text"
+                                      value={editLocation}
+                                      onChange={(e) => setEditLocation(e.target.value)}
+                                      aria-label="Edit survey location"
+                                    />
+                                  </Field>
+                                  <Field label="Surveyor" required span="all">
+                                    <select
+                                      value={editSurveyorId}
+                                      onChange={(e) => setEditSurveyorId(e.target.value)}
+                                      required
+                                      aria-label="Edit surveyor"
+                                    >
+                                      <option value="">-- Select Surveyor --</option>
+                                      {surveyors.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                          {s.companyName} ({s.country})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </Field>
+                                  <Field label="Notes" span="all">
+                                    <textarea
+                                      value={editNotes}
+                                      onChange={(e) => setEditNotes(e.target.value)}
+                                      rows={3}
+                                      style={{ resize: 'vertical' }}
+                                      aria-label="Edit survey notes"
+                                    />
+                                  </Field>
                                 </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      marginBottom: '5px',
-                                      color: 'var(--text-secondary)',
-                                      fontSize: '14px',
-                                      fontWeight: '500'
-                                    }}
-                                  >
-                                    Survey Type *
-                                  </label>
-                                  <select
-                                    value={editType}
-                                    onChange={(e) => setEditType(e.target.value)}
-                                    required
-                                    style={{
-                                      width: '100%',
-                                      padding: '10px',
-                                      borderRadius: '8px',
-                                      background: 'var(--bg-card)',
-                                      color: 'var(--text-primary)',
-                                      border: '1px solid var(--input-border)'
-                                    }}
-                                    aria-label="Edit survey type"
-                                  >
-                                    <option value="">-- Select Type --</option>
-                                    {surveyTypes.map((t) => (
-                                      <option key={t.id} value={t.name}>
-                                        {t.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      marginBottom: '5px',
-                                      color: 'var(--text-secondary)',
-                                      fontSize: '14px',
-                                      fontWeight: '500'
-                                    }}
-                                  >
-                                    Reference
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editReference}
-                                    onChange={(e) => setEditReference(e.target.value)}
-                                    aria-label="Edit survey reference"
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      marginBottom: '5px',
-                                      color: 'var(--text-secondary)',
-                                      fontSize: '14px',
-                                      fontWeight: '500'
-                                    }}
-                                  >
-                                    Location
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editLocation}
-                                    onChange={(e) => setEditLocation(e.target.value)}
-                                    aria-label="Edit survey location"
-                                  />
-                                </div>
-                              </div>
-                              <div style={{ marginBottom: '15px' }}>
-                                <label
-                                  style={{
-                                    display: 'block',
-                                    marginBottom: '5px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '14px',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  Surveyor *
-                                </label>
-                                <select
-                                  value={editSurveyorId}
-                                  onChange={(e) => setEditSurveyorId(e.target.value)}
-                                  required
-                                  style={{ color: 'var(--text-primary)' }}
-                                  aria-label="Edit surveyor"
-                                >
-                                  <option value="">-- Select Surveyor --</option>
-                                  {surveyors.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.companyName} ({s.country})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label
-                                  style={{
-                                    display: 'block',
-                                    marginBottom: '5px',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: '14px',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  Notes
-                                </label>
-                                <textarea
-                                  value={editNotes}
-                                  onChange={(e) => setEditNotes(e.target.value)}
-                                  rows={3}
-                                  style={{ resize: 'vertical', width: '100%' }}
-                                  aria-label="Edit survey notes"
-                                />
                               </div>
                             </div>
                           ) : (
@@ -1366,139 +1156,61 @@ export default function ConditionSurveyManager({
 
       {/* Close Survey confirmation modal */}
       {closingSurveyId && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: 12,
-              padding: 28,
-              maxWidth: 400,
-              width: '90%'
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>
-              Close Survey
-            </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>
-              This will close the survey and all remaining open defects. This action cannot be
-              undone.
-            </p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setClosingSurveyId(null)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer'
-                }}
-              >
+        <Modal
+          title="Close Survey"
+          icon={<CheckCircle size={18} />}
+          onClose={() => setClosingSurveyId(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setClosingSurveyId(null)}>
                 Cancel
               </button>
-              <button
-                onClick={() => handleCloseSurvey(closingSurveyId)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: 'var(--accent, #00aac8)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
+              <button className="btn-primary" onClick={() => handleCloseSurvey(closingSurveyId)}>
                 Close Survey
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
+            This will close the survey and all remaining open defects. This action cannot be undone.
+          </p>
+        </Modal>
       )}
 
       {/* Endorsement question modal */}
       {endorsementSurveyId && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: 12,
-              padding: 28,
-              maxWidth: 460,
-              width: '90%'
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px', color: 'var(--text-primary)', fontSize: 16 }}>
-              Reservations Endorsement
-            </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 24px' }}>
-              Did you issue a reservations endorsement for this survey?
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setEndorsementSurveyId(null)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 6,
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer'
-                }}
-              >
+        <Modal
+          title="Reservations Endorsement"
+          icon={<FileText size={18} />}
+          onClose={() => setEndorsementSurveyId(null)}
+          width={460}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setEndorsementSurveyId(null)}>
                 No endorsement needed
               </button>
               <button
+                className="btn-danger"
                 onClick={() => handleEndorsementAnswer(endorsementSurveyId, false)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,77,77,0.35)',
-                  background: 'rgba(255,77,77,0.12)',
-                  color: 'var(--danger)',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
               >
                 No — remind me in 2 days
               </button>
               <button
+                className="btn-primary"
                 onClick={() => handleEndorsementAnswer(endorsementSurveyId, true)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: 'var(--accent, #00aac8)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
               >
                 Yes
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
+            Did you issue a reservations endorsement for this survey?
+          </p>
+        </Modal>
       )}
     </>
   )

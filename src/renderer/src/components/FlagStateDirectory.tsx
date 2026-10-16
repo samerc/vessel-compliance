@@ -14,10 +14,10 @@ import {
 } from 'lucide-react'
 import { FlagState, FlagStatePort } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getFlagClass, countryNameToIso3 } from '../utils/countryCodeMap'
 import ConfirmationModal from './ConfirmationModal'
+import { Field, Modal } from './ui'
 import 'flag-icons/css/flag-icons.min.css'
 
 interface FlagStateDirectoryProps {
@@ -26,8 +26,6 @@ interface FlagStateDirectoryProps {
 
 // onNavigateToVessel is accepted for API compatibility with Directory but not used yet
 const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
   const { hasPermission } = useAuth()
   const canManage = hasPermission('admin:settings')
@@ -304,7 +302,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
     marginBottom: '8px'
   }
 
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
+  const accentBg = 'var(--accent-tint)'
 
   return (
     <div className="fade-in">
@@ -446,12 +444,9 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
       {/* Main: table + slide-in */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
         {/* Table */}
-        <div
-          className="glass-card"
-          style={{ flex: 1, minWidth: 0, padding: 0, overflow: 'hidden' }}
-        >
+        <div className="table-wrap" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table className="data-table" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: 'auto' }} />
                 <col style={{ width: '70px' }} />
@@ -462,31 +457,9 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
               </colgroup>
               <caption className="sr-only">Flag states</caption>
               <thead>
-                <tr
-                  style={{
-                    background: 'var(--table-header-bg)',
-                    borderBottom: '1px solid var(--table-border)',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1
-                  }}
-                >
+                <tr>
                   {['Flag Name', 'ISO', 'Bunker', 'Wreck', 'Ports', 'Authority'].map((col) => (
-                    <th
-                      key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        fontSize: '0.69rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.6px',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {col}
-                    </th>
+                    <th key={col}>{col}</th>
                   ))}
                 </tr>
               </thead>
@@ -495,11 +468,8 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                   <tr>
                     <td
                       colSpan={6}
-                      style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
+                      className="muted"
+                      style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <Globe
                         size={30}
@@ -517,23 +487,10 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                       <tr
                         key={fs.id}
                         onClick={() => handleSelect(fs)}
-                        className="hover-effect"
-                        style={{
-                          cursor: 'pointer',
-                          borderBottom: '1px solid var(--table-border)',
-                          background: isSelected
-                            ? isLight
-                              ? 'rgba(26,115,232,0.07)'
-                              : 'rgba(var(--accent-primary-rgb), 0.06)'
-                            : 'transparent',
-                          borderLeft: isSelected
-                            ? '3px solid var(--accent-primary)'
-                            : '3px solid transparent',
-                          transition: 'background 0.12s, border-color 0.12s'
-                        }}
+                        className={isSelected ? 'clickable selected' : 'clickable'}
                       >
                         {/* Flag Name */}
-                        <td style={{ padding: '12px 16px', overflow: 'hidden' }}>
+                        <td style={{ overflow: 'hidden' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             {flagCls ? (
                               <span
@@ -546,9 +503,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                                   width: '28px',
                                   height: '20px',
                                   borderRadius: '3px',
-                                  background: isLight
-                                    ? 'rgba(0,0,0,0.06)'
-                                    : 'rgba(255,255,255,0.06)',
+                                  background: 'var(--bg-card-hover)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -572,12 +527,12 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                           </div>
                         </td>
                         {/* ISO */}
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           <span
                             style={{
                               fontSize: '0.82rem',
                               color: 'var(--text-secondary)',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-mono)',
                               fontWeight: 600
                             }}
                           >
@@ -585,29 +540,23 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                           </span>
                         </td>
                         {/* Bunker */}
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           {fs.ratifiedBunker ? (
-                            <CheckCircle2 size={16} color="#22c55e" />
+                            <CheckCircle2 size={16} color="var(--success)" />
                           ) : (
-                            <XCircle
-                              size={16}
-                              color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}
-                            />
+                            <XCircle size={16} color="var(--text-secondary)" opacity={0.35} />
                           )}
                         </td>
                         {/* Wreck */}
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           {fs.ratifiedWreck ? (
-                            <CheckCircle2 size={16} color="#22c55e" />
+                            <CheckCircle2 size={16} color="var(--success)" />
                           ) : (
-                            <XCircle
-                              size={16}
-                              color={isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}
-                            />
+                            <XCircle size={16} color="var(--text-secondary)" opacity={0.35} />
                           )}
                         </td>
                         {/* Ports */}
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           {pCount > 0 ? (
                             <span
                               style={{
@@ -638,7 +587,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                           )}
                         </td>
                         {/* Authority */}
-                        <td style={{ padding: '12px 16px' }}>
+                        <td>
                           {fs.authorityName ? (
                             <span
                               style={{
@@ -680,7 +629,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
             style={{
               width: '400px',
               flexShrink: 0,
-              background: isLight ? '#f4f6fb' : '#14172a',
+              background: 'var(--bg-card)',
               border: '1px solid var(--glass-border-color)',
               borderRadius: '12px',
               maxHeight: 'calc(100vh - 280px)',
@@ -743,7 +692,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     style={{
                       fontSize: '0.82rem',
                       color: 'var(--text-secondary)',
-                      fontFamily: 'monospace',
+                      fontFamily: 'var(--font-mono)',
                       fontWeight: 600
                     }}
                   >
@@ -757,15 +706,8 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     setSelectedFlag(null)
                     setPanelPorts([])
                   }}
-                  style={{
-                    padding: '4px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                    flexShrink: 0
-                  }}
+                  className="btn-ghost btn-icon"
+                  style={{ flexShrink: 0 }}
                 >
                   <X size={16} />
                 </button>
@@ -794,7 +736,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     }}
                   >
                     {selectedFlag.ratifiedBunker ? (
-                      <CheckCircle2 size={15} color="#22c55e" />
+                      <CheckCircle2 size={15} color="var(--success)" />
                     ) : (
                       <XCircle size={15} color="var(--danger)" />
                     )}
@@ -802,7 +744,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     <span
                       style={{
                         fontWeight: 600,
-                        color: selectedFlag.ratifiedBunker ? '#22c55e' : 'var(--danger)'
+                        color: selectedFlag.ratifiedBunker ? 'var(--success)' : 'var(--danger)'
                       }}
                     >
                       {selectedFlag.ratifiedBunker ? 'Ratified' : 'Not Ratified'}
@@ -817,7 +759,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     }}
                   >
                     {selectedFlag.ratifiedWreck ? (
-                      <CheckCircle2 size={15} color="#22c55e" />
+                      <CheckCircle2 size={15} color="var(--success)" />
                     ) : (
                       <XCircle size={15} color="var(--danger)" />
                     )}
@@ -825,7 +767,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                     <span
                       style={{
                         fontWeight: 600,
-                        color: selectedFlag.ratifiedWreck ? '#22c55e' : 'var(--danger)'
+                        color: selectedFlag.ratifiedWreck ? 'var(--success)' : 'var(--danger)'
                       }}
                     >
                       {selectedFlag.ratifiedWreck ? 'Ratified' : 'Not Ratified'}
@@ -896,7 +838,7 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                           padding: '3px 10px',
                           borderRadius: '6px',
                           background: accentBg,
-                          border: `1px solid ${isLight ? 'rgba(26,115,232,0.15)' : 'rgba(var(--accent-primary-rgb), 0.15)'}`,
+                          border: '1px solid rgba(var(--accent-primary-rgb), 0.15)',
                           fontSize: '0.82rem',
                           color: 'var(--accent-primary)'
                         }}
@@ -987,13 +929,9 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
                           padding: '6px 10px',
                           borderRadius: '8px',
                           background: port.isDefault
-                            ? isLight
-                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                              : 'rgba(var(--accent-primary-rgb), 0.1)'
-                            : isLight
-                              ? 'rgba(0,0,0,0.02)'
-                              : 'rgba(255,255,255,0.03)',
-                          border: `1px solid ${port.isDefault ? 'rgba(var(--accent-primary-rgb), 0.25)' : 'var(--glass-border)'}`,
+                            ? 'var(--accent-tint)'
+                            : 'var(--bg-card-hover)',
+                          border: `1px solid ${port.isDefault ? 'rgba(var(--accent-primary-rgb), 0.25)' : 'var(--glass-border-color)'}`,
                           fontSize: '0.85rem'
                         }}
                       >
@@ -1205,296 +1143,109 @@ const FlagStateDirectory: React.FC<FlagStateDirectoryProps> = () => {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '32px',
-              width: '520px',
-              maxWidth: '90vw',
-              border: '1px solid var(--glass-border-color)',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '28px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background:
-                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Globe size={18} color="white" />
-                </div>
-                <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
-                  {modalEditId ? 'Edit Flag State' : 'Add Flag State'}
-                </h3>
-              </div>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={closeModal}
-                style={{
-                  padding: '6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
+        <Modal
+          title={modalEditId ? 'Edit Flag State' : 'Add Flag State'}
+          icon={<Globe size={18} />}
+          onClose={closeModal}
+          width={520}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={closeModal} className="btn-secondary">
+                Cancel
               </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Name + ISO row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '16px' }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '5px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 500
-                    }}
-                  >
-                    Country Name *
-                  </label>
+              <button onClick={handleModalSave} className="btn-primary">
+                {modalEditId ? 'Save Changes' : 'Add Flag State'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 100px' }}>
+            <Field label="Country name" required>
+              <input
+                type="text"
+                value={formName}
+                onChange={(e) => handleNameChange(e.target.value, setFormName, setFormIso3)}
+                placeholder="e.g. Panama"
+                list="country-names-modal"
+                autoFocus
+              />
+              <datalist id="country-names-modal">
+                {countryNameToIso3.map((c) => (
+                  <option key={c.iso3} value={c.name} />
+                ))}
+              </datalist>
+            </Field>
+            <Field label="ISO code" required>
+              <input
+                type="text"
+                value={formIso3}
+                onChange={(e) => setFormIso3(e.target.value.toUpperCase().slice(0, 3))}
+                placeholder="PAN"
+                style={{ textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
+                maxLength={3}
+              />
+            </Field>
+            <Field
+              label="Display name (for documents)"
+              span="all"
+              hint="Official name used in policies and blue cards. If empty, the short name above will be used."
+            >
+              <input
+                type="text"
+                value={formDisplayName}
+                onChange={(e) => setFormDisplayName(e.target.value)}
+                placeholder="e.g. Republic of Panama, Union of Comoros"
+              />
+            </Field>
+            <Field label="Email" span="all">
+              <textarea
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                placeholder="Email addresses (comma-separated)"
+                rows={2}
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
+            <Field label="Conventions" span="all">
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => handleNameChange(e.target.value, setFormName, setFormIso3)}
-                    placeholder="e.g. Panama"
-                    style={{ width: '100%' }}
-                    list="country-names-modal"
-                    autoFocus
+                    type="checkbox"
+                    checked={formRatifiedBunker}
+                    onChange={(e) => setFormRatifiedBunker(e.target.checked)}
                   />
-                  <datalist id="country-names-modal">
-                    {countryNameToIso3.map((c) => (
-                      <option key={c.iso3} value={c.name} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '5px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 500
-                    }}
-                  >
-                    ISO Code *
-                  </label>
+                  Bunker Convention (2001)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input
-                    type="text"
-                    value={formIso3}
-                    onChange={(e) => setFormIso3(e.target.value.toUpperCase().slice(0, 3))}
-                    placeholder="PAN"
-                    style={{ width: '100%', textTransform: 'uppercase', fontFamily: 'monospace' }}
-                    maxLength={3}
+                    type="checkbox"
+                    checked={formRatifiedWreck}
+                    onChange={(e) => setFormRatifiedWreck(e.target.checked)}
                   />
-                </div>
-              </div>
-
-              {/* Display Name */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Display Name (for documents)
+                  Wreck Removal Convention (2007)
                 </label>
-                <input
-                  type="text"
-                  value={formDisplayName}
-                  onChange={(e) => setFormDisplayName(e.target.value)}
-                  placeholder="e.g. Republic of Panama, Union of Comoros"
-                  style={{ width: '100%' }}
-                />
-                <div
-                  style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}
-                >
-                  Official name used in policies and blue cards. If empty, the short name above will
-                  be used.
-                </div>
               </div>
-
-              {/* Email */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Email
-                </label>
-                <textarea
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                  placeholder="Email addresses (comma-separated)"
-                  rows={2}
-                  style={{ width: '100%', resize: 'vertical' }}
-                />
-              </div>
-
-              {/* Conventions */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Conventions
-                </label>
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formRatifiedBunker}
-                      onChange={(e) => setFormRatifiedBunker(e.target.checked)}
-                    />
-                    Bunker Convention (2001)
-                  </label>
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formRatifiedWreck}
-                      onChange={(e) => setFormRatifiedWreck(e.target.checked)}
-                    />
-                    Wreck Removal Convention (2007)
-                  </label>
-                </div>
-              </div>
-
-              {/* Authority */}
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Maritime Authority Name
-                </label>
-                <input
-                  type="text"
-                  value={formAuthorityName}
-                  onChange={(e) => setFormAuthorityName(e.target.value)}
-                  placeholder="e.g. Panama Maritime Authority"
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Authority Address
-                </label>
-                <textarea
-                  value={formAuthorityAddress}
-                  onChange={(e) => setFormAuthorityAddress(e.target.value)}
-                  placeholder="Authority address"
-                  rows={3}
-                  style={{ width: '100%', resize: 'vertical' }}
-                />
-              </div>
-
-              {/* Buttons */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '10px',
-                  justifyContent: 'flex-end',
-                  marginTop: '8px'
-                }}
-              >
-                <button
-                  onClick={closeModal}
-                  className="btn-secondary"
-                  style={{ padding: '10px 20px' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleModalSave}
-                  className="btn-primary"
-                  style={{ padding: '10px 20px' }}
-                >
-                  {modalEditId ? 'Save Changes' : 'Add Flag State'}
-                </button>
-              </div>
-            </div>
+            </Field>
+            <Field label="Maritime authority name" span="all">
+              <input
+                type="text"
+                value={formAuthorityName}
+                onChange={(e) => setFormAuthorityName(e.target.value)}
+                placeholder="e.g. Panama Maritime Authority"
+              />
+            </Field>
+            <Field label="Authority address" span="all">
+              <textarea
+                value={formAuthorityAddress}
+                onChange={(e) => setFormAuthorityAddress(e.target.value)}
+                placeholder="Authority address"
+                rows={3}
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete confirmation */}

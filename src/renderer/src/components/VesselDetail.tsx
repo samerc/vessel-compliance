@@ -68,7 +68,7 @@ import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
 import VesselSidePanel from './VesselSidePanel'
-import { TypeChip } from './ui'
+import { TypeChip, Modal, Field } from './ui'
 import { addRegistryVessel } from '../utils/addRegistryVessel'
 import ConditionSurveyManager from './ConditionSurveyManager'
 import WarrantyManager from './WarrantyManager'
@@ -1058,11 +1058,13 @@ export default function VesselDetail({
     return (
       <div
         style={{
+          // Opens downward: the note box sits at the top of the scrolling dialog body
           position: 'absolute',
-          bottom: '100%',
+          top: '100%',
+          marginTop: '2px',
           left: 0,
           zIndex: 200,
-          background: isLight ? '#ffffff' : '#1a1d28',
+          background: 'var(--bg-primary)',
           border: '1px solid var(--glass-border-color)',
           borderRadius: '6px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
@@ -2647,27 +2649,19 @@ export default function VesselDetail({
           )}
 
           {detailView === 'documents' && !useCardDocs && (
-            <div className="glass-card" style={{ padding: '0', overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+            <div className="table-wrap">
+              <table className="data-table" style={{ minWidth: '900px' }}>
                 <caption className="sr-only">Document compliance</caption>
                 <thead>
-                  <tr
-                    style={{
-                      textAlign: 'left',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)'
-                    }}
-                  >
-                    <th scope="col" style={{ padding: '18px 16px' }}>
+                  <tr>
+                    <th scope="col">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         Document Name
                         <button
                           onClick={() => setShowAddCustomDoc(!showAddCustomDoc)}
                           style={{
-                            background: isLight
-                              ? 'rgba(0, 119, 163, 0.12)'
-                              : 'rgba(var(--accent-primary-rgb), 0.12)',
-                            border: `1px solid ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                            background: 'var(--accent-tint)',
+                            border: '1px solid rgba(var(--accent-primary-rgb), 0.3)',
                             borderRadius: '6px',
                             padding: '3px 8px',
                             cursor: 'pointer',
@@ -2685,19 +2679,11 @@ export default function VesselDetail({
                         </button>
                       </div>
                     </th>
-                    <th scope="col" style={{ padding: '18px 16px' }}>
-                      Requirement
-                    </th>
-                    <th scope="col" style={{ padding: '18px 16px' }}>
-                      File Status
-                    </th>
-                    <th scope="col" style={{ padding: '18px 16px' }}>
-                      Date of Receipt
-                    </th>
-                    <th scope="col" style={{ padding: '18px 16px' }}>
-                      Expiry Date
-                    </th>
-                    <th scope="col" style={{ padding: '18px 16px', textAlign: 'right' }}>
+                    <th scope="col">Requirement</th>
+                    <th scope="col">File Status</th>
+                    <th scope="col">Date of Receipt</th>
+                    <th scope="col">Expiry Date</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>
                       Actions
                     </th>
                   </tr>
@@ -2727,7 +2713,7 @@ export default function VesselDetail({
                           if (exp < now) return 'var(--danger)' // expired
                           const soon = new Date()
                           soon.setDate(soon.getDate() + 30)
-                          if (exp < soon) return '#e6a800' // expiring soon
+                          if (exp < soon) return 'var(--warning)' // expiring soon
                         }
                         return 'transparent' // compliant
                       }
@@ -2736,7 +2722,6 @@ export default function VesselDetail({
                         <tr
                           key={key}
                           style={{
-                            borderBottom: '1px solid var(--table-border)',
                             borderLeft: `4px solid ${getRowBorderColor()}`,
                             background:
                               dragOverId === rowType.id
@@ -2757,7 +2742,7 @@ export default function VesselDetail({
                           onDragLeave={handleDragLeave}
                           onDrop={(e) => handleDrop(e, rowType.id)}
                         >
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             <div
                               style={{
                                 fontWeight: isExtra ? '400' : '600',
@@ -2775,7 +2760,7 @@ export default function VesselDetail({
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {!isExtra && (
                               <button
                                 onClick={() => handleToggleRequired(rowType.id)}
@@ -2799,7 +2784,7 @@ export default function VesselDetail({
                               </button>
                             )}
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {rowHasFile ? (
                               isExtra || rowExists ? (
                                 <div
@@ -2817,7 +2802,7 @@ export default function VesselDetail({
                                     border: isLight
                                       ? '1px solid rgba(0, 140, 70, 0.35)'
                                       : '1px solid rgba(0, 255, 136, 0.3)',
-                                    color: isLight ? '#008c46' : '#00ff88',
+                                    color: 'var(--success)',
                                     textTransform: 'uppercase'
                                   }}
                                 >
@@ -2859,10 +2844,8 @@ export default function VesselDetail({
                                   borderRadius: '6px',
                                   fontSize: '0.75rem',
                                   fontWeight: '500',
-                                  background: isLight
-                                    ? 'rgba(0, 119, 163, 0.05)'
-                                    : 'rgba(var(--accent-primary-rgb), 0.05)',
-                                  border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                  background: 'rgba(var(--accent-primary-rgb), 0.05)',
+                                  border: '1px dashed rgba(var(--accent-primary-rgb), 0.3)',
                                   color: 'var(--accent-primary)',
                                   textTransform: 'uppercase',
                                   cursor: 'pointer'
@@ -2874,7 +2857,7 @@ export default function VesselDetail({
                               </button>
                             ) : null}
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {rowHasFile ? (
                               <input
                                 type="date"
@@ -2930,7 +2913,7 @@ export default function VesselDetail({
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '16px' }}>
+                          <td>
                             {rowType.annualRenewal ? (
                               rowHasFile ? (
                                 (() => {
@@ -3163,7 +3146,7 @@ export default function VesselDetail({
                               </div>
                             )}
                           </td>
-                          <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <div
                               style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                             >
@@ -3241,7 +3224,6 @@ export default function VesselDetail({
                       <tr
                         key={customType.id}
                         style={{
-                          borderBottom: '1px solid var(--table-border)',
                           background:
                             dragOverId === customType.id
                               ? 'rgba(var(--accent-primary-rgb), 0.2)'
@@ -3261,7 +3243,7 @@ export default function VesselDetail({
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, customType.id)}
                       >
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           <div
                             style={{
                               fontWeight: '600',
@@ -3290,12 +3272,12 @@ export default function VesselDetail({
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                             CUSTOM
                           </span>
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           {rowHasFile ? (
                             rowExists ? (
                               <div
@@ -3313,7 +3295,7 @@ export default function VesselDetail({
                                   border: isLight
                                     ? '1px solid rgba(0, 140, 70, 0.35)'
                                     : '1px solid rgba(0, 255, 136, 0.3)',
-                                  color: isLight ? '#008c46' : '#00ff88',
+                                  color: 'var(--success)',
                                   textTransform: 'uppercase'
                                 }}
                               >
@@ -3355,10 +3337,8 @@ export default function VesselDetail({
                                 borderRadius: '6px',
                                 fontSize: '0.75rem',
                                 fontWeight: '500',
-                                background: isLight
-                                  ? 'rgba(0, 119, 163, 0.05)'
-                                  : 'rgba(var(--accent-primary-rgb), 0.05)',
-                                border: `1px dashed ${isLight ? 'rgba(0, 119, 163, 0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
+                                background: 'rgba(var(--accent-primary-rgb), 0.05)',
+                                border: '1px dashed rgba(var(--accent-primary-rgb), 0.3)',
                                 color: 'var(--accent-primary)',
                                 textTransform: 'uppercase',
                                 cursor: 'pointer'
@@ -3370,7 +3350,7 @@ export default function VesselDetail({
                             </button>
                           ) : null}
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           {rowHasFile ? (
                             <input
                               type="date"
@@ -3426,7 +3406,7 @@ export default function VesselDetail({
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '16px' }}>
+                        <td>
                           {!rowHasFile ? (
                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                               -
@@ -3512,7 +3492,7 @@ export default function VesselDetail({
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                             {rowHasFile && (
                               <>
@@ -3562,11 +3542,10 @@ export default function VesselDetail({
                   {showAddCustomDoc && (
                     <tr
                       style={{
-                        borderBottom: '1px solid var(--table-border)',
                         background: isLight ? 'rgba(59, 130, 246, 0.05)' : 'rgba(59, 130, 246, 0.1)'
                       }}
                     >
-                      <td colSpan={6} style={{ padding: '12px 16px' }}>
+                      <td colSpan={6}>
                         <form
                           onSubmit={(e) => {
                             e.preventDefault()
@@ -3703,104 +3682,21 @@ export default function VesselDetail({
 
       {/* Endorsement Prompt Modal */}
       {endorsementPrompt.show && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
-            onClick={() => setEndorsementPrompt((prev) => ({ ...prev, show: false }))}
-          />
-          <div
-            style={{
-              position: 'relative',
-              width: '480px',
-              borderRadius: '14px',
-              padding: '24px',
-              background: isLight ? '#ffffff' : '#1a1d28',
-              border: '1px solid var(--glass-border-color)'
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem' }}>Issue Endorsement?</h3>
-            <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
-              {endorsementPrompt.changes.map((c, i) => (
-                <div key={i} style={{ marginBottom: '6px' }}>
-                  <strong>{c.fieldLabel}</strong> changed from{' '}
-                  <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>
-                    {c.oldValue || '(empty)'}
-                  </span>
-                  {' → '}
-                  <span style={{ fontWeight: 600 }}>{c.newValue || '(empty)'}</span>
-                </div>
-              ))}
-            </div>
-            <div
-              style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}
-            >
-              Select policies to create endorsements for:
-            </div>
-            {endorsementPrompt.policies.map((p) => (
-              <label
-                key={p.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '6px',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={p.selected}
-                  onChange={() =>
-                    setEndorsementPrompt((prev) => ({
-                      ...prev,
-                      policies: prev.policies.map((x) =>
-                        x.id === p.id ? { ...x, selected: !x.selected } : x
-                      )
-                    }))
-                  }
-                />
-                {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    padding: '1px 6px',
-                    borderRadius: '8px',
-                    background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                    color: 'var(--accent-primary)'
-                  }}
-                >
-                  Endorsement No. {p.nextEndNum}
-                </span>
-              </label>
-            ))}
-            <div
-              style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}
-            >
+        <Modal
+          title="Issue Endorsement?"
+          onClose={() => setEndorsementPrompt((prev) => ({ ...prev, show: false }))}
+          width={480}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button
+                className="btn-secondary"
                 onClick={() => setEndorsementPrompt((prev) => ({ ...prev, show: false }))}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: '8px',
-                  fontSize: '0.82rem',
-                  border: '1px solid var(--glass-border-color)',
-                  background: 'transparent',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer'
-                }}
               >
                 Skip
               </button>
               <button
+                className="btn-primary"
                 onClick={async () => {
                   const selected = endorsementPrompt.policies.filter(
                     (p) => p.selected && p.policyDocId
@@ -3841,22 +3737,66 @@ export default function VesselDetail({
                   }
                   setEndorsementPrompt((prev) => ({ ...prev, show: false }))
                 }}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: '8px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  background: 'var(--accent-primary)',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
               >
                 Create
               </button>
-            </div>
+            </>
+          }
+        >
+          <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>
+            {endorsementPrompt.changes.map((c, i) => (
+              <div key={i} style={{ marginBottom: '6px' }}>
+                <strong>{c.fieldLabel}</strong> changed from{' '}
+                <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>
+                  {c.oldValue || '(empty)'}
+                </span>
+                {' → '}
+                <span style={{ fontWeight: 600 }}>{c.newValue || '(empty)'}</span>
+              </div>
+            ))}
           </div>
-        </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            Select policies to create endorsements for:
+          </div>
+          {endorsementPrompt.policies.map((p) => (
+            <label
+              key={p.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={p.selected}
+                onChange={() =>
+                  setEndorsementPrompt((prev) => ({
+                    ...prev,
+                    policies: prev.policies.map((x) =>
+                      x.id === p.id ? { ...x, selected: !x.selected } : x
+                    )
+                  }))
+                }
+              />
+              {p.typeName} {p.policyNumber && `(${p.policyNumber})`}
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  background: 'var(--accent-tint)',
+                  color: 'var(--accent-primary)'
+                }}
+              >
+                Endorsement No. {p.nextEndNum}
+              </span>
+            </label>
+          ))}
+        </Modal>
       )}
 
       {showRemapModal && (
@@ -3872,129 +3812,13 @@ export default function VesselDetail({
       )}
 
       {showAddFlagModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowAddFlagModal(false)}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1e222a',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '420px',
-              maxWidth: '90vw',
-              border: '1px solid var(--glass-border-color)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginBottom: '16px' }}>Add Flag State</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Country *
-                </label>
-                <select
-                  value={newFlagIso3}
-                  onChange={(e) => {
-                    const iso3 = e.target.value
-                    setNewFlagIso3(iso3)
-                    const country = countryNameToIso3.find((c) => c.iso3 === iso3)
-                    setNewFlagName(country ? country.name : '')
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--glass-border-color)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.9rem'
-                  }}
-                  autoFocus
-                >
-                  <option value="">Select a country...</option>
-                  {countryNameToIso3.map((c) => (
-                    <option key={c.iso3} value={c.iso3}>
-                      {c.name} ({c.iso3})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Address
-                </label>
-                <input
-                  value={newFlagAddress}
-                  onChange={(e) => setNewFlagAddress(e.target.value)}
-                  placeholder="Optional"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--glass-border-color)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px',
-                    display: 'block'
-                  }}
-                >
-                  Email
-                </label>
-                <input
-                  value={newFlagEmail}
-                  onChange={(e) => setNewFlagEmail(e.target.value)}
-                  placeholder="Optional"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--glass-border-color)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-            </div>
-            <div
-              style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
-            >
+        <Modal
+          title="Add Flag State"
+          onClose={() => setShowAddFlagModal(false)}
+          width={420}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setShowAddFlagModal(false)} className="btn-secondary">
                 Cancel
               </button>
@@ -4002,293 +3826,300 @@ export default function VesselDetail({
                 onClick={handleAddFlag}
                 disabled={!newFlagName.trim() || !newFlagIso3.trim()}
                 className="btn-primary"
-                style={{ opacity: !newFlagName.trim() || !newFlagIso3.trim() ? 0.5 : 1 }}
               >
                 Add Flag State
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Country" required span="all">
+              <select
+                value={newFlagIso3}
+                onChange={(e) => {
+                  const iso3 = e.target.value
+                  setNewFlagIso3(iso3)
+                  const country = countryNameToIso3.find((c) => c.iso3 === iso3)
+                  setNewFlagName(country ? country.name : '')
+                }}
+                autoFocus
+              >
+                <option value="">Select a country...</option>
+                {countryNameToIso3.map((c) => (
+                  <option key={c.iso3} value={c.iso3}>
+                    {c.name} ({c.iso3})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Address" span="all">
+              <input
+                value={newFlagAddress}
+                onChange={(e) => setNewFlagAddress(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
+            <Field label="Email" span="all">
+              <input
+                value={newFlagEmail}
+                onChange={(e) => setNewFlagEmail(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showPoliciesModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowPoliciesModal(false)}
+        <Modal
+          title="Assign Policy Types"
+          onClose={() => setShowPoliciesModal(false)}
+          width={400}
+          footer={
+            <button onClick={() => setShowPoliciesModal(false)} className="btn-secondary">
+              Done
+            </button>
+          }
         >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1e222a',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '400px',
-              maxWidth: '90vw',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginBottom: '16px' }}>Assign Policy Types</h3>
-            <p
-              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Toggle policy types for this vessel. Used by the Dynamic Address Book.
+          </p>
+          {allPolicyTypes.map((pt) => (
+            <label
+              key={pt.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                marginBottom: '4px',
+                background: assignedPolicyTypeIds.has(pt.id) ? 'var(--row-selected)' : 'transparent'
+              }}
             >
-              Toggle policy types for this vessel. Used by the Dynamic Address Book.
-            </p>
-            {allPolicyTypes.map((pt) => (
-              <label
-                key={pt.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  marginBottom: '4px',
-                  background: assignedPolicyTypeIds.has(pt.id)
-                    ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                    : 'transparent'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={assignedPolicyTypeIds.has(pt.id)}
-                  onChange={() => handleTogglePolicy(pt.id)}
-                  style={{ accentColor: 'var(--accent-primary)' }}
-                />
-                <span>{pt.name}</span>
-              </label>
-            ))}
-            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowPoliciesModal(false)} className="btn-secondary">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+              <input
+                type="checkbox"
+                checked={assignedPolicyTypeIds.has(pt.id)}
+                onChange={() => handleTogglePolicy(pt.id)}
+                style={{ accentColor: 'var(--accent-primary)' }}
+              />
+              <span>{pt.name}</span>
+            </label>
+          ))}
+        </Modal>
       )}
 
       {showNotesModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
+        <Modal
+          title="Vessel Notes"
+          icon={<MessageSquare size={18} />}
+          onClose={() => setShowNotesModal(false)}
+          width={520}
+          closeOnOverlay={false}
         >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '520px',
-              maxWidth: '95vw',
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column',
-              border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '16px',
-                flexShrink: 0
-              }}
-            >
-              <div>
-                <h3
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-primary)',
-                    fontSize: '1.05rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <MessageSquare size={16} color="var(--accent-primary)" /> Vessel Notes
-                </h3>
-                <p
-                  style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
-                >
-                  {vessel.name}
-                </p>
-              </div>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setShowNotesModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  flexShrink: 0
+          <p style={{ margin: '0 0 12px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            {vessel.name}
+          </p>
+
+          {/* New note input */}
+          <div style={{ flexShrink: 0, marginBottom: '16px', position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <textarea
+                value={newVesselNoteText}
+                onChange={(e) => handleMentionCheck(e.target.value, 'new')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote()
                 }}
+                rows={3}
+                placeholder="Add a note... (use @ to mention, Ctrl+Enter to submit)"
+                style={{ width: '100%', resize: 'none', boxSizing: 'border-box' }}
+              />
+              {mentionTarget === 'new' && renderMentionDropdown()}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button
+                onClick={handleAddVesselNote}
+                disabled={vesselNotesSaving || !newVesselNoteText.trim()}
+                className="btn-primary"
+                style={{ padding: '6px 16px', fontSize: '0.85rem' }}
               >
-                <X size={18} />
+                {vesselNotesSaving ? 'Saving...' : 'Add Note'}
               </button>
             </div>
+          </div>
 
-            {/* New note input */}
-            <div style={{ flexShrink: 0, marginBottom: '16px', position: 'relative' }}>
-              <div style={{ position: 'relative' }}>
-                <textarea
-                  value={newVesselNoteText}
-                  onChange={(e) => handleMentionCheck(e.target.value, 'new')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddVesselNote()
-                  }}
-                  rows={3}
-                  placeholder="Add a note... (use @ to mention, Ctrl+Enter to submit)"
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    resize: 'none',
-                    fontFamily: 'inherit',
-                    fontSize: '0.9rem',
-                    background: 'var(--input-bg)',
-                    color: 'var(--input-text)',
-                    border: '1px solid var(--input-border)',
-                    boxSizing: 'border-box'
-                  }}
-                />
-                {mentionTarget === 'new' && renderMentionDropdown()}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button
-                  onClick={handleAddVesselNote}
-                  disabled={vesselNotesSaving || !newVesselNoteText.trim()}
-                  className="btn-primary"
-                  style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-                >
-                  {vesselNotesSaving ? 'Saving...' : 'Add Note'}
-                </button>
-              </div>
-            </div>
-
-            {/* Notes thread */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}
-            >
-              {vesselNotesLoading ? (
-                <p
-                  style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem',
-                    textAlign: 'center',
-                    padding: '16px'
-                  }}
-                >
-                  Loading...
-                </p>
-              ) : parentVesselNotes.length === 0 ? (
-                <p
-                  style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem',
-                    textAlign: 'center',
-                    padding: '16px',
-                    fontStyle: 'italic'
-                  }}
-                >
-                  No notes yet for this vessel.
-                </p>
-              ) : (
-                parentVesselNotes.map((n) => (
-                  <div key={n.id}>
-                    {/* Parent note */}
+          {/* Notes thread */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {vesselNotesLoading ? (
+              <p
+                style={{
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  padding: '16px'
+                }}
+              >
+                Loading...
+              </p>
+            ) : parentVesselNotes.length === 0 ? (
+              <p
+                style={{
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  padding: '16px',
+                  fontStyle: 'italic'
+                }}
+              >
+                No notes yet for this vessel.
+              </p>
+            ) : (
+              parentVesselNotes.map((n) => (
+                <div key={n.id}>
+                  {/* Parent note */}
+                  <div
+                    style={{
+                      background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      borderLeft: '3px solid var(--accent-primary)'
+                    }}
+                  >
                     <div
                       style={{
-                        background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
-                        borderRadius: '10px',
-                        padding: '12px 14px',
-                        borderLeft: '3px solid var(--accent-primary)'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '6px'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          background: 'var(--accent-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.7rem',
+                          fontWeight: '700',
+                          color: '#fff',
+                          flexShrink: 0
+                        }}
+                      >
+                        {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>
+                        {n.createdByUsername || 'Unknown'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          marginLeft: 'auto'
+                        }}
+                      >
+                        {formatDateTime(n.createdAt)}
+                      </span>
+                      <button
+                        onClick={() => setReplyingToNoteId(replyingToNoteId === n.id ? null : n.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--accent-primary)',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '2px 6px'
+                        }}
+                      >
+                        Reply
+                      </button>
+                      {n.createdByUserId === user?.id && (
+                        <button
+                          onClick={() => handleDeleteVesselNote(n.id)}
+                          title="Delete"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--danger)',
+                            display: 'flex',
+                            padding: '2px',
+                            flexShrink: 0
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.88rem',
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: '1.5'
+                      }}
+                    >
+                      {highlightMentions(n.note)}
+                    </p>
+                  </div>
+
+                  {/* Replies */}
+                  {(vesselRepliesMap.get(n.id) || []).map((reply) => (
+                    <div
+                      key={reply.id}
+                      style={{
+                        marginLeft: '24px',
+                        marginTop: '6px',
+                        background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        borderLeft: '2px solid var(--glass-border-color)'
                       }}
                     >
                       <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '6px'
+                          gap: '6px',
+                          marginBottom: '4px'
                         }}
                       >
                         <div
                           style={{
-                            width: '26px',
-                            height: '26px',
+                            width: '22px',
+                            height: '22px',
                             borderRadius: '50%',
-                            background: 'var(--accent-primary)',
+                            background: 'var(--accent-secondary)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '0.7rem',
+                            fontSize: '0.65rem',
                             fontWeight: '700',
                             color: '#fff',
                             flexShrink: 0
                           }}
                         >
-                          {(n.createdByUsername || '?').charAt(0).toUpperCase()}
+                          {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
                         </div>
-                        <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>
-                          {n.createdByUsername || 'Unknown'}
+                        <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>
+                          {reply.createdByUsername || 'Unknown'}
                         </span>
                         <span
                           style={{
-                            fontSize: '0.75rem',
+                            fontSize: '0.72rem',
                             color: 'var(--text-secondary)',
                             marginLeft: 'auto'
                           }}
                         >
-                          {formatDateTime(n.createdAt)}
+                          {formatDateTime(reply.createdAt)}
                         </span>
-                        <button
-                          onClick={() =>
-                            setReplyingToNoteId(replyingToNoteId === n.id ? null : n.id)
-                          }
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--accent-primary)',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            padding: '2px 6px'
-                          }}
-                        >
-                          Reply
-                        </button>
-                        {n.createdByUserId === user?.id && (
+                        {reply.createdByUserId === user?.id && (
                           <button
-                            onClick={() => handleDeleteVesselNote(n.id)}
+                            onClick={() => handleDeleteVesselNote(reply.id)}
                             title="Delete"
                             style={{
                               background: 'none',
@@ -4300,159 +4131,77 @@ export default function VesselDetail({
                               flexShrink: 0
                             }}
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>
                       <p
                         style={{
                           margin: 0,
-                          fontSize: '0.88rem',
+                          fontSize: '0.84rem',
                           whiteSpace: 'pre-wrap',
-                          lineHeight: '1.5'
+                          lineHeight: '1.4'
                         }}
                       >
-                        {highlightMentions(n.note)}
+                        {highlightMentions(reply.note)}
                       </p>
                     </div>
+                  ))}
 
-                    {/* Replies */}
-                    {(vesselRepliesMap.get(n.id) || []).map((reply) => (
-                      <div
-                        key={reply.id}
-                        style={{
-                          marginLeft: '24px',
-                          marginTop: '6px',
-                          background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
-                          borderLeft: '2px solid var(--glass-border-color)'
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            marginBottom: '4px'
+                  {/* Reply input */}
+                  {replyingToNoteId === n.id && (
+                    <div style={{ marginLeft: '24px', marginTop: '6px', position: 'relative' }}>
+                      <div style={{ position: 'relative' }}>
+                        <textarea
+                          value={replyText}
+                          onChange={(e) => handleMentionCheck(e.target.value, 'reply')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddReply(n.id)
                           }}
-                        >
-                          <div
-                            style={{
-                              width: '22px',
-                              height: '22px',
-                              borderRadius: '50%',
-                              background: 'var(--accent-secondary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '0.65rem',
-                              fontWeight: '700',
-                              color: '#fff',
-                              flexShrink: 0
-                            }}
-                          >
-                            {(reply.createdByUsername || '?').charAt(0).toUpperCase()}
-                          </div>
-                          <span style={{ fontWeight: '600', fontSize: '0.82rem' }}>
-                            {reply.createdByUsername || 'Unknown'}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              color: 'var(--text-secondary)',
-                              marginLeft: 'auto'
-                            }}
-                          >
-                            {formatDateTime(reply.createdAt)}
-                          </span>
-                          {reply.createdByUserId === user?.id && (
-                            <button
-                              onClick={() => handleDeleteVesselNote(reply.id)}
-                              title="Delete"
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--danger)',
-                                display: 'flex',
-                                padding: '2px',
-                                flexShrink: 0
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                        <p
+                          rows={2}
+                          placeholder="Reply... (@ to mention)"
+                          autoFocus
                           style={{
-                            margin: 0,
-                            fontSize: '0.84rem',
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: '1.4'
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: '6px',
+                            resize: 'none',
+                            fontSize: '0.85rem',
+                            background: 'var(--input-bg)',
+                            color: 'var(--input-text)',
+                            border: '1px solid var(--input-border)',
+                            boxSizing: 'border-box'
                           }}
+                        />
+                        {mentionTarget === 'reply' && renderMentionDropdown()}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                        <button
+                          onClick={() => handleAddReply(n.id)}
+                          disabled={vesselNotesSaving || !replyText.trim()}
+                          className="btn-primary"
+                          style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                         >
-                          {highlightMentions(reply.note)}
-                        </p>
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReplyingToNoteId(null)
+                            setReplyText('')
+                          }}
+                          className="btn-secondary"
+                          style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                        >
+                          Cancel
+                        </button>
                       </div>
-                    ))}
-
-                    {/* Reply input */}
-                    {replyingToNoteId === n.id && (
-                      <div style={{ marginLeft: '24px', marginTop: '6px', position: 'relative' }}>
-                        <div style={{ position: 'relative' }}>
-                          <textarea
-                            value={replyText}
-                            onChange={(e) => handleMentionCheck(e.target.value, 'reply')}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
-                                handleAddReply(n.id)
-                            }}
-                            rows={2}
-                            placeholder="Reply... (@ to mention)"
-                            autoFocus
-                            style={{
-                              width: '100%',
-                              padding: '8px',
-                              borderRadius: '6px',
-                              resize: 'none',
-                              fontSize: '0.85rem',
-                              background: 'var(--input-bg)',
-                              color: 'var(--input-text)',
-                              border: '1px solid var(--input-border)',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                          {mentionTarget === 'reply' && renderMentionDropdown()}
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                          <button
-                            onClick={() => handleAddReply(n.id)}
-                            disabled={vesselNotesSaving || !replyText.trim()}
-                            className="btn-primary"
-                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
-                          >
-                            Reply
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReplyingToNoteId(null)
-                              setReplyText('')
-                            }}
-                            className="btn-secondary"
-                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Template Generation Modal */}
@@ -4460,7 +4209,6 @@ export default function VesselDetail({
         <VesselTemplateGenerateModal
           vesselId={vessel.id}
           vesselName={vessel.name}
-          isLight={isLight}
           onClose={() => setShowTemplateGenerate(false)}
           showSuccess={showSuccess}
           showError={showError}
@@ -4469,42 +4217,13 @@ export default function VesselDetail({
 
       {/* Classification replace/add modal */}
       {classConfirm?.show && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          onClick={() => setClassConfirm(null)}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ fontSize: '1rem', marginBottom: '12px' }}>Change Classification</h3>
-            <p
-              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px' }}
-            >
-              This vessel already has a classification assigned. Do you want to replace it with{' '}
-              <strong>{classConfirm.newName}</strong> or add it alongside?
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => setClassConfirm(null)}
-                style={{ padding: '8px 16px' }}
-              >
+        <Modal
+          title="Change Classification"
+          onClose={() => setClassConfirm(null)}
+          width={400}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setClassConfirm(null)}>
                 Cancel
               </button>
               <button
@@ -4513,7 +4232,6 @@ export default function VesselDetail({
                   setVesselClassificationIds((prev) => new Set(prev).add(classConfirm.newId))
                   setClassConfirm(null)
                 }}
-                style={{ padding: '8px 16px' }}
               >
                 Add Alongside
               </button>
@@ -4523,13 +4241,17 @@ export default function VesselDetail({
                   setVesselClassificationIds(new Set([classConfirm.newId]))
                   setClassConfirm(null)
                 }}
-                style={{ padding: '8px 16px' }}
               >
                 Replace
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            This vessel already has a classification assigned. Do you want to replace it with{' '}
+            <strong>{classConfirm.newName}</strong> or add it alongside?
+          </p>
+        </Modal>
       )}
     </div>
   )
@@ -4554,7 +4276,7 @@ function DocExpiryBadge({
   soon.setDate(soon.getDate() + 30)
   const expired = exp < now
   if (!expired && exp >= soon) return null
-  const color = expired ? 'var(--danger)' : isLight ? '#b45309' : '#e6a800'
+  const color = expired ? 'var(--danger)' : 'var(--warning)'
   const bg = expired
     ? isLight
       ? 'rgba(200,0,0,0.1)'
@@ -4669,15 +4391,15 @@ function DynamicPoliciesView({
     if (!showAddModal) return
     const modal = modalRef.current
     if (!modal) return
+    const dialog = (modal.closest('.modal-dialog') as HTMLElement | null) || modal
 
     // Small timeout to allow render
     setTimeout(() => {
-      const focusable = modal.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
+      const selector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      const focusable = dialog.querySelectorAll<HTMLElement>(selector)
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
-      first?.focus()
+      modal.querySelector<HTMLElement>(selector)?.focus()
 
       const handleKeyDown = (e: KeyboardEvent): void => {
         if (e.key === 'Escape') {
@@ -4966,7 +4688,7 @@ function DynamicPoliciesView({
   const typeCondsForForm = conditions.filter((c) => c.policyTypeId === formTypeId)
 
   const statusColors: Record<string, { bg: string; color: string }> = {
-    active: { bg: 'rgba(0, 200, 100, 0.1)', color: isLight ? '#008c46' : '#00ff88' },
+    active: { bg: 'rgba(0, 200, 100, 0.1)', color: 'var(--success)' },
     expired: { bg: 'rgba(128, 128, 128, 0.1)', color: 'var(--text-secondary)' },
     cancelled: { bg: 'rgba(255, 77, 77, 0.1)', color: 'var(--danger)' },
     inactive: {
@@ -5234,52 +4956,27 @@ function DynamicPoliciesView({
       )}
 
       {/* Add/Edit Modal */}
-      {/* Add/Edit Modal */}
       {showAddModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999
-          }}
+        <Modal
+          title={editingPolicyId ? 'Edit Policy' : 'Add Policy'}
+          onClose={() => setShowAddModal(false)}
+          width={600}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setShowAddModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleSavePolicy} className="btn-primary">
+                {editingPolicyId ? 'Update' : 'Add'} Policy
+              </button>
+            </>
+          }
         >
-          <div
-            ref={modalRef}
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '600px',
-              maxWidth: '90vw',
-              maxHeight: '80vh',
-              overflow: 'auto',
-              border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)'
-            }}
-          >
-            <h3 style={{ marginBottom: '16px' }}>
-              {editingPolicyId ? 'Edit Policy' : 'Add Policy'}
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div ref={modalRef}>
+            <div className="form-grid cols-2">
               {!editingPolicyId && (
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px',
-                      fontWeight: '500'
-                    }}
-                  >
-                    Policy Type
-                  </label>
+                <Field label="Policy type" span="all">
                   <select
                     name="policyType"
                     value={formTypeId}
@@ -5288,14 +4985,6 @@ function DynamicPoliciesView({
                       setFormConditionId('')
                       setFormValues({})
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      background: 'var(--input-bg)',
-                      color: 'var(--input-text)',
-                      border: '1px solid var(--input-border)'
-                    }}
                   >
                     {policyTypes.map((pt) => (
                       <option key={pt.id} value={pt.id}>
@@ -5303,467 +4992,268 @@ function DynamicPoliciesView({
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px',
-                      fontWeight: '500'
-                    }}
+              <Field label="Policy number">
+                <input
+                  type="text"
+                  value={formNumber}
+                  onChange={(e) => setFormNumber(e.target.value)}
+                />
+              </Field>
+              <Field label="Status">
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as typeof formStatus)}
+                >
+                  <option value="active">Active</option>
+                  <option value="expired">Expired</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </Field>
+              <Field label="Currency">
+                <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value)}>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (\u20AC)</option>
+                  <option value="GBP">GBP (\u00A3)</option>
+                </select>
+              </Field>
+              {typeCondsForForm.length > 0 && (
+                <Field label="Condition">
+                  <select
+                    value={formConditionId}
+                    onChange={(e) => setFormConditionId(e.target.value)}
                   >
-                    Policy Number
-                  </label>
+                    <option value="">None</option>
+                    {typeCondsForForm.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              <Field label="Customer / broker">
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  {(['broker', 'direct'] as const).map((ct) => (
+                    <button
+                      key={ct}
+                      type="button"
+                      onClick={() => setFormCustomerType(ct)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.82rem',
+                        fontWeight: formCustomerType === ct ? 600 : 400,
+                        border:
+                          formCustomerType === ct
+                            ? '1.5px solid var(--accent-primary)'
+                            : '1px solid var(--input-border)',
+                        background: formCustomerType === ct ? 'var(--accent-tint)' : 'transparent',
+                        color:
+                          formCustomerType === ct
+                            ? 'var(--accent-primary)'
+                            : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {ct}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ position: 'relative' }}>
                   <input
                     type="text"
-                    value={formNumber}
-                    onChange={(e) => setFormNumber(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      background: 'var(--input-bg)',
-                      color: 'var(--input-text)',
-                      border: '1px solid var(--input-border)',
-                      boxSizing: 'border-box'
+                    placeholder={
+                      formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'
+                    }
+                    value={
+                      brokerDropdownOpen
+                        ? brokerSearch
+                        : entities.find((e) => e.id === formBrokerId)?.name || ''
+                    }
+                    onFocus={() => {
+                      setBrokerDropdownOpen(true)
+                      setBrokerSearch('')
                     }}
+                    onChange={(e) => setBrokerSearch(e.target.value)}
+                    onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                   />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px',
-                      fontWeight: '500'
-                    }}
-                  >
-                    Status
-                  </label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as typeof formStatus)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      background: 'var(--input-bg)',
-                      color: 'var(--input-text)',
-                      border: '1px solid var(--input-border)'
-                    }}
-                  >
-                    <option value="active">Active</option>
-                    <option value="expired">Expired</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px',
-                      fontWeight: '500'
-                    }}
-                  >
-                    Currency
-                  </label>
-                  <select
-                    value={formCurrency}
-                    onChange={(e) => setFormCurrency(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      background: 'var(--input-bg)',
-                      color: 'var(--input-text)',
-                      border: '1px solid var(--input-border)'
-                    }}
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (\u20AC)</option>
-                    <option value="GBP">GBP (\u00A3)</option>
-                  </select>
-                </div>
-                {typeCondsForForm.length > 0 && (
-                  <div>
-                    <label
+                  {brokerDropdownOpen && (
+                    <div
                       style={{
-                        display: 'block',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '6px',
-                        fontWeight: '500'
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: isLight ? '#ffffff' : '#1a1d28',
+                        border: isLight
+                          ? '1px solid rgba(0,0,0,0.1)'
+                          : '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                        zIndex: 100,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                       }}
                     >
-                      Condition
-                    </label>
-                    <select
-                      value={formConditionId}
-                      onChange={(e) => setFormConditionId(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--input-text)',
-                        border: '1px solid var(--input-border)'
-                      }}
-                    >
-                      <option value="">None</option>
-                      {typeCondsForForm.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '6px',
-                      fontWeight: '500'
-                    }}
-                  >
-                    Customer / Broker
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    {(['broker', 'direct'] as const).map((ct) => (
-                      <button
-                        key={ct}
-                        type="button"
-                        onClick={() => setFormCustomerType(ct)}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.82rem',
-                          fontWeight: formCustomerType === ct ? 600 : 400,
-                          border:
-                            formCustomerType === ct
-                              ? '1.5px solid var(--accent-primary)'
-                              : '1px solid var(--input-border)',
-                          background:
-                            formCustomerType === ct
-                              ? 'rgba(var(--accent-primary-rgb), 0.1)'
-                              : 'transparent',
-                          color:
-                            formCustomerType === ct
-                              ? 'var(--accent-primary)'
-                              : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          textTransform: 'capitalize'
-                        }}
-                      >
-                        {ct}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      placeholder={
-                        formCustomerType === 'direct' ? 'Search customer...' : 'Search broker...'
-                      }
-                      value={
-                        brokerDropdownOpen
-                          ? brokerSearch
-                          : entities.find((e) => e.id === formBrokerId)?.name || ''
-                      }
-                      onFocus={() => {
-                        setBrokerDropdownOpen(true)
-                        setBrokerSearch('')
-                      }}
-                      onChange={(e) => setBrokerSearch(e.target.value)}
-                      onBlur={() => setTimeout(() => setBrokerDropdownOpen(false), 150)}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--input-text)',
-                        border: '1px solid var(--input-border)',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    {brokerDropdownOpen && (
                       <div
+                        onMouseDown={() => {
+                          setFormBrokerId('')
+                          setFormCustomerType('')
+                          setBrokerDropdownOpen(false)
+                          setBrokerSearch('')
+                        }}
                         style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          background: isLight ? '#ffffff' : '#1a1d28',
-                          border: isLight
-                            ? '1px solid rgba(0,0,0,0.1)'
-                            : '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                          zIndex: 100,
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          color:
+                            formBrokerId === '' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          fontStyle: 'italic',
+                          fontSize: '0.9rem'
                         }}
                       >
-                        <div
-                          onMouseDown={() => {
-                            setFormBrokerId('')
-                            setFormCustomerType('')
-                            setBrokerDropdownOpen(false)
-                            setBrokerSearch('')
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            color:
-                              formBrokerId === ''
-                                ? 'var(--accent-primary)'
-                                : 'var(--text-secondary)',
-                            fontStyle: 'italic',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          None
-                        </div>
-                        {entities
-                          .filter((e) => e.name.toLowerCase().includes(brokerSearch.toLowerCase()))
-                          .map((e) => (
-                            <div
-                              key={e.id}
-                              onMouseDown={() => {
-                                setFormBrokerId(e.id)
-                                if (!formCustomerType) setFormCustomerType('broker')
-                                setBrokerDropdownOpen(false)
-                                setBrokerSearch('')
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                color:
-                                  e.id === formBrokerId
-                                    ? 'var(--accent-primary)'
-                                    : 'var(--text-primary)',
-                                background:
-                                  e.id === formBrokerId
-                                    ? isLight
-                                      ? 'rgba(0,119,163,0.1)'
-                                      : 'rgba(var(--accent-primary-rgb), 0.1)'
-                                    : 'transparent',
-                                fontSize: '0.9rem'
-                              }}
-                            >
-                              {e.name}
-                            </div>
-                          ))}
-                        {entities.filter((e) =>
-                          e.name.toLowerCase().includes(brokerSearch.toLowerCase())
-                        ).length === 0 && (
+                        None
+                      </div>
+                      {entities
+                        .filter((e) => e.name.toLowerCase().includes(brokerSearch.toLowerCase()))
+                        .map((e) => (
                           <div
+                            key={e.id}
+                            onMouseDown={() => {
+                              setFormBrokerId(e.id)
+                              if (!formCustomerType) setFormCustomerType('broker')
+                              setBrokerDropdownOpen(false)
+                              setBrokerSearch('')
+                            }}
                             style={{
                               padding: '8px 12px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.85rem',
-                              fontStyle: 'italic'
+                              cursor: 'pointer',
+                              color:
+                                e.id === formBrokerId
+                                  ? 'var(--accent-primary)'
+                                  : 'var(--text-primary)',
+                              background:
+                                e.id === formBrokerId ? 'var(--accent-tint)' : 'transparent',
+                              fontSize: '0.9rem'
                             }}
                           >
-                            No matches
+                            {e.name}
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic characteristic fields */}
-              {typeCharsForForm.length > 0 && (
-                <div>
-                  <h4
-                    style={{
-                      fontSize: '0.9rem',
-                      marginBottom: '8px',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    Characteristics
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {typeCharsForForm.map((c) => (
-                      <div key={c.id}>
-                        <label
+                        ))}
+                      {entities.filter((e) =>
+                        e.name.toLowerCase().includes(brokerSearch.toLowerCase())
+                      ).length === 0 && (
+                        <div
                           style={{
-                            display: 'block',
-                            fontSize: '0.85rem',
+                            padding: '8px 12px',
                             color: 'var(--text-secondary)',
-                            marginBottom: '6px',
-                            fontWeight: '500'
+                            fontSize: '0.85rem',
+                            fontStyle: 'italic'
                           }}
                         >
-                          {c.name} {c.isRequired && '*'}
-                        </label>
-                        {c.fieldType === 'text' && (
-                          <input
-                            type="text"
-                            name={`policy_${c.id}`}
-                            value={(formValues[c.id] as string | number) || ''}
-                            onChange={(e) =>
-                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '10px',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--input-text)',
-                              border: '1px solid var(--input-border)',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        )}
-                        {c.fieldType === 'date' && (
-                          <input
-                            type="date"
-                            value={(formValues[c.id] as string | number) || ''}
-                            onChange={(e) =>
-                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
-                            }
-                            min="1900-01-01"
-                            max="2100-12-31"
-                            style={{
-                              width: '100%',
-                              padding: '10px',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--input-text)',
-                              border: '1px solid var(--input-border)'
-                            }}
-                          />
-                        )}
-                        {c.fieldType === 'amount' && (
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={(formValues[c.id] as string | number) || ''}
-                            onChange={(e) =>
-                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '10px',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--input-text)',
-                              border: '1px solid var(--input-border)',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        )}
-                        {c.fieldType === 'boolean' && (
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              marginTop: '4px'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!formValues[c.id]}
-                              onChange={(e) =>
-                                setFormValues((prev) => ({ ...prev, [c.id]: e.target.checked }))
-                              }
-                            />{' '}
-                            Yes
-                          </label>
-                        )}
-                        {c.fieldType === 'select' && c.selectOptions && (
-                          <select
-                            value={(formValues[c.id] as string | number) || ''}
-                            onChange={(e) =>
-                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '10px',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--input-text)',
-                              border: '1px solid var(--input-border)'
-                            }}
-                          >
-                            <option value="">Select...</option>
-                            {c.selectOptions.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          No matches
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              </Field>
+            </div>
 
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '6px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Notes
-                </label>
+            {/* Dynamic characteristic fields */}
+            {typeCharsForForm.length > 0 && (
+              <div className="form-section" style={{ marginTop: '16px' }}>
+                <h4 className="form-section-title">Characteristics</h4>
+                <div className="form-grid cols-2">
+                  {typeCharsForForm.map((c) => (
+                    <Field key={c.id} label={c.name} required={c.isRequired}>
+                      {c.fieldType === 'text' && (
+                        <input
+                          type="text"
+                          name={`policy_${c.id}`}
+                          value={(formValues[c.id] as string | number) || ''}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                          }
+                        />
+                      )}
+                      {c.fieldType === 'date' && (
+                        <input
+                          type="date"
+                          value={(formValues[c.id] as string | number) || ''}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                          }
+                          min="1900-01-01"
+                          max="2100-12-31"
+                        />
+                      )}
+                      {c.fieldType === 'amount' && (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={(formValues[c.id] as string | number) || ''}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                          }
+                        />
+                      )}
+                      {c.fieldType === 'boolean' && (
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginTop: '4px'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!formValues[c.id]}
+                            onChange={(e) =>
+                              setFormValues((prev) => ({ ...prev, [c.id]: e.target.checked }))
+                            }
+                          />{' '}
+                          Yes
+                        </label>
+                      )}
+                      {c.fieldType === 'select' && c.selectOptions && (
+                        <select
+                          value={(formValues[c.id] as string | number) || ''}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [c.id]: e.target.value }))
+                          }
+                        >
+                          <option value="">Select...</option>
+                          {c.selectOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </Field>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="form-grid" style={{ marginTop: '14px' }}>
+              <Field label="Notes" span="all">
                 <textarea
                   value={formNotes}
                   onChange={(e) => setFormNotes(e.target.value)}
                   rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--input-text)',
-                    border: '1px solid var(--input-border)',
-                    resize: 'vertical',
-                    boxSizing: 'border-box'
-                  }}
+                  style={{ resize: 'vertical' }}
                 />
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  justifyContent: 'flex-end',
-                  marginTop: '24px',
-                  paddingTop: '20px',
-                  borderTop: '1px solid var(--table-border)'
-                }}
-              >
-                <button onClick={() => setShowAddModal(false)} className="btn-secondary">
-                  Cancel
-                </button>
-                <button onClick={handleSavePolicy} className="btn-primary">
-                  {editingPolicyId ? 'Update' : 'Add'} Policy
-                </button>
-              </div>
+              </Field>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Confirmation Modal */}
@@ -5784,14 +5274,12 @@ function DynamicPoliciesView({
 function VesselTemplateGenerateModal({
   vesselId,
   vesselName,
-  isLight,
   onClose,
   showSuccess,
   showError
 }: {
   vesselId: string
   vesselName: string
-  isLight: boolean
   onClose: () => void
   showSuccess: (msg: string) => void
   showError: (msg: string) => void
@@ -5834,148 +5322,96 @@ function VesselTemplateGenerateModal({
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
+    <Modal
+      title="Generate from Template"
+      icon={<FileText size={18} />}
+      onClose={onClose}
+      width={440}
+      closeOnOverlay={false}
     >
-      <div
-        style={{
-          background: isLight ? '#ffffff' : '#1a1d28',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '440px',
-          maxWidth: '90vw',
-          border: 'var(--glass-border)',
-          maxHeight: '70vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: '1.05rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <FileText size={18} /> Generate from Template
-          </h3>
-          <button
-            title="Close"
-            aria-label="Close"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-          Select a template to generate a document pre-filled with data for{' '}
-          <strong>{vesselName}</strong>.
-        </p>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
-              Loading...
-            </div>
-          ) : templates.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
-              No templates available. Upload templates in Document Templates page.
-            </div>
-          ) : (
-            templates.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  marginBottom: '4px',
-                  border: '1px solid var(--input-border)',
-                  background: 'var(--input-bg)'
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{t.name}</div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      display: 'flex',
-                      gap: '6px',
-                      alignItems: 'center',
-                      marginTop: '2px'
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: '1px 5px',
-                        borderRadius: '3px',
-                        fontSize: '0.68rem',
-                        background: 'rgba(var(--accent-primary-rgb), 0.1)',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {t.category}
-                    </span>
-                    {t.placeholders && t.placeholders.length > 0 && (
-                      <span>
-                        {t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  className="btn-primary"
-                  onClick={() => handleGenerate(t.id)}
-                  disabled={generating !== null}
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+        Select a template to generate a document pre-filled with data for{' '}
+        <strong>{vesselName}</strong>.
+      </p>
+      <div>
+        {loading ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+            Loading...
+          </div>
+        ) : templates.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+            No templates available. Upload templates in Document Templates page.
+          </div>
+        ) : (
+          templates.map((t) => (
+            <div
+              key={t.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                marginBottom: '4px',
+                border: '1px solid var(--input-border)',
+                background: 'var(--input-bg)'
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{t.name}</div>
+                <div
                   style={{
-                    padding: '5px 12px',
-                    fontSize: '0.8rem',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-secondary)',
                     display: 'flex',
+                    gap: '6px',
                     alignItems: 'center',
-                    gap: '4px'
+                    marginTop: '2px'
                   }}
                 >
-                  {generating === t.id ? (
-                    'Generating...'
-                  ) : (
-                    <>
-                      <Download size={13} /> Generate
-                    </>
+                  <span
+                    style={{
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      fontSize: '0.68rem',
+                      background: 'var(--accent-tint)',
+                      color: 'var(--accent-primary)'
+                    }}
+                  >
+                    {t.category}
+                  </span>
+                  {t.placeholders && t.placeholders.length > 0 && (
+                    <span>
+                      {t.placeholders.length} placeholder{t.placeholders.length !== 1 ? 's' : ''}
+                    </span>
                   )}
-                </button>
+                </div>
               </div>
-            ))
-          )}
-        </div>
+              <button
+                className="btn-primary"
+                onClick={() => handleGenerate(t.id)}
+                disabled={generating !== null}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {generating === t.id ? (
+                  'Generating...'
+                ) : (
+                  <>
+                    <Download size={13} /> Generate
+                  </>
+                )}
+              </button>
+            </div>
+          ))
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

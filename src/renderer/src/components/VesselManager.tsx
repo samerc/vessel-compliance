@@ -28,7 +28,7 @@ import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import { PageHeader, SanctionsBadge, EmptyState } from './ui'
+import { PageHeader, SanctionsBadge, EmptyState, Field } from './ui'
 
 import { ok } from '../utils/ipc'
 
@@ -557,247 +557,258 @@ export default function VesselManager({
           style={{
             padding: '24px',
             marginBottom: '32px',
-            border: '1px solid var(--accent-primary)'
+            border: '1px solid var(--accent-border)'
           }}
         >
           <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Ship size={20} color="var(--accent-primary)" /> Quick Register
           </h3>
-          <form
-            onSubmit={handleAddVessel}
-            style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}
-          >
-            <input
-              type="text"
-              value={newVessel.name}
-              onChange={(e) => setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })}
-              style={{ flex: 2, minWidth: '200px', textTransform: 'uppercase' }}
-              placeholder="Vessel Name"
-              aria-label="Vessel name"
-            />
-            <input
-              type="text"
-              value={newVessel.imo}
-              onChange={(e) => setNewVessel({ ...newVessel, imo: e.target.value })}
-              style={{ flex: 1, minWidth: '120px' }}
-              placeholder="IMO No."
-              aria-label="IMO number"
-            />
-            <div style={{ position: 'relative', flex: 1, minWidth: '150px' }}>
-              <button
-                ref={addFleetBtnRef}
-                type="button"
-                onClick={() => {
-                  if (fleetComboOpen === '__add__') {
-                    setFleetComboOpen(null)
-                    return
+          <form onSubmit={handleAddVessel}>
+            <div className="form-grid">
+              <Field label="Vessel name" htmlFor="qr-vessel-name">
+                <input
+                  id="qr-vessel-name"
+                  type="text"
+                  value={newVessel.name}
+                  onChange={(e) =>
+                    setNewVessel({ ...newVessel, name: e.target.value.toUpperCase() })
                   }
-                  setAddFleetRect(addFleetBtnRef.current?.getBoundingClientRect() || null)
-                  setFleetComboOpen('__add__')
-                  setFleetComboSearch('')
-                  setFleetComboCreating(false)
-                  setFleetComboNewName('')
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-                aria-label="Fleet assignment"
-              >
-                <span>
-                  {newVessel.fleetId
-                    ? fleets.find((f) => f.id === newVessel.fleetId)?.name || 'Unknown'
-                    : 'Standalone'}
-                </span>
-                <ChevronDown size={14} style={{ opacity: 0.5 }} />
-              </button>
-              {fleetComboOpen === '__add__' &&
-                addFleetRect &&
-                createPortal(
-                  <>
-                    <div
-                      style={{ position: 'fixed', inset: 0, zIndex: 2999 }}
-                      onClick={() => setFleetComboOpen(null)}
-                    />
-                    <div
-                      style={{
-                        position: 'fixed',
-                        top: addFleetRect.bottom + 2,
-                        left: addFleetRect.left,
-                        width: addFleetRect.width,
-                        zIndex: 3000,
-                        background: isLight ? '#ffffff' : '#1a1d28',
-                        border: '1px solid var(--input-border)',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                        maxHeight: '360px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      <input
-                        type="text"
-                        value={fleetComboSearch}
-                        onChange={(e) => setFleetComboSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.preventDefault()
-                        }}
-                        placeholder="Search fleets..."
-                        autoFocus
-                        style={{
-                          padding: '6px 10px',
-                          border: 'none',
-                          borderBottom: '1px solid var(--table-border)',
-                          fontSize: '0.82rem',
-                          background: 'transparent',
-                          color: 'var(--text-primary)',
-                          outline: 'none'
-                        }}
-                      />
-                      <div style={{ overflowY: 'auto', flex: 1 }}>
+                  style={{ textTransform: 'uppercase' }}
+                  placeholder="Vessel Name"
+                />
+              </Field>
+              <Field label="IMO number" htmlFor="qr-vessel-imo">
+                <input
+                  id="qr-vessel-imo"
+                  type="text"
+                  value={newVessel.imo}
+                  onChange={(e) => setNewVessel({ ...newVessel, imo: e.target.value })}
+                  placeholder="IMO No."
+                />
+              </Field>
+              <Field label="Fleet">
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={addFleetBtnRef}
+                    type="button"
+                    onClick={() => {
+                      if (fleetComboOpen === '__add__') {
+                        setFleetComboOpen(null)
+                        return
+                      }
+                      setAddFleetRect(addFleetBtnRef.current?.getBoundingClientRect() || null)
+                      setFleetComboOpen('__add__')
+                      setFleetComboSearch('')
+                      setFleetComboCreating(false)
+                      setFleetComboNewName('')
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      background: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-primary)',
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                    aria-label="Fleet assignment"
+                  >
+                    <span>
+                      {newVessel.fleetId
+                        ? fleets.find((f) => f.id === newVessel.fleetId)?.name || 'Unknown'
+                        : 'Standalone'}
+                    </span>
+                    <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                  </button>
+                  {fleetComboOpen === '__add__' &&
+                    addFleetRect &&
+                    createPortal(
+                      <>
                         <div
-                          onClick={() => {
-                            setNewVessel({ ...newVessel, fleetId: '' })
-                            setFleetComboOpen(null)
-                          }}
+                          style={{ position: 'fixed', inset: 0, zIndex: 2999 }}
+                          onClick={() => setFleetComboOpen(null)}
+                        />
+                        <div
                           style={{
-                            padding: '6px 10px',
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            background: !newVessel.fleetId
-                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                              : 'transparent',
-                            fontWeight: !newVessel.fleetId ? 600 : 400
+                            position: 'fixed',
+                            top: addFleetRect.bottom + 2,
+                            left: addFleetRect.left,
+                            width: addFleetRect.width,
+                            zIndex: 3000,
+                            background: isLight ? '#ffffff' : '#1a1d28',
+                            border: '1px solid var(--input-border)',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                            maxHeight: '360px',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column'
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background =
-                              'rgba(var(--accent-primary-rgb), 0.06)')
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.background = !newVessel.fleetId
-                              ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                              : 'transparent')
-                          }
                         >
-                          Standalone
-                        </div>
-                        {[...fleets]
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .filter(
-                            (f) =>
-                              !fleetComboSearch ||
-                              f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())
-                          )
-                          .map((f) => (
+                          <input
+                            type="text"
+                            value={fleetComboSearch}
+                            onChange={(e) => setFleetComboSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') e.preventDefault()
+                            }}
+                            placeholder="Search fleets..."
+                            autoFocus
+                            style={{
+                              padding: '6px 10px',
+                              border: 'none',
+                              borderBottom: '1px solid var(--table-border)',
+                              fontSize: '0.82rem',
+                              background: 'transparent',
+                              color: 'var(--text-primary)',
+                              outline: 'none'
+                            }}
+                          />
+                          <div style={{ overflowY: 'auto', flex: 1 }}>
                             <div
-                              key={f.id}
                               onClick={() => {
-                                setNewVessel({ ...newVessel, fleetId: f.id })
+                                setNewVessel({ ...newVessel, fleetId: '' })
                                 setFleetComboOpen(null)
                               }}
                               style={{
                                 padding: '6px 10px',
                                 fontSize: '0.85rem',
                                 cursor: 'pointer',
-                                background:
-                                  newVessel.fleetId === f.id
-                                    ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                                    : 'transparent',
-                                fontWeight: newVessel.fleetId === f.id ? 600 : 400
+                                background: !newVessel.fleetId
+                                  ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                                  : 'transparent',
+                                fontWeight: !newVessel.fleetId ? 600 : 400
                               }}
                               onMouseEnter={(e) =>
                                 (e.currentTarget.style.background =
                                   'rgba(var(--accent-primary-rgb), 0.06)')
                               }
                               onMouseLeave={(e) =>
-                                (e.currentTarget.style.background =
-                                  newVessel.fleetId === f.id
-                                    ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                                    : 'transparent')
+                                (e.currentTarget.style.background = !newVessel.fleetId
+                                  ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                                  : 'transparent')
                               }
                             >
-                              {f.name}
+                              Standalone
                             </div>
-                          ))}
-                      </div>
-                      <div
-                        style={{ borderTop: '1px solid var(--table-border)', padding: '4px 6px' }}
-                      >
-                        {fleetComboCreating ? (
-                          <input
-                            type="text"
-                            value={fleetComboNewName}
-                            onChange={(e) => setFleetComboNewName(e.target.value)}
-                            placeholder="New fleet name..."
-                            autoFocus
+                            {[...fleets]
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .filter(
+                                (f) =>
+                                  !fleetComboSearch ||
+                                  f.name.toLowerCase().includes(fleetComboSearch.toLowerCase())
+                              )
+                              .map((f) => (
+                                <div
+                                  key={f.id}
+                                  onClick={() => {
+                                    setNewVessel({ ...newVessel, fleetId: f.id })
+                                    setFleetComboOpen(null)
+                                  }}
+                                  style={{
+                                    padding: '6px 10px',
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    background:
+                                      newVessel.fleetId === f.id
+                                        ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                                        : 'transparent',
+                                    fontWeight: newVessel.fleetId === f.id ? 600 : 400
+                                  }}
+                                  onMouseEnter={(e) =>
+                                    (e.currentTarget.style.background =
+                                      'rgba(var(--accent-primary-rgb), 0.06)')
+                                  }
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background =
+                                      newVessel.fleetId === f.id
+                                        ? 'rgba(var(--accent-primary-rgb), 0.08)'
+                                        : 'transparent')
+                                  }
+                                >
+                                  {f.name}
+                                </div>
+                              ))}
+                          </div>
+                          <div
                             style={{
-                              width: '100%',
-                              padding: '4px 8px',
-                              fontSize: '0.82rem',
-                              borderRadius: '4px',
-                              border: '1px solid var(--input-border)',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)'
-                            }}
-                            onKeyDown={async (e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                if (fleetComboNewName.trim()) {
-                                  const newFleet = ok(
-                                    await window.api.addFleet({ name: fleetComboNewName.trim() })
-                                  )
-                                  setFleets((prev) => [...prev, newFleet])
-                                  setNewVessel({ ...newVessel, fleetId: newFleet.id })
-                                  setFleetComboOpen(null)
-                                }
-                              }
-                              if (e.key === 'Escape') setFleetComboCreating(false)
-                            }}
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFleetComboCreating(true)
-                              setFleetComboNewName('')
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '4px 8px',
-                              fontSize: '0.78rem',
-                              background: 'transparent',
-                              border: '1px dashed var(--input-border)',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              color: 'var(--accent-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              justifyContent: 'center'
+                              borderTop: '1px solid var(--table-border)',
+                              padding: '4px 6px'
                             }}
                           >
-                            <Plus size={12} /> Create Fleet
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </>,
-                  document.body
-                )}
+                            {fleetComboCreating ? (
+                              <input
+                                type="text"
+                                value={fleetComboNewName}
+                                onChange={(e) => setFleetComboNewName(e.target.value)}
+                                placeholder="New fleet name..."
+                                autoFocus
+                                style={{
+                                  width: '100%',
+                                  padding: '4px 8px',
+                                  fontSize: '0.82rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid var(--input-border)',
+                                  background: 'var(--input-bg)',
+                                  color: 'var(--text-primary)'
+                                }}
+                                onKeyDown={async (e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    if (fleetComboNewName.trim()) {
+                                      const newFleet = ok(
+                                        await window.api.addFleet({
+                                          name: fleetComboNewName.trim()
+                                        })
+                                      )
+                                      setFleets((prev) => [...prev, newFleet])
+                                      setNewVessel({ ...newVessel, fleetId: newFleet.id })
+                                      setFleetComboOpen(null)
+                                    }
+                                  }
+                                  if (e.key === 'Escape') setFleetComboCreating(false)
+                                }}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFleetComboCreating(true)
+                                  setFleetComboNewName('')
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '4px 8px',
+                                  fontSize: '0.78rem',
+                                  background: 'transparent',
+                                  border: '1px dashed var(--input-border)',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  color: 'var(--accent-primary)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <Plus size={12} /> Create Fleet
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </>,
+                      document.body
+                    )}
+                </div>
+              </Field>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="form-actions">
               <button
                 type="button"
                 className="btn-secondary"
@@ -805,16 +816,10 @@ export default function VesselManager({
                   setShowQuickAdd(false)
                   setNewVessel({ name: '', imo: '', fleetId: '', customerId: '', customerType: '' })
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <X size={16} /> Cancel
               </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={isAdding}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
+              <button type="submit" className="btn-primary" disabled={isAdding}>
                 {isAdding && <Loader2 size={16} className="spinner" />}
                 {isAdding ? 'Registering...' : 'Register'}
               </button>
@@ -848,14 +853,6 @@ export default function VesselManager({
           <select
             value={fleetFilter}
             onChange={(e) => setFleetFilter(e.target.value)}
-            style={{
-              padding: '10px',
-              borderRadius: '8px',
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              color: 'var(--text-primary)',
-              fontFamily: 'inherit'
-            }}
             aria-label="Filter by fleet"
           >
             <option value="all">All Fleets</option>
@@ -874,14 +871,6 @@ export default function VesselManager({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            style={{
-              padding: '10px',
-              borderRadius: '8px',
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              color: 'var(--text-primary)',
-              fontFamily: 'inherit'
-            }}
             aria-label="Filter by status"
           >
             <option value="active">Active Only</option>
@@ -925,8 +914,8 @@ export default function VesselManager({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: isLight ? 'rgba(0,150,200,0.08)' : 'rgba(var(--accent-primary-rgb), 0.06)',
-            border: '1px solid var(--accent-primary)',
+            background: 'var(--accent-tint)',
+            border: '1px solid var(--accent-border)',
             position: 'sticky',
             top: 0,
             zIndex: 10
@@ -962,7 +951,7 @@ export default function VesselManager({
                     minWidth: '180px',
                     maxHeight: '200px',
                     overflowY: 'auto',
-                    background: isLight ? '#ffffff' : '#1e222a',
+                    background: 'var(--bg-primary)',
                     border: '1px solid var(--glass-border-color)',
                     borderRadius: '8px',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
@@ -1021,15 +1010,8 @@ export default function VesselManager({
                               setNewFleetName('')
                             }
                           }}
-                          style={{
-                            flex: 1,
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.82rem',
-                            border: '1px solid var(--input-border)',
-                            background: 'var(--input-bg)',
-                            color: 'var(--input-text)'
-                          }}
+                          aria-label="New fleet name"
+                          style={{ flex: 1, minWidth: 0 }}
                         />
                         <button
                           onClick={handleCreateFleetAndAssign}
@@ -1072,15 +1054,7 @@ export default function VesselManager({
                   e.target.value = ''
                 }}
                 defaultValue=""
-                style={{
-                  padding: '6px 10px',
-                  fontSize: '0.82rem',
-                  borderRadius: '8px',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit'
-                }}
+                aria-label="Change status"
               >
                 <option value="" disabled>
                   Change Status
@@ -1123,7 +1097,7 @@ export default function VesselManager({
         </div>
       )}
 
-      <div className="glass-card" style={{ padding: '0', overflowX: 'auto', minHeight: '300px' }}>
+      <div className="table-wrap" style={{ minHeight: '300px' }}>
         {isLoading && (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <Loader2 className="spinner" style={{ margin: '0 auto 16px', display: 'block' }} />
@@ -1157,18 +1131,12 @@ export default function VesselManager({
         )}
 
         {!isLoading && vessels.length > 0 && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+          <table className="data-table" style={{ minWidth: '800px' }}>
             <caption className="sr-only">Vessel registry</caption>
             <thead>
-              <tr
-                style={{
-                  textAlign: 'left',
-                  background: 'var(--table-header-bg)',
-                  borderBottom: '1px solid var(--table-border)'
-                }}
-              >
+              <tr>
                 {selectMode && (
-                  <th scope="col" style={{ padding: '14px 8px 14px 16px', width: '40px' }}>
+                  <th scope="col" style={{ padding: '11px 8px 11px 14px', width: '40px' }}>
                     <div
                       onClick={toggleSelectAll}
                       style={{
@@ -1190,19 +1158,7 @@ export default function VesselManager({
                   </th>
                 )}
                 {visibleSet.has('name') && (
-                  <th
-                    scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => toggleSort('name')}
-                  >
+                  <th scope="col" style={{ cursor: 'pointer' }} onClick={() => toggleSort('name')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                       Vessel Name{' '}
                       <ArrowUpDown size={13} style={{ opacity: sortField === 'name' ? 1 : 0.3 }} />
@@ -1212,15 +1168,7 @@ export default function VesselManager({
                 {visibleSet.has('imo') && (
                   <th
                     scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
-                      cursor: 'pointer'
-                    }}
+                    style={{ cursor: 'pointer' }}
                     onClick={() => toggleSort('imoNumber')}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -1232,65 +1180,15 @@ export default function VesselManager({
                     </span>
                   </th>
                 )}
-                {visibleSet.has('vesselType') && (
-                  <th
-                    scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Vessel Type
-                  </th>
-                )}
+                {visibleSet.has('vesselType') && <th scope="col">Vessel Type</th>}
                 {visibleSet.has('sanctions') && (
-                  <th
-                    scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
-                      width: '120px'
-                    }}
-                  >
+                  <th scope="col" style={{ width: '120px' }}>
                     Sanctions
                   </th>
                 )}
-                {visibleSet.has('fleet') && (
-                  <th
-                    scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Fleet
-                  </th>
-                )}
+                {visibleSet.has('fleet') && <th scope="col">Fleet</th>}
                 {visibleSet.has('actions') && (
-                  <th
-                    scope="col"
-                    style={{
-                      padding: '14px 16px',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
-                      textAlign: 'right'
-                    }}
-                  >
+                  <th scope="col" style={{ textAlign: 'right' }}>
                     <div
                       style={{
                         display: 'flex',
@@ -1310,7 +1208,7 @@ export default function VesselManager({
                   </th>
                 )}
                 {!visibleSet.has('actions') && (
-                  <th scope="col" style={{ padding: '14px 16px', textAlign: 'right' }}>
+                  <th scope="col" style={{ textAlign: 'right' }}>
                     <ColumnSelector
                       pageKey="vessels"
                       allColumns={VESSEL_COLUMNS}
@@ -1325,20 +1223,9 @@ export default function VesselManager({
               {vessels.map((v) => {
                 const isBulkChecked = selectedVesselIds.has(v.id)
                 return (
-                  <tr
-                    key={v.id}
-                    style={{
-                      borderBottom: '1px solid var(--table-border)',
-                      background: isBulkChecked
-                        ? isLight
-                          ? 'rgba(0,150,200,0.06)'
-                          : 'rgba(var(--accent-primary-rgb), 0.04)'
-                        : undefined
-                    }}
-                    className="hover-effect"
-                  >
+                  <tr key={v.id} className={isBulkChecked ? 'selected' : undefined}>
                     {selectMode && (
-                      <td style={{ padding: '16px 8px 16px 16px', width: '40px' }}>
+                      <td style={{ padding: '11px 8px 11px 14px', width: '40px' }}>
                         <div
                           onClick={(e) => {
                             e.stopPropagation()
@@ -1360,7 +1247,7 @@ export default function VesselManager({
                       </td>
                     )}
                     {visibleSet.has('name') && (
-                      <td style={{ padding: '16px' }}>
+                      <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div
                             style={{
@@ -1419,15 +1306,11 @@ export default function VesselManager({
                               <span
                                 style={{
                                   fontSize: '0.65rem',
-                                  background: isLight
-                                    ? 'rgba(0,0,0,0.06)'
-                                    : 'rgba(255,255,255,0.08)',
+                                  background: 'var(--table-header-bg)',
                                   padding: '1px 6px',
                                   borderRadius: '3px',
                                   color: 'var(--text-secondary)',
-                                  border: isLight
-                                    ? '1px solid rgba(0,0,0,0.12)'
-                                    : '1px solid rgba(255,255,255,0.12)'
+                                  border: '1px solid var(--glass-border-color)'
                                 }}
                               >
                                 INACTIVE
@@ -1438,22 +1321,21 @@ export default function VesselManager({
                       </td>
                     )}
                     {visibleSet.has('imo') && (
-                      <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                        <Hash size={14} style={{ marginRight: '4px' }} /> {v.imoNumber}
+                      <td className="muted">
+                        <Hash size={14} style={{ marginRight: '4px' }} />{' '}
+                        <span className="mono">{v.imoNumber}</span>
                       </td>
                     )}
                     {visibleSet.has('vesselType') && (
-                      <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                        {v.vesselType || '—'}
-                      </td>
+                      <td className="muted">{v.vesselType || '—'}</td>
                     )}
                     {visibleSet.has('sanctions') && (
-                      <td style={{ padding: '16px' }}>
+                      <td>
                         <OfacBadge vessel={v} />
                       </td>
                     )}
                     {visibleSet.has('fleet') && (
-                      <td style={{ padding: '16px' }}>
+                      <td>
                         <div style={{ position: 'relative', width: '200px' }}>
                           <button
                             onClick={() => {
@@ -1499,7 +1381,7 @@ export default function VesselManager({
                                   right: 0,
                                   marginTop: '2px',
                                   zIndex: 100,
-                                  background: isLight ? '#ffffff' : '#1a1d28',
+                                  background: 'var(--bg-primary)',
                                   border: '1px solid var(--input-border)',
                                   borderRadius: '8px',
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
@@ -1663,7 +1545,7 @@ export default function VesselManager({
                       </td>
                     )}
                     {visibleSet.has('actions') && (
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => {
                             setOpenInEditMode(false)
@@ -1752,16 +1634,7 @@ export default function VesselManager({
               <select
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value))}
-                style={{
-                  marginLeft: '16px',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'inherit'
-                }}
+                style={{ marginLeft: '16px' }}
                 aria-label="Vessels per page"
               >
                 <option value="10">10 / page</option>

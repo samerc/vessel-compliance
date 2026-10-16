@@ -11,7 +11,6 @@ import {
 import { PageHeader, EmptyState } from './ui'
 import { ConditionSurvey, Vessel, Surveyor, SurveyDefect } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
@@ -57,9 +56,6 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
   const [typeFilter, setTypeFilter] = useState('')
   const [openDefectsOnly, setOpenDefectsOnly] = useState(false)
   const { showError, showSuccess } = useToast()
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
-  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
   const { visibleColumns: svVisibleCols, setVisibleColumns: setSvVisibleCols } = useColumnPrefs(
     'surveys',
     SURVEY_COLUMNS
@@ -270,18 +266,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
     )
   }
 
-  const thStyle = {
-    padding: '12px 16px',
-    textAlign: 'left' as const,
-    fontSize: '0.8rem',
-    fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    userSelect: 'none' as const,
-    whiteSpace: 'nowrap' as const
-  }
+  const thStyle = { cursor: 'pointer' }
 
   return (
     <div className="fade-in page">
@@ -362,7 +347,7 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
                     right: 0,
                     marginTop: '4px',
                     zIndex: 91,
-                    background: dropdownBg,
+                    background: 'var(--bg-primary)',
                     border: '1px solid var(--input-border)',
                     borderRadius: '8px',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
@@ -654,270 +639,203 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
       </div>
 
       {/* Table */}
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr
-                style={{
-                  background: 'var(--table-header-bg)',
-                  borderBottom: '1px solid var(--table-border)'
-                }}
-              >
-                {svVisSet.has('vessel') && (
-                  <th style={thStyle} onClick={() => handleSort('vessel')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Vessel {sortIcon('vessel')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('reference') && (
-                  <th style={thStyle} onClick={() => handleSort('reference')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Reference {sortIcon('reference')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('date') && (
-                  <th style={thStyle} onClick={() => handleSort('date')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Survey Date {sortIcon('date')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('type') && (
-                  <th style={thStyle} onClick={() => handleSort('type')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Type {sortIcon('type')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('surveyor') && (
-                  <th style={thStyle} onClick={() => handleSort('surveyor')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Surveyor {sortIcon('surveyor')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('location') && (
-                  <th style={thStyle} onClick={() => handleSort('location')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Location {sortIcon('location')}
-                    </span>
-                  </th>
-                )}
-                {svVisSet.has('defects') && (
-                  <th style={thStyle} onClick={() => handleSort('defects')}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Defects {sortIcon('defects')}
-                    </span>
-                  </th>
-                )}
-                <th
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              {svVisSet.has('vessel') && (
+                <th style={thStyle} onClick={() => handleSort('vessel')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Vessel {sortIcon('vessel')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('reference') && (
+                <th style={thStyle} onClick={() => handleSort('reference')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Reference {sortIcon('reference')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('date') && (
+                <th style={thStyle} onClick={() => handleSort('date')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Survey Date {sortIcon('date')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('type') && (
+                <th style={thStyle} onClick={() => handleSort('type')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Type {sortIcon('type')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('surveyor') && (
+                <th style={thStyle} onClick={() => handleSort('surveyor')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Surveyor {sortIcon('surveyor')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('location') && (
+                <th style={thStyle} onClick={() => handleSort('location')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Location {sortIcon('location')}
+                  </span>
+                </th>
+              )}
+              {svVisSet.has('defects') && (
+                <th style={thStyle} onClick={() => handleSort('defects')}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Defects {sortIcon('defects')}
+                  </span>
+                </th>
+              )}
+              <th style={{ textAlign: 'center' }}>
+                <div
                   style={{
-                    padding: '12px 16px',
-                    textAlign: 'center',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    {svVisSet.has('actions') && 'Actions'}
-                    <ColumnSelector
-                      pageKey="surveys"
-                      allColumns={SURVEY_COLUMNS}
-                      visibleColumns={svVisibleCols}
-                      onChange={setSvVisibleCols}
-                    />
-                  </div>
-                </th>
+                  {svVisSet.has('actions') && 'Actions'}
+                  <ColumnSelector
+                    pageKey="surveys"
+                    allColumns={SURVEY_COLUMNS}
+                    visibleColumns={svVisibleCols}
+                    onChange={setSvVisibleCols}
+                  />
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && surveys.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="muted" style={{ padding: '40px', textAlign: 'center' }}>
+                  Loading surveys...
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {isLoading && surveys.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    style={{
-                      padding: '40px',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    Loading surveys...
-                  </td>
-                </tr>
-              ) : sorted.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    style={{
-                      padding: '40px',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    <EmptyState
-                      compact
-                      icon={<ClipboardList size={34} />}
-                      title={
-                        searchTerm ? 'No surveys match your search' : 'No condition surveys found'
-                      }
-                      text={
-                        searchTerm
-                          ? 'The date, type and open-defects filters also apply.'
-                          : "Surveys are added from a vessel's Surveys tab, where you can import the defects from the report."
-                      }
-                      action={
-                        searchTerm ? (
-                          <button
-                            className="btn-secondary btn-sm"
-                            onClick={() => setSearchTerm('')}
-                          >
-                            Clear search
-                          </button>
-                        ) : undefined
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((survey) => {
-                  const vessel = vesselMap.get(survey.vesselId)
-                  const surveyor = surveyorMap.get(survey.surveyorId)
-                  const hasOpenDefects = survey.openDefects > 0
+            ) : sorted.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '40px', textAlign: 'center' }}>
+                  <EmptyState
+                    compact
+                    icon={<ClipboardList size={34} />}
+                    title={
+                      searchTerm ? 'No surveys match your search' : 'No condition surveys found'
+                    }
+                    text={
+                      searchTerm
+                        ? 'The date, type and open-defects filters also apply.'
+                        : "Surveys are added from a vessel's Surveys tab, where you can import the defects from the report."
+                    }
+                    action={
+                      searchTerm ? (
+                        <button className="btn-secondary btn-sm" onClick={() => setSearchTerm('')}>
+                          Clear search
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                </td>
+              </tr>
+            ) : (
+              paginated.map((survey) => {
+                const vessel = vesselMap.get(survey.vesselId)
+                const surveyor = surveyorMap.get(survey.surveyorId)
+                const hasOpenDefects = survey.openDefects > 0
 
-                  return (
-                    <tr
-                      key={survey.id}
-                      style={{
-                        borderBottom: '1px solid var(--table-border)',
-                        transition: 'background 0.15s'
-                      }}
-                      className="hover-effect"
-                    >
-                      {svVisSet.has('vessel') && (
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: '600', textTransform: 'uppercase' }}>
-                            {vessel?.name || 'Unknown Vessel'}
+                return (
+                  <tr key={survey.id}>
+                    {svVisSet.has('vessel') && (
+                      <td>
+                        <div style={{ fontWeight: '600', textTransform: 'uppercase' }}>
+                          {vessel?.name || 'Unknown Vessel'}
+                        </div>
+                        {vessel?.imoNumber && (
+                          <div
+                            className="mono"
+                            style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--text-secondary)',
+                              marginTop: '2px'
+                            }}
+                          >
+                            IMO: {vessel.imoNumber}
                           </div>
-                          {vessel?.imoNumber && (
-                            <div
-                              style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--text-secondary)',
-                                marginTop: '2px'
-                              }}
-                            >
-                              IMO: {vessel.imoNumber}
-                            </div>
-                          )}
-                        </td>
-                      )}
-                      {svVisSet.has('reference') && (
-                        <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                          {survey.reference ? (
-                            <span
-                              style={{
-                                fontFamily: 'monospace',
-                                fontWeight: 600,
-                                color: 'var(--accent-primary)'
-                              }}
-                            >
-                              {survey.reference}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-secondary)' }}>-</span>
-                          )}
-                        </td>
-                      )}
-                      {svVisSet.has('date') && (
-                        <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
-                          {formatDate(survey.surveyDate)}
-                        </td>
-                      )}
-                      {svVisSet.has('type') && (
-                        <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
-                          {survey.surveyType || '-'}
-                        </td>
-                      )}
-                      {svVisSet.has('surveyor') && (
-                        <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
-                          {surveyor?.companyName || '-'}
-                        </td>
-                      )}
-                      {svVisSet.has('location') && (
-                        <td style={{ padding: '12px 16px', fontSize: '0.9rem' }}>
-                          {survey.location || '-'}
-                        </td>
-                      )}
-                      {svVisSet.has('defects') && (
-                        <td style={{ padding: '12px 16px' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '0.8rem',
-                              fontWeight: '600',
-                              background: hasOpenDefects
-                                ? 'rgba(239, 68, 68, 0.15)'
-                                : survey.totalDefects > 0
-                                  ? 'rgba(34, 197, 94, 0.15)'
-                                  : 'rgba(148, 163, 184, 0.15)',
-                              color: hasOpenDefects
-                                ? 'var(--danger)'
-                                : survey.totalDefects > 0
-                                  ? 'var(--success)'
-                                  : 'var(--text-secondary)',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {survey.openDefects} open / {survey.totalDefects} total
-                          </span>
-                        </td>
-                      )}
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        {svVisSet.has('actions') && (
-                          <button
-                            onClick={() => onNavigateToVessel(survey.vesselId)}
-                            title="View vessel surveys"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '6px 14px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--glass-border-color)',
-                              background: 'var(--glass-bg)',
-                              color: 'var(--accent-primary)',
-                              cursor: 'pointer',
-                              fontSize: '0.8rem',
-                              fontWeight: '500'
-                            }}
-                          >
-                            <Eye size={14} />
-                            View
-                          </button>
                         )}
                       </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                    {svVisSet.has('reference') && (
+                      <td>
+                        {survey.reference ? (
+                          <span
+                            className="mono"
+                            style={{ fontWeight: 600, color: 'var(--accent-primary)' }}
+                          >
+                            {survey.reference}
+                          </span>
+                        ) : (
+                          <span className="muted">-</span>
+                        )}
+                      </td>
+                    )}
+                    {svVisSet.has('date') && (
+                      <td style={{ whiteSpace: 'nowrap' }}>{formatDate(survey.surveyDate)}</td>
+                    )}
+                    {svVisSet.has('type') && <td>{survey.surveyType || '-'}</td>}
+                    {svVisSet.has('surveyor') && <td>{surveyor?.companyName || '-'}</td>}
+                    {svVisSet.has('location') && (
+                      <td className="muted">{survey.location || '-'}</td>
+                    )}
+                    {svVisSet.has('defects') && (
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            background: hasOpenDefects
+                              ? 'rgba(239, 68, 68, 0.15)'
+                              : survey.totalDefects > 0
+                                ? 'rgba(34, 197, 94, 0.15)'
+                                : 'rgba(148, 163, 184, 0.15)',
+                            color: hasOpenDefects
+                              ? 'var(--danger)'
+                              : survey.totalDefects > 0
+                                ? 'var(--success)'
+                                : 'var(--text-secondary)',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {survey.openDefects} open / {survey.totalDefects} total
+                        </span>
+                      </td>
+                    )}
+                    <td style={{ textAlign: 'center' }}>
+                      {svVisSet.has('actions') && (
+                        <button
+                          onClick={() => onNavigateToVessel(survey.vesselId)}
+                          title="View vessel surveys"
+                          className="btn-secondary btn-sm"
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Pagination */}

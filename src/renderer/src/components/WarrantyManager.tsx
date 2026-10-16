@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Bell,
   Check,
-  X,
   AlertTriangle,
   Clock,
   FileWarning,
@@ -23,6 +22,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateShort, formatDateOrDash } from '../utils/dateUtils'
 import { confirmDialog } from './DialogHost'
+import { Field, Modal } from './ui'
 import { ok, isIpcError } from '../utils/ipc'
 
 interface WarrantyManagerProps {
@@ -39,10 +39,10 @@ const STATUS_LABELS: Record<WarrantyStatus, string> = {
 }
 
 const STATUS_COLORS: Record<WarrantyStatus, { bg: string; color: string }> = {
-  pending: { bg: 'rgba(255,165,0,0.12)', color: '#e6a800' },
-  survey_done: { bg: 'rgba(var(--accent-primary-rgb), 0.12)', color: '#00aaff' },
-  completed: { bg: 'rgba(0,200,100,0.12)', color: '#00c864' },
-  waived: { bg: 'rgba(128,128,128,0.1)', color: '#888' }
+  pending: { bg: 'rgba(255,165,0,0.12)', color: 'var(--warning)' },
+  survey_done: { bg: 'rgba(var(--accent-primary-rgb), 0.12)', color: 'var(--accent-primary)' },
+  completed: { bg: 'rgba(0,200,100,0.12)', color: 'var(--success)' },
+  waived: { bg: 'rgba(128,128,128,0.1)', color: 'var(--text-secondary)' }
 }
 
 function calcDeadlineDate(inceptionDate: string, deadlineDays: number): Date {
@@ -534,46 +534,6 @@ export default function WarrantyManager({
     }
   }
 
-  // ── Styles ───────────────────────────────────────────────────────
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 12px',
-    borderRadius: '8px',
-    fontSize: '0.85rem',
-    border: '1px solid var(--input-border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text-primary)'
-  }
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem',
-    color: 'var(--text-secondary)',
-    marginBottom: '4px',
-    display: 'block'
-  }
-  const modalBg: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1100
-  }
-  const modalCard: React.CSSProperties = {
-    background: isLight ? '#ffffff' : '#1a1d28',
-    borderRadius: '16px',
-    padding: '24px',
-    width: '480px',
-    maxWidth: '92vw',
-    border: '1px solid var(--glass-border-color)',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-    maxHeight: '85vh',
-    overflowY: 'auto'
-  }
-
   const renderWarrantyCard = (w: SurveyWarranty): React.JSX.Element => {
     const sc = STATUS_COLORS[w.status]
     const isExpanded = expandedId === w.id
@@ -603,7 +563,11 @@ export default function WarrantyManager({
                   : urgentSoon
                     ? 'rgba(255,165,0,0.15)'
                     : 'rgba(0,200,100,0.10)',
-                color: isOverdue ? 'var(--danger)' : urgentSoon ? '#e6a800' : '#00c864'
+                color: isOverdue
+                  ? 'var(--danger)'
+                  : urgentSoon
+                    ? 'var(--warning)'
+                    : 'var(--success)'
               }}
             >
               {isOverdue ? `${Math.abs(remaining)}d overdue` : `${remaining}d left`}
@@ -742,7 +706,7 @@ export default function WarrantyManager({
               <span
                 style={{
                   fontSize: '0.78rem',
-                  color: '#e6a800',
+                  color: 'var(--warning)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '3px'
@@ -913,7 +877,7 @@ export default function WarrantyManager({
                             borderRadius: '6px',
                             fontSize: '0.7rem',
                             background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                            color: '#00aaff',
+                            color: 'var(--accent-primary)',
                             textTransform: 'uppercase'
                           }}
                         >
@@ -938,7 +902,7 @@ export default function WarrantyManager({
                           <span
                             style={{
                               fontSize: '0.75rem',
-                              color: '#e6a800',
+                              color: 'var(--warning)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '3px',
@@ -1010,7 +974,7 @@ export default function WarrantyManager({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    color: '#8a7dff',
+                    color: 'var(--violet)',
                     borderColor: 'rgba(138,125,255,0.35)'
                   }}
                 >
@@ -1027,7 +991,7 @@ export default function WarrantyManager({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    color: '#00aaff',
+                    color: 'var(--accent-primary)',
                     borderColor: 'rgba(var(--accent-primary-rgb), 0.35)'
                   }}
                 >
@@ -1047,7 +1011,7 @@ export default function WarrantyManager({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    color: '#00c864',
+                    color: 'var(--success)',
                     borderColor: 'rgba(0,200,100,0.35)'
                   }}
                 >
@@ -1073,7 +1037,7 @@ export default function WarrantyManager({
                   style={{
                     fontSize: '0.78rem',
                     padding: '4px 12px',
-                    color: '#e6a800',
+                    color: 'var(--warning)',
                     borderColor: 'rgba(230,168,0,0.35)'
                   }}
                 >
@@ -1145,7 +1109,7 @@ export default function WarrantyManager({
                 fontSize: '0.7rem',
                 fontWeight: '700',
                 background: 'rgba(255,165,0,0.15)',
-                color: '#e6a800'
+                color: 'var(--warning)'
               }}
             >
               {
@@ -1194,151 +1158,14 @@ export default function WarrantyManager({
 
       {/* ── Add/Edit Modal ─────────────────────────────────────── */}
       {showAddModal && (
-        <div style={modalBg}>
-          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                {editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}
-              </h3>
-              <button
-                title="Cancel"
-                aria-label="Cancel"
-                onClick={() => setShowAddModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Description *</label>
-                <input
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="e.g. Follow-up condition survey"
-                  style={inputStyle}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Linked Policy</label>
-                <select
-                  value={formPolicyId}
-                  onChange={(e) => handlePolicyChange(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">— None —</option>
-                  {dynamicPolicies.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.policyTypeName}
-                      {p.policyNumber ? ` #${p.policyNumber}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>
-                  Reference{' '}
-                  <span style={{ fontWeight: 400, opacity: 0.6 }}>(auto from policy)</span>
-                </label>
-                <input
-                  value={formReference}
-                  onChange={(e) => setFormReference(e.target.value)}
-                  placeholder="e.g. SUR9438"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Inception Date *</label>
-                <input
-                  type="date"
-                  value={formInceptionDate}
-                  onChange={(e) => setFormInceptionDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Deadline Type *</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {(['days', 'event'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setFormDeadlineType(t)}
-                      className={formDeadlineType === t ? 'btn-primary' : 'btn-secondary'}
-                      style={{ fontSize: '0.82rem', padding: '5px 16px' }}
-                    >
-                      {t === 'days' ? 'Number of days' : 'Event'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {formDeadlineType === 'days' ? (
-                <div>
-                  <label style={labelStyle}>Deadline (days from inception) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formDeadlineDays}
-                    onChange={(e) => setFormDeadlineDays(e.target.value)}
-                    placeholder="e.g. 30"
-                    style={inputStyle}
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label style={labelStyle}>Deadline Event *</label>
-                  <input
-                    value={formDeadlineEvent}
-                    onChange={(e) => setFormDeadlineEvent(e.target.value)}
-                    placeholder="e.g. Prior to sailing"
-                    style={inputStyle}
-                  />
-                </div>
-              )}
-              {editingWarranty && (
-                <div>
-                  <label style={labelStyle}>Status</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as WarrantyStatus)}
-                    style={inputStyle}
-                  >
-                    {(['pending', 'survey_done', 'completed', 'waived'] as WarrantyStatus[]).map(
-                      (s) => (
-                        <option key={s} value={s}>
-                          {STATUS_LABELS[s]}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label style={labelStyle}>Notes</label>
-                <textarea
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  placeholder="Optional context for follow-up"
-                  rows={3}
-                  style={{ ...inputStyle, resize: 'vertical' }}
-                />
-              </div>
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title={editingWarranty ? 'Edit Warranty' : 'Add Survey Warranty'}
+          icon={<ClipboardCheck size={18} />}
+          onClose={() => setShowAddModal(false)}
+          width={480}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setShowAddModal(false)} className="btn-secondary">
                 Cancel
               </button>
@@ -1349,108 +1176,114 @@ export default function WarrantyManager({
               >
                 {editingWarranty ? 'Save Changes' : 'Add Warranty'}
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid cols-2">
+            <Field label="Description" required span="all">
+              <input
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="e.g. Follow-up condition survey"
+                autoFocus
+              />
+            </Field>
+            <Field label="Linked policy">
+              <select value={formPolicyId} onChange={(e) => handlePolicyChange(e.target.value)}>
+                <option value="">— None —</option>
+                {dynamicPolicies.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.policyTypeName}
+                    {p.policyNumber ? ` #${p.policyNumber}` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Reference" hint="Filled in from the policy">
+              <input
+                value={formReference}
+                onChange={(e) => setFormReference(e.target.value)}
+                placeholder="e.g. SUR9438"
+              />
+            </Field>
+            <Field label="Inception date" required>
+              <input
+                type="date"
+                value={formInceptionDate}
+                onChange={(e) => setFormInceptionDate(e.target.value)}
+              />
+            </Field>
+            <Field label="Deadline type" required>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {(['days', 'event'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setFormDeadlineType(t)}
+                    className={`${formDeadlineType === t ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  >
+                    {t === 'days' ? 'Number of days' : 'Event'}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            {formDeadlineType === 'days' ? (
+              <Field label="Deadline (days from inception)" required>
+                <input
+                  type="number"
+                  min="1"
+                  value={formDeadlineDays}
+                  onChange={(e) => setFormDeadlineDays(e.target.value)}
+                  placeholder="e.g. 30"
+                />
+              </Field>
+            ) : (
+              <Field label="Deadline event" required>
+                <input
+                  value={formDeadlineEvent}
+                  onChange={(e) => setFormDeadlineEvent(e.target.value)}
+                  placeholder="e.g. Prior to sailing"
+                />
+              </Field>
+            )}
+            {editingWarranty && (
+              <Field label="Status">
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as WarrantyStatus)}
+                >
+                  {(['pending', 'survey_done', 'completed', 'waived'] as WarrantyStatus[]).map(
+                    (s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABELS[s]}
+                      </option>
+                    )
+                  )}
+                </select>
+              </Field>
+            )}
+            <Field label="Notes" span="all">
+              <textarea
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
+                placeholder="Optional context for follow-up"
+                rows={3}
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Convert to Survey Modal ───────────────────────────── */}
       {convertWarranty && (
-        <div style={modalBg}>
-          <div style={{ ...modalCard, width: '440px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '6px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Convert to Survey</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setConvertWarranty(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Creates a new condition survey and links it to “{convertWarranty.description}”.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Surveyor *</label>
-                <select
-                  value={convertSurveyorId}
-                  onChange={(e) => setConvertSurveyorId(e.target.value)}
-                  style={inputStyle}
-                  autoFocus
-                >
-                  <option value="">— Select a surveyor —</option>
-                  {surveyorsList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.companyName}
-                      {s.country ? ` (${s.country})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Survey Date *</label>
-                <input
-                  type="date"
-                  value={convertDate}
-                  onChange={(e) => setConvertDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Survey Type</label>
-                {surveyTypesList.length > 0 ? (
-                  <select
-                    value={convertType}
-                    onChange={(e) => setConvertType(e.target.value)}
-                    style={inputStyle}
-                  >
-                    {!surveyTypesList.some((t) => t.name === convertType) && convertType && (
-                      <option value={convertType}>{convertType}</option>
-                    )}
-                    {surveyTypesList.map((t) => (
-                      <option key={t.id} value={t.name}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={convertType}
-                    onChange={(e) => setConvertType(e.target.value)}
-                    style={inputStyle}
-                  />
-                )}
-              </div>
-              <div>
-                <label style={labelStyle}>
-                  Reference <span style={{ fontWeight: 400, opacity: 0.6 }}>(from warranty)</span>
-                </label>
-                <input
-                  value={convertReference}
-                  onChange={(e) => setConvertReference(e.target.value)}
-                  placeholder="e.g. SUR9438"
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Convert to Survey"
+          icon={<ClipboardCheck size={18} />}
+          onClose={() => setConvertWarranty(null)}
+          width={440}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setConvertWarranty(null)} className="btn-secondary">
                 Cancel
               </button>
@@ -1461,403 +1294,342 @@ export default function WarrantyManager({
               >
                 {convertSaving ? 'Creating…' : 'Create & Link'}
               </button>
-            </div>
+            </>
+          }
+        >
+          <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Creates a new condition survey and links it to “{convertWarranty.description}”.
+          </p>
+          <div className="form-grid">
+            <Field label="Surveyor" required span="all">
+              <select
+                value={convertSurveyorId}
+                onChange={(e) => setConvertSurveyorId(e.target.value)}
+                autoFocus
+              >
+                <option value="">— Select a surveyor —</option>
+                {surveyorsList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.companyName}
+                    {s.country ? ` (${s.country})` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Survey date" required span="all">
+              <input
+                type="date"
+                value={convertDate}
+                onChange={(e) => setConvertDate(e.target.value)}
+              />
+            </Field>
+            <Field label="Survey type" span="all">
+              {surveyTypesList.length > 0 ? (
+                <select value={convertType} onChange={(e) => setConvertType(e.target.value)}>
+                  {!surveyTypesList.some((t) => t.name === convertType) && convertType && (
+                    <option value={convertType}>{convertType}</option>
+                  )}
+                  {surveyTypesList.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input value={convertType} onChange={(e) => setConvertType(e.target.value)} />
+              )}
+            </Field>
+            <Field label="Reference" hint="Taken from the warranty" span="all">
+              <input
+                value={convertReference}
+                onChange={(e) => setConvertReference(e.target.value)}
+                placeholder="e.g. SUR9438"
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Log Reminder Modal ────────────────────────────────── */}
       {reminderWarrantyId && (
-        <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Log Reminder</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setReminderWarrantyId(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Sent On *</label>
-                <input
-                  type="date"
-                  value={reminderSentAt}
-                  onChange={(e) => setReminderSentAt(e.target.value)}
-                  style={inputStyle}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Channel</label>
-                <select
-                  value={reminderChannel}
-                  onChange={(e) =>
-                    setReminderChannel(e.target.value as 'email' | 'phone' | 'other')
-                  }
-                  style={inputStyle}
-                >
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>
-                  Reference{' '}
-                  <span style={{ fontWeight: 400, opacity: 0.6 }}>
-                    (e.g. email subject / survey ref)
-                  </span>
-                </label>
-                <input
-                  value={reminderReference}
-                  onChange={(e) => setReminderReference(e.target.value)}
-                  placeholder="Optional — helps locate the email later"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Notes</label>
-                <input
-                  value={reminderNotes}
-                  onChange={(e) => setReminderNotes(e.target.value)}
-                  placeholder="Optional"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Next Reminder Date</label>
-                <input
-                  type="date"
-                  value={reminderNextDate}
-                  onChange={(e) => setReminderNextDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Log Reminder"
+          icon={<Bell size={18} />}
+          onClose={() => setReminderWarrantyId(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setReminderWarrantyId(null)} className="btn-secondary">
                 Cancel
               </button>
               <button onClick={handleLogReminder} className="btn-primary">
                 Log Reminder
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Sent on" required span="all">
+              <input
+                type="date"
+                value={reminderSentAt}
+                onChange={(e) => setReminderSentAt(e.target.value)}
+                autoFocus
+              />
+            </Field>
+            <Field label="Channel" span="all">
+              <select
+                value={reminderChannel}
+                onChange={(e) => setReminderChannel(e.target.value as 'email' | 'phone' | 'other')}
+              >
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+            <Field label="Reference" hint="e.g. email subject / survey ref" span="all">
+              <input
+                value={reminderReference}
+                onChange={(e) => setReminderReference(e.target.value)}
+                placeholder="Optional — helps locate the email later"
+              />
+            </Field>
+            <Field label="Notes" span="all">
+              <input
+                value={reminderNotes}
+                onChange={(e) => setReminderNotes(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
+            <Field label="Next reminder date" span="all">
+              <input
+                type="date"
+                value={reminderNextDate}
+                onChange={(e) => setReminderNextDate(e.target.value)}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Waive Modal ───────────────────────────────────────── */}
       {waiveWarrantyId && (
-        <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Waive Warranty</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setWaiveWarrantyId(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div>
-              <label style={labelStyle}>Waiver Reason *</label>
-              <textarea
-                value={waiveReason}
-                onChange={(e) => setWaiveReason(e.target.value)}
-                placeholder="Explain why this warranty is being waived…"
-                rows={4}
-                style={{ ...inputStyle, resize: 'vertical' }}
-                autoFocus
-              />
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Waive Warranty"
+          icon={<FileWarning size={18} />}
+          onClose={() => setWaiveWarrantyId(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setWaiveWarrantyId(null)} className="btn-secondary">
                 Cancel
               </button>
               <button
                 onClick={handleWaive}
                 disabled={!waiveReason.trim()}
+                className="btn-secondary"
                 style={{
                   background: 'rgba(255,165,0,0.15)',
-                  border: '1px solid rgba(255,165,0,0.35)',
-                  color: '#e6a800',
-                  borderRadius: '8px',
-                  padding: '6px 16px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.85rem',
+                  borderColor: 'rgba(255,165,0,0.35)',
+                  color: 'var(--warning)',
+                  fontWeight: 600,
                   opacity: waiveReason.trim() ? 1 : 0.5
                 }}
               >
                 Waive Warranty
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Waiver reason" required span="all">
+              <textarea
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                placeholder="Explain why this warranty is being waived…"
+                rows={4}
+                style={{ resize: 'vertical' }}
+                autoFocus
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Complete Modal ────────────────────────────────────── */}
       {completeWarrantyId && (
-        <div style={modalBg}>
-          <div style={{ ...modalCard, width: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Complete Warranty</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setCompleteWarrantyId(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div>
-              <label style={labelStyle}>Completion Notes (optional)</label>
-              <textarea
-                value={completeNotes}
-                onChange={(e) => setCompleteNotes(e.target.value)}
-                placeholder="Any notes on completion…"
-                rows={3}
-                style={{ ...inputStyle, resize: 'vertical' }}
-                autoFocus
-              />
-            </div>
-            <div
-              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}
-            >
+        <Modal
+          title="Complete Warranty"
+          icon={<Check size={18} />}
+          onClose={() => setCompleteWarrantyId(null)}
+          width={400}
+          closeOnOverlay={false}
+          footer={
+            <>
               <button onClick={() => setCompleteWarrantyId(null)} className="btn-secondary">
                 Cancel
               </button>
               <button
                 onClick={handleComplete}
+                className="btn-secondary"
                 style={{
                   background: 'rgba(0,200,100,0.15)',
-                  border: '1px solid rgba(0,200,100,0.35)',
-                  color: '#00c864',
-                  borderRadius: '8px',
-                  padding: '6px 16px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.85rem'
+                  borderColor: 'rgba(0,200,100,0.35)',
+                  color: 'var(--success)',
+                  fontWeight: 600
                 }}
               >
                 Mark Complete
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Completion notes" hint="Optional" span="all">
+              <textarea
+                value={completeNotes}
+                onChange={(e) => setCompleteNotes(e.target.value)}
+                placeholder="Any notes on completion…"
+                rows={3}
+                style={{ resize: 'vertical' }}
+                autoFocus
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Link to Survey Modal ──────────────────────────────── */}
       {linkWarranty && (
-        <div style={modalBg}>
-          <div
-            style={{
-              ...modalCard,
-              width: '560px',
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '6px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Link to Survey</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setLinkWarranty(null)}
+        <Modal
+          title="Link to Survey"
+          icon={<Link2 size={18} />}
+          onClose={() => setLinkWarranty(null)}
+          width={560}
+        >
+          <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Pick an existing survey on file for this vessel to link to:{' '}
+            <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>
+          </p>
+          <input
+            type="text"
+            value={linkSearch}
+            onChange={(e) => setLinkSearch(e.target.value)}
+            placeholder="Search by type, reference, surveyor…"
+            style={{ width: '100%', marginBottom: '12px' }}
+          />
+          <div>
+            {linkLoading ? (
+              <div
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
+                  padding: '30px',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.85rem'
                 }}
               >
-                <X size={18} />
-              </button>
-            </div>
-            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Pick an existing survey on file for this vessel to link to:{' '}
-              <span style={{ color: 'var(--text-primary)' }}>{linkWarranty.description}</span>
-            </p>
-            <input
-              type="text"
-              value={linkSearch}
-              onChange={(e) => setLinkSearch(e.target.value)}
-              placeholder="Search by type, reference, surveyor…"
-              style={{ ...inputStyle, marginBottom: '12px' }}
-            />
-            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-              {linkLoading ? (
-                <div
-                  style={{
-                    padding: '30px',
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  Loading surveys…
-                </div>
-              ) : (
-                (() => {
-                  const q = linkSearch.trim().toLowerCase()
-                  const filtered = availableSurveys.filter((s) => {
-                    if (!q) return true
-                    const surveyor = (surveyorMap[s.surveyorId] || '').toLowerCase()
-                    return (
-                      (s.surveyType || '').toLowerCase().includes(q) ||
-                      (s.reference || '').toLowerCase().includes(q) ||
-                      surveyor.includes(q) ||
-                      (s.surveyDate || '').includes(q)
-                    )
-                  })
-                  if (availableSurveys.length === 0) {
-                    return (
-                      <div
-                        style={{
-                          padding: '30px',
-                          textAlign: 'center',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        No condition surveys recorded for this vessel.
-                        <br />
-                        Use “Convert to Survey” to create one.
-                      </div>
-                    )
-                  }
-                  if (filtered.length === 0) {
-                    return (
-                      <div
-                        style={{
-                          padding: '30px',
-                          textAlign: 'center',
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        No surveys match your search.
-                      </div>
-                    )
-                  }
-                  return filtered.map((s) => (
+                Loading surveys…
+              </div>
+            ) : (
+              (() => {
+                const q = linkSearch.trim().toLowerCase()
+                const filtered = availableSurveys.filter((s) => {
+                  if (!q) return true
+                  const surveyor = (surveyorMap[s.surveyorId] || '').toLowerCase()
+                  return (
+                    (s.surveyType || '').toLowerCase().includes(q) ||
+                    (s.reference || '').toLowerCase().includes(q) ||
+                    surveyor.includes(q) ||
+                    (s.surveyDate || '').includes(q)
+                  )
+                })
+                if (availableSurveys.length === 0) {
+                  return (
                     <div
-                      key={s.id}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        padding: '10px 12px',
-                        marginBottom: '8px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--glass-border-color)',
-                        background: isLight ? 'rgba(0,0,0,0.015)' : 'rgba(255,255,255,0.02)'
+                        padding: '30px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem'
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: '0.85rem',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)'
-                          }}
-                        >
-                          {formatDateShort(s.surveyDate)} · {s.surveyType || 'Survey'}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--text-secondary)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {surveyorMap[s.surveyorId] || 'Unknown surveyor'}
-                          {s.reference ? ` — ${s.reference}` : ''}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleLinkSurvey(s.id)}
-                        className="btn-secondary"
+                      No condition surveys recorded for this vessel.
+                      <br />
+                      Use “Convert to Survey” to create one.
+                    </div>
+                  )
+                }
+                if (filtered.length === 0) {
+                  return (
+                    <div
+                      style={{
+                        padding: '30px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      No surveys match your search.
+                    </div>
+                  )
+                }
+                return filtered.map((s) => (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      padding: '10px 12px',
+                      marginBottom: '8px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--glass-border-color)',
+                      background: 'var(--bg-card)'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
                         style={{
-                          fontSize: '0.78rem',
-                          padding: '5px 14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          color: '#8a7dff',
-                          borderColor: 'rgba(138,125,255,0.35)',
-                          flexShrink: 0
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)'
                         }}
                       >
-                        <Link2 size={13} /> Link
-                      </button>
+                        {formatDateShort(s.surveyDate)} · {s.surveyType || 'Survey'}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {surveyorMap[s.surveyorId] || 'Unknown surveyor'}
+                        {s.reference ? ` — ${s.reference}` : ''}
+                      </div>
                     </div>
-                  ))
-                })()
-              )}
-            </div>
+                    <button
+                      onClick={() => handleLinkSurvey(s.id)}
+                      className="btn-secondary btn-sm"
+                      style={{
+                        color: 'var(--violet)',
+                        borderColor: 'rgba(138,125,255,0.35)',
+                        flexShrink: 0
+                      }}
+                    >
+                      <Link2 size={13} /> Link
+                    </button>
+                  </div>
+                ))
+              })()
+            )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

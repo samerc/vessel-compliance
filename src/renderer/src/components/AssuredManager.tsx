@@ -24,9 +24,9 @@ import {
 } from '../../../shared/types'
 import { OfacService } from '../services/OfacService'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import ConfirmationModal from './ConfirmationModal'
+import { Badge, Field } from './ui'
 import EntityEditPanel from './EntityEditPanel'
 import { ok, isIpcError } from '../utils/ipc'
 
@@ -42,8 +42,6 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
   const [entityDocTypes, setEntityDocTypes] = useState<EntityDocumentType[]>([])
   const [entityDocs, setEntityDocs] = useState<EntityDocument[]>([])
   const { showError, showSuccess } = useToast()
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { hasPermission } = useAuth()
   const canManageAssureds = hasPermission('assureds:manage')
 
@@ -350,108 +348,92 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
           style={{
             padding: '24px',
             marginBottom: '24px',
-            border: '1px solid var(--accent-primary)'
+            border: '1px solid var(--accent-border)'
           }}
         >
           <form onSubmit={handleAddAssured}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '20px',
-                marginBottom: '20px'
-              }}
-            >
-              <div style={{ position: 'relative' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Entity Name
-                </label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => {
-                    setNewName(e.target.value)
-                    setSelectedEntityId(null)
-                  }}
-                  style={{ width: '100%' }}
-                  placeholder="Type name to find or create..."
-                  required
-                  aria-label="Entity name"
-                />
-                {newName && !selectedEntityId && matchingEntities.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 100,
-                      marginTop: '4px',
-                      padding: '8px',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      background: isLight ? '#ffffff' : '#1e222a',
-                      border: '1px solid var(--accent-primary)',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                      backdropFilter: 'none'
+            <div className="form-grid cols-2">
+              <Field label="Entity name" required>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => {
+                      setNewName(e.target.value)
+                      setSelectedEntityId(null)
                     }}
-                  >
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Type name to find or create..."
+                    required
+                    aria-label="Entity name"
+                  />
+                  {newName && !selectedEntityId && matchingEntities.length > 0 && (
                     <div
                       style={{
-                        fontSize: '0.7rem',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '8px',
-                        padding: '4px'
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 100,
+                        marginTop: '4px',
+                        padding: '8px',
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: 'var(--bg-primary)',
+                        border: '1px solid var(--accent-border)',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                        backdropFilter: 'none'
                       }}
                     >
-                      Existing matches:
-                    </div>
-                    {matchingEntities.map((ent) => (
                       <div
-                        key={ent.id}
-                        onClick={() => {
-                          setSelectedEntityId(ent.id)
-                          setNewName(ent.name)
-                        }}
                         style={{
-                          padding: '8px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
+                          fontSize: '0.7rem',
+                          color: 'var(--text-secondary)',
+                          marginBottom: '8px',
+                          padding: '4px'
                         }}
-                        className="hover-effect"
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {ent.type === 'company' ? (
-                            <Building2 size={14} opacity={0.5} />
-                          ) : (
-                            <User size={14} opacity={0.5} />
-                          )}
-                          <span>{ent.name}</span>
-                        </div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
-                          {ent.identifier
-                            ? `[${ent.identifier}]`
-                            : '(ID: ' + ent.id.slice(0, 4) + ')'}
-                        </span>
+                        Existing matches:
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {matchingEntities.map((ent) => (
+                        <div
+                          key={ent.id}
+                          onClick={() => {
+                            setSelectedEntityId(ent.id)
+                            setNewName(ent.name)
+                          }}
+                          style={{
+                            padding: '8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                          className="hover-effect"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {ent.type === 'company' ? (
+                              <Building2 size={14} opacity={0.5} />
+                            ) : (
+                              <User size={14} opacity={0.5} />
+                            )}
+                            <span>{ent.name}</span>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
+                            {ent.identifier
+                              ? `[${ent.identifier}]`
+                              : '(ID: ' + ent.id.slice(0, 4) + ')'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {selectedEntityId && (
                   <div
                     style={{
-                      marginTop: '8px',
                       fontSize: '0.8rem',
                       color: 'var(--success)',
                       display: 'flex',
@@ -462,125 +444,13 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                     <Check size={14} /> Linked to existing entity
                   </div>
                 )}
-              </div>
-              {!selectedEntityId && (
-                <>
-                  <div style={{ display: 'flex', gap: '20px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '4px'
-                        }}
-                      >
-                        Identifier (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={newIdentifier}
-                        onChange={(e) => setNewIdentifier(e.target.value)}
-                        style={{ width: '100%' }}
-                        placeholder="e.g. Greek Branch..."
-                      />
-                    </div>
-                    <div style={{ width: '140px' }}>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '4px'
-                        }}
-                      >
-                        Type
-                      </label>
-                      <select
-                        value={newType}
-                        onChange={(e) => setNewType(e.target.value as 'company' | 'person')}
-                        style={{ width: '100%', color: 'var(--text-primary)' }}
-                      >
-                        <option value="company">Company</option>
-                        <option value="person">Person</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '20px',
-                      marginTop: '20px'
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '4px'
-                        }}
-                      >
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        style={{ width: '100%' }}
-                        placeholder="contact@entity.com"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.8rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '4px'
-                        }}
-                      >
-                        Phone
-                      </label>
-                      <input
-                        type="text"
-                        value={newPhone}
-                        onChange={(e) => setNewPhone(e.target.value)}
-                        style={{ width: '100%' }}
-                        placeholder="+123..."
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                gap: '20px',
-                alignItems: 'flex-end'
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px'
-                  }}
-                >
-                  Role on Vessel
-                </label>
+              </Field>
+              <Field label="Role on vessel" required>
                 <input
                   list="role-suggestions"
                   type="text"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  style={{ width: '100%' }}
                   placeholder="Select or type role..."
                   required
                 />
@@ -589,13 +459,47 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                     <option key={r.id} value={r.name} />
                   ))}
                 </datalist>
-              </div>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={isAddingAssured}
-                style={{ padding: '10px 32px', display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
+              </Field>
+              {!selectedEntityId && (
+                <>
+                  <Field label="Identifier" hint="Optional">
+                    <input
+                      type="text"
+                      value={newIdentifier}
+                      onChange={(e) => setNewIdentifier(e.target.value)}
+                      placeholder="e.g. Greek Branch..."
+                    />
+                  </Field>
+                  <Field label="Type">
+                    <select
+                      value={newType}
+                      onChange={(e) => setNewType(e.target.value as 'company' | 'person')}
+                    >
+                      <option value="company">Company</option>
+                      <option value="person">Person</option>
+                    </select>
+                  </Field>
+                  <Field label="Email">
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="contact@entity.com"
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <input
+                      type="text"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder="+123..."
+                    />
+                  </Field>
+                </>
+              )}
+            </div>
+            <div className="form-actions">
+              <button type="submit" className="btn-primary" disabled={isAddingAssured}>
                 {isAddingAssured && <Loader2 size={16} className="spinner" />}
                 {isAddingAssured
                   ? 'Adding...'
@@ -611,28 +515,20 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
       <div style={{ display: 'flex', gap: '0' }}>
         {/* Left: Assured table */}
         <div
-          className="glass-card"
+          className="table-wrap"
           style={{
             flex: 1,
-            padding: '0',
-            overflow: 'hidden',
             borderRadius: selectedAssuredId ? '12px 0 0 12px' : '12px'
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
-              <tr
-                style={{
-                  textAlign: 'left',
-                  background: 'var(--table-header-bg)',
-                  borderBottom: '1px solid var(--table-border)'
-                }}
-              >
-                <th style={{ padding: '14px 16px' }}>Assured Name</th>
-                <th style={{ padding: '14px 16px' }}>Role</th>
-                <th style={{ padding: '14px 16px', minWidth: '100px' }}>Documents</th>
-                <th style={{ padding: '14px 16px' }}>UBOs</th>
-                <th style={{ padding: '14px 16px', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Assured Name</th>
+                <th>Role</th>
+                <th style={{ minWidth: '100px' }}>Documents</th>
+                <th>UBOs</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -645,32 +541,18 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                   score.total === 0
                     ? 'var(--text-secondary)'
                     : score.have === score.total
-                      ? isLight
-                        ? '#008c46'
-                        : '#00c264'
+                      ? 'var(--success)'
                       : score.have === 0
-                        ? isLight
-                          ? '#c00000'
-                          : '#ff4d4d'
-                        : isLight
-                          ? '#b45309'
-                          : '#f59e0b'
+                        ? 'var(--danger)'
+                        : 'var(--warning)'
 
                 return (
                   <tr
                     key={va.id}
                     onClick={() => setSelectedAssuredId(isSelected ? null : va.id)}
-                    style={{
-                      borderBottom: '1px solid var(--table-border)',
-                      cursor: 'pointer',
-                      background: isSelected
-                        ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                        : 'transparent',
-                      transition: 'background 0.15s'
-                    }}
-                    className="hover-effect"
+                    className={isSelected ? 'clickable selected' : 'clickable'}
                   >
-                    <td style={{ padding: '12px 16px' }}>
+                    <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {entity?.type === 'company' ? (
                           <Building2 size={15} opacity={0.5} />
@@ -687,29 +569,16 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span
-                        style={{
-                          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.78rem'
-                        }}
-                      >
-                        {va.role}
-                      </span>
+                    <td>
+                      <Badge tone="neutral">{va.role}</Badge>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: docColor }}>
+                    <td>
+                      <span style={{ fontWeight: 600, color: docColor }}>
                         {score.have}/{score.total}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                        {ubos.length}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <td className="muted">{ubos.length}</td>
+                    <td style={{ textAlign: 'right' }}>
                       <div
                         style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
                         onClick={(e) => e.stopPropagation()}
@@ -752,12 +621,8 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                 <tr>
                   <td
                     colSpan={5}
-                    style={{
-                      padding: '32px',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)',
-                      fontStyle: 'italic'
-                    }}
+                    className="muted"
+                    style={{ padding: '32px', textAlign: 'center', fontStyle: 'italic' }}
                   >
                     No assureds assigned to this vessel.
                   </td>
@@ -773,7 +638,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
             style={{
               width: '440px',
               flexShrink: 0,
-              background: isLight ? '#f4f6fb' : '#14172a',
+              background: 'var(--bg-card)',
               border: '1px solid var(--glass-border-color)',
               borderLeft: 'none',
               borderRadius: '0 12px 12px 0',
@@ -889,7 +754,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                       if (e.key === 'Enter') handleUpdateRole(selectedVA.id)
                       if (e.key === 'Escape') setEditingVesselAssuredId(null)
                     }}
-                    style={{ flex: 1, padding: '6px 10px', fontSize: '0.82rem' }}
+                    style={{ flex: 1 }}
                     autoFocus
                   />
                   <datalist id="role-suggestions-edit">
@@ -944,15 +809,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                       <select
                         value={selectedVA.addressId || ''}
                         onChange={(e) => handleChangeAddress(selectedVA.id, e.target.value || null)}
-                        style={{
-                          flex: 1,
-                          padding: '5px 8px',
-                          fontSize: '0.78rem',
-                          borderRadius: '6px',
-                          border: '1px solid var(--input-border)',
-                          background: 'var(--bg-primary)',
-                          color: 'var(--text-primary)'
-                        }}
+                        style={{ flex: 1 }}
                       >
                         <option value="">— No address —</option>
                         {entityAddrs.map((a) => (
@@ -1000,14 +857,7 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                           placeholder="Label *"
                           value={addrForm.label}
                           onChange={(e) => setAddrForm((p) => ({ ...p, label: e.target.value }))}
-                          style={{
-                            padding: '5px 8px',
-                            borderRadius: '5px',
-                            border: '1px solid var(--input-border)',
-                            background: 'var(--bg-primary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.78rem'
-                          }}
+                          aria-label="Address label"
                         />
                         <textarea
                           placeholder="Full address *"
@@ -1016,30 +866,20 @@ export default function AssuredManager({ vessel }: AssuredManagerProps): React.J
                             setAddrForm((p) => ({ ...p, addressLine1: e.target.value }))
                           }
                           rows={2}
-                          style={{
-                            padding: '5px 8px',
-                            borderRadius: '5px',
-                            border: '1px solid var(--input-border)',
-                            background: 'var(--bg-primary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.78rem',
-                            resize: 'vertical',
-                            fontFamily: 'inherit'
-                          }}
+                          aria-label="Full address"
+                          style={{ resize: 'vertical' }}
                         />
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <button
                             onClick={() => handleAddNewAddress(selectedVA.id, selectedVA.entityId)}
                             disabled={!addrForm.label.trim() || !addrForm.addressLine1.trim()}
-                            className="btn-primary"
-                            style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                            className="btn-primary btn-sm"
                           >
                             Save & Assign
                           </button>
                           <button
                             onClick={() => setShowAddAddressFor(null)}
-                            className="btn-secondary"
-                            style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                            className="btn-secondary btn-sm"
                           >
                             Cancel
                           </button>

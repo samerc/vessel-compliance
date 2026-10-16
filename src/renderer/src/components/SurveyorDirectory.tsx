@@ -29,12 +29,12 @@ import {
   Vessel
 } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateShort } from '../utils/dateUtils'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
+import { Badge, Field, Modal } from './ui'
 
 function useDebounceValue<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -46,8 +46,6 @@ function useDebounceValue<T>(value: T, delay: number): T {
 }
 
 export default function SurveyorDirectory(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showError, showSuccess } = useToast()
   const { hasPermission } = useAuth()
   const canManage = hasPermission('surveys:manage')
@@ -291,35 +289,22 @@ export default function SurveyorDirectory(): React.JSX.Element {
   }
 
   // ── Style constants ──────────────────────────────────────────────────────────
-  const accentBg = isLight ? 'rgba(26,115,232,0.1)' : 'rgba(var(--accent-primary-rgb), 0.1)'
-  const closedColor = isLight ? '#008c46' : '#00c264'
-  const closedBg = isLight ? 'rgba(0,140,70,0.1)' : 'rgba(0,194,100,0.1)'
-  const openColor = isLight ? '#b45309' : '#f59e0b'
-  const openBg = isLight ? 'rgba(180,83,9,0.1)' : 'rgba(245,158,11,0.1)'
+  const accentBg = 'var(--accent-tint)'
+  const closedColor = 'var(--success)'
+  const closedBg = 'color-mix(in srgb, var(--success) 10%, transparent)'
+  const openColor = 'var(--warning)'
+  const openBg = 'color-mix(in srgb, var(--warning) 10%, transparent)'
+  const openBorder = 'color-mix(in srgb, var(--warning) 20%, transparent)'
 
   const StatusPill = ({
     status
   }: {
     status: ReturnType<typeof getSurveyStatus>
   }): React.JSX.Element => (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        padding: '2px 8px',
-        borderRadius: '5px',
-        fontSize: '0.67rem',
-        fontWeight: 700,
-        letterSpacing: '0.4px',
-        background: status.color === 'closed' ? closedBg : openBg,
-        color: status.color === 'closed' ? closedColor : openColor,
-        border: `1px solid ${status.color === 'closed' ? (isLight ? 'rgba(0,140,70,0.2)' : 'rgba(0,194,100,0.2)') : isLight ? 'rgba(180,83,9,0.2)' : 'rgba(245,158,11,0.2)'}`
-      }}
-    >
+    <Badge tone={status.color === 'closed' ? 'success' : 'warning'}>
       {status.color === 'closed' ? <CheckCircle size={9} /> : <AlertCircle size={9} />}
       {status.label}
-    </span>
+    </Badge>
   )
 
   const selectedSurveys = selectedSurveyor ? getSurveyorSurveys(selectedSurveyor.id) : []
@@ -426,12 +411,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
               width: '42px',
               height: '42px',
               borderRadius: '12px',
-              background:
-                openSurveysCount > 0
-                  ? isLight
-                    ? 'rgba(180,83,9,0.1)'
-                    : 'rgba(245,158,11,0.1)'
-                  : closedBg,
+              background: openSurveysCount > 0 ? openBg : closedBg,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -515,12 +495,9 @@ export default function SurveyorDirectory(): React.JSX.Element {
       {/* Main: table + slide-in */}
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
         {/* Table */}
-        <div
-          className="glass-card"
-          style={{ flex: 1, minWidth: 0, padding: 0, overflow: 'hidden' }}
-        >
+        <div className="table-wrap" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table className="data-table" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: 'auto' }} />
                 <col style={{ width: '130px' }} />
@@ -528,15 +505,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                 <col style={{ width: '80px' }} />
               </colgroup>
               <thead>
-                <tr
-                  style={{
-                    background: 'var(--table-header-bg)',
-                    borderBottom: '1px solid var(--table-border)',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1
-                  }}
-                >
+                <tr>
                   {[
                     { id: 'company', label: 'Company' },
                     { id: 'country', label: 'Country' },
@@ -545,23 +514,9 @@ export default function SurveyorDirectory(): React.JSX.Element {
                   ]
                     .filter((col) => survVisibleSet.has(col.id))
                     .map((col) => (
-                      <th
-                        key={col.id}
-                        style={{
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          fontSize: '0.69rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.6px',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {col.label}
-                      </th>
+                      <th key={col.id}>{col.label}</th>
                     ))}
-                  <th style={{ padding: '10px 16px', textAlign: 'right', width: '40px' }}>
+                  <th style={{ textAlign: 'right', width: '40px' }}>
                     <ColumnSelector
                       pageKey="surveyors"
                       allColumns={SURVEYOR_COLUMNS}
@@ -576,11 +531,8 @@ export default function SurveyorDirectory(): React.JSX.Element {
                   <tr>
                     <td
                       colSpan={survVisibleCols.length + 1}
-                      style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
+                      className="muted"
+                      style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <Loader2
                         size={22}
@@ -594,11 +546,8 @@ export default function SurveyorDirectory(): React.JSX.Element {
                   <tr>
                     <td
                       colSpan={survVisibleCols.length + 1}
-                      style={{
-                        padding: '48px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)'
-                      }}
+                      className="muted"
+                      style={{ padding: '48px', textAlign: 'center' }}
                     >
                       <Anchor
                         size={30}
@@ -615,24 +564,11 @@ export default function SurveyorDirectory(): React.JSX.Element {
                       <tr
                         key={surveyor.id}
                         onClick={() => setSelectedSurveyor(isSelected ? null : surveyor)}
-                        className="hover-effect"
-                        style={{
-                          cursor: 'pointer',
-                          borderBottom: '1px solid var(--table-border)',
-                          background: isSelected
-                            ? isLight
-                              ? 'rgba(26,115,232,0.07)'
-                              : 'rgba(var(--accent-primary-rgb), 0.07)'
-                            : 'transparent',
-                          borderLeft: isSelected
-                            ? '3px solid var(--accent-primary)'
-                            : '3px solid transparent',
-                          transition: 'background 0.12s, border-color 0.12s'
-                        }}
+                        className={isSelected ? 'clickable selected' : 'clickable'}
                       >
                         {/* Company */}
                         {survVisibleSet.has('company') && (
-                          <td style={{ padding: '12px 16px', overflow: 'hidden' }}>
+                          <td style={{ overflow: 'hidden' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div
                                 style={{
@@ -680,7 +616,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                         )}
                         {/* Country */}
                         {survVisibleSet.has('country') && (
-                          <td style={{ padding: '12px 16px' }}>
+                          <td>
                             <div
                               style={{
                                 display: 'flex',
@@ -709,7 +645,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                         )}
                         {/* Contact Person */}
                         {survVisibleSet.has('contact') && (
-                          <td style={{ padding: '12px 16px' }}>
+                          <td>
                             {surveyor.contactPerson ? (
                               <div
                                 style={{
@@ -745,7 +681,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                         )}
                         {/* Surveys */}
                         {survVisibleSet.has('surveys') && (
-                          <td style={{ padding: '12px 16px' }}>
+                          <td>
                             {count > 0 ? (
                               <span
                                 style={{
@@ -919,15 +855,8 @@ export default function SurveyorDirectory(): React.JSX.Element {
                   title="Close"
                   aria-label="Close"
                   onClick={() => setSelectedSurveyor(null)}
-                  style={{
-                    padding: '4px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: 'var(--text-secondary)',
-                    flexShrink: 0
-                  }}
+                  className="btn-ghost btn-icon"
+                  style={{ flexShrink: 0 }}
                 >
                   <X size={16} />
                 </button>
@@ -987,7 +916,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                     marginTop: '10px',
                     padding: '8px 12px',
                     borderRadius: '8px',
-                    background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)',
+                    background: 'var(--bg-card-hover)',
                     border: '1px solid var(--table-border)',
                     fontSize: '0.8rem',
                     color: 'var(--text-secondary)',
@@ -1141,7 +1070,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                           background: openBg,
                           color: openColor,
                           fontWeight: 600,
-                          border: `1px solid ${isLight ? 'rgba(180,83,9,0.2)' : 'rgba(245,158,11,0.2)'}`
+                          border: `1px solid ${openBorder}`
                         }}
                       >
                         {openCount} open
@@ -1178,24 +1107,9 @@ export default function SurveyorDirectory(): React.JSX.Element {
                         key={survey.id}
                         style={{
                           borderRadius: '10px',
-                          border: `1px solid ${
-                            status.color === 'closed'
-                              ? isLight
-                                ? 'rgba(0,140,70,0.18)'
-                                : 'rgba(0,194,100,0.15)'
-                              : isLight
-                                ? 'rgba(180,83,9,0.2)'
-                                : 'rgba(245,158,11,0.18)'
-                          }`,
+                          border: `1px solid ${status.color === 'closed' ? 'color-mix(in srgb, var(--success) 16%, transparent)' : openBorder}`,
                           borderLeft: `3px solid ${status.color === 'closed' ? closedColor : openColor}`,
-                          background:
-                            status.color === 'closed'
-                              ? isLight
-                                ? 'rgba(0,140,70,0.03)'
-                                : 'rgba(0,194,100,0.03)'
-                              : isLight
-                                ? 'rgba(180,83,9,0.03)'
-                                : 'rgba(245,158,11,0.03)',
+                          background: `color-mix(in srgb, ${status.color === 'closed' ? 'var(--success)' : 'var(--warning)'} 3%, transparent)`,
                           padding: '12px 14px',
                           display: 'flex',
                           flexDirection: 'column',
@@ -1250,7 +1164,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                             <span
                               style={{
                                 fontSize: '0.73rem',
-                                fontFamily: 'monospace',
+                                fontFamily: 'var(--font-mono)',
                                 fontWeight: 600,
                                 color: 'var(--text-secondary)'
                               }}
@@ -1265,7 +1179,7 @@ export default function SurveyorDirectory(): React.JSX.Element {
                                 padding: '1px 7px',
                                 borderRadius: '4px',
                                 background: accentBg,
-                                border: `1px solid ${isLight ? 'rgba(26,115,232,0.12)' : 'rgba(var(--accent-primary-rgb), 0.12)'}`,
+                                border: '1px solid rgba(var(--accent-primary-rgb), 0.12)',
                                 color: 'var(--accent-primary)',
                                 fontWeight: 500
                               }}
@@ -1326,204 +1240,74 @@ export default function SurveyorDirectory(): React.JSX.Element {
 
       {/* ── Add / Edit Modal ──────────────────────────────────────────────────── */}
       {showModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '32px',
-              width: '520px',
-              maxWidth: '90vw',
-              border: '1px solid var(--glass-border-color)',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '28px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background:
-                      'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Anchor size={18} color="white" />
-                </div>
-                <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
-                  {editingId ? 'Edit Surveyor' : 'Add Surveyor'}
-                </h3>
-              </div>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={closeModal}
-                style={{
-                  padding: '6px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                <X size={18} />
+        <Modal
+          title={editingId ? 'Edit Surveyor' : 'Add Surveyor'}
+          icon={<Anchor size={18} />}
+          onClose={closeModal}
+          width={520}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={closeModal} className="btn-secondary">
+                Cancel
               </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '5px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 500
-                    }}
-                  >
-                    Company Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formCompanyName}
-                    onChange={(e) => setFormCompanyName(e.target.value)}
-                    style={{ width: '100%' }}
-                    placeholder="e.g., Bureau Veritas"
-                    autoFocus={!editingId}
-                  />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      marginBottom: '5px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 500
-                    }}
-                  >
-                    Country *
-                  </label>
-                  <input
-                    type="text"
-                    value={formCountry}
-                    onChange={(e) => setFormCountry(e.target.value)}
-                    style={{ width: '100%' }}
-                    placeholder="e.g., France"
-                  />
-                </div>
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Contact Person
-                </label>
-                <input
-                  type="text"
-                  value={formContactPerson}
-                  onChange={(e) => setFormContactPerson(e.target.value)}
-                  style={{ width: '100%' }}
-                  placeholder="e.g., John Smith"
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Contact Details
-                </label>
-                <textarea
-                  value={formContactDetails}
-                  onChange={(e) => setFormContactDetails(e.target.value)}
-                  rows={3}
-                  placeholder="Phone, email, address..."
-                  style={{ resize: 'vertical', width: '100%' }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '5px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 500
-                  }}
-                >
-                  Notes
-                </label>
-                <textarea
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Additional notes..."
-                  style={{ resize: 'vertical', width: '100%' }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  justifyContent: 'flex-end',
-                  paddingTop: '4px'
-                }}
+              <button
+                onClick={handleSubmit}
+                className="btn-primary"
+                disabled={!formCompanyName.trim() || !formCountry.trim() || isSubmitting}
               >
-                <button onClick={closeModal} className="btn-secondary">
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  className="btn-primary"
-                  disabled={!formCompanyName.trim() || !formCountry.trim() || isSubmitting}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  {isSubmitting ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
-                  {editingId ? 'Save Changes' : 'Add Surveyor'}
-                </button>
-              </div>
-            </div>
+                {isSubmitting ? <Loader2 size={14} className="spinner" /> : <Save size={14} />}
+                {editingId ? 'Save Changes' : 'Add Surveyor'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid cols-2">
+            <Field label="Company name" required>
+              <input
+                type="text"
+                value={formCompanyName}
+                onChange={(e) => setFormCompanyName(e.target.value)}
+                placeholder="e.g., Bureau Veritas"
+                autoFocus={!editingId}
+              />
+            </Field>
+            <Field label="Country" required>
+              <input
+                type="text"
+                value={formCountry}
+                onChange={(e) => setFormCountry(e.target.value)}
+                placeholder="e.g., France"
+              />
+            </Field>
+            <Field label="Contact person" span="all">
+              <input
+                type="text"
+                value={formContactPerson}
+                onChange={(e) => setFormContactPerson(e.target.value)}
+                placeholder="e.g., John Smith"
+              />
+            </Field>
+            <Field label="Contact details" span="all">
+              <textarea
+                value={formContactDetails}
+                onChange={(e) => setFormContactDetails(e.target.value)}
+                rows={3}
+                placeholder="Phone, email, address..."
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
+            <Field label="Notes" span="all">
+              <textarea
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
+                rows={2}
+                placeholder="Additional notes..."
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

@@ -57,7 +57,7 @@ interface CompareData {
 
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { PageHeader } from './ui'
+import { PageHeader, Modal, Badge } from './ui'
 import SanctionsBadge from './ui/SanctionsBadge'
 
 interface VesselFilterProps {
@@ -339,16 +339,7 @@ function MultiSelectDropdown({
 
 // ── Module-level cache — persists filter state only when returning from vessel detail ──
 const SectionLabel = ({ children }: { children: string }): React.JSX.Element => (
-  <div
-    style={{
-      fontSize: '0.7rem',
-      fontWeight: 700,
-      letterSpacing: '0.6px',
-      textTransform: 'uppercase',
-      color: 'var(--text-secondary)',
-      marginBottom: '10px'
-    }}
-  >
+  <div className="field-label" style={{ marginBottom: '8px' }}>
     {children}
   </div>
 )
@@ -367,36 +358,12 @@ const CompareRow = ({
   val2: React.ReactNode
   highlight?: boolean
 }): React.JSX.Element => (
-  <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-    <td
-      style={{
-        padding: '10px 14px',
-        fontWeight: '600',
-        fontSize: '0.82rem',
-        color: 'var(--text-secondary)',
-        width: '160px'
-      }}
-    >
+  <tr>
+    <td className="muted" style={{ fontWeight: 600, width: '160px' }}>
       {label}
     </td>
-    <td
-      style={{
-        padding: '10px 14px',
-        fontSize: '0.88rem',
-        fontWeight: highlight ? '700' : '400'
-      }}
-    >
-      {val1}
-    </td>
-    <td
-      style={{
-        padding: '10px 14px',
-        fontSize: '0.88rem',
-        fontWeight: highlight ? '700' : '400'
-      }}
-    >
-      {val2}
-    </td>
+    <td style={{ fontWeight: highlight ? 700 : 400 }}>{val1}</td>
+    <td style={{ fontWeight: highlight ? 700 : 400 }}>{val2}</td>
   </tr>
 )
 
@@ -405,11 +372,10 @@ const SectionHeader = ({ label }: { label: string }): React.JSX.Element => (
     <td
       colSpan={3}
       style={{
-        padding: '14px 14px 6px',
-        fontWeight: '800',
-        fontSize: '0.72rem',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
+        paddingTop: '16px',
+        paddingBottom: '6px',
+        fontWeight: 600,
+        fontSize: '0.8rem',
         color: 'var(--accent-primary)'
       }}
     >
@@ -925,22 +891,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
   const numInput = {
     flex: 1,
-    padding: '6px 8px',
-    borderRadius: '6px',
-    fontSize: '0.78rem',
-    border: '1px solid var(--input-border)',
-    background: isLight ? '#ffffff' : '#1a1d28',
-    color: 'var(--text-primary)',
-    width: '100%'
-  }
-
-  const th = {
-    padding: '11px 16px',
-    fontSize: '0.73rem',
-    fontWeight: '700',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    color: 'var(--text-secondary)'
+    width: '100%',
+    minWidth: 0
   }
 
   return (
@@ -1010,7 +962,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                   flexShrink: 0
                 }}
               >
-                <SlidersHorizontal size={16} color="#fff" />
+                <SlidersHorizontal size={16} color="var(--accent-contrast)" />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
@@ -1024,7 +976,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                 <span
                   style={{
                     background: 'var(--accent-primary)',
-                    color: '#000',
+                    color: 'var(--accent-contrast)',
                     borderRadius: '10px',
                     padding: '2px 8px',
                     fontSize: '0.7rem',
@@ -1068,7 +1020,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
               {/* Policy Types */}
               {policyTypes.length > 0 && (
                 <div>
-                  <SectionLabel>Policy Types</SectionLabel>
+                  <SectionLabel>Policy types</SectionLabel>
                   <MultiSelectDropdown
                     options={policyTypes.map((pt) => ({ id: pt.id, label: pt.name }))}
                     selected={selectedPolicyTypes}
@@ -1078,7 +1030,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                   />
                   {selectedPolicyTypes.length > 0 && (
                     <div style={{ marginTop: '8px' }}>
-                      <SectionLabel>Policy Status</SectionLabel>
+                      <SectionLabel>Policy status</SectionLabel>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         {(['all', 'active', 'expired'] as const).map((s) => (
                           <button
@@ -1098,7 +1050,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
               {/* Vessel Types */}
               {vesselTypes.length > 0 && (
                 <div>
-                  <SectionLabel>Vessel Type</SectionLabel>
+                  <SectionLabel>Vessel type</SectionLabel>
                   <MultiSelectDropdown
                     options={vesselTypes.map((vt) => ({
                       id: vt.id,
@@ -1116,7 +1068,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
               {/* Flag States */}
               {flagStates.length > 0 && (
                 <div>
-                  <SectionLabel>Flag State</SectionLabel>
+                  <SectionLabel>Flag state</SectionLabel>
                   <MultiSelectDropdown
                     options={flagOptions}
                     selected={allSelectedFlags}
@@ -1145,7 +1097,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
               {/* Year Built */}
               <div>
-                <SectionLabel>Year Built</SectionLabel>
+                <SectionLabel>Year built</SectionLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="number"
@@ -1169,7 +1121,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
               {/* Gross Tonnage */}
               <div>
-                <SectionLabel>Gross Tonnage</SectionLabel>
+                <SectionLabel>Gross tonnage</SectionLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="number"
@@ -1199,16 +1151,11 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                 <select
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  aria-label="Customer"
                   style={{
                     width: '100%',
-                    padding: '6px 8px',
-                    borderRadius: '6px',
-                    border: selectedCustomerId
-                      ? '1px solid var(--accent-primary)'
-                      : '1px solid var(--input-border)',
-                    background: isLight ? '#ffffff' : '#1a1d28',
+                    borderColor: selectedCustomerId ? 'var(--accent-primary)' : undefined,
                     color: selectedCustomerId ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    fontSize: '0.78rem',
                     marginBottom: '8px'
                   }}
                 >
@@ -1234,7 +1181,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
               {/* Vessel Status */}
               <div>
-                <SectionLabel>Vessel Status</SectionLabel>
+                <SectionLabel>Vessel status</SectionLabel>
                 <div style={{ display: 'flex', gap: '5px' }}>
                   {(['active', 'inactive', 'all'] as const).map((s) => (
                     <button
@@ -1330,7 +1277,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                 <span
                   style={{
                     background: 'var(--accent-primary)',
-                    color: '#000',
+                    color: 'var(--accent-contrast)',
                     borderRadius: '10px',
                     padding: '0 5px',
                     fontSize: '0.68rem',
@@ -1361,19 +1308,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                   placeholder="Search in results…"
                   value={nameSearch}
                   onChange={(e) => setNameSearch(e.target.value)}
-                  style={{
-                    width: '100%',
-                    paddingLeft: '28px',
-                    paddingRight: '8px',
-                    paddingTop: '5px',
-                    paddingBottom: '5px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--input-border)',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.82rem',
-                    boxSizing: 'border-box'
-                  }}
+                  aria-label="Search in results"
+                  style={{ width: '100%', paddingLeft: '28px', boxSizing: 'border-box' }}
                 />
               </div>
             )}
@@ -1417,7 +1353,10 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
           </div>
 
           {/* Table */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div
+            className={hasSearched ? 'table-wrap' : undefined}
+            style={{ flex: 1, overflowY: 'auto', margin: hasSearched ? '12px 16px 16px' : 0 }}
+          >
             {!hasSearched ? (
               <div
                 style={{
@@ -1451,47 +1390,27 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                 </div>
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="data-table">
                 <caption className="sr-only">Filtered vessel results</caption>
                 <thead>
-                  <tr
-                    style={{
-                      textAlign: 'left',
-                      background: 'var(--table-header-bg)',
-                      borderBottom: '1px solid var(--table-border)'
-                    }}
-                  >
+                  <tr>
                     <th
                       scope="col"
-                      style={{ ...th, width: '36px', padding: '11px 8px' }}
+                      style={{ width: '36px', padding: '11px 8px' }}
                       title="Tick two vessels to compare them side by side"
                     >
                       Compare
                     </th>
-                    <th scope="col" style={th}>
-                      Vessel
-                    </th>
-                    <th scope="col" style={th}>
-                      IMO
-                    </th>
-                    <th scope="col" style={th}>
-                      Type
-                    </th>
-                    <th scope="col" style={th}>
-                      Flag
-                    </th>
-                    <th scope="col" style={th}>
-                      Year
-                    </th>
-                    <th scope="col" style={th}>
+                    <th scope="col">Vessel</th>
+                    <th scope="col">IMO</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Flag</th>
+                    <th scope="col">Year</th>
+                    <th scope="col" className="num">
                       GT
                     </th>
-                    <th scope="col" style={th}>
-                      Customer
-                    </th>
-                    <th scope="col" style={th}>
-                      Status
-                    </th>
+                    <th scope="col">Customer</th>
+                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1499,11 +1418,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                     <tr>
                       <td
                         colSpan={9}
-                        style={{
-                          padding: '56px',
-                          textAlign: 'center',
-                          color: 'var(--text-secondary)'
-                        }}
+                        className="muted"
+                        style={{ padding: '56px', textAlign: 'center' }}
                       >
                         <Loader2
                           size={32}
@@ -1519,11 +1435,8 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                     <tr>
                       <td
                         colSpan={9}
-                        style={{
-                          padding: '56px',
-                          textAlign: 'center',
-                          color: 'var(--text-secondary)'
-                        }}
+                        className="muted"
+                        style={{ padding: '56px', textAlign: 'center' }}
                       >
                         <Search
                           size={40}
@@ -1546,14 +1459,14 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                     displayedVessels.map((v) => (
                       <tr
                         key={v.id}
-                        className="hover-effect"
-                        style={{
-                          borderBottom: '1px solid var(--table-border)',
-                          cursor: onNavigateToVessel ? 'pointer' : 'default',
-                          background: comparedVesselIds.includes(v.id)
-                            ? 'rgba(var(--accent-primary-rgb), 0.06)'
-                            : undefined
-                        }}
+                        className={
+                          [
+                            onNavigateToVessel ? 'clickable' : '',
+                            comparedVesselIds.includes(v.id) ? 'selected' : ''
+                          ]
+                            .filter(Boolean)
+                            .join(' ') || undefined
+                        }
                       >
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                           <input
@@ -1568,7 +1481,6 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                           />
                         </td>
                         <td
-                          style={{ padding: '12px 16px' }}
                           onClick={() => {
                             if (onNavigateToVessel) {
                               _cache.preserveOnReturn = true
@@ -1592,61 +1504,34 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                             {v.name}
                           </div>
                         </td>
-                        <td
-                          style={{
-                            padding: '12px 16px',
-                            color: 'var(--text-secondary)',
-                            fontSize: '0.88rem'
-                          }}
-                        >
-                          {v.imoNumber}
+                        <td className="muted">
+                          <span className="mono">{v.imoNumber}</span>
                         </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.88rem' }}>
-                          {v.vesselType || <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.88rem' }}>
+                        <td>{v.vesselType || <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td>
                           {v.flagStateId ? (
                             flagMap.get(v.flagStateId) || '—'
                           ) : (
                             <span style={{ opacity: 0.3 }}>—</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.88rem' }}>
-                          {v.builtYear || <span style={{ opacity: 0.3 }}>—</span>}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.88rem' }}>
+                        <td>{v.builtYear || <span style={{ opacity: 0.3 }}>—</span>}</td>
+                        <td className="num">
                           {v.grossTonnage?.toLocaleString() || (
                             <span style={{ opacity: 0.3 }}>—</span>
                           )}
                         </td>
-                        <td
-                          style={{
-                            padding: '12px 16px',
-                            fontSize: '0.88rem',
-                            color: 'var(--text-secondary)'
-                          }}
-                        >
+                        <td className="muted">
                           {v.customerId ? (
                             customerMap.get(v.customerId) || '—'
                           ) : (
                             <span style={{ opacity: 0.3 }}>—</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: '600',
-                              background: v.isActive
-                                ? 'rgba(0,255,136,0.1)'
-                                : 'rgba(255,77,77,0.1)',
-                              color: v.isActive ? 'var(--success)' : 'var(--danger)'
-                            }}
-                          >
+                        <td>
+                          <Badge tone={v.isActive ? 'success' : 'danger'}>
                             {v.isActive ? 'Active' : 'Inactive'}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     ))
@@ -1660,148 +1545,65 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
 
       {/* Vessel Comparison Modal */}
       {showCompare && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0,0,0,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+        <Modal
+          title="Vessel Comparison"
+          icon={<GitCompareArrows size={18} />}
+          onClose={() => {
+            setShowCompare(false)
+            setCompareData(null)
           }}
+          width={800}
+          closeOnOverlay={false}
         >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '28px',
-              width: '90%',
-              maxWidth: '800px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              border: `1px solid ${isLight ? '#e4e7ef' : 'rgba(255,255,255,0.1)'}`
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '24px'
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: '1.2rem',
-                  fontWeight: '800',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}
-              >
-                <GitCompareArrows size={22} color="var(--accent-primary)" />
-                Vessel Comparison
-              </h2>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => {
-                  setShowCompare(false)
-                  setCompareData(null)
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
-              </button>
+          {compareLoading ? (
+            <div style={{ padding: '60px', textAlign: 'center' }}>
+              <Loader2
+                size={32}
+                className="spinner"
+                style={{ opacity: 0.4, display: 'block', margin: '0 auto 14px' }}
+              />
+              <div style={{ color: 'var(--text-secondary)' }}>Loading comparison data...</div>
             </div>
+          ) : compareData ? (
+            (() => {
+              const {
+                vessel1,
+                vessel2,
+                policies1,
+                policies2,
+                docs1,
+                docs2,
+                class1,
+                class2,
+                fleet1,
+                fleet2,
+                customer1,
+                customer2,
+                flag1,
+                flag2
+              } = compareData
 
-            {compareLoading ? (
-              <div style={{ padding: '60px', textAlign: 'center' }}>
-                <Loader2
-                  size={32}
-                  className="spinner"
-                  style={{ opacity: 0.4, display: 'block', margin: '0 auto 14px' }}
-                />
-                <div style={{ color: 'var(--text-secondary)' }}>Loading comparison data...</div>
-              </div>
-            ) : compareData ? (
-              (() => {
-                const {
-                  vessel1,
-                  vessel2,
-                  policies1,
-                  policies2,
-                  docs1,
-                  docs2,
-                  class1,
-                  class2,
-                  fleet1,
-                  fleet2,
-                  customer1,
-                  customer2,
-                  flag1,
-                  flag2
-                } = compareData
+              const allPolicyTypes = new Set([
+                ...policies1.map((p) => p.typeName),
+                ...policies2.map((p) => p.typeName)
+              ])
 
-                const allPolicyTypes = new Set([
-                  ...policies1.map((p) => p.typeName),
-                  ...policies2.map((p) => p.typeName)
-                ])
+              const pctColor = (pct: number): string =>
+                pct === 100 ? 'var(--success)' : pct >= 80 ? 'var(--warning)' : 'var(--danger)'
 
-                const pctColor = (pct: number): '#10b981' | '#f59e0b' | 'var(--danger)' =>
-                  pct === 100 ? '#10b981' : pct >= 80 ? '#f59e0b' : 'var(--danger)'
-
-                return (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              return (
+                <div className="table-wrap">
+                  <table className="data-table">
                     <thead>
-                      <tr
-                        style={{
-                          borderBottom: '2px solid var(--table-border)',
-                          background: 'var(--table-header-bg)'
-                        }}
-                      >
-                        <th
-                          style={{
-                            padding: '12px 14px',
-                            textAlign: 'left',
-                            fontSize: '0.72rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.06em',
-                            color: 'var(--text-secondary)'
-                          }}
-                        >
-                          Field
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px 14px',
-                            textAlign: 'left',
-                            fontWeight: '700',
-                            fontSize: '0.88rem'
-                          }}
-                        >
+                      <tr>
+                        <th>Field</th>
+                        <th>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ship size={14} color="var(--accent-primary)" />
                             {vessel1.name}
                           </div>
                         </th>
-                        <th
-                          style={{
-                            padding: '12px 14px',
-                            textAlign: 'left',
-                            fontWeight: '700',
-                            fontSize: '0.88rem'
-                          }}
-                        >
+                        <th>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ship size={14} color="var(--accent-primary)" />
                             {vessel2.name}
@@ -1844,7 +1646,10 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                             p ? (
                               <span
                                 style={{
-                                  color: p.status === 'active' ? '#10b981' : 'var(--text-secondary)'
+                                  color:
+                                    p.status === 'active'
+                                      ? 'var(--success)'
+                                      : 'var(--text-secondary)'
                                 }}
                               >
                                 {p.policyNumber} ({p.status})
@@ -1863,14 +1668,7 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                         })
                       ) : (
                         <tr>
-                          <td
-                            colSpan={3}
-                            style={{
-                              padding: '10px 14px',
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.82rem'
-                            }}
-                          >
+                          <td colSpan={3} className="muted">
                             No active policies
                           </td>
                         </tr>
@@ -1893,12 +1691,20 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                       <CompareRow
                         label="Missing"
                         val1={
-                          <span style={{ color: docs1.missing > 0 ? 'var(--danger)' : '#10b981' }}>
+                          <span
+                            style={{
+                              color: docs1.missing > 0 ? 'var(--danger)' : 'var(--success)'
+                            }}
+                          >
                             {docs1.missing}
                           </span>
                         }
                         val2={
-                          <span style={{ color: docs2.missing > 0 ? 'var(--danger)' : '#10b981' }}>
+                          <span
+                            style={{
+                              color: docs2.missing > 0 ? 'var(--danger)' : 'var(--success)'
+                            }}
+                          >
                             {docs2.missing}
                           </span>
                         }
@@ -1906,12 +1712,20 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                       <CompareRow
                         label="Expired"
                         val1={
-                          <span style={{ color: docs1.expired > 0 ? 'var(--danger)' : '#10b981' }}>
+                          <span
+                            style={{
+                              color: docs1.expired > 0 ? 'var(--danger)' : 'var(--success)'
+                            }}
+                          >
                             {docs1.expired}
                           </span>
                         }
                         val2={
-                          <span style={{ color: docs2.expired > 0 ? 'var(--danger)' : '#10b981' }}>
+                          <span
+                            style={{
+                              color: docs2.expired > 0 ? 'var(--danger)' : 'var(--success)'
+                            }}
+                          >
                             {docs2.expired}
                           </span>
                         }
@@ -1925,11 +1739,11 @@ export default function VesselFilter({ onNavigateToVessel }: VesselFilterProps):
                       />
                     </tbody>
                   </table>
-                )
-              })()
-            ) : null}
-          </div>
-        </div>
+                </div>
+              )
+            })()
+          ) : null}
+        </Modal>
       )}
     </div>
   )

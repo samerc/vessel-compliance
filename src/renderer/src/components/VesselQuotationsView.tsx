@@ -227,7 +227,7 @@ export default function VesselQuotationsView({
       case 'approved':
         return {
           background: 'rgba(68,204,136,0.12)',
-          color: isLight ? '#228844' : '#44cc88',
+          color: 'var(--success)',
           border: '1px solid rgba(68,204,136,0.2)'
         }
       default:
@@ -482,176 +482,138 @@ export default function VesselQuotationsView({
           </p>
         </div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--table-border)' }}>
-              {['Reference', 'Type', 'Status', 'Date', 'Premium', 'Conditions', ''].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: '10px 14px',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--text-secondary)'
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {quotations.map((q) => {
-              const statusStyle = getStatusStyle(q.status, q.workflowStepColor)
-              const statusLabel = q.workflowStepName || q.status || 'draft'
-              return (
-                <tr
-                  key={q.id}
-                  onClick={() => onNavigateToQuotation(q.id)}
-                  style={{
-                    borderBottom: '1px solid var(--table-border)',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={(e) => {
-                    ;(e.currentTarget as HTMLElement).style.background =
-                      'rgba(var(--accent-primary-rgb), 0.04)'
-                  }}
-                  onMouseLeave={(e) => {
-                    ;(e.currentTarget as HTMLElement).style.background = 'transparent'
-                  }}
-                >
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontWeight: 500, fontSize: '0.88rem' }}>
-                        {q.referenceNumber || 'DRAFT'}
+        <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                {['Reference', 'Type', 'Status', 'Date', 'Premium', 'Conditions', ''].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {quotations.map((q) => {
+                const statusStyle = getStatusStyle(q.status, q.workflowStepColor)
+                const statusLabel = q.workflowStepName || q.status || 'draft'
+                return (
+                  <tr key={q.id} className="clickable" onClick={() => onNavigateToQuotation(q.id)}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: 500 }}>{q.referenceNumber || 'DRAFT'}</span>
+                        {q.revisionNumber > 0 && (
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: 'rgba(100,100,255,0.1)',
+                              color: isLight ? '#4444cc' : '#8888ff'
+                            }}
+                          >
+                            R{q.revisionNumber}
+                          </span>
+                        )}
+                        {q.isRenewal && (
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              background: 'rgba(68,204,136,0.1)',
+                              color: 'var(--success)'
+                            }}
+                          >
+                            RNW
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '22px',
+                          borderRadius: '5px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: typeColor(q.quotationTypeCode) + '22',
+                          color: typeColor(q.quotationTypeCode)
+                        }}
+                      >
+                        {q.quotationTypeCode}
                       </span>
-                      {q.revisionNumber > 0 && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            background: 'rgba(100,100,255,0.1)',
-                            color: isLight ? '#4444cc' : '#8888ff'
-                          }}
-                        >
-                          R{q.revisionNumber}
-                        </span>
-                      )}
-                      {q.isRenewal && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            background: 'rgba(68,204,136,0.1)',
-                            color: isLight ? '#228844' : '#44cc88'
-                          }}
-                        >
-                          RNW
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          borderRadius: '6px',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          ...statusStyle
+                        }}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="muted">{formatDate(q.quotationDate || q.createdAt)}</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {formatPremium(q.premiumAmount, q.premiumCurrency)}
+                    </td>
+                    <td
+                      className="muted"
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '28px',
-                        height: '22px',
-                        borderRadius: '5px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        background: typeColor(q.quotationTypeCode) + '22',
-                        color: typeColor(q.quotationTypeCode)
+                        maxWidth: '200px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      {q.quotationTypeCode}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
-                        ...statusStyle
-                      }}
-                    >
-                      {statusLabel}
-                    </span>
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px 14px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    {formatDate(q.quotationDate || q.createdAt)}
-                  </td>
-                  <td style={{ padding: '12px 14px', fontSize: '0.85rem', fontWeight: 500 }}>
-                    {formatPremium(q.premiumAmount, q.premiumCurrency)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '12px 14px',
-                      fontSize: '0.82rem',
-                      color: 'var(--text-secondary)',
-                      maxWidth: '200px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {q.conditionsSummary || ''}
-                  </td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        justifyContent: 'flex-end'
-                      }}
-                    >
-                      {q.vesselCount > 1 && (
-                        <span
-                          title={`${q.vesselCount} vessels`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            fontSize: '0.74rem',
-                            color: 'var(--text-secondary)',
-                            opacity: 0.7
-                          }}
-                        >
-                          <Users size={13} />
-                          {q.vesselCount}
-                        </span>
-                      )}
-                      <ExternalLink
-                        size={14}
-                        style={{ color: 'var(--text-secondary)', opacity: 0.5 }}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                      {q.conditionsSummary || ''}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          justifyContent: 'flex-end'
+                        }}
+                      >
+                        {q.vesselCount > 1 && (
+                          <span
+                            title={`${q.vesselCount} vessels`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '0.74rem',
+                              color: 'var(--text-secondary)',
+                              opacity: 0.7
+                            }}
+                          >
+                            <Users size={13} />
+                            {q.vesselCount}
+                          </span>
+                        )}
+                        <ExternalLink
+                          size={14}
+                          style={{ color: 'var(--text-secondary)', opacity: 0.5 }}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

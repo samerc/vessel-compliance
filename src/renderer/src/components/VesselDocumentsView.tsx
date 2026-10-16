@@ -312,19 +312,19 @@ export default function VesselDocumentsView({
       label: 'COMPLIANT'
     },
     expiring: {
-      border: isLight ? '#b45309' : '#f59e0b',
+      border: 'var(--warning)',
       bg: isLight ? 'rgba(180,83,9,0.04)' : 'rgba(245,158,11,0.04)',
       badge: isLight ? 'rgba(180,83,9,0.12)' : 'rgba(245,158,11,0.12)',
       label: 'EXPIRING SOON'
     },
     expired: {
-      border: isLight ? '#c00000' : '#ff4d4d',
+      border: 'var(--danger)',
       bg: isLight ? 'rgba(192,0,0,0.04)' : 'rgba(255,77,77,0.04)',
       badge: isLight ? 'rgba(192,0,0,0.12)' : 'rgba(255,77,77,0.12)',
       label: 'EXPIRED'
     },
     missing: {
-      border: isLight ? '#c00000' : '#ff4d4d',
+      border: 'var(--danger)',
       bg: isLight ? 'rgba(192,0,0,0.04)' : 'rgba(255,77,77,0.04)',
       badge: isLight ? 'rgba(192,0,0,0.12)' : 'rgba(255,77,77,0.12)',
       label: 'MISSING'
@@ -437,7 +437,7 @@ export default function VesselDocumentsView({
                       gap: '3px',
                       fontSize: '0.65rem',
                       fontWeight: 600,
-                      color: isLight ? '#008c46' : '#10b981',
+                      color: 'var(--success)',
                       background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)',
                       border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`,
                       borderRadius: '4px',
@@ -551,10 +551,8 @@ export default function VesselDocumentsView({
                     fontSize: '0.65rem',
                     padding: '1px 6px',
                     borderRadius: '4px',
-                    background: isLight
-                      ? 'rgba(0,119,163,0.1)'
-                      : 'rgba(var(--accent-primary-rgb), 0.12)',
-                    color: isLight ? '#0077a3' : 'var(--accent-primary)',
+                    background: 'var(--accent-tint)',
+                    color: 'var(--accent-primary)',
                     fontWeight: '600'
                   }}
                 >
@@ -679,7 +677,7 @@ export default function VesselDocumentsView({
                 gap: '3px',
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                color: isLight ? '#008c46' : '#10b981',
+                color: 'var(--success)',
                 background: isLight ? 'rgba(0,140,70,0.08)' : 'rgba(16,185,129,0.1)',
                 border: `1px solid ${isLight ? 'rgba(0,140,70,0.2)' : 'rgba(16,185,129,0.2)'}`,
                 borderRadius: '4px',
@@ -797,15 +795,11 @@ export default function VesselDocumentsView({
                   fontWeight: required ? '600' : '500',
                   cursor: uploadingId === id ? 'not-allowed' : 'pointer',
                   opacity: uploadingId === id ? 0.65 : 1,
-                  background: required
-                    ? isLight
-                      ? 'rgba(0,119,163,0.1)'
-                      : 'rgba(var(--accent-primary-rgb), 0.1)'
-                    : 'transparent',
+                  background: required ? 'var(--accent-tint)' : 'transparent',
                   border: required
-                    ? `1px solid ${isLight ? 'rgba(0,119,163,0.5)' : 'rgba(var(--accent-primary-rgb), 0.4)'}`
-                    : `1px dashed ${isLight ? 'rgba(0,119,163,0.3)' : 'rgba(var(--accent-primary-rgb), 0.3)'}`,
-                  color: isLight ? '#0077a3' : 'var(--accent-primary)'
+                    ? '1px solid var(--accent-border)'
+                    : '1px dashed rgba(var(--accent-primary-rgb), 0.3)',
+                  color: 'var(--accent-primary)'
                 }}
               >
                 {uploadingId === id ? (
@@ -978,18 +972,7 @@ export default function VesselDocumentsView({
     return !(d ? d.required : t.required)
   })
 
-  const pctColor =
-    pct === 100
-      ? isLight
-        ? '#008c46'
-        : '#00c264'
-      : pct >= 70
-        ? isLight
-          ? '#b45309'
-          : '#f59e0b'
-        : isLight
-          ? '#c00000'
-          : '#ff4d4d'
+  const pctColor = pct === 100 ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--danger)'
 
   const sectionHeader = (title: string, count: number): React.JSX.Element => (
     <div
@@ -1082,11 +1065,11 @@ export default function VesselDocumentsView({
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'stretch' }}>
         {[
           { label: 'Total Required', value: requiredDocs.length, color: 'var(--text-primary)' },
-          { label: 'Compliant', value: compliantCount, color: isLight ? '#008c46' : '#00c264' },
+          { label: 'Compliant', value: compliantCount, color: 'var(--success)' },
           {
             label: 'Missing',
             value: missingCount,
-            color: missingCount > 0 ? (isLight ? '#c00000' : '#ff4d4d') : 'var(--text-secondary)'
+            color: missingCount > 0 ? 'var(--danger)' : 'var(--text-secondary)'
           }
         ].map((s) => (
           <div

@@ -19,11 +19,10 @@ import {
   X,
   BarChart2
 } from 'lucide-react'
-import { PageHeader, Badge } from './ui'
+import { PageHeader, Badge, Modal } from './ui'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import XLSX from 'xlsx-js-style'
-import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -214,19 +213,17 @@ function MultiSelectDropdown({
   label,
   options,
   selectedIds,
-  onChange,
-  isLight
+  onChange
 }: {
   label: string
   options: { id: string; name: string }[]
   selectedIds: string[]
   onChange: (ids: string[]) => void
-  isLight: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
-  const dropdownBg = isLight ? '#ffffff' : '#1a1d28'
+  const dropdownBg = 'var(--bg-primary)'
 
   const filtered = useMemo(() => {
     if (!search) return options
@@ -562,34 +559,11 @@ function ProgressBar({ pct }: { pct: number }): React.JSX.Element {
   )
 }
 
-// ── table cell style helpers ──────────────────────────────────────────────────
-
-const thStyle: React.CSSProperties = {
-  padding: '10px 14px',
-  textAlign: 'left',
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
-  background: 'var(--table-header-bg)',
-  borderBottom: '1px solid var(--table-border)',
-  whiteSpace: 'nowrap'
-}
-
-const tdStyle = (idx: number): React.CSSProperties => ({
-  padding: '9px 14px',
-  fontSize: '0.84rem',
-  color: 'var(--text-primary)',
-  borderBottom: '1px solid var(--table-border)',
-  background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
-})
-
 // ══════════════════════════════════════════════════════════════════════════════
 // ── Main component ───────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function FleetAnalytics(): React.JSX.Element {
-  const { theme } = useTheme()
-  const isLight = theme === 'light' || theme === 'aurora'
   const { showSuccess, showError } = useToast()
   useAuth()
 
@@ -1592,7 +1566,6 @@ export default function FleetAnalytics(): React.JSX.Element {
             options={flagStates.map((f) => ({ id: f.id, name: f.name }))}
             selectedIds={filters.flagStateIds}
             onChange={(ids) => updateFilter('flagStateIds', ids)}
-            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1603,7 +1576,6 @@ export default function FleetAnalytics(): React.JSX.Element {
             options={vesselTypes.map((vt) => ({ id: vt.id, name: vt.name }))}
             selectedIds={filters.vesselTypeIds}
             onChange={(ids) => updateFilter('vesselTypeIds', ids)}
-            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1614,7 +1586,6 @@ export default function FleetAnalytics(): React.JSX.Element {
             options={fleets.map((f) => ({ id: f.id, name: f.name }))}
             selectedIds={filters.fleetIds}
             onChange={(ids) => updateFilter('fleetIds', ids)}
-            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1625,7 +1596,6 @@ export default function FleetAnalytics(): React.JSX.Element {
             options={customerEntities.map((e) => ({ id: e.id, name: e.name }))}
             selectedIds={filters.customerIds}
             onChange={(ids) => updateFilter('customerIds', ids)}
-            isLight={isLight}
           />
         </CollapsibleFilter>
 
@@ -1896,25 +1866,25 @@ export default function FleetAnalytics(): React.JSX.Element {
               {vesselTypeBreakdown.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No type data</p>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={thStyle}>Type</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
-                        <th style={{ ...thStyle, minWidth: '120px' }}>%</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Avg Age</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Avg Tonnage</th>
+                        <th>Type</th>
+                        <th className="num">Count</th>
+                        <th style={{ minWidth: '120px' }}>%</th>
+                        <th className="num">Avg Age</th>
+                        <th className="num">Avg Tonnage</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {vesselTypeBreakdown.map((row, idx) => (
+                      {vesselTypeBreakdown.map((row) => (
                         <tr key={row.name}>
-                          <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                          <td style={{ fontWeight: 600 }}>{row.name}</td>
+                          <td className="num" style={{ fontWeight: 700 }}>
                             {row.count}
                           </td>
-                          <td style={tdStyle(idx)}>
+                          <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <ProgressBar pct={row.pct} />
                               <span
@@ -1929,22 +1899,10 @@ export default function FleetAnalytics(): React.JSX.Element {
                               </span>
                             </div>
                           </td>
-                          <td
-                            style={{
-                              ...tdStyle(idx),
-                              textAlign: 'right',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
+                          <td className="num muted">
                             {row.avgAge != null ? `${row.avgAge} yr` : '--'}
                           </td>
-                          <td
-                            style={{
-                              ...tdStyle(idx),
-                              textAlign: 'right',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
+                          <td className="num muted">
                             {row.avgTonnage != null ? fmt(row.avgTonnage) : '--'}
                           </td>
                         </tr>
@@ -1967,21 +1925,21 @@ export default function FleetAnalytics(): React.JSX.Element {
               {flagDistribution.rows.length === 0 ? (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No flag data</p>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={thStyle}>Flag</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
-                        <th style={{ ...thStyle, minWidth: '120px' }}>%</th>
+                        <th>Flag</th>
+                        <th className="num">Count</th>
+                        <th style={{ minWidth: '120px' }}>%</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {flagDistribution.rows.map((row, idx) => {
+                      {flagDistribution.rows.map((row) => {
                         const flagCls = row.iso3 ? getFlagClass(row.iso3) : ''
                         return (
                           <tr key={row.name}>
-                            <td style={tdStyle(idx)}>
+                            <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {flagCls ? (
                                   <span
@@ -2009,10 +1967,10 @@ export default function FleetAnalytics(): React.JSX.Element {
                                 <span style={{ fontWeight: 600 }}>{row.name}</span>
                               </div>
                             </td>
-                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                            <td className="num" style={{ fontWeight: 700 }}>
                               {row.count}
                             </td>
-                            <td style={tdStyle(idx)}>
+                            <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <ProgressBar pct={row.pct} />
                                 <span
@@ -2032,25 +1990,13 @@ export default function FleetAnalytics(): React.JSX.Element {
                       })}
                       {flagDistribution.othersCount > 0 && (
                         <tr>
-                          <td
-                            style={{
-                              ...tdStyle(flagDistribution.rows.length),
-                              fontStyle: 'italic',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
+                          <td className="muted" style={{ fontStyle: 'italic' }}>
                             Others
                           </td>
-                          <td
-                            style={{
-                              ...tdStyle(flagDistribution.rows.length),
-                              textAlign: 'right',
-                              fontWeight: 700
-                            }}
-                          >
+                          <td className="num" style={{ fontWeight: 700 }}>
                             {flagDistribution.othersCount}
                           </td>
-                          <td style={tdStyle(flagDistribution.rows.length)}>
+                          <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <ProgressBar
                                 pct={
@@ -2094,7 +2040,7 @@ export default function FleetAnalytics(): React.JSX.Element {
                       padding: '12px 16px',
                       borderRadius: '8px',
                       border: '1px solid var(--glass-border-color)',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      background: 'var(--bg-card-hover)',
                       minWidth: '100px',
                       flex: '1 1 100px',
                       textAlign: 'center'
@@ -2149,7 +2095,7 @@ export default function FleetAnalytics(): React.JSX.Element {
                       padding: '12px 16px',
                       borderRadius: '8px',
                       border: '1px solid var(--glass-border-color)',
-                      background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
+                      background: 'var(--bg-card-hover)',
                       minWidth: '100px',
                       flex: '1 1 100px',
                       textAlign: 'center'
@@ -2202,26 +2148,26 @@ export default function FleetAnalytics(): React.JSX.Element {
                   No active policies found
                 </p>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={thStyle}>Policy Type</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Vessels Covered</th>
-                        <th style={{ ...thStyle, minWidth: '120px' }}>% of Selection</th>
+                        <th>Policy Type</th>
+                        <th className="num">Vessels Covered</th>
+                        <th style={{ minWidth: '120px' }}>% of Selection</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {policyCoverage.map((row, idx) => {
+                      {policyCoverage.map((row) => {
                         const pct =
                           pool.length > 0 ? (Number(row.vesselCount) / pool.length) * 100 : 0
                         return (
                           <tr key={row.name}>
-                            <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                            <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                            <td style={{ fontWeight: 600 }}>{row.name}</td>
+                            <td className="num" style={{ fontWeight: 700 }}>
                               {row.vesselCount}
                             </td>
-                            <td style={tdStyle(idx)}>
+                            <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <ProgressBar pct={pct} />
                                 <span
@@ -2259,40 +2205,25 @@ export default function FleetAnalytics(): React.JSX.Element {
                   No customer data
                 </p>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-wrap">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={thStyle}>Customer</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Vessels</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>%</th>
-                        <th style={thStyle}>Types</th>
+                        <th>Customer</th>
+                        <th className="num">Vessels</th>
+                        <th className="num">%</th>
+                        <th>Types</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {customerConcentration.map((row, idx) => (
+                      {customerConcentration.map((row) => (
                         <tr key={row.name}>
-                          <td style={{ ...tdStyle(idx), fontWeight: 600 }}>{row.name}</td>
-                          <td style={{ ...tdStyle(idx), textAlign: 'right', fontWeight: 700 }}>
+                          <td style={{ fontWeight: 600 }}>{row.name}</td>
+                          <td className="num" style={{ fontWeight: 700 }}>
                             {row.count}
                           </td>
-                          <td
-                            style={{
-                              ...tdStyle(idx),
-                              textAlign: 'right',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
-                            {row.pct.toFixed(0)}%
-                          </td>
-                          <td
-                            style={{
-                              ...tdStyle(idx),
-                              color: 'var(--text-secondary)',
-                              fontSize: '0.8rem',
-                              maxWidth: '200px'
-                            }}
-                          >
+                          <td className="num muted">{row.pct.toFixed(0)}%</td>
+                          <td className="muted" style={{ maxWidth: '200px' }}>
                             {row.types || '--'}
                           </td>
                         </tr>
@@ -2358,178 +2289,15 @@ export default function FleetAnalytics(): React.JSX.Element {
 
       {/* ── Export Modal ── */}
       {exportModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setExportModalOpen(false)
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '440px',
-              maxWidth: '90vw',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.3)'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Export Analytics</h3>
-              <button
-                title="Close"
-                aria-label="Close"
-                onClick={() => setExportModalOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  padding: '4px'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Format selector */}
-            <div style={{ marginBottom: '18px' }}>
-              <div
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '8px'
-                }}
-              >
-                Format
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {(['pdf', 'excel'] as const).map((fmt) => (
-                  <label
-                    key={fmt}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                      padding: '6px 14px',
-                      borderRadius: '8px',
-                      border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
-                      background:
-                        exportFormat === fmt
-                          ? isLight
-                            ? 'rgba(var(--accent-primary-rgb), 0.08)'
-                            : 'rgba(var(--accent-primary-rgb), 0.12)'
-                          : 'transparent'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value={fmt}
-                      checked={exportFormat === fmt}
-                      onChange={() => setExportFormat(fmt)}
-                      style={{ accentColor: 'var(--accent-primary)' }}
-                    />
-                    {fmt === 'pdf' ? 'PDF Report' : 'Excel Spreadsheet'}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Section checkboxes */}
-            <div style={{ marginBottom: '20px' }}>
-              <div
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '8px'
-                }}
-              >
-                Sections to include
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {[
-                  { key: 'kpi' as const, label: 'KPI Summary' },
-                  { key: 'vesselTypes' as const, label: 'Vessel Type Distribution' },
-                  { key: 'flagStates' as const, label: 'Flag State Distribution' },
-                  { key: 'ageDistribution' as const, label: 'Age Distribution' },
-                  { key: 'tonnageDistribution' as const, label: 'Tonnage Distribution' },
-                  { key: 'policyCoverage' as const, label: 'Policy Coverage' },
-                  { key: 'topCustomers' as const, label: 'Top Customers' },
-                  { key: 'ofacStatus' as const, label: 'OFAC Status' },
-                  { key: 'rawVesselData' as const, label: 'Raw Vessel Data' }
-                ].map((item) => {
-                  const isExcelOnly = item.key === 'rawVesselData'
-                  const disabled = isExcelOnly && exportFormat === 'pdf'
-                  return (
-                    <label
-                      key={item.key}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        cursor: disabled ? 'default' : 'pointer',
-                        fontSize: '0.86rem',
-                        color: disabled ? 'var(--text-secondary)' : 'var(--text-primary)',
-                        opacity: disabled ? 0.5 : 1,
-                        padding: '3px 0'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={disabled ? false : exportSections[item.key]}
-                        onChange={() => !disabled && toggleExportSection(item.key)}
-                        disabled={disabled}
-                        style={{ accentColor: 'var(--accent-primary)' }}
-                      />
-                      {item.label}
-                      {isExcelOnly && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            color: 'var(--text-secondary)',
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          (Excel only)
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => setExportModalOpen(false)}
-                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
-              >
+        <Modal
+          title="Export Analytics"
+          icon={<FileDown size={18} />}
+          onClose={() => setExportModalOpen(false)}
+          width={440}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button className="btn-secondary" onClick={() => setExportModalOpen(false)}>
                 Cancel
               </button>
               <button
@@ -2541,13 +2309,101 @@ export default function FleetAnalytics(): React.JSX.Element {
                     exportExcel(exportSections)
                   }
                 }}
-                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
               >
                 Export
               </button>
+            </>
+          }
+        >
+          {/* Format selector */}
+          <div className="form-section">
+            <h4 className="form-section-title">Format</h4>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {(['pdf', 'excel'] as const).map((fmt) => (
+                <label
+                  key={fmt}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.88rem',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: `1px solid ${exportFormat === fmt ? 'var(--accent-primary)' : 'var(--input-border)'}`,
+                    background: exportFormat === fmt ? 'var(--accent-tint)' : 'transparent'
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="exportFormat"
+                    value={fmt}
+                    checked={exportFormat === fmt}
+                    onChange={() => setExportFormat(fmt)}
+                    style={{ accentColor: 'var(--accent-primary)' }}
+                  />
+                  {fmt === 'pdf' ? 'PDF Report' : 'Excel Spreadsheet'}
+                </label>
+              ))}
             </div>
           </div>
-        </div>
+
+          {/* Section checkboxes */}
+          <div className="form-section">
+            <h4 className="form-section-title">Sections to include</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { key: 'kpi' as const, label: 'KPI Summary' },
+                { key: 'vesselTypes' as const, label: 'Vessel Type Distribution' },
+                { key: 'flagStates' as const, label: 'Flag State Distribution' },
+                { key: 'ageDistribution' as const, label: 'Age Distribution' },
+                { key: 'tonnageDistribution' as const, label: 'Tonnage Distribution' },
+                { key: 'policyCoverage' as const, label: 'Policy Coverage' },
+                { key: 'topCustomers' as const, label: 'Top Customers' },
+                { key: 'ofacStatus' as const, label: 'OFAC Status' },
+                { key: 'rawVesselData' as const, label: 'Raw Vessel Data' }
+              ].map((item) => {
+                const isExcelOnly = item.key === 'rawVesselData'
+                const disabled = isExcelOnly && exportFormat === 'pdf'
+                return (
+                  <label
+                    key={item.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: disabled ? 'default' : 'pointer',
+                      fontSize: '0.86rem',
+                      color: disabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                      opacity: disabled ? 0.5 : 1,
+                      padding: '3px 0'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={disabled ? false : exportSections[item.key]}
+                      onChange={() => !disabled && toggleExportSection(item.key)}
+                      disabled={disabled}
+                      style={{ accentColor: 'var(--accent-primary)' }}
+                    />
+                    {item.label}
+                    {isExcelOnly && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          color: 'var(--text-secondary)',
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        (Excel only)
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

@@ -30,6 +30,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
+import { Field, Modal } from './ui'
 import { ReportService } from '../services/ReportService'
 
 interface DefectManagerProps {
@@ -511,12 +512,12 @@ export default function DefectManager({
           <StatBadge
             label="Closed"
             value={closedCount}
-            color={closedCount > 0 ? (isLight ? '#008c46' : '#00ff88') : undefined}
+            color={closedCount > 0 ? 'var(--success)' : undefined}
           />
           <StatBadge
             label="Overdue"
             value={overdueCount}
-            color={overdueCount > 0 ? '#ffa726' : undefined}
+            color={overdueCount > 0 ? 'var(--warning)' : undefined}
             alert={overdueCount > 0}
           />
         </div>
@@ -536,12 +537,7 @@ export default function DefectManager({
                   statusFilter === f
                     ? '1px solid var(--accent-primary)'
                     : '1px solid var(--input-border)',
-                background:
-                  statusFilter === f
-                    ? isLight
-                      ? 'rgba(26, 115, 232, 0.1)'
-                      : 'rgba(var(--accent-primary-rgb), 0.1)'
-                    : 'transparent',
+                background: statusFilter === f ? 'var(--accent-tint)' : 'transparent',
                 color: statusFilter === f ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontSize: '12px',
                 fontWeight: statusFilter === f ? '600' : '500',
@@ -593,7 +589,7 @@ export default function DefectManager({
             marginBottom: '12px',
             padding: '10px 14px',
             borderRadius: '8px',
-            background: isLight ? 'rgba(0,150,200,0.06)' : 'rgba(var(--accent-primary-rgb), 0.06)',
+            background: 'rgba(var(--accent-primary-rgb), 0.06)',
             border: '1px solid rgba(var(--accent-primary-rgb), 0.2)',
             alignItems: 'center'
           }}
@@ -645,79 +641,86 @@ export default function DefectManager({
           style={{
             marginBottom: '20px',
             padding: '16px',
-            background: 'var(--input-bg)',
+            background: 'var(--bg-card)',
             borderRadius: '10px',
-            border: '1px solid var(--input-border)'
+            border: 'var(--glass-border)'
           }}
         >
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <input
-              ref={defectNumberRef}
-              type="text"
-              placeholder="Number (auto)"
-              value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value)}
-              aria-label="Defect number"
-              style={{ width: '120px', flexShrink: 0 }}
-            />
-            <select
-              value={newSeverity}
-              onChange={(e) => setNewSeverity(e.target.value as typeof newSeverity)}
-              style={{ color: 'var(--text-primary)', minWidth: '130px' }}
-              aria-label="Severity"
-            >
-              <option value="">Severity: Not Set</option>
-              <option value="Critical">Critical</option>
-              <option value="Major">Major</option>
-              <option value="Minor">Minor</option>
-              <option value="Observation">Observation</option>
-            </select>
-            <input
-              type="date"
-              placeholder="Due Date"
-              value={newDueDate}
-              onChange={(e) => setNewDueDate(e.target.value)}
-              min="1900-01-01"
-              max="2100-12-31"
-              aria-label="Due date"
-              style={{ minWidth: '140px' }}
-            />
-            <input
-              type="text"
-              list="defect-due-events"
-              placeholder="or due event (e.g. At next dry dock)"
-              value={newDueEvent}
-              onChange={(e) => setNewDueEvent(e.target.value)}
-              aria-label="Due event"
-              title="A deadline that is an event rather than a date"
-              style={{ minWidth: '220px', flex: 1 }}
-            />
+          <div className="form-grid">
+            <Field label="Number" hint="Leave empty to number automatically">
+              <input
+                ref={defectNumberRef}
+                type="text"
+                placeholder="Number (auto)"
+                value={newNumber}
+                onChange={(e) => setNewNumber(e.target.value)}
+                aria-label="Defect number"
+              />
+            </Field>
+            <Field label="Severity">
+              <select
+                value={newSeverity}
+                onChange={(e) => setNewSeverity(e.target.value as typeof newSeverity)}
+                aria-label="Severity"
+              >
+                <option value="">Severity: Not Set</option>
+                <option value="Critical">Critical</option>
+                <option value="Major">Major</option>
+                <option value="Minor">Minor</option>
+                <option value="Observation">Observation</option>
+              </select>
+            </Field>
+            <Field label="Due date">
+              <input
+                type="date"
+                placeholder="Due Date"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                min="1900-01-01"
+                max="2100-12-31"
+                aria-label="Due date"
+              />
+            </Field>
+            <Field label="Or due event">
+              <input
+                type="text"
+                list="defect-due-events"
+                placeholder="e.g. At next dry dock"
+                value={newDueEvent}
+                onChange={(e) => setNewDueEvent(e.target.value)}
+                aria-label="Due event"
+                title="A deadline that is an event rather than a date"
+              />
+            </Field>
+            <Field label="Description" required span="all">
+              <FormattedTextArea
+                placeholder="Description *"
+                value={newDescription}
+                onChange={setNewDescription}
+                required
+                rows={4}
+                ariaLabel="Defect description"
+                isLight={isLight}
+                marginBottom="0"
+              />
+            </Field>
+            <Field label="Notes" hint="Optional" span="all">
+              <textarea
+                placeholder="Notes (optional)"
+                value={newNotes}
+                onChange={(e) => setNewNotes(e.target.value)}
+                rows={2}
+                style={{ resize: 'vertical' }}
+                aria-label="Notes"
+              />
+            </Field>
           </div>
-          <FormattedTextArea
-            placeholder="Description *"
-            value={newDescription}
-            onChange={setNewDescription}
-            required
-            rows={4}
-            ariaLabel="Defect description"
-            isLight={isLight}
-          />
-          <textarea
-            placeholder="Notes (optional)"
-            value={newNotes}
-            onChange={(e) => setNewNotes(e.target.value)}
-            rows={2}
-            style={{ width: '100%', resize: 'vertical', marginBottom: '12px' }}
-            aria-label="Notes"
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Plus size={16} />
-            Add Defect
-          </button>
+          <div className="form-actions" style={{ marginTop: '14px' }}>
+            <button type="submit" className="btn-primary">
+              <Plus size={16} />
+              Add Defect
+            </button>
+          </div>
         </form>
       )}
 
@@ -748,91 +751,85 @@ export default function DefectManager({
                     borderRadius: '10px',
                     border: '1px solid var(--accent-primary)',
                     borderLeft: `4px solid var(--accent-primary)`,
-                    background: 'var(--input-bg)'
+                    background: 'var(--bg-card)'
                   }}
                 >
-                  <div
-                    style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Number"
-                      value={editNumber}
-                      onChange={(e) => setEditNumber(e.target.value)}
-                      required
-                      aria-label="Defect number"
-                      style={{ width: '80px', flexShrink: 0 }}
-                    />
-                    <select
-                      value={editSeverity}
-                      onChange={(e) => setEditSeverity(e.target.value as typeof editSeverity)}
-                      style={{ color: 'var(--text-primary)', minWidth: '130px' }}
-                      aria-label="Severity"
-                    >
-                      <option value="">Severity: Not Set</option>
-                      <option value="Critical">Critical</option>
-                      <option value="Major">Major</option>
-                      <option value="Minor">Minor</option>
-                      <option value="Observation">Observation</option>
-                    </select>
-                    <input
-                      type="date"
-                      placeholder="Due Date"
-                      value={editDueDate}
-                      onChange={(e) => setEditDueDate(e.target.value)}
-                      min="1900-01-01"
-                      max="2100-12-31"
-                      aria-label="Due date"
-                      style={{ minWidth: '140px' }}
-                    />
-                    <input
-                      type="text"
-                      list="defect-due-events"
-                      placeholder="or due event (e.g. At next dry dock)"
-                      value={editDueEvent}
-                      onChange={(e) => setEditDueEvent(e.target.value)}
-                      aria-label="Due event"
-                      title="A deadline that is an event rather than a date"
-                      style={{ minWidth: '220px', flex: 1 }}
-                    />
+                  <div className="form-grid">
+                    <Field label="Number" required>
+                      <input
+                        type="text"
+                        placeholder="Number"
+                        value={editNumber}
+                        onChange={(e) => setEditNumber(e.target.value)}
+                        required
+                        aria-label="Defect number"
+                      />
+                    </Field>
+                    <Field label="Severity">
+                      <select
+                        value={editSeverity}
+                        onChange={(e) => setEditSeverity(e.target.value as typeof editSeverity)}
+                        aria-label="Severity"
+                      >
+                        <option value="">Severity: Not Set</option>
+                        <option value="Critical">Critical</option>
+                        <option value="Major">Major</option>
+                        <option value="Minor">Minor</option>
+                        <option value="Observation">Observation</option>
+                      </select>
+                    </Field>
+                    <Field label="Due date">
+                      <input
+                        type="date"
+                        placeholder="Due Date"
+                        value={editDueDate}
+                        onChange={(e) => setEditDueDate(e.target.value)}
+                        min="1900-01-01"
+                        max="2100-12-31"
+                        aria-label="Due date"
+                      />
+                    </Field>
+                    <Field label="Or due event">
+                      <input
+                        type="text"
+                        list="defect-due-events"
+                        placeholder="e.g. At next dry dock"
+                        value={editDueEvent}
+                        onChange={(e) => setEditDueEvent(e.target.value)}
+                        aria-label="Due event"
+                        title="A deadline that is an event rather than a date"
+                      />
+                    </Field>
+                    <Field label="Description" required span="all">
+                      <FormattedTextArea
+                        placeholder="Description *"
+                        value={editDescription}
+                        onChange={setEditDescription}
+                        required
+                        rows={4}
+                        ariaLabel="Defect description"
+                        isLight={isLight}
+                        marginBottom="0"
+                      />
+                    </Field>
+                    <Field label="Notes" hint="Optional" span="all">
+                      <textarea
+                        placeholder="Notes (optional)"
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        rows={2}
+                        style={{ resize: 'vertical' }}
+                        aria-label="Notes"
+                      />
+                    </Field>
                   </div>
-                  <FormattedTextArea
-                    placeholder="Description *"
-                    value={editDescription}
-                    onChange={setEditDescription}
-                    required
-                    rows={4}
-                    ariaLabel="Defect description"
-                    isLight={isLight}
-                  />
-                  <textarea
-                    placeholder="Notes (optional)"
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
-                    rows={2}
-                    style={{ width: '100%', resize: 'vertical', marginBottom: '12px' }}
-                    aria-label="Notes"
-                  />
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={() => handleSaveEdit(defect.id)}
-                      className="btn-primary"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 16px'
-                      }}
-                    >
+                  <div className="form-actions" style={{ marginTop: '14px' }}>
+                    <button onClick={handleCancelEdit} className="btn-secondary">
+                      Cancel
+                    </button>
+                    <button onClick={() => handleSaveEdit(defect.id)} className="btn-primary">
                       <Save size={16} />
                       Save
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="btn-secondary"
-                      style={{ padding: '8px 16px' }}
-                    >
-                      Cancel
                     </button>
                   </div>
                 </div>
@@ -862,11 +859,7 @@ export default function DefectManager({
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '12px',
-                    background: isExpanded
-                      ? isLight
-                        ? 'rgba(0, 119, 163, 0.04)'
-                        : 'rgba(var(--accent-primary-rgb), 0.04)'
-                      : 'transparent'
+                    background: isExpanded ? 'rgba(var(--accent-primary-rgb), 0.04)' : 'transparent'
                   }}
                 >
                   {/* Bulk select checkbox */}
@@ -986,7 +979,7 @@ export default function DefectManager({
                               background: isLight
                                 ? 'rgba(255, 152, 0, 0.15)'
                                 : 'rgba(255, 167, 38, 0.15)',
-                              color: '#ffa726',
+                              color: 'var(--warning)',
                               border: '1px solid rgba(255, 167, 38, 0.3)',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px'
@@ -1068,7 +1061,7 @@ export default function DefectManager({
                           background: isLight
                             ? 'rgba(0, 140, 70, 0.08)'
                             : 'rgba(0, 255, 136, 0.08)',
-                          color: isLight ? '#008c46' : '#00ff88',
+                          color: 'var(--success)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.4px',
                           whiteSpace: 'nowrap'
@@ -1095,11 +1088,7 @@ export default function DefectManager({
                       borderRadius: '6px',
                       cursor: 'pointer',
                       color:
-                        copiedDefectId === defect.id
-                          ? isLight
-                            ? '#008c46'
-                            : '#00ff88'
-                          : 'var(--text-secondary)',
+                        copiedDefectId === defect.id ? 'var(--success)' : 'var(--text-secondary)',
                       display: 'flex',
                       alignItems: 'center',
                       flexShrink: 0,
@@ -1117,11 +1106,7 @@ export default function DefectManager({
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = 'transparent'
                       e.currentTarget.style.color =
-                        copiedDefectId === defect.id
-                          ? isLight
-                            ? '#008c46'
-                            : '#00ff88'
-                          : 'var(--text-secondary)'
+                        copiedDefectId === defect.id ? 'var(--success)' : 'var(--text-secondary)'
                     }}
                   >
                     {copiedDefectId === defect.id ? <Check size={15} /> : <Copy size={15} />}
@@ -1191,7 +1176,7 @@ export default function DefectManager({
                             e.currentTarget.style.background = isLight
                               ? 'rgba(0,140,70,0.1)'
                               : 'rgba(0,255,136,0.1)'
-                            e.currentTarget.style.color = isLight ? '#008c46' : '#00ff88'
+                            e.currentTarget.style.color = 'var(--success)'
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = 'transparent'
@@ -1222,7 +1207,7 @@ export default function DefectManager({
                             e.currentTarget.style.background = isLight
                               ? 'rgba(255,152,0,0.1)'
                               : 'rgba(255,204,0,0.1)'
-                            e.currentTarget.style.color = isLight ? '#e68a00' : '#ffcc00'
+                            e.currentTarget.style.color = 'var(--warning)'
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = 'transparent'
@@ -1271,9 +1256,7 @@ export default function DefectManager({
                     style={{
                       padding: '0 16px 14px 52px',
                       borderTop: '1px solid var(--table-border)',
-                      background: isLight
-                        ? 'rgba(0, 119, 163, 0.03)'
-                        : 'rgba(var(--accent-primary-rgb), 0.03)'
+                      background: 'rgba(var(--accent-primary-rgb), 0.03)'
                     }}
                   >
                     <DefectAttachments
@@ -1359,7 +1342,7 @@ export default function DefectManager({
                             fontSize: '13px',
                             lineHeight: '1.5',
                             whiteSpace: 'pre-wrap',
-                            borderLeft: `3px solid ${isLight ? '#008c46' : '#00ff88'}`
+                            borderLeft: `3px solid var(--success)`
                           }}
                         >
                           {defect.closureNotes}
@@ -1388,7 +1371,7 @@ export default function DefectManager({
                             fontSize: '13px',
                             lineHeight: '1.5',
                             whiteSpace: 'pre-wrap',
-                            borderLeft: '3px solid #ffa726'
+                            borderLeft: '3px solid var(--warning)'
                           }}
                         >
                           {defect.reopenReason}
@@ -1419,79 +1402,38 @@ export default function DefectManager({
 
       {/* Reopen modal with optional reason */}
       {reopenModalDefect && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            style={{
-              background: isLight ? '#ffffff' : '#1a1d28',
-              borderRadius: '14px',
-              padding: '24px',
-              width: '420px',
-              border: '1px solid var(--glass-border-color)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>
-              Reopen Defect #{reopenModalDefect.defectNumber}
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-              This will clear the closure data and set the defect back to OPEN.
-            </p>
-            <label
-              style={{
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                display: 'block',
-                marginBottom: '6px',
-                color: 'var(--text-primary)'
-              }}
-            >
-              Reason (optional)
-            </label>
-            <textarea
-              value={reopenReason}
-              onChange={(e) => setReopenReason(e.target.value)}
-              placeholder="Why is this defect being reopened?"
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: '1px solid var(--input-border)',
-                background: 'var(--input-bg)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-                resize: 'vertical',
-                marginBottom: '16px'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                onClick={() => setReopenModalDefect(null)}
-                className="btn-secondary"
-                style={{ padding: '8px 16px' }}
-              >
+        <Modal
+          title={`Reopen Defect #${reopenModalDefect.defectNumber}`}
+          icon={<RotateCcw size={18} />}
+          onClose={() => setReopenModalDefect(null)}
+          width={420}
+          closeOnOverlay={false}
+          footer={
+            <>
+              <button onClick={() => setReopenModalDefect(null)} className="btn-secondary">
                 Cancel
               </button>
-              <button
-                onClick={handleConfirmReopen}
-                className="btn-primary"
-                style={{ padding: '8px 16px' }}
-              >
+              <button onClick={handleConfirmReopen} className="btn-primary">
                 Reopen
               </button>
-            </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+            This will clear the closure data and set the defect back to OPEN.
+          </p>
+          <div className="form-grid">
+            <Field label="Reason" hint="Optional" span="all">
+              <textarea
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+                placeholder="Why is this defect being reopened?"
+                rows={3}
+                style={{ resize: 'vertical' }}
+              />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* PDF note selection modal */}
@@ -1500,174 +1442,108 @@ export default function DefectManager({
           const defectsWithNotes = defects.filter((d) => d.notes || d.closureNotes)
           const allSelected = defectsWithNotes.every((d) => pdfNoteIds.has(d.id))
           return (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-              }}
-            >
-              <div
-                style={{
-                  background: isLight ? '#ffffff' : '#1a1d28',
-                  borderRadius: '16px',
-                  padding: '28px',
-                  width: '500px',
-                  maxWidth: '95vw',
-                  border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-                  maxHeight: '80vh',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '8px'
-                  }}
-                >
-                  <div>
-                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Export PDF</h3>
-                    <p
-                      style={{
-                        margin: '4px 0 0',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      Select which defect notes to include
-                    </p>
-                  </div>
-                  <button
-                    title="Close"
-                    aria-label="Close"
-                    onClick={() => setShowPdfModal(false)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                  <button
-                    onClick={() =>
-                      setPdfNoteIds(
-                        allSelected ? new Set() : new Set(defectsWithNotes.map((d) => d.id))
-                      )
-                    }
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--accent-primary)',
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      padding: '2px 0'
-                    }}
-                  >
-                    {allSelected ? 'Deselect all' : 'Select all'}
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    overflowY: 'auto',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    marginBottom: '20px'
-                  }}
-                >
-                  {defectsWithNotes.map((d) => (
-                    <label
-                      key={d.id}
-                      style={{
-                        display: 'flex',
-                        gap: '12px',
-                        alignItems: 'flex-start',
-                        cursor: 'pointer',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        background: pdfNoteIds.has(d.id)
-                          ? 'var(--bg-card-hover)'
-                          : 'var(--bg-card)',
-                        border: 'var(--glass-border)'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={pdfNoteIds.has(d.id)}
-                        onChange={() => togglePdfNoteId(d.id)}
-                        style={{ marginTop: '2px', flexShrink: 0 }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: '600',
-                            fontSize: '0.88rem',
-                            color: 'var(--text-primary)'
-                          }}
-                        >
-                          #{d.defectNumber} — {d.description.substring(0, 60)}
-                          {d.description.length > 60 ? '...' : ''}
-                        </div>
-                        {d.notes && (
-                          <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--text-secondary)',
-                              marginTop: '3px'
-                            }}
-                          >
-                            {d.notes.substring(0, 80)}
-                            {d.notes.length > 80 ? '...' : ''}
-                          </div>
-                        )}
-                        {d.closureNotes && (
-                          <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: '#2d8a4e',
-                              marginTop: '2px',
-                              fontStyle: 'italic'
-                            }}
-                          >
-                            Closure: {d.closureNotes.substring(0, 80)}
-                            {d.closureNotes.length > 80 ? '...' : ''}
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <Modal
+              title="Export PDF"
+              icon={<FileText size={18} />}
+              onClose={() => setShowPdfModal(false)}
+              width={500}
+              closeOnOverlay={false}
+              footer={
+                <>
                   <button onClick={() => setShowPdfModal(false)} className="btn-secondary">
                     Cancel
                   </button>
-                  <button
-                    onClick={handlePdfExport}
-                    className="btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
+                  <button onClick={handlePdfExport} className="btn-primary">
                     <FileText size={15} /> Export PDF
                   </button>
-                </div>
+                </>
+              }
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}
+              >
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Select which defect notes to include
+                </p>
+                <button
+                  onClick={() =>
+                    setPdfNoteIds(
+                      allSelected ? new Set() : new Set(defectsWithNotes.map((d) => d.id))
+                    )
+                  }
+                  className="btn-ghost btn-sm"
+                >
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
               </div>
-            </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {defectsWithNotes.map((d) => (
+                  <label
+                    key={d.id}
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'flex-start',
+                      cursor: 'pointer',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: pdfNoteIds.has(d.id) ? 'var(--row-selected)' : 'var(--bg-card)',
+                      border: 'var(--glass-border)'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pdfNoteIds.has(d.id)}
+                      onChange={() => togglePdfNoteId(d.id)}
+                      style={{ marginTop: '2px', flexShrink: 0 }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: '600',
+                          fontSize: '0.88rem',
+                          color: 'var(--text-primary)'
+                        }}
+                      >
+                        #{d.defectNumber} — {d.description.substring(0, 60)}
+                        {d.description.length > 60 ? '...' : ''}
+                      </div>
+                      {d.notes && (
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                            marginTop: '3px'
+                          }}
+                        >
+                          {d.notes.substring(0, 80)}
+                          {d.notes.length > 80 ? '...' : ''}
+                        </div>
+                      )}
+                      {d.closureNotes && (
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--success)',
+                            marginTop: '2px',
+                            fontStyle: 'italic'
+                          }}
+                        >
+                          Closure: {d.closureNotes.substring(0, 80)}
+                          {d.closureNotes.length > 80 ? '...' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </Modal>
           )
         })()}
 
@@ -2087,106 +1963,37 @@ function CloseDefectModal({
   onClose: () => void
   onConfirm: () => void
 }): React.JSX.Element {
-  const modalRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const modal = modalRef.current
-    if (!modal) return
-    const focusable = modal.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    first?.focus()
-
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        onClose()
-        return
-      }
-      if (e.key === 'Tab') {
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault()
-            last?.focus()
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault()
-            first?.focus()
-          }
-        }
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
   return (
-    <div
-      role="presentation"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 99999
-      }}
-    >
-      <div
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="close-defect-title"
-        style={{
-          padding: '30px',
-          width: '500px',
-          maxWidth: '90%',
-          background: 'var(--bg-primary)',
-          border: '1px solid var(--glass-border-color)',
-          borderRadius: '12px',
-          boxShadow: 'var(--shadow-lg)'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 id="close-defect-title" style={{ marginTop: 0, color: 'var(--text-primary)' }}>
-          Close Defect #{defect.defectNumber}
-        </h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>
-          Add optional closure notes:
-        </p>
-        <textarea
-          value={closureNotes}
-          onChange={(e) => onClosureNotesChange(e.target.value)}
-          placeholder="Closure notes (optional)"
-          rows={4}
-          style={{
-            width: '100%',
-            resize: 'vertical',
-            background: 'var(--input-bg)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--input-border)',
-            padding: '10px',
-            borderRadius: '6px'
-          }}
-          aria-label="Closure notes"
-        />
-        <div
-          style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}
-        >
+    <Modal
+      title={`Close Defect #${defect.defectNumber}`}
+      icon={<CheckCircle size={18} />}
+      onClose={onClose}
+      width={500}
+      closeOnOverlay={false}
+      footer={
+        <>
           <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
           <button onClick={onConfirm} className="btn-primary">
             Close Defect
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="form-grid">
+        <Field label="Closure notes" hint="Optional" span="all">
+          <textarea
+            autoFocus
+            value={closureNotes}
+            onChange={(e) => onClosureNotesChange(e.target.value)}
+            placeholder="Closure notes (optional)"
+            rows={4}
+            style={{ resize: 'vertical' }}
+            aria-label="Closure notes"
+          />
+        </Field>
       </div>
-    </div>
+    </Modal>
   )
 }
