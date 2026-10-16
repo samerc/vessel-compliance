@@ -13,7 +13,6 @@ import {
   Filter
 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
-import XLSX from 'xlsx-js-style'
 import { formatDateOrDash } from '../utils/dateUtils'
 import type { PolicyRenewalRow } from '../../../shared/types'
 
@@ -300,8 +299,9 @@ export default function RenewalPipelineReport(): React.JSX.Element {
   }
 
   // Excel export
-  const exportExcel = (): void => {
+  const exportExcel = async (): Promise<void> => {
     if (filtered.length === 0) return
+    const XLSX = (await import('xlsx-js-style')).default
     const rows = filtered.map((r) => ({
       Vessel: r.vesselName,
       IMO: r.imoNumber,

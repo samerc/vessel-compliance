@@ -14,7 +14,6 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDate } from '../utils/dateUtils'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
-import XLSX from 'xlsx-js-style'
 
 interface Props {
   onNavigateToVessel: (vesselId: string) => void
@@ -226,8 +225,9 @@ export default function ConditionSurveyList({ onNavigateToVessel }: Props): Reac
   const totalPages = Math.ceil(sorted.length / pageSize)
   const paginated = sorted.slice(page * pageSize, (page + 1) * pageSize)
 
-  const exportExcel = (): void => {
+  const exportExcel = async (): Promise<void> => {
     if (sorted.length === 0) return
+    const XLSX = (await import('xlsx-js-style')).default
     const data = sorted.map((s) => ({
       Vessel: vesselMap.get(s.vesselId)?.name || '',
       IMO: vesselMap.get(s.vesselId)?.imoNumber || '',

@@ -25,7 +25,6 @@ import { useToast } from '../contexts/ToastContext'
 import DefectManager from './DefectManager'
 import ConfirmationModal from './ConfirmationModal'
 import { Field, Modal } from './ui'
-import XLSX from 'xlsx-js-style'
 import { ok } from '../utils/ipc'
 import { formatDate } from '../utils/dateUtils'
 
@@ -421,6 +420,7 @@ export default function ConditionSurveyManager({
       Open: s.openDefects,
       Closed: s.closedDefects
     }))
+    const XLSX = (await import('xlsx-js-style')).default
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Survey History')

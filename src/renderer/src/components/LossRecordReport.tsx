@@ -1,7 +1,5 @@
 import { useState, useRef } from 'react'
-import XLSX from 'xlsx-js-style'
-import { jsPDF } from 'jspdf'
-import autoTable, { type RowInput, type Styles } from 'jspdf-autotable'
+import type { RowInput, Styles } from 'jspdf-autotable'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
@@ -61,7 +59,8 @@ function fmt(v: number): string {
 
 // ── Excel parser ──────────────────────────────────────────────────────────────
 
-function parseExcel(buffer: ArrayBuffer): LossUWY[] {
+async function parseExcel(buffer: ArrayBuffer): Promise<LossUWY[]> {
+  const XLSX = (await import('xlsx-js-style')).default
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
@@ -173,7 +172,13 @@ interface LossReportOpts {
   showClaimSubtotals: boolean
 }
 
-function exportToPDF(data: LossUWY[], s: ReportSettings, opts: LossReportOpts): void {
+async function exportToPDF(
+  data: LossUWY[],
+  s: ReportSettings,
+  opts: LossReportOpts
+): Promise<void> {
+  const { jsPDF } = await import('jspdf')
+  const autoTable = (await import('jspdf-autotable')).default
   const primary = s.primaryColor
   const vesselBg = tintColor(primary, 0.82)
   const vesselText: [number, number, number] = [
@@ -507,10 +512,10 @@ export default function LossRecordReport(): React.JSX.Element {
     setFileName(file.name)
 
     const reader = new FileReader()
-    reader.onload = (e): void => {
+    reader.onload = async (e): Promise<void> => {
       try {
         const buffer = e.target?.result as ArrayBuffer
-        const parsed = parseExcel(buffer)
+        const parsed = await parseExcel(buffer)
         if (parsed.length === 0) {
           setError('No data found in the file. Make sure the sheet matches the expected format.')
           setData(null)
@@ -543,7 +548,7 @@ export default function LossRecordReport(): React.JSX.Element {
     setExporting(true)
     try {
       const settings = await getReportSettings()
-      exportToPDF(data, settings, { currency, showReserves, showClaimSubtotals })
+      await exportToPDF(data, settings, { currency, showReserves, showClaimSubtotals })
     } finally {
       setExporting(false)
     }

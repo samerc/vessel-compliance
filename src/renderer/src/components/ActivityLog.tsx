@@ -12,9 +12,6 @@ import {
   FileText,
   Table
 } from 'lucide-react'
-import XLSX from 'xlsx-js-style'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { ActivityLogEntry, ActivityLogFilters } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -220,6 +217,8 @@ function ActivityLogView(): React.JSX.Element {
       }
 
       const settings = await getReportSettings()
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'landscape' })
       const pageW = doc.internal.pageSize.getWidth()
 
@@ -297,6 +296,7 @@ function ActivityLogView(): React.JSX.Element {
         Entity: e.entityName || '',
         Details: e.details || ''
       }))
+      const XLSX = (await import('xlsx-js-style')).default
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Activity Log')

@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import XLSX from 'xlsx-js-style'
 import { useTheme } from '../contexts/ThemeContext'
 import {
   Plus,
@@ -324,7 +323,8 @@ export default function WarBreachCalculator(): React.JSX.Element {
 
   // ── Excel export ──────────────────────────────────────────────────────────
 
-  function exportToExcel(): void {
+  async function exportToExcel(): Promise<void> {
+    const XLSX = (await import('xlsx-js-style')).default
     const wb = XLSX.utils.book_new()
 
     // Info rows
@@ -1229,7 +1229,8 @@ export default function WarBreachCalculator(): React.JSX.Element {
             return `${[vesselNames || 'Vessels', bdet || 'Breach', monthYear].join(' - ')}.${ext}`
           }
 
-          const modalExportToExcel = (): void => {
+          const modalExportToExcel = async (): Promise<void> => {
+            const XLSX = (await import('xlsx-js-style')).default
             const wb = XLSX.utils.book_new()
             const infoRows = [
               ['COVER NOTE', cvn, 'CURRENCY', curr, 'BASE DAYS', bd, 'BREACH DETAILS', bdet],

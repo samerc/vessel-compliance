@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import {
   Search,
   FileText,
@@ -459,7 +457,11 @@ async function exportPdf(opts: {
   checkedBy: string | null
   checkedAt: Date
 }): Promise<void> {
-  const s = await getReportSettings()
+  const [{ jsPDF }, { default: autoTable }, s] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+    getReportSettings()
+  ])
   const primary = s.primaryColor
   const doc = new jsPDF()
 

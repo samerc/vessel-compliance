@@ -15,8 +15,6 @@ import {
   Square
 } from 'lucide-react'
 import { Fleet, Vessel, VesselDocument, DocumentType } from '../../../shared/types'
-import JSZip from 'jszip'
-import { ReportService } from '../services/ReportService'
 import VesselDetail from './VesselDetail'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -168,6 +166,10 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.
   const handleExportIndividualPDFs = async (): Promise<void> => {
     const selectedVessels = activeVessels.filter((v) => zipSelectedIds.has(v.id))
     if (selectedVessels.length === 0) return
+    const [{ default: JSZip }, { ReportService }] = await Promise.all([
+      import('jszip'),
+      import('../services/ReportService')
+    ])
     setShowZipModal(false)
     setExportingIndividual(true)
     setExportProgress({ current: 0, total: selectedVessels.length })
@@ -585,16 +587,28 @@ export default function FleetDetail({ fleet, onBack }: FleetDetailProps): React.
               <button
                 className="btn-primary"
                 disabled={zipSelectedIds.size === 0}
-                onClick={() => {
+                onClick={async () => {
                   const selectedVessels = vessels.filter((v) => zipSelectedIds.has(v.id))
                   if (selectedVessels.length === 0) return
                   setShowZipModal(false)
                   if (exportMode === 'excel') {
                     const selectedDocs = allDocs.filter((d) => zipSelectedIds.has(d.vesselId))
-                    ReportService.exportFleetToExcel(fleet, selectedVessels, docTypes, selectedDocs)
+                    const { ReportService } = await import('../services/ReportService')
+                    await ReportService.exportFleetToExcel(
+                      fleet,
+                      selectedVessels,
+                      docTypes,
+                      selectedDocs
+                    )
                   } else if (exportMode === 'pdf') {
                     const selectedDocs = allDocs.filter((d) => zipSelectedIds.has(d.vesselId))
-                    ReportService.exportFleetToPDF(fleet, selectedVessels, docTypes, selectedDocs)
+                    const { ReportService } = await import('../services/ReportService')
+                    await ReportService.exportFleetToPDF(
+                      fleet,
+                      selectedVessels,
+                      docTypes,
+                      selectedDocs
+                    )
                   } else {
                     handleExportIndividualPDFs()
                   }

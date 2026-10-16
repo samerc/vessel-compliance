@@ -18,12 +18,6 @@ import { TEMPLATE_PLACEHOLDERS, TEMPLATE_CATEGORIES } from '../../../shared/type
 import RichTextEditor from './RichTextEditor'
 import { confirmDialog } from './DialogHost'
 import { PageHeader, Modal, Field, EmptyState } from './ui'
-import {
-  resolveTemplatePlaceholders,
-  htmlToPlainText,
-  buildTemplateContext,
-  generateTemplateDocx
-} from '../services/DocumentTemplateExportService'
 
 const CATEGORY_TABS = [
   { id: 'all', label: 'All' },
@@ -744,6 +738,12 @@ function GenerateModal({
   const handleAction = async (): Promise<void> => {
     try {
       setProcessing(true)
+      const {
+        resolveTemplatePlaceholders,
+        htmlToPlainText,
+        buildTemplateContext,
+        generateTemplateDocx
+      } = await import('../services/DocumentTemplateExportService')
       const ctx = await buildTemplateContext({
         vesselId: selectedVesselId || undefined,
         policyId: selectedPolicyId || undefined,

@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { jsPDF } from 'jspdf'
-import autoTable, { type RowInput } from 'jspdf-autotable'
-import XLSX from 'xlsx-js-style'
-import JSZip from 'jszip'
+import type { jsPDF } from 'jspdf'
+import type { RowInput } from 'jspdf-autotable'
 import {
   Download,
   FileText,
@@ -17,11 +15,9 @@ import {
 import { Badge, EmptyState, Field, Modal } from './ui'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings, tintColor } from '../services/ReportSettingsService'
-import { exportCustomerPortfolioPDF } from '../services/CustomerPortfolioService'
-import { ReportService } from '../services/ReportService'
 import { formatDate } from '../utils/dateUtils'
 import type { VesselDocument } from '../../../shared/types'
-import { buildVesselRow, type CustomerGroup } from '../services/CustomerComplianceExport'
+import { buildVesselRow, type CustomerGroup } from '../services/customerComplianceRows'
 
 type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
@@ -180,6 +176,8 @@ export default function CustomerComplianceReport(): React.JSX.Element {
       const s = await getReportSettings()
       const primary = s.primaryColor
       const vesselBg = tintColor(primary, 0.93)
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF()
 
       // Header band
@@ -325,7 +323,8 @@ export default function CustomerComplianceReport(): React.JSX.Element {
     }
   }
 
-  const exportToExcel = (): void => {
+  const exportToExcel = async (): Promise<void> => {
+    const XLSX = (await import('xlsx-js-style')).default
     const rows: Record<string, string | number>[] = []
     for (const group of groups) {
       rows.push({
@@ -370,6 +369,7 @@ export default function CustomerComplianceReport(): React.JSX.Element {
   ): Promise<void> => {
     setExportingPortfolio(custId)
     try {
+      const { exportCustomerPortfolioPDF } = await import('../services/CustomerPortfolioService')
       await exportCustomerPortfolioPDF(custId, custName, custType)
     } finally {
       setExportingPortfolio(null)
@@ -406,6 +406,8 @@ export default function CustomerComplianceReport(): React.JSX.Element {
     setExportingZip(true)
     setZipProgress({ current: 0, total: selected.length })
     try {
+      const JSZip = (await import('jszip')).default
+      const { ReportService } = await import('../services/ReportService')
       const zip = new JSZip()
       const vessels = await window.api.getVessels()
       const docTypesRaw = await window.api.getDocumentTypes()

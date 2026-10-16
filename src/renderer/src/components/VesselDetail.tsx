@@ -62,8 +62,6 @@ import { formatDate, formatDateTime } from '../utils/dateUtils'
 import { resolveEffectivePolicyExpiry } from '../utils/policyUtils'
 import 'flag-icons/css/flag-icons.min.css'
 
-import XLSX from 'xlsx-js-style'
-import { ReportService } from '../services/ReportService'
 import VesselDocumentsView from './VesselDocumentsView'
 import AssuredManager from './AssuredManager'
 import VesselSummaryTiles from './VesselSummaryTiles'
@@ -202,6 +200,7 @@ export default function VesselDetail({
           Notes: p.notes || ''
         })
       }
+      const XLSX = (await import('xlsx-js-style')).default
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.json_to_sheet(rows)
       ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }))
@@ -2128,9 +2127,10 @@ export default function VesselDetail({
                       }}
                     >
                       <button
-                        onClick={() => {
-                          ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)
+                        onClick={async () => {
                           setShowExportMenu(false)
+                          const { ReportService } = await import('../services/ReportService')
+                          await ReportService.exportVesselToExcel(vessel, docTypes, vesselDocs)
                         }}
                         style={{
                           width: '100%',
@@ -2151,9 +2151,10 @@ export default function VesselDetail({
                         <FileSpreadsheet size={16} /> Excel Report
                       </button>
                       <button
-                        onClick={() => {
-                          ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs)
+                        onClick={async () => {
                           setShowExportMenu(false)
+                          const { ReportService } = await import('../services/ReportService')
+                          await ReportService.exportVesselToPDF(vessel, docTypes, vesselDocs)
                         }}
                         style={{
                           width: '100%',

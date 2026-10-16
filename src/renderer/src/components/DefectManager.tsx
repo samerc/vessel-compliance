@@ -23,7 +23,6 @@ import {
   Copy,
   Check
 } from 'lucide-react'
-import XLSX from 'xlsx-js-style'
 import { SurveyDefect, ConditionSurvey, Vessel } from '../../../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -31,7 +30,6 @@ import { useTheme } from '../contexts/ThemeContext'
 import { formatDate } from '../utils/dateUtils'
 import ConfirmationModal from './ConfirmationModal'
 import { Field, Modal } from './ui'
-import { ReportService } from '../services/ReportService'
 
 interface DefectManagerProps {
   survey: ConditionSurvey
@@ -341,19 +339,21 @@ export default function DefectManager({
   const [showPdfModal, setShowPdfModal] = useState(false)
   const [pdfNoteIds, setPdfNoteIds] = useState<Set<string>>(new Set())
 
-  const exportToPDF = (): void => {
+  const exportToPDF = async (): Promise<void> => {
     const defectsWithNotes = defects.filter((d) => d.notes || d.closureNotes)
     if (defectsWithNotes.length === 0) {
-      ReportService.exportSurveyToPDF(vessel, survey, defects)
+      const { ReportService } = await import('../services/ReportService')
+      await ReportService.exportSurveyToPDF(vessel, survey, defects)
     } else {
       setPdfNoteIds(new Set(defectsWithNotes.map((d) => d.id)))
       setShowPdfModal(true)
     }
   }
 
-  const handlePdfExport = (): void => {
+  const handlePdfExport = async (): Promise<void> => {
     setShowPdfModal(false)
-    ReportService.exportSurveyToPDF(vessel, survey, defects, pdfNoteIds)
+    const { ReportService } = await import('../services/ReportService')
+    await ReportService.exportSurveyToPDF(vessel, survey, defects, pdfNoteIds)
   }
 
   const togglePdfNoteId = (id: string): void => {
@@ -364,7 +364,7 @@ export default function DefectManager({
     })
   }
 
-  const exportToExcel = (): void => {
+  const exportToExcel = async (): Promise<void> => {
     const rows = defects.map((d) => ({
       '#': d.defectNumber,
       Description: d.description,
@@ -376,6 +376,7 @@ export default function DefectManager({
       'Closed At': d.closedAt ? formatDate(d.closedAt) : '',
       Notes: d.notes || ''
     }))
+    const XLSX = (await import('xlsx-js-style')).default
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Defects')

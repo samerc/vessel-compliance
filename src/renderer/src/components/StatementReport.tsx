@@ -26,13 +26,11 @@ import {
 import {
   loadStatementSettings,
   saveStatementSettings,
-  exportStatementDocx,
-  exportStatementPdf,
   DEFAULT_STATEMENT_SETTINGS,
   STATEMENT_PLACEHOLDERS,
-  type StatementSettings,
-  type StatementExportInput
-} from '../services/StatementExportService'
+  type StatementSettings
+} from '../services/statementSettings'
+import type { StatementExportInput } from '../services/StatementExportService'
 
 // Statement of Account / invoice letter: upload the accounting Excel, pick a title, reference,
 // date and columns, export on the company letterhead (Word or PDF).
@@ -499,6 +497,8 @@ export default function StatementReport(): React.JSX.Element {
       fontSize: settings.fontSize || 9
     }
     try {
+      const { exportStatementDocx, exportStatementPdf } =
+        await import('../services/StatementExportService')
       if (kind === 'docx') await exportStatementDocx(input)
       else await exportStatementPdf(input)
     } catch (e) {

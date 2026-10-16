@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import { PageHeader, Badge, Field, Modal, Tabs } from './ui'
 import type { BadgeTone } from './ui'
-import XLSX from 'xlsx-js-style'
 import {
   SurveyWarranty,
   SurveyWarrantyReminder,
@@ -272,7 +271,8 @@ export default function SurveyFollowUp({
     }
   }
 
-  const exportExcel = (): void => {
+  const exportExcel = async (): Promise<void> => {
+    const XLSX = (await import('xlsx-js-style')).default
     const data = allFiltered.map((w) => ({
       Vessel: w.vesselName || '',
       Description: w.description || '',

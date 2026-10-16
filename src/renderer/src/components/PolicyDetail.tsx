@@ -33,21 +33,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateShort, formatDate } from '../utils/dateUtils'
-import {
-  exportPolicyDocx,
-  exportDebitAdviceDocx,
-  exportCreditAdviceDocx,
-  exportBlueCardDocx,
-  exportPolicyPdfWithTC,
-  exportPolicyBundleZip,
-  capturePolicyExportSnapshot,
-  loadDeclarationFields,
-  exportDeclarationDocx,
-  DeclarationFields,
-  BlueCardData
-} from '../services/PolicyExportService'
+import type { DeclarationFields, BlueCardData } from '../services/PolicyExportService'
 import { getReportSettings } from '../services/ReportSettingsService'
-import { exportPolicyToQuickBooks } from '../services/QuickBooksExportService'
 import ConfirmationModal from './ConfirmationModal'
 import EndorsementManager from './EndorsementManager'
 import { countDays, calcProRataPremium, distributeInstalments } from '../utils/premiumCalc'
@@ -1239,6 +1226,7 @@ export default function PolicyDetail({
   const handleExportSingleBC = async (card: BlueCard): Promise<void> => {
     try {
       const reportSettings = await getReportSettings()
+      const { exportBlueCardDocx } = await import('../services/PolicyExportService')
       await exportBlueCardDocx(
         buildBlueCardData(card, reportSettings.companyName || 'Insurance Company'),
         card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2',
@@ -1260,6 +1248,7 @@ export default function PolicyDetail({
         data: buildBlueCardData(card, reportSettings.companyName || 'Insurance Company'),
         cardType: card.cardType as 'BBC' | 'WRC' | 'MLC4.2' | 'MLC2.5.2'
       }))
+      const { exportPolicyBundleZip } = await import('../services/PolicyExportService')
       await exportPolicyBundleZip(policyId, {
         includeCA: commissionAmount != null && commissionAmount > 0,
         blueCards: bundleBlueCards
@@ -1373,6 +1362,7 @@ export default function PolicyDetail({
       } else {
         // Capture export snapshot so future exports are frozen
         try {
+          const { capturePolicyExportSnapshot } = await import('../services/PolicyExportService')
           await capturePolicyExportSnapshot(policyId)
         } catch (snapErr) {
           console.error('Failed to capture export snapshot:', snapErr)
@@ -1391,6 +1381,7 @@ export default function PolicyDetail({
   const handleExportPolicy = async (): Promise<void> => {
     setExportingPolicy(true)
     try {
+      const { exportPolicyDocx } = await import('../services/PolicyExportService')
       await exportPolicyDocx(policyId)
       showSuccess('Policy document exported')
       await loadData() // Reload to update exportedAt (hides Edit button)
@@ -1404,6 +1395,7 @@ export default function PolicyDetail({
   const handleExportPdfTC = async (): Promise<void> => {
     setExportingPdfTC(true)
     try {
+      const { exportPolicyPdfWithTC } = await import('../services/PolicyExportService')
       await exportPolicyPdfWithTC(policyId)
       showSuccess('Policy PDF with T&C exported')
       await loadData()
@@ -1417,6 +1409,7 @@ export default function PolicyDetail({
   const handleExportDA = async (): Promise<void> => {
     setExportingDA(true)
     try {
+      const { exportDebitAdviceDocx } = await import('../services/PolicyExportService')
       await exportDebitAdviceDocx(policyId)
       showSuccess('Debit advice exported')
     } catch (err) {
@@ -1429,6 +1422,7 @@ export default function PolicyDetail({
   const handleExportCA = async (): Promise<void> => {
     setExportingCA(true)
     try {
+      const { exportCreditAdviceDocx } = await import('../services/PolicyExportService')
       await exportCreditAdviceDocx(policyId)
       showSuccess('Credit advice exported')
     } catch (err) {
@@ -1441,6 +1435,7 @@ export default function PolicyDetail({
   const handleExportQuickBooks = async (): Promise<void> => {
     setExportingQB(true)
     try {
+      const { exportPolicyToQuickBooks } = await import('../services/QuickBooksExportService')
       await exportPolicyToQuickBooks(policyId)
       showSuccess('QuickBooks Excel exported')
     } catch (err) {
@@ -1810,6 +1805,8 @@ export default function PolicyDetail({
                             onClick={async () => {
                               setShowActionsMenu(false)
                               try {
+                                const { loadDeclarationFields } =
+                                  await import('../services/PolicyExportService')
                                 const fields = await loadDeclarationFields(policyId)
                                 setDeclarationFields(fields)
                                 setShowDeclarationModal(true)
@@ -4660,6 +4657,8 @@ export default function PolicyDetail({
                   <button
                     onClick={async () => {
                       try {
+                        const { exportDeclarationDocx } =
+                          await import('../services/PolicyExportService')
                         await exportDeclarationDocx(policyId, f)
                         showSuccess('Declaration exported')
                         setShowDeclarationModal(false)

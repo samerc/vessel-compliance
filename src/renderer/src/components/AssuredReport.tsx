@@ -4,10 +4,8 @@ import { EmptyState } from './ui'
 import { Vessel, Entity, VesselAssured, Fleet, AssuredRole } from '../../../shared/types'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import type { jsPDF } from 'jspdf'
 import type { CellHookData } from 'jspdf-autotable'
-import * as XLSX from 'xlsx-js-style'
 
 type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
@@ -182,8 +180,9 @@ export default function AssuredReport(): React.JSX.Element {
         ? 'Selected Vessels'
         : 'All Vessels'
 
-  const exportExcel = (): void => {
+  const exportExcel = async (): Promise<void> => {
     if (displayRows.length === 0) return
+    const XLSX = await import('xlsx-js-style')
     const data = displayRows.map((r) => ({
       Vessel: r.vesselName,
       IMO: r.vesselImo,
@@ -215,6 +214,8 @@ export default function AssuredReport(): React.JSX.Element {
     if (groupedByVessel.length === 0) return
     try {
       const s = await getReportSettings()
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'portrait' })
       const pw = doc.internal.pageSize.getWidth()
       const ph = doc.internal.pageSize.getHeight()

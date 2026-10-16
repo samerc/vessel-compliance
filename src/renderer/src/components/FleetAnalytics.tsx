@@ -20,9 +20,7 @@ import {
   BarChart2
 } from 'lucide-react'
 import { PageHeader, Badge, Modal } from './ui'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import XLSX from 'xlsx-js-style'
+import type { jsPDF } from 'jspdf'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -883,6 +881,8 @@ export default function FleetAnalytics(): React.JSX.Element {
       const navy: [number, number, number] = [10, 22, 40]
       const accent: [number, number, number] = settings.primaryColor ?? [0, 170, 200]
       const date = new Date().toLocaleDateString()
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const pw = doc.internal.pageSize.getWidth()
 
@@ -1159,9 +1159,10 @@ export default function FleetAnalytics(): React.JSX.Element {
     }
   }
 
-  const exportExcel = (sections: typeof exportSections): void => {
+  const exportExcel = async (sections: typeof exportSections): Promise<void> => {
     setExportModalOpen(false)
     try {
+      const XLSX = (await import('xlsx-js-style')).default
       const dateStr = new Date().toISOString().slice(0, 10)
       const wb = XLSX.utils.book_new()
 

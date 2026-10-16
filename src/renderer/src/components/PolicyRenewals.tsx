@@ -24,7 +24,6 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate, formatDateTime } from '../utils/dateUtils'
-import XLSX from 'xlsx-js-style'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { confirmDialog } from './DialogHost'
@@ -856,6 +855,7 @@ export default function PolicyRenewals({
       'Quotation Sent': r.quotationSentDate || '',
       Notes: notesByKey.get(`${r.id}::${r.policyNumber || ''}`) || ''
     }))
+    const XLSX = (await import('xlsx-js-style')).default
     const ws = XLSX.utils.json_to_sheet(rows)
     // Set wider column width for Notes
     const colWidths = Object.keys(rows[0] || {}).map((k, i) => ({

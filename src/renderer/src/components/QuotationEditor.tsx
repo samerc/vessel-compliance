@@ -45,7 +45,6 @@ import {
   Search,
   History
 } from 'lucide-react'
-import { exportQuotationToWord } from '../services/QuotationExportService'
 import { DEFAULT_SECTION_TEXTS } from './quotationSettingsConstants'
 import InsuredTab from './quotation-tabs/InsuredTab'
 import VesselTab from './quotation-tabs/VesselTab'
@@ -665,6 +664,7 @@ export default function QuotationEditor({
     _format: 'pdf' | 'word',
     successMsg: string
   ): Promise<void> => {
+    const { exportQuotationToWord } = await import('../services/QuotationExportService')
     await exportQuotationToWord(quotation)
     // Mark as exported if approved
     if (

@@ -55,7 +55,6 @@ import { useAuth } from '../contexts/AuthContext'
 import SanctionsModal from './SanctionsModal'
 import VesselDetail from './VesselDetail'
 import ConfirmationModal from './ConfirmationModal'
-import { exportCustomerCompliancePDF } from '../services/CustomerComplianceExport'
 import ColumnSelector from './ColumnSelector'
 import { useColumnPrefs, type ColumnDef } from '../utils/useColumnPrefs'
 import { SanctionsBadge, EmptyState, Modal, Field } from './ui'
@@ -1743,6 +1742,8 @@ export default function EntityDirectory({
                     onClick={async () => {
                       setExportingCompliance(true)
                       try {
+                        const { exportCustomerCompliancePDF } =
+                          await import('../services/CustomerComplianceExport')
                         await exportCustomerCompliancePDF(
                           selectedEntity.id,
                           selectedEntity.name,

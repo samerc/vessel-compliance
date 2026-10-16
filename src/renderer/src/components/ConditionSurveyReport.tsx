@@ -4,10 +4,8 @@ import { SurveyWarranty } from '../../../shared/types'
 import { Badge, EmptyState, type BadgeTone } from './ui'
 import { useToast } from '../contexts/ToastContext'
 import { getReportSettings } from '../services/ReportSettingsService'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import type { jsPDF } from 'jspdf'
 import type { CellHookData } from 'jspdf-autotable'
-import * as XLSX from 'xlsx-js-style'
 
 type DocWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } }
 
@@ -191,8 +189,9 @@ export default function ConditionSurveyReport(): React.JSX.Element {
   const dueCell = (row: ReportRow): string =>
     row.dueDate ? fmtDate(row.dueDate) : row.deadlineText || 'No due date'
 
-  const exportExcel = (): void => {
+  const exportExcel = async (): Promise<void> => {
     if (displayRows.length === 0) return
+    const XLSX = await import('xlsx-js-style')
     const data: Record<string, unknown>[] = []
     for (const g of groups) {
       for (const r of g.rows) {
@@ -231,6 +230,8 @@ export default function ConditionSurveyReport(): React.JSX.Element {
     if (groups.length === 0) return
     try {
       const s = await getReportSettings()
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'landscape' })
       const pw = doc.internal.pageSize.getWidth()
       const ph = doc.internal.pageSize.getHeight()

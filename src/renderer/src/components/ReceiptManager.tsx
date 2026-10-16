@@ -4,7 +4,7 @@ import { isIpcError } from '../utils/ipc'
 import { useToast } from '../contexts/ToastContext'
 import { confirmDialog } from './DialogHost'
 import { PageHeader, EmptyState, Modal, Field } from './ui'
-import { exportReceiptDocx, ordinal, formatReceiptAmount } from '../services/ReceiptExportService'
+import { ordinal, formatReceiptAmount } from '../services/receiptFormat'
 import { numberToWords } from '../utils/numberToWords'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -129,6 +129,7 @@ export default function ReceiptManager({
   const handleExport = async (r: Receipt): Promise<void> => {
     try {
       const full = await window.api.receiptGet(r.id)
+      const { exportReceiptDocx } = await import('../services/ReceiptExportService')
       await exportReceiptDocx(full || r)
     } catch (e) {
       showError((e instanceof Error && e.message) || 'Failed to export receipt')
